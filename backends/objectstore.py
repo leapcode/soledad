@@ -17,7 +17,7 @@ class ObjectStore(InMemoryDatabase):
         # sync data in memory with data in object store
         if not self._get_doc(self.U1DB_DATA_DOC_ID):
             self._init_u1db_data()
-        self._get_u1db_data()
+        self._fetch_u1db_data()
 
     #-------------------------------------------------------------------------
     # methods from Database
@@ -25,7 +25,7 @@ class ObjectStore(InMemoryDatabase):
 
     def _set_replica_uid(self, replica_uid):
         super(ObjectStore, self)._set_replica_uid(replica_uid)
-        self._set_u1db_data()
+        self._store_u1db_data()
 
     def _put_doc(self, doc):
         raise NotImplementedError(self._put_doc)
@@ -59,11 +59,11 @@ class ObjectStore(InMemoryDatabase):
 
     def delete_index(self, index_name):
         super(ObjectStore, self).delete_index(index_name)
-        self._set_u1db_data()
+        self._store_u1db_data()
 
     def _replace_conflicts(self, doc, conflicts):
         super(ObjectStore, self)._replace_conflicts(doc, conflicts)
-        self._set_u1db_data()
+        self._store_u1db_data()
 
     def _do_set_replica_gen_and_trans_id(self, other_replica_uid,
                                          other_generation,
@@ -72,7 +72,7 @@ class ObjectStore(InMemoryDatabase):
             other_replica_uid,
             other_generation,
             other_transaction_id)
-        self._set_u1db_data()
+        self._store_u1db_data()
 
     #-------------------------------------------------------------------------
     # implemented methods from CommonBackend
@@ -87,7 +87,7 @@ class ObjectStore(InMemoryDatabase):
         trans_id = self._allocate_transaction_id()
         self._put_doc(doc)
         self._transaction_log.append((doc.doc_id, trans_id))
-        self._set_u1db_data()
+        self._store_u1db_data()
 
     #-------------------------------------------------------------------------
     # methods specific for object stores
@@ -95,17 +95,17 @@ class ObjectStore(InMemoryDatabase):
 
     U1DB_DATA_DOC_ID = 'u1db_data'
 
-    def _get_u1db_data(self):
+    def _fetch_u1db_data(self):
         """
         Fetch u1db configuration data from backend storage.
         """
-        NotImplementedError(self._get_u1db_data)
+        NotImplementedError(self._fetch_u1db_data)
 
-    def _set_u1db_data(self):
+    def _store_u1db_data(self):
         """
         Save u1db configuration data on backend storage.
         """
-        NotImplementedError(self._set_u1db_data)
+        NotImplementedError(self._store_u1db_data)
 
     def _init_u1db_data(self):
         """

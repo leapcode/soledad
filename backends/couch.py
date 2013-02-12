@@ -139,7 +139,7 @@ class CouchDatabase(ObjectStore):
                 index.add_json(doc_id, doc.get_json())
         self._indexes[index_name] = index
         # save data in object store
-        self._set_u1db_data()
+        self._store_u1db_data()
 
     def close(self):
         # TODO: fix this method so the connection is properly closed and
@@ -171,7 +171,7 @@ class CouchDatabase(ObjectStore):
                        'replica_uid': self._replica_uid}
         self._put_doc(doc)
 
-    def _get_u1db_data(self):
+    def _fetch_u1db_data(self):
         # retrieve u1db data from couch db
         cdoc = self._database.get(self.U1DB_DATA_DOC_ID)
         jsonstr = self._database.get_attachment(cdoc, 'u1db_json').getvalue()
@@ -187,7 +187,7 @@ class CouchDatabase(ObjectStore):
         # save couch _rev
         self._couch_rev = cdoc['_rev']
 
-    def _set_u1db_data(self):
+    def _store_u1db_data(self):
         doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
         doc.content = {
             'transaction_log': self._transaction_log,
