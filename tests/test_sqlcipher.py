@@ -126,7 +126,7 @@ load_tests = tests.load_with_scenarios
 #-----------------------------------------------------------------------------
 
 class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
-    
+
     def test_atomic_initialize(self):
         tmpdir = self.createTempDir()
         dbname = os.path.join(tmpdir, 'atomic.db')
@@ -139,7 +139,8 @@ class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
             def __init__(self, dbname, ntry):
                 self._try = ntry
                 self._is_initialized_invocations = 0
-                super(SQLCipherDatabaseTesting, self).__init__(dbname, PASSWORD)
+                super(SQLCipherDatabaseTesting, self).__init__(dbname,
+                                                               PASSWORD)
 
             def _is_initialized(self, c):
                 res = super(SQLCipherDatabaseTesting, self)._is_initialized(c)
@@ -239,7 +240,7 @@ class TestSQLCipherPartialExpandDatabase(
             document_factory=TestAlternativeDocument)
         doc = db2.create_doc({})
         self.assertTrue(isinstance(doc, LeapDocument))
-        
+
     def test__open_database_non_existent(self):
         temp_dir = self.createTempDir(prefix='u1db-test-')
         path = temp_dir + '/non-existent.sqlite'
@@ -291,7 +292,6 @@ class TestSQLCipherPartialExpandDatabase(
         self.assertRaises(dbapi2.DatabaseError,
                           SQLiteDatabaseTesting._open_database, path1,
                           PASSWORD)
-
 
     def test_open_database_existing(self):
         temp_dir = self.createTempDir(prefix='u1db-test-')
