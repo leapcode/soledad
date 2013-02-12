@@ -4,7 +4,9 @@ For these tests to run, a couch server has to be running on (default) port
 5984.
 """
 
+import re
 import copy
+from base64 import b64decode
 from leap.soledad.backends import couch
 from leap.soledad.tests import u1db_tests as tests
 from leap.soledad.tests.u1db_tests import test_backends
@@ -293,6 +295,101 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         db = self.create_database('test3', 'target')
         db.delete_database()
         super(CouchDatabaseSyncTests, self).tearDown()
+
+
+#-----------------------------------------------------------------------------
+# The following tests test extra functionality introduced by our backends
+#-----------------------------------------------------------------------------
+
+class CouchDatabaseStorageTests(CouchDBTestCase):
+
+    def _listify(self, l):
+        if type(l) is dict:
+            return {
+                self._listify(a): self._listify(b) for a, b in l.iteritems()}
+        if hasattr(l, '__iter__'):
+            return [self._listify(i) for i in l]
+        return l
+
+    def _fetch_u1db_data(self, db):
+        cdoc = db._database.get(db.U1DB_DATA_DOC_ID)
+        jsonstr = db._database.get_attachment(cdoc, 'u1db_json').getvalue()
+        return json.loads(jsonstr)
+
+    def test_transaction_log_storage_after_put(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        db.create_doc({'simple': 'doc'})
+        content = self._fetch_u1db_data(db)
+        self.assertEqual(
+            self._listify(db._transaction_log),
+            self._listify(content['transaction_log']))
+
+    def test_conflict_log_storage_after_put_if_newer(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        doc = db.create_doc({'simple': 'doc'})
+        doc.set_json(nested_doc)
+        doc.rev = db._replica_uid + ':2'
+        db._force_doc_sync_conflict(doc)
+        content = self._fetch_u1db_data(db)
+        self.assertEqual(
+            self._listify(db._conflicts),
+            self._listify(json.loads(b64decode(content['conflicts']))))
+
+    def test_other_gens_storage_after_set(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        doc = db.create_doc({'simple': 'doc'})
+        db._set_replica_gen_and_trans_id('a', 'b', 'c')
+        content = self._fetch_u1db_data(db)
+        self.assertEqual(
+            self._listify(db._other_generations),
+            self._listify(content['other_generations']))
+
+    def test_index_storage_after_create(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        doc = db.create_doc({'name': 'john'})
+        db.create_index('myindex', 'name')
+        content = self._fetch_u1db_data(db)
+        myind = db._indexes['myindex']
+        index = {
+            'myindex': {
+                'definition': myind._definition,
+                'name': myind._name,
+                'values': myind._values,
+            }
+        }
+        self.assertEqual(self._listify(index),
+                         self._listify(
+                             json.loads(b64decode(content['indexes']))))
+
+    def test_index_storage_after_delete(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        doc = db.create_doc({'name': 'john'})
+        db.create_index('myindex', 'name')
+        db.create_index('myindex2', 'name')
+        db.delete_index('myindex')
+        content = self._fetch_u1db_data(db)
+        myind = db._indexes['myindex2']
+        index = {
+            'myindex2': {
+                'definition': myind._definition,
+                'name': myind._name,
+                'values': myind._values,
+            }
+        }
+        self.assertEqual(self._listify(index),
+                         self._listify(
+                             json.loads(b64decode(content['indexes']))))
+
+    def test_replica_uid_storage_after_db_creation(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        content = self._fetch_u1db_data(db)
+        self.assertEqual(db._replica_uid, content['replica_uid'])
 
 
 load_tests = tests.load_with_scenarios
