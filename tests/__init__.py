@@ -1,3 +1,7 @@
+"""
+Tests to make sure Soledad provides U1DB functionality and more.
+"""
+
 import u1db
 from leap.soledad import Soledad
 from leap.soledad.backends.leap_backend import LeapDocument
@@ -10,6 +14,9 @@ from leap.testing.basetest import BaseLeapTest
 #-----------------------------------------------------------------------------
 
 class BaseSoledadTest(BaseLeapTest):
+    """
+    Instantiates GPG and Soledad for usage in tests.
+    """
 
     def setUp(self):
         # config info
@@ -27,7 +34,8 @@ class BaseSoledadTest(BaseLeapTest):
                                 initialize=False)
         self._soledad._gpg.import_keys(PUBLIC_KEY)
         self._soledad._gpg.import_keys(PRIVATE_KEY)
-        self._soledad._initialize()
+        self._soledad._init_crypto()
+        self._soledad._init_db()
 
     def tearDown(self):
         self._db1.close()

@@ -450,20 +450,26 @@ class SQLCipherSyncTargetTests(test_sync.DatabaseSyncTargetTests):
 #-----------------------------------------------------------------------------
 
 class SQLCipherEncryptionTest(BaseLeapTest):
+    """
+    Tests to guarantee SQLCipher is indeed encrypting data when storing.
+    """
 
-    def delete_dbfiles(self):
+    def _delete_dbfiles(self):
         for dbfile in [self.DB_FILE]:
             if os.path.exists(dbfile):
                 os.unlink(dbfile)
 
     def setUp(self):
         self.DB_FILE = self.tempdir + '/test.db'
-        self.delete_dbfiles()
+        self._delete_dbfiles()
 
     def tearDown(self):
-        self.delete_dbfiles()
+        self._delete_dbfiles()
 
     def test_try_to_open_encrypted_db_with_sqlite_backend(self):
+        """
+        SQLite backend should not succeed to open SQLCipher databases.
+        """
         db = SQLCipherDatabase(self.DB_FILE, PASSWORD)
         doc = db.create_doc_from_json(tests.simple_doc)
         db.close()
@@ -483,6 +489,9 @@ class SQLCipherEncryptionTest(BaseLeapTest):
                              'decrypted content mismatch')
 
     def test_try_to_open_raw_db_with_sqlcipher_backend(self):
+        """
+        SQLCipher backend should not succeed to open unencrypted databases.
+        """
         db = SQLitePartialExpandDatabase(self.DB_FILE,
                                          document_factory=LeapDocument)
         db.create_doc_from_json(tests.simple_doc)

@@ -38,6 +38,9 @@ class CouchDBWrapper(object):
     """
 
     def start(self):
+        """
+        Start a CouchDB instance for a test.
+        """
         self.tempdir = tempfile.mkdtemp(suffix='.couch.test')
 
         path = os.path.join(os.path.dirname(__file__),
@@ -89,6 +92,9 @@ stderr:
         self.port = int(m.group('port'))
 
     def stop(self):
+        """
+        Terminate the CouchDB instance.
+        """
         self.process.terminate()
         self.process.communicate()
         os.system("rm -rf %s" % self.tempdir)
@@ -100,12 +106,18 @@ class CouchDBTestCase(unittest.TestCase):
     """
 
     def setUp(self):
+        """
+        Make sure we have a CouchDB instance for a test.
+        """
         self.wrapper = CouchDBWrapper()
         self.wrapper.start()
         #self.db = self.wrapper.db
         super(CouchDBTestCase, self).setUp()
 
     def tearDown(self):
+        """
+        Stop CouchDB instance for test.
+        """
         self.wrapper.stop()
         super(CouchDBTestCase, self).tearDown()
 
@@ -148,7 +160,7 @@ def copy_couch_database_for_test(test, db):
     new_db._conflicts = copy.deepcopy(db._conflicts)
     new_db._other_generations = copy.deepcopy(db._other_generations)
     new_db._indexes = copy.deepcopy(db._indexes)
-    new_db._set_u1db_data()
+    new_db._store_u1db_data()
     return new_db
 
 
