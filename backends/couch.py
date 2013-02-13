@@ -1,3 +1,5 @@
+"""A U1DB backend that uses CouchDB as its persistence layer."""
+
 # general imports
 import uuid
 from base64 import b64encode, b64decode
@@ -22,14 +24,16 @@ except ImportError:
 
 
 class InvalidURLError(Exception):
+    """Exception raised when Soledad encounters a malformed URL."""
     pass
 
 
 class CouchDatabase(ObjectStore):
-    """A U1DB implementation that uses Couch as its persistence layer."""
+    """A U1DB backend that uses Couch as its persistence layer."""
 
     @classmethod
     def open_database(cls, url, create):
+        """Open a U1DB database using CouchDB as backend."""
         # get database from url
         m = re.match('(^https?://[^/]+)/(.+)$', url)
         if not m:
@@ -69,9 +73,7 @@ class CouchDatabase(ObjectStore):
     #-------------------------------------------------------------------------
 
     def _get_doc(self, doc_id, check_for_conflicts=False):
-        """
-        Get just the document content, without fancy handling.
-        """
+        """Get just the document content, without fancy handling."""
         cdoc = self._database.get(doc_id)
         if cdoc is None:
             return None
@@ -90,7 +92,7 @@ class CouchDatabase(ObjectStore):
         return doc
 
     def get_all_docs(self, include_deleted=False):
-        """Get all documents from the database."""
+        """Get the JSON content for all documents in the database."""
         generation = self._get_generation()
         results = []
         for doc_id in self._database:
@@ -103,6 +105,7 @@ class CouchDatabase(ObjectStore):
         return (generation, results)
 
     def _put_doc(self, doc):
+        """Store document in database."""
         # prepare couch's Document
         cdoc = CouchDocument()
         cdoc['_id'] = doc.doc_id
@@ -122,9 +125,15 @@ class CouchDatabase(ObjectStore):
             self._database.delete_attachment(cdoc, 'u1db_json')
 
     def get_sync_target(self):
+        """
+        Return a SyncTarget object, for another u1db to synchronize with.
+        """
         return CouchSyncTarget(self)
 
     def create_index(self, index_name, *index_expressions):
+        """
+        Create a named index, which can then be queried for future lookups.
+        """
         if index_name in self._indexes:
             if self._indexes[index_name]._definition == list(
                     index_expressions):
@@ -142,6 +151,7 @@ class CouchDatabase(ObjectStore):
         self._store_u1db_data()
 
     def close(self):
+        """Release any resources associated with this database."""
         # TODO: fix this method so the connection is properly closed and
         # test_close (+tearDown, which deletes the db) works without problems.
         self._url = None
@@ -152,6 +162,7 @@ class CouchDatabase(ObjectStore):
         return True
 
     def sync(self, url, creds=None, autocreate=True):
+        """Synchronize documents with remote replica exposed at url."""
         from u1db.sync import Synchronizer
         return Synchronizer(self, CouchSyncTarget(url, creds=creds)).sync(
             autocreate=autocreate)
@@ -206,6 +217,7 @@ class CouchDatabase(ObjectStore):
     #-------------------------------------------------------------------------
 
     def delete_database(self):
+        """Delete a U1DB CouchDB database."""
         del(self._server[self._dbname])
 
     def _dump_indexes_as_json(self):
@@ -228,6 +240,7 @@ class CouchDatabase(ObjectStore):
 class CouchSyncTarget(LocalSyncTarget):
 
     def get_sync_info(self, source_replica_uid):
+        """Return information about known state."""
         source_gen, source_trans_id = self._db._get_replica_gen_and_trans_id(
             source_replica_uid)
         my_gen, my_trans_id = self._db._get_generation_info()
@@ -237,6 +250,7 @@ class CouchSyncTarget(LocalSyncTarget):
 
     def record_sync_info(self, source_replica_uid, source_replica_generation,
                          source_replica_transaction_id):
+        """Record tip information for another replica."""
         if self._trace_hook:
             self._trace_hook('record_sync_info')
         self._db._set_replica_gen_and_trans_id(
@@ -245,25 +259,26 @@ class CouchSyncTarget(LocalSyncTarget):
 
 
 class CouchServerState(ServerState):
-    """
-    Inteface of the WSGI server with the CouchDB backend.
-    """
+    """Inteface of the WSGI server with the CouchDB backend."""
 
     def __init__(self, couch_url):
         self.couch_url = couch_url
 
     def open_database(self, dbname):
+        """Open a database at the given location."""
         # TODO: open couch
         from leap.soledad.backends.couch import CouchDatabase
         return CouchDatabase.open_database(self.couch_url + '/' + dbname,
                                            create=False)
 
     def ensure_database(self, dbname):
+        """Ensure database at the given location."""
         from leap.soledad.backends.couch import CouchDatabase
         db = CouchDatabase.open_database(self.couch_url + '/' + dbname,
                                          create=True)
         return db, db._replica_uid
 
     def delete_database(self, dbname):
+        """Delete database at the given location."""
         from leap.soledad.backends.couch import CouchDatabase
         CouchDatabase.delete_database(self.couch_url + '/' + dbname)

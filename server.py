@@ -1,5 +1,5 @@
 """
-An u1db server that stores data using couchdb.
+A U1DB server that stores data using couchdb.
 
 This should be run with:
     twistd -n web --wsgi=leap.soledad.server.application
@@ -10,6 +10,7 @@ from twisted.internet import reactor
 from u1db.remote import http_app
 from leap.soledad.backends.couch import CouchServerState
 
+# TODO: change couch url accordingly
 couch_url = 'http://localhost:5984'
 state = CouchServerState(couch_url)
 # TODO: change working dir to something meaningful

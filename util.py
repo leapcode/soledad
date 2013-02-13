@@ -1,3 +1,7 @@
+"""
+Utilities for Soledad.
+"""
+
 import os
 import gnupg
 import re
@@ -28,6 +32,9 @@ class GPGWrapper(gnupg.GPG):
 
     def encrypt(self, data, recipient, sign=None, always_trust=True,
                 passphrase=None, symmetric=False):
+        """
+        Encrypt data using GPG.
+        """
         # TODO: devise a way so we don't need to "always trust".
         return super(GPGWrapper, self).encrypt(data, recipient, sign=sign,
                                                always_trust=always_trust,
@@ -35,6 +42,9 @@ class GPGWrapper(gnupg.GPG):
                                                symmetric=symmetric)
 
     def decrypt(self, data, always_trust=True, passphrase=None):
+        """
+        Decrypt data using GPG.
+        """
         # TODO: devise a way so we don't need to "always trust".
         return super(GPGWrapper, self).decrypt(data,
                                                always_trust=always_trust,

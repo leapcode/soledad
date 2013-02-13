@@ -1,6 +1,12 @@
-# License?
+"""
+Soledad - Synchronization Of Locally Encrypted Data Among Devices.
 
-"""A U1DB implementation for using Object Stores as its persistence layer."""
+Soledad is the part of LEAP that manages storage and synchronization of
+application data. It is built on top of U1DB reference Python API and
+implements (1) a SQLCipher backend for local storage in the client, (2) a
+SyncTarget that encrypts data to the user's private OpenPGP key before
+syncing, and (3) a CouchDB backend for remote storage in the server side.
+"""
 
 import os
 import string
@@ -11,6 +17,13 @@ from leap.soledad.util import GPGWrapper
 
 
 class Soledad(object):
+    """
+    Soledad client class. It is used to store and fetch data locally in an
+    encrypted manner and request synchronization with Soledad server. This
+    class is also responsible for bootstrapping users' account by creating
+    OpenPGP keys and other cryptographic secrets and/or storing/fetching them
+    on Soledad server.
+    """
 
     # paths
     PREFIX = os.environ['HOME'] + '/.config/leap/soledad'
@@ -23,6 +36,10 @@ class Soledad(object):
 
     def __init__(self, user_email, gpghome=None, initialize=True,
                  prefix=None, secret_path=None, local_db_path=None):
+        """
+        Bootstrap Soledad, initialize cryptographic material and open
+        underlying U1DB database.
+        """
         self._user_email = user_email
         self.PREFIX = prefix or self.PREFIX
         self.SECRET_PATH = secret_path or self.SECRET_PATH
@@ -31,9 +48,13 @@ class Soledad(object):
             os.makedirs(self.PREFIX)
         self._gpg = GPGWrapper(gpghome=(gpghome or self.GNUPG_HOME))
         if initialize:
-            self._initialize()
+            self._init_crypto()
+            self._init_db()
 
-    def _initialize(self):
+    def _init_crypto(self):
+        """
+        Load/generate OpenPGP keypair and secret for symmetric encryption.
+        """
         # load/generate OpenPGP keypair
         if not self._has_openpgp_keypair():
             self._gen_openpgp_keypair()
@@ -42,13 +63,19 @@ class Soledad(object):
         if not self._has_secret():
             self._gen_secret()
         self._load_secret()
+
+    def _init_db(self):
         # instantiate u1db
-        # TODO: verify if secret for sqlcipher should be the same as the one
-        # for symmetric encryption.
+        # TODO: verify if secret for sqlcipher should be the same as the
+        # one for symmetric encryption.
         self._db = sqlcipher.open(self.LOCAL_DB_PATH, True, self._secret,
                                   soledad=self)
+        
 
     def close(self):
+        """
+        Close underlying U1DB database.
+        """
         self._db.close()
 
     #-------------------------------------------------------------------------

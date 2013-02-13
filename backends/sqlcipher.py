@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""A U1DB implementation that uses SQLCipher as its persistence layer."""
+"""A U1DB backend that uses SQLCipher as its persistence layer."""
 
 import os
 from pysqlcipher import dbapi2
@@ -125,6 +125,7 @@ class SQLCipherDatabase(SQLitePartialExpandDatabase):
     @classmethod
     def open_database(cls, sqlite_file, password, create, backend_cls=None,
                       document_factory=None, soledad=None):
+        """Open U1DB database using SQLCipher as backend."""
         try:
             return cls._open_database(sqlite_file, password,
                                       document_factory=document_factory,

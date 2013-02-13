@@ -1,3 +1,7 @@
+"""
+Backends that extend U1DB functionality.
+"""
+
 import objectstore
 
 

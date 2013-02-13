@@ -1,3 +1,11 @@
+"""
+Abstract U1DB backend to handle storage using object stores (like CouchDB, for
+example.
+
+Right now, this is only used by CouchDatabase backend, but can also be
+extended to implement OpenStack or Amazon S3 storage, for example.
+"""
+
 from u1db.backends.inmemory import InMemoryDatabase
 from u1db import errors
 
@@ -37,6 +45,7 @@ class ObjectStore(InMemoryDatabase):
         raise NotImplementedError(self.get_all_docs)
 
     def delete_doc(self, doc):
+        """Mark a document as deleted."""        
         old_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if old_doc is None:
             raise errors.DocumentDoesNotExist
@@ -55,9 +64,13 @@ class ObjectStore(InMemoryDatabase):
     # index-related methods
 
     def create_index(self, index_name, *index_expressions):
+        """
+        Create an named index, which can then be queried for future lookups.
+        """
         raise NotImplementedError(self.create_index)
 
     def delete_index(self, index_name):
+        """Remove a named index."""
         super(ObjectStore, self).delete_index(index_name)
         self._store_u1db_data()
 

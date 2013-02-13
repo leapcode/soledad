@@ -1,3 +1,8 @@
+"""
+A U1DB backend that encrypts data before sending to server and decrypts after
+receiving.
+"""
+
 try:
     import simplejson as json
 except ImportError:
@@ -13,14 +18,23 @@ import uuid
 
 
 class NoDefaultKey(Exception):
+    """
+    Exception to signal that there's no default OpenPGP key configured.
+    """
     pass
 
 
 class NoSoledadInstance(Exception):
+    """
+    Exception to signal that no Soledad instance was found.
+    """
     pass
 
 
 class DocumentEncryptionFailed(Exception):
+    """
+    Exception to signal the failure of document encryption.
+    """
     pass
 
 
