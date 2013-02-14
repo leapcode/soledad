@@ -70,7 +70,6 @@ class Soledad(object):
         # one for symmetric encryption.
         self._db = sqlcipher.open(self.LOCAL_DB_PATH, True, self._secret,
                                   soledad=self)
-        
 
     def close(self):
         """
