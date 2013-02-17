@@ -6,11 +6,14 @@ Right now, this is only used by CouchDatabase backend, but can also be
 extended to implement OpenStack or Amazon S3 storage, for example.
 """
 
-from u1db.backends.inmemory import InMemoryDatabase
+from u1db.backends.inmemory import (
+    InMemoryDatabase,
+    InMemorySyncTarget,
+)
 from u1db import errors
 
 
-class ObjectStore(InMemoryDatabase):
+class ObjectStoreDatabase(InMemoryDatabase):
     """
     A backend for storing u1db data in an object store.
     """
@@ -20,8 +23,9 @@ class ObjectStore(InMemoryDatabase):
         raise NotImplementedError(cls.open_database)
 
     def __init__(self, replica_uid=None, document_factory=None):
-        super(ObjectStore, self).__init__(replica_uid,
-                                          document_factory=document_factory)
+        super(ObjectStoreDatabase, self).__init__(
+            replica_uid,
+            document_factory=document_factory)
         # sync data in memory with data in object store
         if not self._get_doc(self.U1DB_DATA_DOC_ID):
             self._init_u1db_data()
@@ -32,7 +36,7 @@ class ObjectStore(InMemoryDatabase):
     #-------------------------------------------------------------------------
 
     def _set_replica_uid(self, replica_uid):
-        super(ObjectStore, self)._set_replica_uid(replica_uid)
+        super(ObjectStoreDatabase, self)._set_replica_uid(replica_uid)
         self._store_u1db_data()
 
     def _put_doc(self, doc):
@@ -45,7 +49,7 @@ class ObjectStore(InMemoryDatabase):
         raise NotImplementedError(self.get_all_docs)
 
     def delete_doc(self, doc):
-        """Mark a document as deleted."""        
+        """Mark a document as deleted."""
         old_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if old_doc is None:
             raise errors.DocumentDoesNotExist
@@ -71,17 +75,17 @@ class ObjectStore(InMemoryDatabase):
 
     def delete_index(self, index_name):
         """Remove a named index."""
-        super(ObjectStore, self).delete_index(index_name)
+        super(ObjectStoreDatabase, self).delete_index(index_name)
         self._store_u1db_data()
 
     def _replace_conflicts(self, doc, conflicts):
-        super(ObjectStore, self)._replace_conflicts(doc, conflicts)
+        super(ObjectStoreDatabase, self)._replace_conflicts(doc, conflicts)
         self._store_u1db_data()
 
     def _do_set_replica_gen_and_trans_id(self, other_replica_uid,
                                          other_generation,
                                          other_transaction_id):
-        super(ObjectStore, self)._do_set_replica_gen_and_trans_id(
+        super(ObjectStoreDatabase, self)._do_set_replica_gen_and_trans_id(
             other_replica_uid,
             other_generation,
             other_transaction_id)
@@ -125,3 +129,7 @@ class ObjectStore(InMemoryDatabase):
         Initialize u1db configuration data on backend storage.
         """
         NotImplementedError(self._init_u1db_data)
+
+
+class ObjectStoreSyncTarget(InMemorySyncTarget):
+    pass

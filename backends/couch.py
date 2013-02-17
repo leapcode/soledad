@@ -14,7 +14,10 @@ from u1db.errors import DatabaseDoesNotExist
 from couchdb.client import Server, Document as CouchDocument
 from couchdb.http import ResourceNotFound
 # leap
-from leap.soledad.backends.objectstore import ObjectStore
+from leap.soledad.backends.objectstore import (
+    ObjectStoreDatabase,
+    ObjectStoreSyncTarget,
+)
 from leap.soledad.backends.leap_backend import LeapDocument
 
 try:
@@ -28,7 +31,7 @@ class InvalidURLError(Exception):
     pass
 
 
-class CouchDatabase(ObjectStore):
+class CouchDatabase(ObjectStoreDatabase):
     """A U1DB backend that uses Couch as its persistence layer."""
 
     @classmethod
@@ -168,7 +171,7 @@ class CouchDatabase(ObjectStore):
             autocreate=autocreate)
 
     #-------------------------------------------------------------------------
-    # methods from ObjectStore
+    # methods from ObjectStoreDatabase
     #-------------------------------------------------------------------------
 
     def _init_u1db_data(self):
@@ -237,25 +240,8 @@ class CouchDatabase(ObjectStore):
         return dict
 
 
-class CouchSyncTarget(LocalSyncTarget):
-
-    def get_sync_info(self, source_replica_uid):
-        """Return information about known state."""
-        source_gen, source_trans_id = self._db._get_replica_gen_and_trans_id(
-            source_replica_uid)
-        my_gen, my_trans_id = self._db._get_generation_info()
-        return (
-            self._db._replica_uid, my_gen, my_trans_id, source_gen,
-            source_trans_id)
-
-    def record_sync_info(self, source_replica_uid, source_replica_generation,
-                         source_replica_transaction_id):
-        """Record tip information for another replica."""
-        if self._trace_hook:
-            self._trace_hook('record_sync_info')
-        self._db._set_replica_gen_and_trans_id(
-            source_replica_uid, source_replica_generation,
-            source_replica_transaction_id)
+class CouchSyncTarget(ObjectStoreSyncTarget):
+    pass
 
 
 class CouchServerState(ServerState):

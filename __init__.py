@@ -14,6 +14,7 @@ import random
 import hmac
 from leap.soledad.backends import sqlcipher
 from leap.soledad.util import GPGWrapper
+from leap.soledad.backends.leap_backend import LeapDocument
 
 
 class Soledad(object):
@@ -68,8 +69,12 @@ class Soledad(object):
         # instantiate u1db
         # TODO: verify if secret for sqlcipher should be the same as the
         # one for symmetric encryption.
-        self._db = sqlcipher.open(self.LOCAL_DB_PATH, True, self._secret,
-                                  soledad=self)
+        self._db = sqlcipher.open(
+            self.LOCAL_DB_PATH,
+            self._secret,
+            create=True,
+            document_factory=LeapDocument,
+            soledad=self)
 
     def close(self):
         """
