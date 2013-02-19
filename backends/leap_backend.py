@@ -31,9 +31,9 @@ class NoSoledadInstance(Exception):
     pass
 
 
-class DocumentEncryptionFailed(Exception):
+class DocumentNotEncrypted(Exception):
     """
-    Exception to signal the failure of document encryption.
+    Exception to signal failures in document encryption.
     """
     pass
 
@@ -135,6 +135,11 @@ class LeapSyncTarget(HTTPSyncTarget):
                 line, comma = utils.check_and_strip_comma(entry)
                 entry = json.loads(line)
                 # decrypt after receiving from server.
+                if not self._soledad:
+                    raise NoSoledadInstance()
+                if not self._soledad.is_encrypted_sym(entry['content']):
+                    raise DocumentNotEncrypted(
+                        "Incoming document from sync is not encrypted.")
                 doc = LeapDocument(entry['id'], entry['rev'],
                                    encrypted_json=entry['content'],
                                    soledad=self._soledad)
@@ -183,16 +188,12 @@ class LeapSyncTarget(HTTPSyncTarget):
         for doc, gen, trans_id in docs_by_generations:
             if doc.syncable:
                 # encrypt and verify before sending to server.
-                doc_content = doc.get_encrypted_json()
-                if doc_content == doc.get_json():
-                    raise DocumentEncryptionFailed
-                enc_doc = LeapDocument(doc.doc_id, doc.rev,
-                                       encrypted_json=doc_content,
-                                       soledad=self._soledad)
-                if doc.get_json() != enc_doc.get_json():
-                    raise DocumentEncryptionFailed
+                enc_json = doc.get_encrypted_json()
+                if not self._soledad.is_encrypted_sym(enc_json):
+                    raise DocumentNotEncrypted(
+                        "Could not encrypt document before sync.")
                 size += prepare(id=doc.doc_id, rev=doc.rev,
-                                content=doc_content,
+                                content=enc_json,
                                 gen=gen, trans_id=trans_id)
         entries.append('\r\n]')
         size += len(entries[-1])

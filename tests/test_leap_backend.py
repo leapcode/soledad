@@ -134,7 +134,6 @@ class TestLeapParsingSyncStream(test_remote_sync_target.TestParsingSyncStream):
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n{},\r\n]", None)
-
         self.assertRaises(leap_backend.NoSoledadInstance,
                           tgt._parse_sync_stream,
                           '[\r\n{},\r\n{"id": "i", "rev": "r", '

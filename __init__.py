@@ -35,7 +35,7 @@ class Soledad(object):
     # other configs
     SECRET_LENGTH = 50
 
-    def __init__(self, user_email, gpghome=None, initialize=True,
+    def __init__(self, user_email, gnupghome=None, initialize=True,
                  prefix=None, secret_path=None, local_db_path=None):
         """
         Bootstrap Soledad, initialize cryptographic material and open
@@ -47,7 +47,7 @@ class Soledad(object):
         self.LOCAL_DB_PATH = local_db_path or self.LOCAL_DB_PATH
         if not os.path.isdir(self.PREFIX):
             os.makedirs(self.PREFIX)
-        self._gpg = GPGWrapper(gpghome=(gpghome or self.GNUPG_HOME))
+        self._gpg = GPGWrapper(gnupghome=(gnupghome or self.GNUPG_HOME))
         if initialize:
             self._init_crypto()
             self._init_db()
@@ -131,7 +131,7 @@ class Soledad(object):
         """
         # TODO: verify if we have the corresponding private key.
         try:
-            self._gpg.find_key(self._user_email)
+            self._gpg.find_key_by_email(self._user_email)
             return True
         except LookupError:
             return False
@@ -152,7 +152,8 @@ class Soledad(object):
         """
         Find fingerprint for this user's OpenPGP keypair.
         """
-        self._fingerprint = self._gpg.find_key(self._user_email)['fingerprint']
+        self._fingerprint = self._gpg.find_key_by_email(
+            self._user_email)['fingerprint']
 
     def publish_pubkey(self, keyserver):
         """
@@ -177,8 +178,9 @@ class Soledad(object):
         """
         Encrypt data using symmetric secret.
         """
-        h = hmac.new(self._secret, doc_id).hexdigest()
-        return self.encrypt(data, sign=sign, passphrase=h, symmetric=True)
+        return self.encrypt(data, sign=sign,
+                            passphrase=self._hmac_passphrase(doc_id),
+                            symmetric=True)
 
     def decrypt(self, data, passphrase=None, symmetric=False):
         """
@@ -190,8 +192,19 @@ class Soledad(object):
         """
         Decrypt data using symmetric secret.
         """
-        h = hmac.new(self._secret, doc_id).hexdigest()
-        return self.decrypt(data, passphrase=h)
+        return self.decrypt(data, passphrase=self._hmac_passphrase(doc_id))
+
+    def _hmac_passphrase(self, doc_id):
+        return hmac.new(self._secret, doc_id).hexdigest()
+
+    def is_encrypted(self, data):
+        return self._gpg.is_encrypted(data)
+
+    def is_encrypted_sym(self, data):
+        return self._gpg.is_encrypted_sym(data)
+
+    def is_encrypted_asym(self, data):
+        return self._gpg.is_encrypted_asym(data)
 
     #-------------------------------------------------------------------------
     # Document storage, retrieval and sync
