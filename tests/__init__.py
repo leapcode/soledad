@@ -4,6 +4,7 @@ Tests to make sure Soledad provides U1DB functionality and more.
 
 import u1db
 from leap.soledad import Soledad
+from leap.soledad.util import GPGWrapper
 from leap.soledad.backends.leap_backend import LeapDocument
 from leap.testing.basetest import BaseLeapTest
 
@@ -29,13 +30,18 @@ class BaseSoledadTest(BaseLeapTest):
                               document_factory=LeapDocument)
         self._db2 = u1db.open(self.db2_file, create=True,
                               document_factory=LeapDocument)
-        # open a soledad instance
-        self._soledad = Soledad(self.email, gnupghome=self.gnupg_home,
+        # initialize soledad by hand so we can control keys
+        self._soledad = Soledad(self.email, gnupg_home=self.gnupg_home,
                                 initialize=False,
                                 prefix=self.tempdir)
+        self._soledad._init_dirs()
+        self._soledad._gpg = GPGWrapper(gnupghome=self.gnupg_home)
         self._soledad._gpg.import_keys(PUBLIC_KEY)
         self._soledad._gpg.import_keys(PRIVATE_KEY)
-        self._soledad._init_crypto()
+        self._soledad._load_openpgp_keypair()
+        if not self._soledad._has_secret():
+            self._soledad._gen_secret()
+        self._soledad._load_secret()
         self._soledad._init_db()
 
     def tearDown(self):

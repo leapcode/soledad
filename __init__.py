@@ -12,6 +12,9 @@ import os
 import string
 import random
 import hmac
+import configparser
+import re
+
 from leap.soledad.backends import sqlcipher
 from leap.soledad.util import GPGWrapper
 from leap.soledad.backends.leap_backend import (
@@ -33,34 +36,58 @@ class Soledad(object):
     on Soledad server.
     """
 
-    LOCAL_DB_PATH = None
-
     # other configs
     SECRET_LENGTH = 50
 
-    def __init__(self, user_email, gnupghome=None, initialize=True,
-                 prefix=None, secret_path=None, local_db_path=None):
+    def __init__(self, user_email, prefix=None, gnupg_home=None,
+                 secret_path=None, local_db_path=None,
+                 config_file=None, initialize=True):
         """
         Bootstrap Soledad, initialize cryptographic material and open
         underlying U1DB database.
         """
         self._user_email = user_email
-        # paths
-        self.PREFIX = prefix or os.environ['HOME'] + '/.config/leap/soledad'
-        self.SECRET_PATH = secret_path or self.PREFIX + '/secret.gpg'
-        self.LOCAL_DB_PATH = local_db_path or self.PREFIX + '/soledad.u1db'
-        if not os.path.isdir(self.PREFIX):
-            os.makedirs(self.PREFIX)
-        self._gpg = GPGWrapper(
-            gnupghome=(gnupghome or self.PREFIX + '/gnupg'))
+        self._init_config(prefix, gnupg_home, secret_path, local_db_path,
+                          config_file)
         if initialize:
+            self._init_dirs()
             self._init_crypto()
             self._init_db()
+
+    def _init_config(self, prefix, gnupg_home, secret_path, local_db_path,
+                     config_file):
+        # set default config
+        self.prefix = prefix or os.environ['HOME'] + '/.config/leap/soledad'
+        default_conf = {
+            'gnupg_home': gnupg_home or '%s/gnupg',
+            'secret_path': secret_path or '%s/secret.gpg',
+            'local_db_path': local_db_path or '%s/soledad.u1db',
+            'config_file': config_file or '%s/soledad.ini'
+        }
+        m = re.compile('.*%s.*')
+        for key, default_value in default_conf.iteritems():
+            if m.match(default_value):
+                val = default_value % self.prefix
+            else:
+                val = default_value
+            setattr(self, key, val)
+        # get config from file
+        config = configparser.ConfigParser()
+        config.read(self.config_file)
+        if 'soledad-server' in config:
+            for key in default_conf:
+                if key in config['soledad-server']:
+                    setattr(self, key, config['soledad-server'][key])
+
+    def _init_dirs(self):
+        if not os.path.isdir(self.prefix):
+            os.makedirs(self.prefix)
 
     def _init_crypto(self):
         """
         Load/generate OpenPGP keypair and secret for symmetric encryption.
         """
+        self._gpg = GPGWrapper(gnupghome=self.gnupg_home)
         # load/generate OpenPGP keypair
         if not self._has_openpgp_keypair():
             self._gen_openpgp_keypair()
@@ -75,7 +102,7 @@ class Soledad(object):
         # TODO: verify if secret for sqlcipher should be the same as the
         # one for symmetric encryption.
         self._db = sqlcipher.open(
-            self.LOCAL_DB_PATH,
+            self.local_db_path,
             self._secret,
             create=True,
             document_factory=LeapDocument,
@@ -97,14 +124,14 @@ class Soledad(object):
         file.
         """
         # does the file exist in disk?
-        if not os.path.isfile(self.SECRET_PATH):
+        if not os.path.isfile(self.secret_path):
             return False
         # is it asymmetrically encrypted?
-        f = open(self.SECRET_PATH, 'r')
+        f = open(self.secret_path, 'r')
         content = f.read()
         if not self.is_encrypted_asym(content):
             raise DocumentNotEncrypted(
-                "File %s is not encrypted!" % self.SECRET_PATH)
+                "File %s is not encrypted!" % self.secret_path)
         # can we decrypt it?
         fp = self._gpg.encrypted_to(content)['fingerprint']
         if fp != self._fingerprint:
@@ -116,22 +143,23 @@ class Soledad(object):
         Load secret for symmetric encryption from local encrypted file.
         """
         try:
-            with open(self.SECRET_PATH) as f:
+            with open(self.secret_path) as f:
                 self._secret = str(self._gpg.decrypt(f.read()))
         except IOError:
-            raise IOError('Failed to open secret file %s.' % self.SECRET_PATH)
+            raise IOError('Failed to open secret file %s.' % self.secret_path)
 
     def _gen_secret(self):
         """
         Generate a secret for symmetric encryption and store in a local
         encrypted file.
         """
-        self._secret = ''.join(random.choice(string.ascii_uppercase +
-                               string.digits) for x in
-                               range(self.SECRET_LENGTH))
+        self._secret = ''.join(
+            random.choice(
+                string.ascii_letters +
+                string.digits) for x in range(self.SECRET_LENGTH))
         ciphertext = self._gpg.encrypt(self._secret, self._fingerprint,
                                        self._fingerprint)
-        f = open(self.SECRET_PATH, 'w')
+        f = open(self.secret_path, 'w')
         f.write(str(ciphertext))
         f.close()
 
