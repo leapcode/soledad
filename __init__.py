@@ -145,7 +145,7 @@ class Soledad(object):
         """
         # TODO: verify if we have the corresponding private key.
         try:
-            self._gpg.find_key_by_email(self._user_email)
+            self._gpg.find_key_by_email(self._user_email, secret=True)
             return True
         except LookupError:
             return False

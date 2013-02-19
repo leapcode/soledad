@@ -60,11 +60,11 @@ class GPGWrapper(gnupg.GPG):
                                          options=options)
         self.result_map['list-packets'] = ListPackets
 
-    def find_key_by_email(self, email):
+    def find_key_by_email(self, email, secret=False):
         """
         Find user's key based on their email.
         """
-        for key in self.list_keys():
+        for key in self.list_keys(secret=secret):
             for uid in key['uids']:
                 if re.search(email, uid):
                     return key
