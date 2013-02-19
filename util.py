@@ -161,7 +161,7 @@ class GPGWrapper(gnupg.GPG):
         """
         # TODO: make this support multiple keys.
         result = self.list_packets(raw_data)
-        if not result.encrypted_sym:
+        if not result.key:
             raise LookupError(
                 "Content is not encrypted to a GnuPG key!")
         return self.find_key_by_subkey(result.key)
@@ -172,7 +172,7 @@ class GPGWrapper(gnupg.GPG):
 
     def is_encrypted_asym(self, raw_data):
         result = self.list_packets(raw_data)
-        return bool(result.need_passphrase)
+        return bool(result.key)
 
     def is_encrypted(self, raw_data):
         self.is_encrypted_asym() or self.is_encrypted_sym()
