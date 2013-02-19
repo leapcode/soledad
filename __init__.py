@@ -74,10 +74,10 @@ class Soledad(object):
         # get config from file
         config = configparser.ConfigParser()
         config.read(self.config_file)
-        if 'soledad-server' in config:
+        if 'soledad-client' in config:
             for key in default_conf:
-                if key in config['soledad-server']:
-                    setattr(self, key, config['soledad-server'][key])
+                if key in config['soledad-client']:
+                    setattr(self, key, config['soledad-client'][key])
 
     def _init_dirs(self):
         if not os.path.isdir(self.prefix):
