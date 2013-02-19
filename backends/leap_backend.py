@@ -188,12 +188,13 @@ class LeapSyncTarget(HTTPSyncTarget):
         for doc, gen, trans_id in docs_by_generations:
             if doc.syncable:
                 # encrypt and verify before sending to server.
-                enc_json = doc.get_encrypted_json()
+                enc_json = json.loads(
+                    doc.get_encrypted_json())['_encrypted_json']
                 if not self._soledad.is_encrypted_sym(enc_json):
                     raise DocumentNotEncrypted(
                         "Could not encrypt document before sync.")
                 size += prepare(id=doc.doc_id, rev=doc.rev,
-                                content=enc_json,
+                                content=doc.get_encrypted_json(),
                                 gen=gen, trans_id=trans_id)
         entries.append('\r\n]')
         size += len(entries[-1])
