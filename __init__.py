@@ -14,7 +14,14 @@ import random
 import hmac
 from leap.soledad.backends import sqlcipher
 from leap.soledad.util import GPGWrapper
-from leap.soledad.backends.leap_backend import LeapDocument
+from leap.soledad.backends.leap_backend import (
+    LeapDocument,
+    DocumentNotEncrypted,
+)
+
+
+class KeyMissing(Exception):
+    pass
 
 
 class Soledad(object):
@@ -26,11 +33,7 @@ class Soledad(object):
     on Soledad server.
     """
 
-    # paths
-    PREFIX = os.environ['HOME'] + '/.config/leap/soledad'
-    SECRET_PATH = PREFIX + '/secret.gpg'
-    GNUPG_HOME = PREFIX + '/gnupg'
-    LOCAL_DB_PATH = PREFIX + '/soledad.u1db'
+    LOCAL_DB_PATH = None
 
     # other configs
     SECRET_LENGTH = 50
@@ -42,12 +45,14 @@ class Soledad(object):
         underlying U1DB database.
         """
         self._user_email = user_email
-        self.PREFIX = prefix or self.PREFIX
-        self.SECRET_PATH = secret_path or self.SECRET_PATH
-        self.LOCAL_DB_PATH = local_db_path or self.LOCAL_DB_PATH
+        # paths
+        self.PREFIX = prefix or os.environ['HOME'] + '/.config/leap/soledad'
+        self.SECRET_PATH = secret_path or self.PREFIX + '/secret.gpg'
+        self.LOCAL_DB_PATH = local_db_path or self.PREFIX + '/soledad.u1db'
         if not os.path.isdir(self.PREFIX):
             os.makedirs(self.PREFIX)
-        self._gpg = GPGWrapper(gnupghome=(gnupghome or self.GNUPG_HOME))
+        self._gpg = GPGWrapper(
+            gnupghome=(gnupghome or self.PREFIX + '/gnupg'))
         if initialize:
             self._init_crypto()
             self._init_db()
@@ -91,11 +96,20 @@ class Soledad(object):
         Verify if secret for symmetric encryption exists on local encrypted
         file.
         """
-        # TODO: verify if file is a GPG-encrypted file and if we have the
-        # corresponding private key for decryption.
-        if os.path.isfile(self.SECRET_PATH):
-            return True
-        return False
+        # does the file exist in disk?
+        if not os.path.isfile(self.SECRET_PATH):
+            return False
+        # is it asymmetrically encrypted?
+        f = open(self.SECRET_PATH, 'r')
+        content = f.read()
+        if not self.is_encrypted_asym(content):
+            raise DocumentNotEncrypted(
+                "File %s is not encrypted!" % self.SECRET_PATH)
+        # can we decrypt it?
+        fp = self._gpg.encrypted_to(content)['fingerprint']
+        if fp != self._fingerprint:
+            raise KeyMissing("Key %s missing." % fp)
+        return True
 
     def _load_secret(self):
         """
