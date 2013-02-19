@@ -31,7 +31,8 @@ class BaseSoledadTest(BaseLeapTest):
                               document_factory=LeapDocument)
         # open a soledad instance
         self._soledad = Soledad(self.email, gnupghome=self.gnupg_home,
-                                initialize=False)
+                                initialize=False,
+                                prefix=self.tempdir)
         self._soledad._gpg.import_keys(PUBLIC_KEY)
         self._soledad._gpg.import_keys(PRIVATE_KEY)
         self._soledad._init_crypto()
