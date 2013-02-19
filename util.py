@@ -73,9 +73,15 @@ class GPGWrapper(gnupg.GPG):
     def find_key_by_subkey(self, subkey):
         for key in self.list_keys():
             for sub in key['subkeys']:
-                #print sub[0]
                 if sub[0] == subkey:
                     return key
+        raise LookupError(
+            "GnuPG public key for subkey %s not found!" % subkey)
+
+    def find_key_by_keyid(self, keyid):
+        for key in self.list_keys():
+            if keyid == key['keyid']:
+                return key
         raise LookupError(
             "GnuPG public key for subkey %s not found!" % subkey)
 
@@ -164,7 +170,10 @@ class GPGWrapper(gnupg.GPG):
         if not result.key:
             raise LookupError(
                 "Content is not encrypted to a GnuPG key!")
-        return self.find_key_by_subkey(result.key)
+        try:
+            return self.find_key_by_keyid(result.key)
+        except:
+            return self.find_key_by_subkey(result.key)
 
     def is_encrypted_sym(self, raw_data):
         result = self.list_packets(raw_data)
