@@ -36,14 +36,14 @@ To install it, do the following:
 Tests
 -----
 
-Soledad's tests should be run with nose2, like this:
-
-  nose2 leap.soledad.tests
-
 Right now, there are 3 conditions that have to be met for all Soledad tests to
 pass without problems:
 
   1. Use nose2.
-  2. Have an http CouchDB instance running on `localhost:5984`.
-  3. Have sqlcipher configured (using LD_PRELOAD or LD_LIBRARY_CONFIG to point
-     to the place where libsqlite3.so.0 is located).
+  2. Have CouchDB installed in the system.
+  3. Have pysqlcipher module properly installed as described above.
+
+Soledad's tests should be run with nose2, like this:
+
+  nose2 leap.soledad.tests
+
