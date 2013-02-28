@@ -7,6 +7,11 @@ This should be run with:
 
 import configparser
 from wsgiref.util import shift_path_info
+import httplib
+try:
+    import simplejson as json
+except ImportError:
+    import json  # noqa
 
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
@@ -52,7 +57,7 @@ class SoledadAuthMiddleware(object):
             return self._error(start_response, 400, "bad request")
         token = environ.get('HTTP_AUTHORIZATION')
         if not token:
-            if need_auth(environ):
+            if self.need_auth(environ):
                 return self._error(start_response, 401, "unauthorized",
                                    "Missing Authentication Token.")
         else:
@@ -89,8 +94,8 @@ def load_configuration(file_path):
     conf = {
         'couch_url': 'http://localhost:5984',
         'working_dir': '/tmp',
-        'public_dbs': 'keys'
-        'prefix': '/soledad/'
+        'public_dbs': 'keys',
+        'prefix': '/soledad/',
     }
     config = configparser.ConfigParser()
     config.read(file_path)
