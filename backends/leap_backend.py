@@ -137,7 +137,8 @@ class LeapSyncTarget(HTTPSyncTarget):
                 # decrypt after receiving from server.
                 if not self._soledad:
                     raise NoSoledadInstance()
-                if not self._soledad.is_encrypted_sym(entry['content']):
+                enc_json = json.loads(entry['content'])['_encrypted_json']
+                if not self._soledad.is_encrypted_sym(enc_json):
                     raise DocumentNotEncrypted(
                         "Incoming document from sync is not encrypted.")
                 doc = LeapDocument(entry['id'], entry['rev'],
