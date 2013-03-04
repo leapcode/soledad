@@ -23,8 +23,16 @@ from leap.soledad.backends.leap_backend import (
 )
 
 
-class KeyMissing(Exception):
-    pass
+class KeyDoesNotExist(Exception):
+    """
+    Soledad attempted to find a key that does not exist locally.
+    """
+
+
+class KeyAlreadyExists(Exception):
+    """
+    Soledad attempted to create a key that already exists locally.
+    """
 
 
 #-----------------------------------------------------------------------------
@@ -45,10 +53,17 @@ class Soledad(object):
 
     # other configs
     SECRET_LENGTH = 50
+    DEFAULT_CONF = {
+        'gnupg_home': '%s/gnupg',
+        'secret_path': '%s/secret.gpg',
+        'local_db_path': '%s/soledad.u1db',
+        'config_file': '%s/soledad.ini',
+        'soledad_server_url': '',
+    }
 
     def __init__(self, user_email, prefix=None, gnupg_home=None,
                  secret_path=None, local_db_path=None,
-                 config_file=None, server_url=None, auth_token=None,
+                 config_file=None, soledad_server_url=None, auth_token=None,
                  initialize=True):
         """
         Bootstrap Soledad, initialize cryptographic material and open
@@ -56,43 +71,72 @@ class Soledad(object):
         """
         self._user_email = user_email
         self._auth_token = auth_token
-        self._init_config(prefix, gnupg_home, secret_path, local_db_path,
-                          config_file)
-        # TODO: how to obtain server's URL?
-        if server_url:
-            self._init_client(server_url, token=auth_token)
+        self._init_config(
+            {'prefix': prefix,
+             'gnupg_home': gnupg_home,
+             'secret_path': secret_path,
+             'local_db_path': local_db_path,
+             'config_file': config_file,
+             'soledad_server_url': soledad_server_url,
+             }
+        )
+        if self.soledad_server_url:
+            self._client = SoledadClient(server_url, token=auth_token)
         if initialize:
-            self._init_dirs()
-            self._init_crypto()
-            self._init_db()
+            self.bootstrap()
 
-    def _init_client(self, url, token=None):
-        self._client = SoledadClient(server_url, token)
+    def _bootstrap(self):
+        """
+        Bootstrap local Soledad instance.
 
-    def _init_config(self, prefix, gnupg_home, secret_path, local_db_path,
-                     config_file):
-        # set default config
-        self.prefix = prefix or os.environ['HOME'] + '/.config/leap/soledad'
-        default_conf = {
-            'gnupg_home': gnupg_home or '%s/gnupg',
-            'secret_path': secret_path or '%s/secret.gpg',
-            'local_db_path': local_db_path or '%s/soledad.u1db',
-            'config_file': config_file or '%s/soledad.ini',
-            'soledad_server_url': '',
-        }
+        There are 3 stages for Soledad Client bootstrap:
+
+            1. No key material has been generated, so we need to generate and
+               upload to the server.
+
+            2. Key material has already been generated and uploaded to the
+               server, but has not been downloaded to this device/installation
+               yet.
+
+            3. Key material has already been generated and uploaded, and is
+               also stored locally, so we just need to load it from disk.
+
+        This method decides which bootstrap stage has to be performed and
+        performs it.
+        """
+        self._init_dirs()
+        self._gpg = GPGWrapper(gnupghome=self.gnupg_home)
+        if not self._has_keys():
+            try:
+                # stage 2 bootstrap
+                self._retrieve_keys()
+            except Exception:
+            # stage 1 bootstrap
+                self._init_keys()
+                self._send_keys()
+        # stage 3 bootstrap
+        self._load_keys()
+        self._init_db()
+
+    def _init_config(self, param_conf):
+        """
+        Initialize configuration, with precedence order give by: instance
+        parameters > config file > default values.
+        """
+        self.prefix = param_conf['prefix'] or \
+            os.environ['HOME'] + '/.config/leap/soledad'
         m = re.compile('.*%s.*')
-        for key, default_value in default_conf.iteritems():
-            if m.match(default_value):
-                val = default_value % self.prefix
-            else:
-                val = default_value
+        for key, default_value in self.DEFAULT_CONF.iteritems():
+            val = param_conf[key] or default_value
+            if m.match(val):
+                val = val % self.prefix
             setattr(self, key, val)
         # get config from file
         config = configparser.ConfigParser()
         config.read(self.config_file)
         if 'soledad-client' in config:
             for key in default_conf:
-                if key in config['soledad-client']:
+                if key in config['soledad-client'] and not param_conf[key]:
                     setattr(self, key, config['soledad-client'][key])
 
     def _init_dirs(self):
@@ -102,11 +146,11 @@ class Soledad(object):
         if not os.path.isdir(self.prefix):
             os.makedirs(self.prefix)
 
-    def _init_crypto(self):
+    def _init_keys(self):
         """
-        Load/generate OpenPGP keypair and secret for symmetric encryption.
+        Generate (if needed) and load OpenPGP keypair and secret for symmetric
+        encryption.
         """
-        self._gpg = GPGWrapper(gnupghome=self.gnupg_home)
         # load/generate OpenPGP keypair
         if not self._has_openpgp_keypair():
             self._gen_openpgp_keypair()
@@ -157,13 +201,18 @@ class Soledad(object):
         # can we decrypt it?
         fp = self._gpg.encrypted_to(content)['fingerprint']
         if fp != self._fingerprint:
-            raise KeyMissing("Key %s missing." % fp)
+            raise KeyDoesNotExist("Secret for symmetric encryption is "
+                                  "encrypted to key with fingerprint '%s' "
+                                  "which we don't have." % fp)
         return True
 
     def _load_secret(self):
         """
         Load secret for symmetric encryption from local encrypted file.
         """
+        if not self._has_secret():
+            raise KeyDoesNotExist("Tried to load key for symmetric "
+                                  "encryption but it does not exist on disk.")
         try:
             with open(self.secret_path) as f:
                 self._secret = str(self._gpg.decrypt(f.read()))
@@ -175,6 +224,10 @@ class Soledad(object):
         Generate a secret for symmetric encryption and store in a local
         encrypted file.
         """
+        if self._has_secret():
+            raise KeyAlreadyExists("Tried to generate secret for symmetric "
+                                   "encryption but it already exists on "
+                                   "disk.")
         self._secret = ''.join(
             random.choice(
                 string.ascii_letters +
@@ -204,6 +257,9 @@ class Soledad(object):
         """
         Generate an OpenPGP keypair for this user.
         """
+        if self._has_openpgp_keypair():
+            raise KeyAlreadyExists("Tried to generate OpenPGP keypair but it "
+                                   "already exists on disk.")
         params = self._gpg.gen_key_input(
             key_type='RSA',
             key_length=4096,
@@ -216,6 +272,9 @@ class Soledad(object):
         """
         Find fingerprint for this user's OpenPGP keypair.
         """
+        if not self._has_openpgp_keypair():
+            raise KeyDoesNotExist("Tried to load OpenPGP keypair but it does "
+                                  "not exist on disk.")
         self._fingerprint = self._gpg.find_key_by_email(
             self._user_email)['fingerprint']
 
@@ -225,6 +284,26 @@ class Soledad(object):
         """
         # TODO: this has to talk to LEAP's Nickserver.
         pass
+
+    #-------------------------------------------------------------------------
+    # General crypto utility methods.
+    #-------------------------------------------------------------------------
+
+    def _has_keys(self):
+        return self._has_openpgp_keypair() and self._has_secret()
+
+    def _load_keys(self):
+        self._load_openpgp_keypair()
+        self._load_secret()
+
+    def _gen_keys(self):
+        self._gen_openpgp_keypair()
+        self._gen_secret()
+
+    def _retrieve_keys(self):
+        h = hmac.new(self._user_email, 'user-keys').hexdigest()
+        self._client._request_json('GET', ['user-keys', h])
+        # TODO: create corresponding error on server side
 
     #-------------------------------------------------------------------------
     # Data encryption and decryption
