@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 A U1DB server that stores data using couchdb.
 
