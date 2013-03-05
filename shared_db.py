@@ -99,21 +99,6 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         Modified method to allow for unauth request.
         """
-        try:
-            res, headers = self._request(
-                'GET', ['doc', doc_id], {"include_deleted": False},
-                auth=False)
-        except errors.DocumentDoesNotExist:
-            return None
-        except errors.HTTPError, e:
-            if (e.status == http_database.DOCUMENT_DELETED_STATUS and
-                    'x-u1db-rev' in e.headers):
-                res = None
-                headers = e.headers
-            else:
-                raise
-        doc_rev = headers['x-u1db-rev']
-        has_conflicts = json.loads(headers['x-u1db-has-conflicts'])
-        doc = self._factory(doc_id, doc_rev, res)
-        doc.has_conflicts = has_conflicts
-        return doc
+        db = http_database.HTTPDatabase(self._url, factory=self._factory,
+                                        creds=self._creds)
+        return db.get_doc(doc_id)
