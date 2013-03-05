@@ -14,7 +14,15 @@ import random
 import hmac
 import configparser
 import re
-from u1db.remote import http_client
+try:
+    import simplejson as json
+except ImportError:
+    import json  # noqa
+from u1db import errors
+from u1db.remote import (
+    http_client,
+    http_database,
+)
 from leap.soledad.backends import sqlcipher
 from leap.soledad.util import GPGWrapper
 from leap.soledad.backends.leap_backend import (
@@ -58,12 +66,12 @@ class Soledad(object):
         'secret_path': '%s/secret.gpg',
         'local_db_path': '%s/soledad.u1db',
         'config_file': '%s/soledad.ini',
-        'soledad_server_url': '',
+        'shared_db_url': '',
     }
 
     def __init__(self, user_email, prefix=None, gnupg_home=None,
                  secret_path=None, local_db_path=None,
-                 config_file=None, soledad_server_url=None, auth_token=None,
+                 config_file=None, shared_db_url=None, auth_token=None,
                  initialize=True):
         """
         Bootstrap Soledad, initialize cryptographic material and open
@@ -77,13 +85,17 @@ class Soledad(object):
              'secret_path': secret_path,
              'local_db_path': local_db_path,
              'config_file': config_file,
-             'soledad_server_url': soledad_server_url,
+             'shared_db_url': shared_db_url,
              }
         )
-        if self.soledad_server_url:
-            self._client = SoledadClient(server_url, token=auth_token)
+        if self.shared_db_url:
+            # TODO: eliminate need to create db here.
+            self._shared_db = SoledadSharedDatabase.open_database(
+                shared_db_url,
+                True,
+                token=auth_token)
         if initialize:
-            self.bootstrap()
+            self._bootstrap()
 
     def _bootstrap(self):
         """
@@ -113,9 +125,11 @@ class Soledad(object):
             except Exception:
             # stage 1 bootstrap
                 self._init_keys()
-                self._send_keys()
+                # TODO: change key below
+                self._send_keys(self._secret)
         # stage 3 bootstrap
         self._load_keys()
+        self._send_keys(self._secret)
         self._init_db()
 
     def _init_config(self, param_conf):
@@ -186,7 +200,7 @@ class Soledad(object):
 
     def _has_secret(self):
         """
-        Verify if secret for symmetric encryption exists on local encrypted
+        Verify if secret for symmetric encryption exists in a local encrypted
         file.
         """
         # does the file exist in disk?
@@ -246,11 +260,10 @@ class Soledad(object):
         """
         Verify if there exists an OpenPGP keypair for this user.
         """
-        # TODO: verify if we have the corresponding private key.
         try:
-            self._gpg.find_key_by_email(self._user_email, secret=True)
+            self._load_openpgp_keypair()
             return True
-        except LookupError:
+        except:
             return False
 
     def _gen_openpgp_keypair(self):
@@ -272,11 +285,15 @@ class Soledad(object):
         """
         Find fingerprint for this user's OpenPGP keypair.
         """
-        if not self._has_openpgp_keypair():
+        # TODO: verify if we have the corresponding private key.
+        try:
+            self._fingerprint = self._gpg.find_key_by_email(
+                self._user_email,
+                secret=True)['fingerprint']
+            return self._fingerprint
+        except LookupError:
             raise KeyDoesNotExist("Tried to load OpenPGP keypair but it does "
                                   "not exist on disk.")
-        self._fingerprint = self._gpg.find_key_by_email(
-            self._user_email)['fingerprint']
 
     def publish_pubkey(self, keyserver):
         """
@@ -300,10 +317,25 @@ class Soledad(object):
         self._gen_openpgp_keypair()
         self._gen_secret()
 
+    def _user_hash(self):
+        return hmac.new(self._user_email, 'user').hexdigest()
+
     def _retrieve_keys(self):
-        h = hmac.new(self._user_email, 'user-keys').hexdigest()
-        self._client._request_json('GET', ['user-keys', h])
+        return self._shared_db.get_doc_unauth(self._user_hash())
         # TODO: create corresponding error on server side
+
+    def _send_keys(self, passphrase):
+        privkey = self._gpg.export_keys(self._fingerprint, secret=True)
+        content = {
+            '_privkey': self.encrypt(privkey, passphrase=passphrase,
+                                     symmetric=True),
+            '_symkey': self.encrypt(self._secret),
+        }
+        doc = self._retrieve_keys()
+        if not doc:
+            doc = LeapDocument(doc_id=self._user_hash(), soledad=self)
+        doc.content = content
+        self._shared_db.put_doc(doc)
 
     #-------------------------------------------------------------------------
     # Data encryption and decryption
@@ -407,7 +439,7 @@ class Soledad(object):
 
 
 #-----------------------------------------------------------------------------
-# Soledad client
+# Soledad shared database
 #-----------------------------------------------------------------------------
 
 class NoTokenForAuth(Exception):
@@ -416,15 +448,34 @@ class NoTokenForAuth(Exception):
     """
 
 
-class SoledadClient(http_client.HTTPClientBase):
+class Unauthorized(Exception):
+    """
+    User does not have authorization to perform task.
+    """
+
+
+class SoledadSharedDatabase(http_database.HTTPDatabase):
+    """
+    This is a shared HTTP database that holds users' encrypted keys.
+    """
+    # TODO: prevent client from messing with the shared DB.
+    # TODO: define and document API.
 
     @staticmethod
-    def connect(url, token=None):
-        return SoledadClient(url, token=token)
+    def open_database(url, create, token=None, soledad=None):
+        db = SoledadSharedDatabase(url, token=token, soledad=soledad)
+        db.open(create)
+        return db
 
-    def __init__(self, url, creds=None, token=None):
-        super(SoledadClient, self).__init__(url, creds)
-        self.token = token
+    def delete_database(url):
+        raise Unauthorized("Can't delete shared database.")
+
+    def __init__(self, url, document_factory=None, creds=None, token=None,
+                 soledad=None):
+        self._set_token(token)
+        self._soledad = soledad
+        super(SoledadSharedDatabase, self).__init__(url, document_factory,
+                                                    creds)
 
     def _set_token(self, token):
         self._token = token
@@ -435,14 +486,54 @@ class SoledadClient(http_client.HTTPClientBase):
     token = property(_get_token, _set_token,
                      doc='Token for token-based authentication.')
 
-    def _request_json(self, method, url_parts, params=None, body=None,
-                      content_type=None, auth=False):
+    def _request(self, method, url_parts, params=None, body=None,
+                 content_type=None, auth=True):
+        """
+        Perform token-based http request.
+        """
         if auth:
-            if not token:
+            if not self.token:
                 raise NoTokenForAuth()
-            params.update({'auth_token', self.token})
-        super(SoledadClient, self)._request_json(method, url_parts, params,
-                                                 body, content_type)
+            if not params:
+                params = {}
+            params['auth_token'] = self.token
+        return super(SoledadSharedDatabase, self)._request(
+            method, url_parts,
+            params,
+            body,
+            content_type)
 
+    def _request_json(self, method, url_parts, params=None, body=None,
+                      content_type=None, auth=True):
+        """
+        Perform token-based http request.
+        """
+        res, headers = self._request(method, url_parts,
+                                     params=params, body=body,
+                                     content_type=content_type, auth=auth)
+        return json.loads(res), headers
+
+    def get_doc_unauth(self, doc_id):
+        """
+        Modified method to allow for unauth request.
+        """
+        try:
+            res, headers = self._request(
+                'GET', ['doc', doc_id], {"include_deleted": False},
+                auth=False)
+        except errors.DocumentDoesNotExist:
+            return None
+        except errors.HTTPError, e:
+            if (e.status == http_database.DOCUMENT_DELETED_STATUS and
+                    'x-u1db-rev' in e.headers):
+                res = None
+                headers = e.headers
+            else:
+                raise
+        doc_rev = headers['x-u1db-rev']
+        has_conflicts = json.loads(headers['x-u1db-has-conflicts'])
+        doc = self._factory(doc_id, doc_rev, res)
+        doc.has_conflicts = has_conflicts
+        return doc
 
 __all__ = ['util']

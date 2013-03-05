@@ -55,25 +55,39 @@ class LeapDocument(Document):
         if encrypted_json:
             self.set_encrypted_json(encrypted_json)
 
-    def get_encrypted_json(self):
+    def get_encrypted_content(self):
         """
-        Return document's json serialization encrypted with user's public key.
+        Return an encrypted JSON serialization of document's contents.
         """
         if not self._soledad:
             raise NoSoledadInstance()
-        ciphertext = self._soledad.encrypt_symmetric(self.doc_id,
-                                                     self.get_json())
-        return json.dumps({'_encrypted_json': ciphertext})
+        return self._soledad.encrypt_symmetric(self.doc_id,
+                                               self.get_json())
+
+    def set_encrypted_content(self, cyphertext):
+        """
+        Set document's content based on an encrypted JSON serialization of
+        contents.
+        """
+        plaintext = self._soledad.decrypt_symmetric(self.doc_id, cyphertext)
+        return self.set_json(plaintext)
+
+    def get_encrypted_json(self):
+        """
+        Return a valid JSON string containing document's content encrypted to
+        the user's public key.
+        """
+        return json.dumps({'_encrypted_json': self.get_encrypted_content()})
 
     def set_encrypted_json(self, encrypted_json):
         """
-        Set document's content based on encrypted version of json string.
+        Set document's content based on a valid JSON string containing the
+        encrypted document's contents.
         """
         if not self._soledad:
             raise NoSoledadInstance()
-        ciphertext = json.loads(encrypted_json)['_encrypted_json']
-        plaintext = self._soledad.decrypt_symmetric(self.doc_id, ciphertext)
-        return self.set_json(plaintext)
+        cyphertext = json.loads(encrypted_json)['_encrypted_json']
+        self.set_encrypted_content(cyphertext)
 
     def _get_syncable(self):
         return self._syncable
