@@ -113,6 +113,9 @@ class Soledad(object):
         This method decides which bootstrap stage has to be performed and
         performs it.
         """
+        # TODO: make sure key storage always happens (even if this method is
+        #       interrupted).
+        # TODO: write tests for bootstrap stages.
         self._init_dirs()
         self._gpg = GPGWrapper(gnupghome=self.gnupg_home)
         if not self._has_keys():
@@ -134,6 +137,7 @@ class Soledad(object):
         Initialize configuration, with precedence order give by: instance
         parameters > config file > default values.
         """
+        # TODO: write tests for _init_config()
         self.prefix = param_conf['prefix'] or \
             os.environ['HOME'] + '/.config/leap/soledad'
         m = re.compile('.*%s.*')
@@ -143,6 +147,7 @@ class Soledad(object):
                 val = val % self.prefix
             setattr(self, key, val)
         # get config from file
+        # TODO: sanitize options from config file.
         config = configparser.ConfigParser()
         config.read(self.config_file)
         if 'soledad-client' in config:
@@ -162,6 +167,7 @@ class Soledad(object):
         Generate (if needed) and load OpenPGP keypair and secret for symmetric
         encryption.
         """
+        # TODO: write tests for methods below.
         # load/generate OpenPGP keypair
         if not self._has_openpgp_keypair():
             self._gen_openpgp_keypair()
@@ -194,6 +200,9 @@ class Soledad(object):
     #-------------------------------------------------------------------------
     # Management of secret for symmetric encryption
     #-------------------------------------------------------------------------
+
+    # TODO: refactor the following methods to somewhere out of here
+    # (SoledadCrypto, maybe?)
 
     def _has_secret(self):
         """
@@ -322,6 +331,7 @@ class Soledad(object):
         # TODO: create corresponding error on server side
 
     def _send_keys(self, passphrase):
+        # TODO: change this method's name to something more meaningful.
         privkey = self._gpg.export_keys(self._fingerprint, secret=True)
         content = {
             '_privkey': self.encrypt(privkey, passphrase=passphrase,
@@ -381,6 +391,9 @@ class Soledad(object):
     #-------------------------------------------------------------------------
     # Document storage, retrieval and sync
     #-------------------------------------------------------------------------
+
+    # TODO: refactor the following methods to somewhere out of here
+    # (SoledadLocalDatabase, maybe?)
 
     def put_doc(self, doc):
         """

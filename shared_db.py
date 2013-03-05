@@ -33,16 +33,21 @@ class Unauthorized(Exception):
 class SoledadSharedDatabase(http_database.HTTPDatabase):
     """
     This is a shared HTTP database that holds users' encrypted keys.
+
+    An authorization token is attached to every request other than
+    get_doc_unauth, which has the purpose of retrieving encrypted content from
+    the shared database without the need to associate user information with
+    the request.
     """
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
 
     @staticmethod
-    def open_database(url, create, token=None, soledad=None):
+    def open_database(url, create, token=None):
         """
         Open a Soledad shared database.
         """
-        db = SoledadSharedDatabase(url, token=token, soledad=soledad)
+        db = SoledadSharedDatabase(url, token=token)
         db.open(create)
         return db
 
@@ -53,10 +58,11 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         raise Unauthorized("Can't delete shared database.")
 
-    def __init__(self, url, document_factory=None, creds=None, token=None,
-                 soledad=None):
+    def __init__(self, url, document_factory=None, creds=None, token=None):
+        """
+        Initialize database with auth token and encryption powers.
+        """
         self._token = token
-        self._soledad = soledad
         super(SoledadSharedDatabase, self).__init__(url, document_factory,
                                                     creds)
 
@@ -65,6 +71,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         Perform token-based http request.
         """
+        # add the auth-token as a request parameter
         if auth:
             if not self._token:
                 raise NoTokenForAuth()
@@ -82,6 +89,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         Perform token-based http request.
         """
+        # allow for token-authenticated requests.
         res, headers = self._request(method, url_parts,
                                      params=params, body=body,
                                      content_type=content_type, auth=auth)

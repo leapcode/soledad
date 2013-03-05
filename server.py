@@ -128,7 +128,8 @@ def load_configuration(file_path):
         for key in conf:
             if key in config['soledad-server']:
                 conf[key] = config['soledad-server'][key]
-    # TODO: implement basic parsing of options comming from config file.
+    # TODO: implement basic parsing/sanitization of options comming from
+    # config file.
     return conf
 
 
