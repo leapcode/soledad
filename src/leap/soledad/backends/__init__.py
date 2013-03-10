@@ -2,8 +2,17 @@
 Backends that extend U1DB functionality.
 """
 
-import objectstore
+from leap.soledad.backends import (
+    objectstore,
+    couch,
+    sqlcipher,
+    leap_backend,
+)
 
 
 __all__ = [
-    'objectstore']
+    'objectstore',
+    'couch',
+    'sqlcipher',
+    'leap_backend',
+]

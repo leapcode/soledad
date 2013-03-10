@@ -1,4 +1,16 @@
-from distutils.core import setup
+from setuptools import setup
+
+
+requirements = [
+    'python-gnupg',
+    'u1db',
+    'oauth',
+    'couchdb',
+    'configparser',
+    # TODO: add a dependency for leap client
+    #'leap_client',
+]
+
 
 setup(
     name='leap.soledad',
@@ -15,8 +27,10 @@ setup(
         "securely shared among devices. It provides, to other parts of the "
         "LEAP client, an API for data storage and sync."
     ),
+    namespace_packages=["leap"],
     packages=['leap', 'leap.soledad', 'leap.soledad.backends'],
     package_dir = {'': 'src'},
     test_suite='leap.soledad.tests',
+    install_requires=requirements,
 )
 
