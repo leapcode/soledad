@@ -1,0 +1,5 @@
+*.log
+*.pyc
+dist/
+MANIFEST
+*.egg-info/
