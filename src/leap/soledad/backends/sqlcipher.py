@@ -4,11 +4,13 @@ import os
 from pysqlcipher import dbapi2
 import time
 
-from leap import util
+# TODO: uncomment imports below after solving circular dependency issue
+# between leap_client and soledad.
+#from leap import util
 from u1db.backends import sqlite_backend
-util.logger.debug(
-    "Monkey-patching u1db.backends.sqlite_backend with pysqlcipher.dbapi2..."
-)
+#util.logger.debug(
+#    "Monkey-patching u1db.backends.sqlite_backend with pysqlcipher.dbapi2..."
+#)
 sqlite_backend.dbapi2 = dbapi2
 
 from u1db import (
