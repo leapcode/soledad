@@ -212,3 +212,11 @@ RZXoH+FTg9UAW87eqU610npOkT6cRaBxaMK/mDtGNdc=
 =JTFu
 -----END PGP PRIVATE KEY BLOCK-----
 """
+
+__all__ = [
+    'test_couch',
+    'test_encrypted',
+    'test_leap_backend',
+    'test_sqlcipher',
+    'u1db_tests',
+]

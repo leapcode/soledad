@@ -448,4 +448,4 @@ class Soledad(object):
         return self._db.sync(url, creds=None, autocreate=True)
 
 
-__all__ = ['util', 'server', 'shared_db']
+__all__ = ['backends', 'util', 'server', 'shared_db']
