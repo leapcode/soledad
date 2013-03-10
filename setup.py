@@ -1,14 +1,25 @@
-from setuptools import setup
+from setuptools import (
+    setup,
+    find_packages
+)
 
 
-requirements = [
+install_requirements = [
     'python-gnupg',
     'u1db',
     'oauth',
     'couchdb',
     'configparser',
-    # TODO: add a dependency for leap client
-    #'leap_client',
+    'simplejson',
+    'pysqlite',
+    # TODO: add dependency for leap client ?
+    # TODO: add dependency for pysqlcipher.
+]
+
+
+tests_requirements = [
+    'nose2',
+    'testscenarios',
 ]
 
 
@@ -28,9 +39,9 @@ setup(
         "LEAP client, an API for data storage and sync."
     ),
     namespace_packages=["leap"],
-    packages=['leap', 'leap.soledad', 'leap.soledad.backends'],
+    packages=find_packages('src', exclude=['leap.soledad.tests']),
     package_dir = {'': 'src'},
-    test_suite='leap.soledad.tests',
-    install_requires=requirements,
+    test_suite='nose2.collector.collector',
+    install_requires=install_requirements,
+    tests_requires=tests_requirements,
 )
-
