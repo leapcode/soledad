@@ -86,7 +86,8 @@ class SoledadAuthMiddleware(object):
         Verify if token is valid for authenticating this action.
         """
         # TODO: implement token verification
-        raise NotImplementedError(self.verify_token)
+        return True
+        #raise NotImplementedError(self.verify_token)
 
     def need_auth(self, environ):
         """

@@ -99,6 +99,6 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         Modified method to allow for unauth request.
         """
-        db = http_database.HTTPDatabase(self._url, factory=self._factory,
-                                        creds=self._creds)
+        db = http_database.HTTPDatabase(self._url.geturl(),
+                                        document_factory=self._factory)
         return db.get_doc(doc_id)

@@ -43,6 +43,9 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             self._soledad._gpg.is_encrypted_sym(enc_json),
             "could not encrypt with passphrase.")
 
+
+class RecoveryDocumentTestCase(BaseSoledadTest):
+
     def test_export_recovery_document_raw(self):
         rd = self._soledad.export_recovery_document(None)
         self.assertEqual(
@@ -51,7 +54,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
                 'privkey': self._soledad._gpg.export_keys(
                     self._soledad._fingerprint,
                     secret=True),
-                'secret': self._soledad._secret
+                'symkey': self._soledad._symkey
             },
             json.loads(rd),
             "Could not export raw recovery document."
@@ -66,7 +69,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             'privkey': self._soledad._gpg.export_keys(
                 self._soledad._fingerprint,
                 secret=True),
-            'secret': self._soledad._secret,
+            'symkey': self._soledad._symkey,
         }
         raw_data = json.loads(str(self._soledad._gpg.decrypt(
             rd,
@@ -86,14 +89,14 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document(None)
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = Soledad('anotheruser@leap.se', gnupg_home=gnupg_home,
-                    initialize=False, prefix=self.tempdir)
+                    bootstrap=False, prefix=self.tempdir)
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, None)
         self.assertEqual(self._soledad._user_email,
                          s._user_email, 'Failed setting user email.')
-        self.assertEqual(self._soledad._secret,
-                         s._secret,
+        self.assertEqual(self._soledad._symkey,
+                         s._symkey,
                          'Failed settinng secret for symmetric encryption.')
         self.assertEqual(self._soledad._fingerprint,
                          s._fingerprint,
@@ -112,14 +115,14 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document('123456')
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = Soledad('anotheruser@leap.se', gnupg_home=gnupg_home,
-                    initialize=False, prefix=self.tempdir)
+                    bootstrap=False, prefix=self.tempdir)
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, '123456')
         self.assertEqual(self._soledad._user_email,
                          s._user_email, 'Failed setting user email.')
-        self.assertEqual(self._soledad._secret,
-                         s._secret,
+        self.assertEqual(self._soledad._symkey,
+                         s._symkey,
                          'Failed settinng secret for symmetric encryption.')
         self.assertEqual(self._soledad._fingerprint,
                          s._fingerprint,
