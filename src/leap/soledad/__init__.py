@@ -253,6 +253,9 @@ class Soledad(object):
             random.choice(
                 string.ascii_letters +
                 string.digits) for x in range(self.SECRET_LENGTH))
+        self._store_secret()
+
+    def _store_secret(self):
         ciphertext = self._gpg.encrypt(self._secret, self._fingerprint,
                                        self._fingerprint)
         f = open(self.secret_path, 'w')
@@ -472,16 +475,34 @@ class Soledad(object):
            - private key.
            - key for symmetric encryption
         """
-        data = json.dumps([
-            self._user_email,
-            self._gpg.export_keys(self._fingerprint, secret=True),
-            self._secret
-        ])
+        data = json.dumps({
+            'user_email': self._user_email,
+            'privkey': self._gpg.export_keys(self._fingerprint, secret=True),
+            'secret': self._secret,
+        })
         if passphrase:
             data = str(self._gpg.encrypt(data, None, sign=None,
                                          passphrase=passphrase,
                                          symmetric=True))
         return data
+
+    def import_recovery_document(self, data, passphrase):
+        if self._has_keys():
+            raise KeyAlreadyExists("You tried to import a recovery document "
+                                   "but secret keys are already present.")
+        if passphrase and not self._gpg.is_encrypted_sym(data):
+            raise DocumentNotEncrypted("You provided a password but the "
+                                       "recovery document is not encrypted.")
+        if passphrase:
+            data = str(self._gpg.decrypt(data, passphrase=passphrase))
+        data = json.loads(data)
+        self._user_email = data['user_email']
+        self._gpg.import_keys(data['privkey'])
+        self._load_openpgp_keypair()
+        self._secret = data['secret']
+        self._store_secret()
+        # TODO: make this work well with bootstrap.
+        self._load_keys()
 
 
 __all__ = ['backends', 'util', 'server', 'shared_db']
