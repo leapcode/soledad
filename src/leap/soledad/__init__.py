@@ -66,6 +66,7 @@ class Soledad(object):
         'shared_db_url': '',
     }
 
+    # TODO: separate username from provider, currently in user_email.
     def __init__(self, user_email, prefix=None, gnupg_home=None,
                  secret_path=None, local_db_path=None,
                  config_file=None, shared_db_url=None, auth_token=None,
@@ -446,6 +447,41 @@ class Soledad(object):
         """
         # TODO: create authentication scheme for sync with server.
         return self._db.sync(url, creds=None, autocreate=True)
+
+    #-------------------------------------------------------------------------
+    # Recovery document export and import
+    #-------------------------------------------------------------------------
+
+    def export_recovery_document(self, passphrase):
+        """
+        Exports username, provider, private key and key for symmetric
+        encryption, optionally encrypted with a password.
+
+        The LEAP client gives the user the option to export a text file with a
+        complete copy of their private keys and authorization information,
+        either password protected or not. This "recovery document" can be
+        printed or saved electronically as the user sees fit. If the user
+        needs to recover their data, they can load this recover document into
+        any LEAP client. The user can also type the recovery document in
+        manually, although it will be long and very painful to copy manually.
+
+        Contents of recovery document:
+
+           - username
+           - provider
+           - private key.
+           - key for symmetric encryption
+        """
+        data = json.dumps([
+            self._user_email,
+            self._gpg.export_keys(self._fingerprint, secret=True),
+            self._secret
+        ])
+        if passphrase:
+            data = str(self._gpg.encrypt(data, None, sign=None,
+                                         passphrase=passphrase,
+                                         symmetric=True))
+        return data
 
 
 __all__ = ['backends', 'util', 'server', 'shared_db']

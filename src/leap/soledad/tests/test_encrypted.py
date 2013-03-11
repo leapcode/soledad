@@ -37,3 +37,35 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             True,
             self._soledad._gpg.is_encrypted_sym(enc_json),
             "could not encrypt with passphrase.")
+
+    def test_export_recovery_document_raw(self):
+        rd = self._soledad.export_recovery_document(None)
+        self.assertEqual(
+            [
+                self._soledad._user_email,
+                self._soledad._gpg.export_keys(self._soledad._fingerprint,
+                                               secret=True),
+                self._soledad._secret
+            ],
+            json.loads(rd),
+            "Could not export raw recovery document."
+        )
+
+    def test_export_recovery_document_crypt(self):
+        rd = self._soledad.export_recovery_document('123456')
+        self.assertEqual(True,
+                         self._soledad._gpg.is_encrypted_sym(rd))
+        data = [
+            self._soledad._user_email,
+            self._soledad._gpg.export_keys(self._soledad._fingerprint,
+                                           secret=True),
+            self._soledad._secret,
+        ]
+        raw_data = json.loads(str(self._soledad._gpg.decrypt(
+            rd,
+            passphrase='123456')))
+        self.assertEqual(
+            raw_data,
+            data,
+            "Could not export raw recovery document."
+        )
