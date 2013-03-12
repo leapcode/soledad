@@ -1,6 +1,11 @@
+import os
+from leap.testing.basetest import BaseLeapTest
 from leap.soledad.backends.leap_backend import LeapDocument
 from leap.soledad.tests import BaseSoledadTest
-from leap.soledad.tests import KEY_FINGERPRINT
+from leap.soledad.tests import (
+    KEY_FINGERPRINT,
+    PRIVATE_KEY,
+)
 from leap.soledad import (
     Soledad,
     KeyAlreadyExists,
@@ -43,6 +48,9 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             self._soledad._gpg.is_encrypted_sym(enc_json),
             "could not encrypt with passphrase.")
 
+
+class RecoveryDocumentTestCase(BaseSoledadTest):
+
     def test_export_recovery_document_raw(self):
         rd = self._soledad.export_recovery_document(None)
         self.assertEqual(
@@ -51,7 +59,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
                 'privkey': self._soledad._gpg.export_keys(
                     self._soledad._fingerprint,
                     secret=True),
-                'secret': self._soledad._secret
+                'symkey': self._soledad._symkey
             },
             json.loads(rd),
             "Could not export raw recovery document."
@@ -66,7 +74,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             'privkey': self._soledad._gpg.export_keys(
                 self._soledad._fingerprint,
                 secret=True),
-            'secret': self._soledad._secret,
+            'symkey': self._soledad._symkey,
         }
         raw_data = json.loads(str(self._soledad._gpg.decrypt(
             rd,
@@ -86,14 +94,14 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document(None)
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = Soledad('anotheruser@leap.se', gnupg_home=gnupg_home,
-                    initialize=False, prefix=self.tempdir)
+                    bootstrap=False, prefix=self.tempdir)
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, None)
         self.assertEqual(self._soledad._user_email,
                          s._user_email, 'Failed setting user email.')
-        self.assertEqual(self._soledad._secret,
-                         s._secret,
+        self.assertEqual(self._soledad._symkey,
+                         s._symkey,
                          'Failed settinng secret for symmetric encryption.')
         self.assertEqual(self._soledad._fingerprint,
                          s._fingerprint,
@@ -112,14 +120,14 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document('123456')
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = Soledad('anotheruser@leap.se', gnupg_home=gnupg_home,
-                    initialize=False, prefix=self.tempdir)
+                    bootstrap=False, prefix=self.tempdir)
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, '123456')
         self.assertEqual(self._soledad._user_email,
                          s._user_email, 'Failed setting user email.')
-        self.assertEqual(self._soledad._secret,
-                         s._secret,
+        self.assertEqual(self._soledad._symkey,
+                         s._symkey,
                          'Failed settinng secret for symmetric encryption.')
         self.assertEqual(self._soledad._fingerprint,
                          s._fingerprint,
@@ -133,3 +141,67 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             pk2,
             'Failed settinng private key.'
         )
+
+
+class SoledadAuxMethods(BaseLeapTest):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def _soledad_instance(self):
+        return Soledad('leap@leap.se', bootstrap=False,
+                       prefix=self.tempdir+'/soledad')
+    def _gpgwrapper_instance(self):
+        return GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
+
+    def test__init_dirs(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        self.assertTrue(os.path.isdir(sol.prefix))
+
+    def test__init_db(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        sol._gpg = self._gpgwrapper_instance()
+        #self._soledad._gpg.import_keys(PUBLIC_KEY)
+        if not sol._has_privkey():
+            sol._set_privkey(PRIVATE_KEY)
+        if not sol._has_symkey():
+            sol._gen_symkey()
+        sol._load_symkey()
+        sol._init_db()
+        from leap.soledad.backends.sqlcipher import SQLCipherDatabase
+        self.assertIsInstance(sol._db, SQLCipherDatabase)
+
+    def test__has_privkey(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        sol._gpg = GPGWrapper(gnupghome="%s/gnupg2" % self.tempdir)
+        self.assertFalse(sol._has_privkey())
+        sol._set_privkey(PRIVATE_KEY)
+        self.assertTrue(sol._has_privkey())
+
+    def test__has_symkey(self):
+        sol = Soledad('leap@leap.se', bootstrap=False,
+                      prefix=self.tempdir+'/soledad3')
+        sol._init_dirs()
+        sol._gpg = GPGWrapper(gnupghome="%s/gnupg3" % self.tempdir)
+        if not sol._has_privkey():
+            sol._set_privkey(PRIVATE_KEY)
+        self.assertFalse(sol._has_symkey())
+        sol._gen_symkey()
+        self.assertTrue(sol._has_symkey())
+
+    def test__has_keys(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        sol._gpg = self._gpgwrapper_instance()
+        self.assertFalse(sol._has_keys())
+        sol._set_privkey(PRIVATE_KEY)
+        self.assertFalse(sol._has_keys())
+        sol._gen_symkey()
+        self.assertTrue(sol._has_keys())
+

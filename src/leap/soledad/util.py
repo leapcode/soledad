@@ -70,20 +70,27 @@ class GPGWrapper(gnupg.GPG):
                     return key
         raise LookupError("GnuPG public key for email %s not found!" % email)
 
-    def find_key_by_subkey(self, subkey):
-        for key in self.list_keys():
+    def find_key_by_subkey(self, subkey, secret=False):
+        for key in self.list_keys(secret=secret):
             for sub in key['subkeys']:
                 if sub[0] == subkey:
                     return key
         raise LookupError(
             "GnuPG public key for subkey %s not found!" % subkey)
 
-    def find_key_by_keyid(self, keyid):
-        for key in self.list_keys():
+    def find_key_by_keyid(self, keyid, secret=False):
+        for key in self.list_keys(secret=secret):
             if keyid == key['keyid']:
                 return key
         raise LookupError(
-            "GnuPG public key for subkey %s not found!" % subkey)
+            "GnuPG public key for keyid %s not found!" % keyid)
+
+    def find_key_by_fingerprint(self, fingerprint, secret=False):
+        for key in self.list_keys(secret=secret):
+            if fingerprint == key['fingerprint']:
+                return key
+        raise LookupError(
+            "GnuPG public key for fingerprint %s not found!" % fingerprint)
 
     def encrypt(self, data, recipient, sign=None, always_trust=True,
                 passphrase=None, symmetric=False):
