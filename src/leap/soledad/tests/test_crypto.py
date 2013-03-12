@@ -1,6 +1,11 @@
+import os
+from leap.testing.basetest import BaseLeapTest
 from leap.soledad.backends.leap_backend import LeapDocument
 from leap.soledad.tests import BaseSoledadTest
-from leap.soledad.tests import KEY_FINGERPRINT
+from leap.soledad.tests import (
+    KEY_FINGERPRINT,
+    PRIVATE_KEY,
+)
 from leap.soledad import (
     Soledad,
     KeyAlreadyExists,
@@ -136,3 +141,21 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
             pk2,
             'Failed settinng private key.'
         )
+
+
+class SoledadAuxMethods(BaseLeapTest):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def _soledad_instance(self):
+        return Soledad('leap@leap.se', bootstrap=False,
+                       prefix=self.tempdir+'/soledad')
+
+    def test__init_dirs(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        self.assertTrue(os.path.isdir(sol.prefix))
