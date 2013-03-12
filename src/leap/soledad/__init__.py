@@ -98,12 +98,6 @@ class Soledad(object):
              'shared_db_url': shared_db_url,
              }
         )
-        if self.shared_db_url:
-            # TODO: eliminate need to create db here.
-            self._shared_db = SoledadSharedDatabase.open_database(
-                self.shared_db_url,
-                True,
-                token=auth_token)
         if bootstrap:
             self._bootstrap()
 
@@ -113,10 +107,18 @@ class Soledad(object):
 
         Soledad Client bootstrap is the following sequence of stages:
 
-            1. Key loading/generation: guarantees key is either loaded from
-               server or generated locally.
-            2. Key copy verification: guarantees our copy of keys is identical
-               to server's copy.
+            Stage 0 - Local environment setup.
+                - directory initialization.
+                - gnupg wrapper initialization.
+            Stage 1 - Keys generation/loading:
+                - if keys exists locally, load them.
+                - else, if keys exists in server, download them.
+                - else, generate keys.
+            Stage 2 - Keys synchronization:
+                - if keys exist in server, confirm we have the same keys
+                  locally.
+                - else, send keys to server.
+            Stage 3 - Database initialization.
 
         This method decides which bootstrap stages have already been performed
         and performs the missing ones in order.
@@ -124,9 +126,11 @@ class Soledad(object):
         # TODO: make sure key storage always happens (even if this method is
         #       interrupted).
         # TODO: write tests for bootstrap stages.
+        # TODO: log each bootstrap step.
+        # Stage 0  - Local environment setup
         self._init_dirs()
         self._gpg = GPGWrapper(gnupghome=self.gnupg_home)
-        # bootstrap stage 1
+        # Stage 1 - Keys generation/loading
         if self._has_keys():
             self._load_keys()
         else:
@@ -137,9 +141,16 @@ class Soledad(object):
                 self._set_privkey(self.decrypt(doc.content['_privkey'],
                                                passphrase=self._user_hash()))
                 self._set_symkey(self.decrypt(doc.content['_symkey']))
-        # bootstrap stage 2
+        # Stage 2 - Keys synchronization
         self._assert_server_keys()
+        # Stage 3 -Database initialization
         self._init_db()
+        if self.shared_db_url:
+            # TODO: eliminate need to create db here.
+            self._shared_db = SoledadSharedDatabase.open_database(
+                self.shared_db_url,
+                True,
+                token=auth_token)
 
     def _init_config(self, param_conf):
         """
