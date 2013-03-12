@@ -159,3 +159,17 @@ class SoledadAuxMethods(BaseLeapTest):
         sol = self._soledad_instance()
         sol._init_dirs()
         self.assertTrue(os.path.isdir(sol.prefix))
+
+    def test__init_db(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        sol._gpg = GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
+        #self._soledad._gpg.import_keys(PUBLIC_KEY)
+        if not sol._has_privkey():
+            sol._set_privkey(PRIVATE_KEY)
+        if not sol._has_symkey():
+            sol._gen_symkey()
+        sol._load_symkey()
+        sol._init_db()
+        from leap.soledad.backends.sqlcipher import SQLCipherDatabase
+        self.assertIsInstance(sol._db, SQLCipherDatabase)
