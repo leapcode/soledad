@@ -154,6 +154,8 @@ class SoledadAuxMethods(BaseLeapTest):
     def _soledad_instance(self):
         return Soledad('leap@leap.se', bootstrap=False,
                        prefix=self.tempdir+'/soledad')
+    def _gpgwrapper_instance(self):
+        return GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
 
     def test__init_dirs(self):
         sol = self._soledad_instance()
@@ -163,7 +165,7 @@ class SoledadAuxMethods(BaseLeapTest):
     def test__init_db(self):
         sol = self._soledad_instance()
         sol._init_dirs()
-        sol._gpg = GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
+        sol._gpg = self._gpgwrapper_instance()
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
         if not sol._has_privkey():
             sol._set_privkey(PRIVATE_KEY)
@@ -177,17 +179,29 @@ class SoledadAuxMethods(BaseLeapTest):
     def test__has_privkey(self):
         sol = self._soledad_instance()
         sol._init_dirs()
-        sol._gpg = GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
+        sol._gpg = GPGWrapper(gnupghome="%s/gnupg2" % self.tempdir)
         self.assertFalse(sol._has_privkey())
         sol._set_privkey(PRIVATE_KEY)
         self.assertTrue(sol._has_privkey())
 
     def test__has_symkey(self):
-        sol = self._soledad_instance()
+        sol = Soledad('leap@leap.se', bootstrap=False,
+                      prefix=self.tempdir+'/soledad3')
         sol._init_dirs()
-        sol._gpg = GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
+        sol._gpg = GPGWrapper(gnupghome="%s/gnupg3" % self.tempdir)
         if not sol._has_privkey():
             sol._set_privkey(PRIVATE_KEY)
         self.assertFalse(sol._has_symkey())
         sol._gen_symkey()
         self.assertTrue(sol._has_symkey())
+
+    def test__has_keys(self):
+        sol = self._soledad_instance()
+        sol._init_dirs()
+        sol._gpg = self._gpgwrapper_instance()
+        self.assertFalse(sol._has_keys())
+        sol._set_privkey(PRIVATE_KEY)
+        self.assertFalse(sol._has_keys())
+        sol._gen_symkey()
+        self.assertTrue(sol._has_keys())
+
