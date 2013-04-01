@@ -6,7 +6,7 @@ import u1db
 from leap.soledad import Soledad
 from leap.soledad.util import GPGWrapper
 from leap.soledad.backends.leap_backend import LeapDocument
-from leap.testing.basetest import BaseLeapTest
+from leap.common.testing.basetest import BaseLeapTest
 
 
 #-----------------------------------------------------------------------------

@@ -11,9 +11,15 @@ install_requirements = [
     'couchdb',
     'configparser',
     'simplejson',
-    'pysqlite',
-    # TODO: add dependency for leap client ?
-    # TODO: add dependency for pysqlcipher.
+    'pysqlcipher',
+    'leap.common',
+]
+
+
+# TODO: change below so we get stable versions of modules.
+dependency_links = [
+    'git+git://git.futeisha.org/pysqlcipher.git@develop#egg=pysqlcipher',
+    'git+ssh://code.leap.se/leap_pycommon.git@develop#egg=leap_pycommon',
 ]
 
 
@@ -43,5 +49,6 @@ setup(
     package_dir = {'': 'src'},
     test_suite='nose2.collector.collector',
     install_requires=install_requirements,
-    tests_requires=tests_requirements,
+    tests_require=tests_requirements,
+    dependency_links=dependency_links
 )

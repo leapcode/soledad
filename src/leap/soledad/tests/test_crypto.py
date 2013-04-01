@@ -1,5 +1,5 @@
 import os
-from leap.testing.basetest import BaseLeapTest
+from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.backends.leap_backend import LeapDocument
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad.tests import (
