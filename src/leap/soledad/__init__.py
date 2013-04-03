@@ -72,7 +72,7 @@ class Soledad(object):
                  config_file=None, shared_db_url=None, auth_token=None,
                  bootstrap=True):
         """
-        Initialize crypto and dbs.
+        Initialize configuration, cryptographic keys and dbs.
 
         :param user_email: Email address of the user (username@provider).
         :param prefix: Path to use as prefix for files.
@@ -380,7 +380,7 @@ class Soledad(object):
                                           passphrase=self._user_hash())
             remote_symkey = self.decrypt(doc.content['_symkey'])
             result = self._gpg.import_keys(remote_privkey)
-            # TODO: is the following behaviour expected in any scenario?
+            # TODO: is the following behaviour not expected in any scenario?
             assert result.fingerprints[0] == self._fingerprint
             assert remote_symkey == self._symkey
         else:

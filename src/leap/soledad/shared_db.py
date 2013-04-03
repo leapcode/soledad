@@ -32,7 +32,7 @@ class Unauthorized(Exception):
 
 class SoledadSharedDatabase(http_database.HTTPDatabase):
     """
-    This is a shared HTTP database that holds users' encrypted keys.
+    This is a shared remote database that holds users' encrypted keys.
 
     An authorization token is attached to every request other than
     get_doc_unauth, which has the purpose of retrieving encrypted content from

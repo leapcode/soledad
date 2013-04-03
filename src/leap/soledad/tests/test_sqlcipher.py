@@ -30,7 +30,7 @@ from leap.soledad.tests.u1db_tests import test_backends
 from leap.soledad.tests.u1db_tests import test_open
 from leap.soledad.tests.u1db_tests import test_sync
 from leap.soledad.backends.leap_backend import LeapSyncTarget
-from leap.testing.basetest import BaseLeapTest
+from leap.common.testing.basetest import BaseLeapTest
 
 PASSWORD = '123456'
 
