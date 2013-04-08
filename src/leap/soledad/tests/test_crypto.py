@@ -55,7 +55,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document(None)
         self.assertEqual(
             {
-                'user_email': self._soledad._user_email,
+                'user': self._soledad._user,
                 'privkey': self._soledad._gpg.export_keys(
                     self._soledad._fingerprint,
                     secret=True),
@@ -70,7 +70,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(True,
                          self._soledad._gpg.is_encrypted_sym(rd))
         data = {
-            'user_email': self._soledad._user_email,
+            'user': self._soledad._user,
             'privkey': self._soledad._gpg.export_keys(
                 self._soledad._fingerprint,
                 secret=True),
@@ -98,8 +98,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, None)
-        self.assertEqual(self._soledad._user_email,
-                         s._user_email, 'Failed setting user email.')
+        self.assertEqual(self._soledad._user,
+                         s._user, 'Failed setting user email.')
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
@@ -124,8 +124,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, '123456')
-        self.assertEqual(self._soledad._user_email,
-                         s._user_email, 'Failed setting user email.')
+        self.assertEqual(self._soledad._user,
+                         s._user, 'Failed setting user email.')
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
@@ -151,9 +151,10 @@ class SoledadAuxMethods(BaseLeapTest):
     def tearDown(self):
         pass
 
-    def _soledad_instance(self):
+    def _soledad_instance(self, prefix=None):
         return Soledad('leap@leap.se', bootstrap=False,
-                       prefix=self.tempdir+'/soledad')
+                       prefix=prefix or self.tempdir+'/soledad')
+
     def _gpgwrapper_instance(self):
         return GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
 
@@ -176,24 +177,26 @@ class SoledadAuxMethods(BaseLeapTest):
         from leap.soledad.backends.sqlcipher import SQLCipherDatabase
         self.assertIsInstance(sol._db, SQLCipherDatabase)
 
-    def test__has_privkey(self):
+    def test__gen_privkey(self):
         sol = self._soledad_instance()
         sol._init_dirs()
         sol._gpg = GPGWrapper(gnupghome="%s/gnupg2" % self.tempdir)
-        self.assertFalse(sol._has_privkey())
+        self.assertFalse(sol._has_privkey(), 'Should not have a private key '
+                                             'at this point.')
         sol._set_privkey(PRIVATE_KEY)
-        self.assertTrue(sol._has_privkey())
+        self.assertTrue(sol._has_privkey(), 'Could not generate privkey.')
 
-    def test__has_symkey(self):
+    def test__gen_symkey(self):
         sol = Soledad('leap@leap.se', bootstrap=False,
                       prefix=self.tempdir+'/soledad3')
         sol._init_dirs()
         sol._gpg = GPGWrapper(gnupghome="%s/gnupg3" % self.tempdir)
         if not sol._has_privkey():
             sol._set_privkey(PRIVATE_KEY)
-        self.assertFalse(sol._has_symkey())
+        self.assertFalse(sol._has_symkey(), "Should not have a symkey at "
+                                            "this point")
         sol._gen_symkey()
-        self.assertTrue(sol._has_symkey())
+        self.assertTrue(sol._has_symkey(), "Could not generate symkey.")
 
     def test__has_keys(self):
         sol = self._soledad_instance()
@@ -204,4 +207,3 @@ class SoledadAuxMethods(BaseLeapTest):
         self.assertFalse(sol._has_keys())
         sol._gen_symkey()
         self.assertTrue(sol._has_keys())
-
