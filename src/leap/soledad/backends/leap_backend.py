@@ -90,7 +90,7 @@ class LeapDocument(Document):
         @param syncable: Should this document be synced with remote replicas?
         @type syncable: bool
         """
-        super(LeapDocument, self).__init__(doc_id, rev, json, has_conflicts)
+        Document.__init__(self, doc_id, rev, json, has_conflicts)
         self._soledad = soledad
         self._syncable = syncable
         if encrypted_json:
@@ -209,7 +209,7 @@ class LeapSyncTarget(HTTPSyncTarget):
             document contents when syncing.
         @type soledad: soledad.Soledad
         """
-        super(LeapSyncTarget, self).__init__(url, creds)
+        HTTPSyncTarget.__init__(self, url, creds)
         self._soledad = soledad
 
     def _parse_sync_stream(self, data, return_doc_cb, ensure_callback=None):

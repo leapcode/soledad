@@ -139,11 +139,11 @@ class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
             def __init__(self, dbname, ntry):
                 self._try = ntry
                 self._is_initialized_invocations = 0
-                super(SQLCipherDatabaseTesting, self).__init__(dbname,
-                                                               PASSWORD)
+                SQLCipherDatabase.__init__(self, dbname, PASSWORD)
 
             def _is_initialized(self, c):
-                res = super(SQLCipherDatabaseTesting, self)._is_initialized(c)
+                res = \
+                    SQLCipherDatabase._is_initialized(self, c)
                 if self._try == 1:
                     self._is_initialized_invocations += 1
                     if self._is_initialized_invocations == 2:
@@ -183,8 +183,7 @@ class TestSQLCipherPartialExpandDatabase(
     # our backend be instantiated in place.
 
     def setUp(self):
-        super(test_sqlite_backend.TestSQLitePartialExpandDatabase,
-              self).setUp()
+        test_sqlite_backend.TestSQLitePartialExpandDatabase.setUp(self)
         self.db = SQLCipherDatabase(':memory:', PASSWORD)
         self.db._set_replica_uid('test')
 
@@ -264,7 +263,7 @@ class TestSQLCipherPartialExpandDatabase(
 
             @classmethod
             def _which_index_storage(cls, c):
-                res = super(SQLiteDatabaseTesting, cls)._which_index_storage(c)
+                res = SQLCipherDatabase._which_index_storage(c)
                 db._ensure_schema()  # init db
                 observed.append(res[0])
                 return res

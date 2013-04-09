@@ -66,7 +66,8 @@ class ObjectStoreDatabase(InMemoryDatabase):
             parameters as Document.__init__.
         @type document_factory: callable
         """
-        super(ObjectStoreDatabase, self).__init__(
+        InMemoryDatabase.__init__(
+            self,
             replica_uid,
             document_factory=document_factory)
         # sync data in memory with data in object store
@@ -85,7 +86,7 @@ class ObjectStoreDatabase(InMemoryDatabase):
         @param replica_uid: The uid of the replica.
         @type replica_uid: str
         """
-        super(ObjectStoreDatabase, self)._set_replica_uid(replica_uid)
+        InMemoryDatabase._set_replica_uid(self, replica_uid)
         self._store_u1db_data()
 
     def _put_doc(self, doc):
@@ -185,7 +186,7 @@ class ObjectStoreDatabase(InMemoryDatabase):
         @param index_name: The name of the index we are removing.
         @type index_name: str
         """
-        super(ObjectStoreDatabase, self).delete_index(index_name)
+        InMemoryDatabase.delete_index(self, index_name)
         self._store_u1db_data()
 
     def _replace_conflicts(self, doc, conflicts):
@@ -199,7 +200,7 @@ class ObjectStoreDatabase(InMemoryDatabase):
         @param conflicts: The new set of conflicts.
         @type conflicts: list
         """
-        super(ObjectStoreDatabase, self)._replace_conflicts(doc, conflicts)
+        InMemoryDatabase._replace_conflicts(self, doc, conflicts)
         self._store_u1db_data()
 
     def _do_set_replica_gen_and_trans_id(self, other_replica_uid,
@@ -220,7 +221,8 @@ class ObjectStoreDatabase(InMemoryDatabase):
             generation.
         @type other_transaction_id: str
         """
-        super(ObjectStoreDatabase, self)._do_set_replica_gen_and_trans_id(
+        InMemoryDatabase._do_set_replica_gen_and_trans_id(
+            self,
             other_replica_uid,
             other_generation,
             other_transaction_id)

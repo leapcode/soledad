@@ -110,10 +110,10 @@ class CouchDatabase(ObjectStoreDatabase):
         except ResourceNotFound:
             self._server.create(self._dbname)
             self._database = self._server[self._dbname]
-        super(CouchDatabase, self).__init__(replica_uid=replica_uid,
-                                            # TODO: move the factory choice
-                                            # away
-                                            document_factory=LeapDocument)
+        ObjectStoreDatabase.__init__(self, replica_uid=replica_uid,
+                                     # TODO: move the factory choice
+                                     # away
+                                     document_factory=LeapDocument)
 
     #-------------------------------------------------------------------------
     # methods from Database

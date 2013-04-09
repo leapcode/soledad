@@ -112,14 +112,14 @@ class CouchDBTestCase(unittest.TestCase):
         self.wrapper = CouchDBWrapper()
         self.wrapper.start()
         #self.db = self.wrapper.db
-        super(CouchDBTestCase, self).setUp()
+        unittest.TestCase.setUp(self)
 
     def tearDown(self):
         """
         Stop CouchDB instance for test.
         """
         self.wrapper.stop()
-        super(CouchDBTestCase, self).tearDown()
+        unittest.TestCase.tearDown(self)
 
 
 #-----------------------------------------------------------------------------
@@ -177,7 +177,7 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchTests, self).tearDown()
+        test_backends.AllDatabaseTests.tearDown(self)
 
 
 class CouchDatabaseTests(test_backends.LocalDatabaseTests, CouchDBTestCase):
@@ -186,7 +186,7 @@ class CouchDatabaseTests(test_backends.LocalDatabaseTests, CouchDBTestCase):
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchDatabaseTests, self).tearDown()
+        test_backends.LocalDatabaseTests.tearDown(self)
 
 
 class CouchValidateGenNTransIdTests(
@@ -196,7 +196,7 @@ class CouchValidateGenNTransIdTests(
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchValidateGenNTransIdTests, self).tearDown()
+        test_backends.LocalDatabaseValidateGenNTransIdTests.tearDown(self)
 
 
 class CouchValidateSourceGenTests(
@@ -206,7 +206,7 @@ class CouchValidateSourceGenTests(
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchValidateSourceGenTests, self).tearDown()
+        test_backends.LocalDatabaseValidateSourceGenTests.tearDown(self)
 
 
 class CouchWithConflictsTests(
@@ -216,7 +216,7 @@ class CouchWithConflictsTests(
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchWithConflictsTests, self).tearDown()
+        test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
 
 
 # Notice: the CouchDB backend is currently used for storing encrypted data in
@@ -229,7 +229,7 @@ class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchIndexTests, self).tearDown()
+        test_backends.DatabaseIndexTests.tearDown(self)
 
 
 #-----------------------------------------------------------------------------
@@ -251,7 +251,7 @@ class CouchDatabaseSyncTargetTests(test_sync.DatabaseSyncTargetTests,
 
     def tearDown(self):
         self.db.delete_database()
-        super(CouchDatabaseSyncTargetTests, self).tearDown()
+        test_sync.DatabaseSyncTargetTests.tearDown(self)
 
     def test_sync_exchange_returns_many_new_docs(self):
         # This test was replicated to allow dictionaries to be compared after
@@ -293,7 +293,8 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         self.db1 = None
         self.db2 = None
         self.db3 = None
-        super(CouchDatabaseSyncTests, self).setUp()
+        test_sync.DatabaseSyncTests.setUp(self)
+        CouchDBTestCase.setUp(self)
 
     def tearDown(self):
         self.db and self.db.delete_database()
@@ -306,7 +307,7 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         db.delete_database()
         db = self.create_database('test3', 'target')
         db.delete_database()
-        super(CouchDatabaseSyncTests, self).tearDown()
+        test_sync.DatabaseSyncTests.tearDown(self)
 
 
 #-----------------------------------------------------------------------------

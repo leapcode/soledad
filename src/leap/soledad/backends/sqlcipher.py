@@ -256,7 +256,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @param doc: The new version of the document.
         @type doc: u1db.Document
         """
-        super(SQLCipherDatabase, self)._put_and_update_indexes(old_doc, doc)
+        sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
+            self, old_doc, doc)
         c = self._db_handle.cursor()
         c.execute('UPDATE document SET syncable=? WHERE doc_id=?',
                   (doc.syncable, doc.doc_id))
@@ -275,8 +276,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @return: a Document object.
         @type: u1db.Document
         """
-        doc = super(SQLCipherDatabase, self)._get_doc(doc_id,
-                                                      check_for_conflicts)
+        doc = sqlite_backend.SQLitePartialExpandDatabase._get_doc(
+            self, doc_id, check_for_conflicts)
         if doc:
             c = self._db_handle.cursor()
             c.execute('SELECT syncable FROM document WHERE doc_id=?',

@@ -195,7 +195,7 @@ class SoledadApp(http_app.HTTPApp):
         @return: HTTP application results.
         @rtype: list
         """
-        return super(SoledadApp, self).__call__(environ, start_response)
+        return http_app.HTTPApp.__call__(self, environ, start_response)
 
 
 #-----------------------------------------------------------------------------

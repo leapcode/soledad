@@ -106,12 +106,9 @@ class GPGWrapper(gnupg.GPG):
         @raise: RuntimeError with explanation message if there is a problem
             invoking gpg.
         """
-        super(GPGWrapper, self).__init__(gnupghome=gnupghome,
-                                         gpgbinary=gpgbinary,
-                                         verbose=verbose,
-                                         use_agent=use_agent,
-                                         keyring=keyring,
-                                         options=options)
+        gnupg.GPG.__init__(self, gnupghome=gnupghome, gpgbinary=gpgbinary,
+                           verbose=verbose, use_agent=use_agent,
+                           keyring=keyring, options=options)
         self.result_map['list-packets'] = ListPackets
 
     def find_key_by_email(self, email, secret=False):
@@ -211,11 +208,11 @@ class GPGWrapper(gnupg.GPG):
         @rtype: gnupg.Crypt
         """
         # TODO: devise a way so we don't need to "always trust".
-        return super(GPGWrapper, self).encrypt(data, recipient, sign=sign,
-                                               always_trust=always_trust,
-                                               passphrase=passphrase,
-                                               symmetric=symmetric,
-                                               cipher_algo='AES256')
+        return gnupg.GPG.encrypt(self, data, recipient, sign=sign,
+                                 always_trust=always_trust,
+                                 passphrase=passphrase,
+                                 symmetric=symmetric,
+                                 cipher_algo='AES256')
 
     def decrypt(self, data, always_trust=True, passphrase=None):
         """
@@ -234,9 +231,8 @@ class GPGWrapper(gnupg.GPG):
         @rtype: gnupg.Crypt
         """
         # TODO: devise a way so we don't need to "always trust".
-        return super(GPGWrapper, self).decrypt(data,
-                                               always_trust=always_trust,
-                                               passphrase=passphrase)
+        return gnupg.GPG.decrypt(self, data, always_trust=always_trust,
+                                 passphrase=passphrase)
 
     def send_keys(self, keyserver, *keyids):
         """

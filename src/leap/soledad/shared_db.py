@@ -107,8 +107,8 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         @type token: str
         """
         self._token = token
-        super(SoledadSharedDatabase, self).__init__(url, document_factory,
-                                                    creds)
+        http_database.HTTPDatabase.__init__(self, url, document_factory,
+                                            creds)
 
     def _request(self, method, url_parts, params=None, body=None,
                  content_type=None, auth=True):
@@ -142,7 +142,8 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
             if not params:
                 params = {}
             params['auth_token'] = self._token
-        return super(SoledadSharedDatabase, self)._request(
+        return http_database.HTTPDatabase._request(
+            self,
             method, url_parts,
             params,
             body,
