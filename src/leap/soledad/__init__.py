@@ -178,6 +178,8 @@ class Soledad(object):
                 self.shared_db_url,
                 True,
                 token=auth_token)
+        else:
+            self._shared_db = None
 
     def _init_config(self, **kwargs):
         """
@@ -472,8 +474,8 @@ class Soledad(object):
         @rtype: LeapDocument
         """
         # TODO: change below to raise appropriate exceptions
-        #if not hasattr(self, '_shared_db'):
-        #    return None
+        if not self._shared_db:
+            return None
         return self._shared_db.get_doc_unauth(self._user_hash())
 
     def _assert_server_keys(self):
@@ -481,8 +483,8 @@ class Soledad(object):
         Assert our key copies are the same as server's ones.
         """
         assert self._has_keys()
-        #if not hasattr(self, '_shared_db'):
-        #    return
+        if not self._shared_db:
+            return
         doc = self._get_keys_doc()
         if doc:
             remote_privkey = self.decrypt(doc.content['_privkey'],

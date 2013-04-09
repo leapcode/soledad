@@ -6,44 +6,19 @@ This software is under development.
 Dependencies
 ------------
 
-Soledad depends on the following python libraries:
+The following Soledad dependencies have not been packaged in pypi yet, and so
+are downloaded directly from their repositories (see `setup.py`):
 
-  * u1db 0.1.4 [1]
-  * python-gnupg 0.3.1 [2]
-  * CouchDB 0.8 [3]
-  * hmac 20101005 [4]
-  * pysqlcipher [5]
+  * pysqlcipher: pysqlite fork that binds to SQLCipher libraries.
+    Repository: git://git.futeisha.org/pysqlcipher.git@develop
 
-[1] http://pypi.python.org/pypi/u1db/0.1.4
-[2] http://pypi.python.org/pypi/python-gnupg/0.3.1
-[3] http://pypi.python.org/pypi/CouchDB/0.8
-[4] http://pypi.python.org/pypi/hmac/20101005
-[5] Instructions for downloading and installing are below.
-
-pysqlcipher
------------
-
-Pysqlcipher is an experimental fork of pysqlite, and is statically linked
-against sqlcipher.
-
-To install it, do the following:
-
-  git clone git://git.futeisha.org/pysqlcipher.git
-  cd pysqlcipher
-  python setup.py install
-
+  * leap.common: Leap's common code (provides config, events, testing, etc).
+    Repository: ssh://code.leap.se/leap_pycommon.git@develop
 
 Tests
 -----
 
-Right now, there are 3 conditions that have to be met for all Soledad tests to
-pass without problems:
+To run CouchDB tests, be sure you have CouchDB installed on your system.
+Tests can be run with:
 
-  1. Use nose2.
-  2. Have CouchDB installed in the system.
-  3. Have pysqlcipher module properly installed as described above.
-
-Soledad's tests should be run with nose2, like this:
-
-  nose2 leap.soledad.tests
-
+  python setup.py test
