@@ -31,9 +31,7 @@ class BaseSoledadTest(BaseLeapTest):
         self._db2 = u1db.open(self.db2_file, create=True,
                               document_factory=LeapDocument)
         # initialize soledad by hand so we can control keys
-        self._soledad = Soledad(self.email, gnupg_home=self.gnupg_home,
-                                bootstrap=False,
-                                prefix=self.tempdir)
+        self._soledad = self._soledad_instance(user=self.email)
         self._soledad._init_dirs()
         self._soledad._gpg = GPGWrapper(gnupghome=self.gnupg_home)
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
@@ -48,6 +46,20 @@ class BaseSoledadTest(BaseLeapTest):
         self._db1.close()
         self._db2.close()
         self._soledad.close()
+
+    def _soledad_instance(self, user='leap@leap.se', prefix='',
+                          bootstrap=False, gnupg_home='/gnupg',
+                          secret_path='/secret.gpg',
+                          local_db_path='/soledad.u1db'):
+        return Soledad(
+            user,
+            gnupg_home=self.tempdir+prefix+gnupg_home,
+            secret_path=self.tempdir+prefix+secret_path,
+            local_db_path=self.tempdir+prefix+local_db_path,
+            bootstrap=bootstrap)
+
+    def _gpgwrapper_instance(self):
+        return GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
 
 
 # Key material for testing

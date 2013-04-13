@@ -1,4 +1,29 @@
+# -*- coding: utf-8 -*-
+# test_crypto.py
+# Copyright (C) 2013 LEAP
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+
+"""
+Tests for cryptographic related stuff.
+"""
+
+
 import os
+
+
 from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.backends.leap_backend import LeapDocument
 from leap.soledad.tests import BaseSoledadTest
@@ -6,10 +31,7 @@ from leap.soledad.tests import (
     KEY_FINGERPRINT,
     PRIVATE_KEY,
 )
-from leap.soledad import (
-    Soledad,
-    KeyAlreadyExists,
-)
+from leap.soledad import KeyAlreadyExists
 from leap.soledad.util import GPGWrapper
 
 try:
@@ -93,8 +115,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
     def test_import_recovery_document_raw(self):
         rd = self._soledad.export_recovery_document(None)
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
-        s = Soledad('anotheruser@leap.se', gnupg_home=gnupg_home,
-                    bootstrap=False, prefix=self.tempdir)
+        s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, None)
@@ -119,8 +140,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
     def test_import_recovery_document_crypt(self):
         rd = self._soledad.export_recovery_document('123456')
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
-        s = Soledad('anotheruser@leap.se', gnupg_home=gnupg_home,
-                    bootstrap=False, prefix=self.tempdir)
+        s = self._soledad_instance(user='anotheruser@leap.se')
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, '123456')
@@ -143,52 +163,19 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         )
 
 
-class SoledadAuxMethods(BaseLeapTest):
-
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def _soledad_instance(self, prefix=None):
-        return Soledad('leap@leap.se', bootstrap=False,
-                       prefix=prefix or self.tempdir+'/soledad')
-
-    def _gpgwrapper_instance(self):
-        return GPGWrapper(gnupghome="%s/gnupg" % self.tempdir)
-
-    def test__init_dirs(self):
-        sol = self._soledad_instance()
-        sol._init_dirs()
-        self.assertTrue(os.path.isdir(sol.prefix))
-
-    def test__init_db(self):
-        sol = self._soledad_instance()
-        sol._init_dirs()
-        sol._gpg = self._gpgwrapper_instance()
-        #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        if not sol._has_privkey():
-            sol._set_privkey(PRIVATE_KEY)
-        if not sol._has_symkey():
-            sol._gen_symkey()
-        sol._load_symkey()
-        sol._init_db()
-        from leap.soledad.backends.sqlcipher import SQLCipherDatabase
-        self.assertIsInstance(sol._db, SQLCipherDatabase)
+class CryptoMethodsTestCase(BaseSoledadTest):
 
     def test__gen_privkey(self):
-        sol = self._soledad_instance()
+        sol = self._soledad_instance(user='user@leap.se', prefix='/4')
         sol._init_dirs()
         sol._gpg = GPGWrapper(gnupghome="%s/gnupg2" % self.tempdir)
         self.assertFalse(sol._has_privkey(), 'Should not have a private key '
                                              'at this point.')
-        sol._set_privkey(PRIVATE_KEY)
+        sol._gen_privkey()
         self.assertTrue(sol._has_privkey(), 'Could not generate privkey.')
 
     def test__gen_symkey(self):
-        sol = Soledad('leap@leap.se', bootstrap=False,
-                      prefix=self.tempdir+'/soledad3')
+        sol = self._soledad_instance(user='user@leap.se', prefix='/3')
         sol._init_dirs()
         sol._gpg = GPGWrapper(gnupghome="%s/gnupg3" % self.tempdir)
         if not sol._has_privkey():
@@ -199,11 +186,12 @@ class SoledadAuxMethods(BaseLeapTest):
         self.assertTrue(sol._has_symkey(), "Could not generate symkey.")
 
     def test__has_keys(self):
-        sol = self._soledad_instance()
+        sol = self._soledad_instance(user='leap@leap.se', prefix='/5')
         sol._init_dirs()
-        sol._gpg = self._gpgwrapper_instance()
+        sol._gpg = GPGWrapper(gnupghome=self.tempdir+"/5/gnupg")
         self.assertFalse(sol._has_keys())
         sol._set_privkey(PRIVATE_KEY)
+        sol._has_privkey()
         self.assertFalse(sol._has_keys())
         sol._gen_symkey()
         self.assertTrue(sol._has_keys())

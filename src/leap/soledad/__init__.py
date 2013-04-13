@@ -38,8 +38,9 @@ except ImportError:
     import json  # noqa
 
 
-from leap.soledad.backends import sqlcipher
+from leap.soledad.config import SoledadConfig
 from leap.soledad.util import GPGWrapper
+from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
     DocumentNotEncrypted,
@@ -75,27 +76,21 @@ class Soledad(object):
     storing/fetching them on Soledad server.
     """
 
-    # other configs
     SECRET_LENGTH = 50
-    DEFAULT_CONF = {
-        'gnupg_home': '%s/gnupg',
-        'secret_path': '%s/secret.gpg',
-        'local_db_path': '%s/soledad.u1db',
-        'config_file': '%s/soledad.ini',
-        'shared_db_url': '',
-    }
+    """
+    The length of the secret used for symmetric encryption.
+    """
 
-    def __init__(self, user, prefix=None, gnupg_home=None,
+    def __init__(self, user, config_path=None, gnupg_home=None,
                  secret_path=None, local_db_path=None,
-                 config_file=None, shared_db_url=None, auth_token=None,
-                 bootstrap=True):
+                 shared_db_url=None, auth_token=None, bootstrap=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
         @param user: Email address of the user (username@provider).
         @type user: str
-        @param prefix: Path to use as prefix for files.
-        @type prefix: str
+        @param config_path: Path for configuration file.
+        @type config_path: str
         @param gnupg_home: Home directory for gnupg.
         @type gnupg_home: str
         @param secret_path: Path for storing gpg-encrypted key used for
@@ -103,8 +98,6 @@ class Soledad(object):
         @type secret_path: str
         @param local_db_path: Path for local encrypted storage db.
         @type local_db_path: str
-        @param config_file: Path for configuration file.
-        @type config_file: str
         @param shared_db_url: URL for shared Soledad DB for key storage and
             unauth retrieval.
         @type shared_db_url: str
@@ -118,11 +111,10 @@ class Soledad(object):
         self._user = user
         self._auth_token = auth_token
         self._init_config(
-            prefix=prefix,
+            config_path=config_path,
             gnupg_home=gnupg_home,
             secret_path=secret_path,
             local_db_path=local_db_path,
-            config_file=config_file,
             shared_db_url=shared_db_url,
         )
         if bootstrap:
@@ -156,7 +148,15 @@ class Soledad(object):
         # TODO: log each bootstrap step.
         # Stage 0  - Local environment setup
         self._init_dirs()
-        self._gpg = GPGWrapper(gnupghome=self.gnupg_home)
+        self._gpg = GPGWrapper(gnupghome=self._config.get_gnupg_home())
+        if self._config.get_shared_db_url() and self._auth_token:
+            # TODO: eliminate need to create db here.
+            self._shared_db = SoledadSharedDatabase.open_database(
+                self._config.get_shared_db_url(),
+                True,
+                token=self._auth_token)
+        else:
+            self._shared_db = None
         # Stage 1 - Keys generation/loading
         if self._has_keys():
             self._load_keys()
@@ -170,50 +170,44 @@ class Soledad(object):
                 self._set_symkey(self.decrypt(doc.content['_symkey']))
         # Stage 2 - Keys synchronization
         self._assert_server_keys()
-        # Stage 3 -Database initialization
+        # Stage 3 - Local database initialization
         self._init_db()
-        if self.shared_db_url:
-            # TODO: eliminate need to create db here.
-            self._shared_db = SoledadSharedDatabase.open_database(
-                self.shared_db_url,
-                True,
-                token=auth_token)
-        else:
-            self._shared_db = None
 
     def _init_config(self, **kwargs):
         """
-        Initialize configuration, with precedence order give by: instance
-        parameters > config file > default values.
+        Initialize configuration using SoledadConfig.
 
-        @param kwargs: a dictionary with parameter values passed when
-            instantiating this Soledad instance.
+        Soledad configuration makes use of BaseLeapConfig to load values from
+        a file or from default configuration. Parameters passed as arguments
+        for this method will supersede file and default values.
+
+        @param kwargs: a dictionary with configuration parameter values passed
+            when instantiating this Soledad instance.
         @type kwargs: dict
         """
-        # TODO: write tests for _init_config()
-        self.prefix = kwargs['prefix'] or \
-            os.environ['HOME'] + '/.config/leap/soledad'
-        m = re.compile('.*%s.*')
-        for key, default_value in self.DEFAULT_CONF.iteritems():
-            val = kwargs[key] or default_value
-            if m.match(val):
-                val = val % self.prefix
-            setattr(self, key, val)
-        # get config from file
-        # TODO: sanitize options from config file.
-        config = configparser.ConfigParser()
-        config.read(self.config_file)
-        if 'soledad-client' in config:
-            for key in self.DEFAULT_CONF:
-                if key in config['soledad-client'] and not kwargs[key]:
-                    setattr(self, key, config['soledad-client'][key])
+        self._config = SoledadConfig()
+        config_file = kwargs.get('config_path', None)
+        if config_file is not None:
+            self._config.load(path=config_file)
+        else:
+            self._config.load(data='')
+        # overwrite config with passed parameters
+        for param in ['gnupg_home', 'secret_path', 'local_db_path',
+                      'shared_db_url']:
+            if param in kwargs and kwargs[param] is not None:
+                self._config._config_checker.config[param] = kwargs[param]
 
     def _init_dirs(self):
         """
         Create work directories.
         """
-        if not os.path.isdir(self.prefix):
-            os.makedirs(self.prefix)
+        paths = map(
+            lambda x: os.path.dirname(x),
+            [self._config.get_gnupg_home(), self._config.get_local_db_path(),
+             self._config.get_secret_path()])
+        for path in paths:
+            if not os.path.isdir(path):
+                os.makedirs(path)
 
     def _init_keys(self):
         """
@@ -238,7 +232,7 @@ class Soledad(object):
         # TODO: verify if secret for sqlcipher should be the same as the
         # one for symmetric encryption.
         self._db = sqlcipher.open(
-            self.local_db_path,
+            self._config.get_local_db_path(),
             self._symkey,
             create=True,
             document_factory=LeapDocument,
@@ -267,14 +261,14 @@ class Soledad(object):
         @rtype: bool
         """
         # does the file exist in disk?
-        if not os.path.isfile(self.secret_path):
+        if not os.path.isfile(self._config.get_secret_path()):
             return False
         # is it asymmetrically encrypted?
-        f = open(self.secret_path, 'r')
+        f = open(self._config.get_secret_path(), 'r')
         content = f.read()
         if not self.is_encrypted_asym(content):
             raise DocumentNotEncrypted(
-                "File %s is not encrypted!" % self.secret_path)
+                "File %s is not encrypted!" % self._config.get_secret_path())
         # can we decrypt it?
         fp = self._gpg.encrypted_to(content)['fingerprint']
         if fp != self._fingerprint:
@@ -291,10 +285,11 @@ class Soledad(object):
             raise KeyDoesNotExist("Tried to load key for symmetric "
                                   "encryption but it does not exist on disk.")
         try:
-            with open(self.secret_path) as f:
+            with open(self._config.get_secret_path()) as f:
                 self._symkey = str(self._gpg.decrypt(f.read()))
         except IOError:
-            raise IOError('Failed to open secret file %s.' % self.secret_path)
+            raise IOError('Failed to open secret file %s.' %
+                          self._config.get_secret_path())
 
     def _gen_symkey(self):
         """
@@ -323,7 +318,7 @@ class Soledad(object):
     def _store_symkey(self):
         ciphertext = self._gpg.encrypt(self._symkey, self._fingerprint,
                                        self._fingerprint)
-        f = open(self.secret_path, 'w')
+        f = open(self._config.get_secret_path(), 'w')
         f.write(str(ciphertext))
         f.close()
 
