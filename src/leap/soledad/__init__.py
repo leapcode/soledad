@@ -38,12 +38,14 @@ except ImportError:
     import json  # noqa
 
 
+from leap.common import events
 from leap.soledad.config import SoledadConfig
 from leap.soledad.util import GPGWrapper
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
     DocumentNotEncrypted,
+    LeapSyncTarget,
 )
 from leap.soledad.shared_db import SoledadSharedDatabase
 
@@ -216,6 +218,7 @@ class Soledad(object):
         """
         # TODO: write tests for methods below.
         # load/generate OpenPGP keypair
+        events.signal(events.SOLEDAD_CREATING_KEYS, self._user)
         if not self._has_privkey():
             self._gen_privkey()
         self._load_privkey()
@@ -223,6 +226,7 @@ class Soledad(object):
         if not self._has_symkey():
             self._gen_symkey()
         self._load_symkey()
+        events.signal(events.SOLEDAD_DONE_CREATING_KEYS, self._user)
 
     def _init_db(self):
         """
@@ -468,10 +472,13 @@ class Soledad(object):
         @return: a document with encrypted key material in its contents
         @rtype: LeapDocument
         """
+        events.signal(events.SOLEDAD_DOWNLOADING_KEYS, self._user)
         # TODO: change below to raise appropriate exceptions
         if not self._shared_db:
             return None
-        return self._shared_db.get_doc_unauth(self._user_hash())
+        doc = self._shared_db.get_doc_unauth(self._user_hash())
+        events.signal(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._user)
+        return doc
 
     def _assert_server_keys(self):
         """
@@ -491,6 +498,7 @@ class Soledad(object):
             assert result.fingerprints[0] == self._fingerprint
             assert remote_symkey == self._symkey
         else:
+            events.signal(events.SOLEDAD_UPLOADING_KEYS, self._user)
             privkey = self._gpg.export_keys(self._fingerprint, secret=True)
             content = {
                 '_privkey': self.encrypt(privkey,
@@ -502,6 +510,7 @@ class Soledad(object):
             doc = LeapDocument(doc_id=self._user_hash(), soledad=self)
             doc.content = content
             self._shared_db.put_doc(doc)
+            events.signal(events.SOLEDAD_DONE_UPLOADING_KEYS, self._user)
 
     def _assert_remote_keys(self):
         privkey, symkey = self._retrieve_keys()
@@ -742,7 +751,29 @@ class Soledad(object):
         @rtype: str
         """
         # TODO: create authentication scheme for sync with server.
-        return self._db.sync(url, creds=None, autocreate=True)
+        local_gen = self._db.sync(url, creds=None, autocreate=True)
+        events.signal(events.SOLEDAD_DONE_DATA_SYNC, self._user)
+        return local_gen
+
+    def need_sync(self, url):
+        """
+        Return if local db replica differs from remote url's replica.
+
+        @param url: The remote replica to compare with local replica.
+        @type url: str
+
+        @return: Whether remote replica and local replica differ.
+        @rtype: bool
+        """
+        # TODO: create auth scheme for sync with server
+        target = LeapSyncTarget(url, creds=None, soledad=self)
+        info = target.get_sync_info(self._db._get_replica_uid())
+        # compare source generation with target's last known source generation
+        if self._db._get_generation() != info[4]:
+            events.signal(events.SOLEDAD_NEW_DATA_TO_SYNC, self._user)
+            return True
+        return False
+
 
     #-------------------------------------------------------------------------
     # Recovery document export and import
