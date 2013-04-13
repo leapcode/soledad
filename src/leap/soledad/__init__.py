@@ -76,6 +76,27 @@ class Soledad(object):
     This class is also responsible for bootstrapping users' account by
     creating OpenPGP keys and other cryptographic secrets and/or
     storing/fetching them on Soledad server.
+
+    Soledad uses C{leap.common.events} to signal events. The possible events
+    to be signaled are:
+
+        SOLEDAD_CREATING_KEYS: emitted during bootstrap sequence when key
+            generation starts.
+        SOLEDAD_DONE_CREATING_KEYS: emitted during bootstrap sequence when key
+            generation finishes.
+        SOLEDAD_UPLOADING_KEYS: emitted during bootstrap sequence when soledad
+            starts sending keys to server.
+        SOLEDAD_DONE_UPLOADING_KEYS: emitted during bootstrap sequence when
+            soledad finishes sending keys to server.
+        SOLEDAD_DOWNLOADING_KEYS: emitted during bootstrap sequence when
+            soledad starts to retrieve keys from server.
+        SOLEDAD_DONE_DOWNLOADING_KEYS: emitted during bootstrap sequence when
+            soledad finishes downloading keys from server.
+        SOLEDAD_NEW_DATA_TO_SYNC: emitted upon call to C{need_sync()} when
+          there's indeed new data to be synchronized between local database
+          replica and server's replica.
+        SOLEDAD_DONE_DATA_SYNC: emitted inside C{sync()} method when it has
+            finished synchronizing with remote replica.
     """
 
     SECRET_LENGTH = 50
