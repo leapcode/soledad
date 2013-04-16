@@ -240,12 +240,12 @@ class Soledad(object):
         """
         Generate (if needed) and load secret for symmetric encryption.
         """
-        events.signal(events.SOLEDAD_CREATING_KEYS, self._user)
+        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._user)
         # load/generate secret
         if not self._has_symkey():
             self._gen_symkey()
         self._load_symkey()
-        events.signal(events.SOLEDAD_DONE_CREATING_KEYS, self._user)
+        events.signal(events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._user)
 
     def _init_db(self):
         """
@@ -385,12 +385,12 @@ class Soledad(object):
         @return: a document with encrypted key material in its contents
         @rtype: LeapDocument
         """
-        events.signal(events.SOLEDAD_DOWNLOADING_KEYS, self._user)
+        events.signal(events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._user)
         # TODO: change below to raise appropriate exceptions
         if not self._shared_db:
             return None
         doc = self._shared_db.get_doc_unauth(self._user_hash())
-        events.signal(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._user)
+        events.signal(events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._user)
         return doc
 
     def _assert_server_keys(self):
@@ -406,14 +406,14 @@ class Soledad(object):
                                          passphrase=self._user_hash())
             assert remote_symkey == self._symkey
         else:
-            events.signal(events.SOLEDAD_UPLOADING_KEYS, self._user)
+            events.signal(events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._user)
             content = {
                 '_symkey': self.encrypt(self._symkey),
             }
             doc = LeapDocument(doc_id=self._user_hash(), soledad=self)
             doc.content = content
             self._shared_db.put_doc(doc)
-            events.signal(events.SOLEDAD_DONE_UPLOADING_KEYS, self._user)
+            events.signal(events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._user)
 
     #-------------------------------------------------------------------------
     # Data encryption and decryption
@@ -653,7 +653,7 @@ class Soledad(object):
         """
         # TODO: create authentication scheme for sync with server.
         local_gen = self._db.sync(url, creds=None, autocreate=True)
-        events.signal(events.SOLEDAD_DONE_DATA_SYNC, self._user)
+        events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._user)
         return local_gen
 
     def need_sync(self, url):
@@ -671,7 +671,7 @@ class Soledad(object):
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
-            events.signal(events.SOLEDAD_NEW_DATA_TO_SYNC, self._user)
+            events.signal(events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._user)
             return True
         return False
 
