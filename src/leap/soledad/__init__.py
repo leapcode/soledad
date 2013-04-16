@@ -601,6 +601,19 @@ class Soledad(object):
                                  check_for_conflicts=check_for_conflicts,
                                  include_deleted=include_deleted)
 
+    def get_all_docs(self, include_deleted=False):
+        """Get the JSON content for all documents in the database.
+
+        @param include_deleted: If set to True, deleted documents will be
+            returned with empty content. Otherwise deleted documents will not
+            be included in the results.
+        @return: (generation, [Document])
+            The current generation of the database, followed by a list of all
+            the documents in the database.
+        """
+        return self._db.get_all_docs(include_deleted)
+
+
     def create_doc(self, content, doc_id=None):
         """
         Create a new document in the local encrypted database.
