@@ -35,8 +35,6 @@ class BaseSoledadTest(BaseLeapTest):
         self._soledad._init_dirs()
         self._soledad._gpg = GPGWrapper(gnupghome=self.gnupg_home)
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        if not self._soledad._has_privkey():
-            self._soledad._set_privkey(PRIVATE_KEY)
         if not self._soledad._has_symkey():
             self._soledad._gen_symkey()
         self._soledad._load_symkey()
@@ -53,6 +51,7 @@ class BaseSoledadTest(BaseLeapTest):
                           local_db_path='/soledad.u1db'):
         return Soledad(
             user,
+            '123',
             gnupg_home=self.tempdir+prefix+gnupg_home,
             secret_path=self.tempdir+prefix+secret_path,
             local_db_path=self.tempdir+prefix+local_db_path,

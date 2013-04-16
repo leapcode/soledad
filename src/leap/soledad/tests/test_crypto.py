@@ -78,9 +78,6 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(
             {
                 'user': self._soledad._user,
-                'privkey': self._soledad._gpg.export_keys(
-                    self._soledad._fingerprint,
-                    secret=True),
                 'symkey': self._soledad._symkey
             },
             json.loads(rd),
@@ -93,9 +90,6 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
                          self._soledad._gpg.is_encrypted_sym(rd))
         data = {
             'user': self._soledad._user,
-            'privkey': self._soledad._gpg.export_keys(
-                self._soledad._fingerprint,
-                secret=True),
             'symkey': self._soledad._symkey,
         }
         raw_data = json.loads(str(self._soledad._gpg.decrypt(
@@ -124,23 +118,11 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
-        self.assertEqual(self._soledad._fingerprint,
-                         s._fingerprint,
-                         'Failed settinng fingerprint.')
-        pk1 = self._soledad._gpg.export_keys(
-            self._soledad._fingerprint,
-            secret=True)
-        pk2 = s._gpg.export_keys(s._fingerprint, secret=True)
-        self.assertEqual(
-            pk1,
-            pk2,
-            'Failed settinng private key.'
-        )
 
     def test_import_recovery_document_crypt(self):
         rd = self._soledad.export_recovery_document('123456')
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
-        s = self._soledad_instance(user='anotheruser@leap.se')
+        s = self._soledad_instance(user='anotheruser@leap.se', prefix='3')
         s._init_dirs()
         s._gpg = GPGWrapper(gnupghome=gnupg_home)
         s.import_recovery_document(rd, '123456')
@@ -149,37 +131,14 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
-        self.assertEqual(self._soledad._fingerprint,
-                         s._fingerprint,
-                         'Failed settinng fingerprint.')
-        pk1 = self._soledad._gpg.export_keys(
-            self._soledad._fingerprint,
-            secret=True)
-        pk2 = s._gpg.export_keys(s._fingerprint, secret=True)
-        self.assertEqual(
-            pk1,
-            pk2,
-            'Failed settinng private key.'
-        )
 
 
 class CryptoMethodsTestCase(BaseSoledadTest):
-
-    def test__gen_privkey(self):
-        sol = self._soledad_instance(user='user@leap.se', prefix='/4')
-        sol._init_dirs()
-        sol._gpg = GPGWrapper(gnupghome="%s/gnupg2" % self.tempdir)
-        self.assertFalse(sol._has_privkey(), 'Should not have a private key '
-                                             'at this point.')
-        sol._gen_privkey()
-        self.assertTrue(sol._has_privkey(), 'Could not generate privkey.')
 
     def test__gen_symkey(self):
         sol = self._soledad_instance(user='user@leap.se', prefix='/3')
         sol._init_dirs()
         sol._gpg = GPGWrapper(gnupghome="%s/gnupg3" % self.tempdir)
-        if not sol._has_privkey():
-            sol._set_privkey(PRIVATE_KEY)
         self.assertFalse(sol._has_symkey(), "Should not have a symkey at "
                                             "this point")
         sol._gen_symkey()
@@ -189,9 +148,6 @@ class CryptoMethodsTestCase(BaseSoledadTest):
         sol = self._soledad_instance(user='leap@leap.se', prefix='/5')
         sol._init_dirs()
         sol._gpg = GPGWrapper(gnupghome=self.tempdir+"/5/gnupg")
-        self.assertFalse(sol._has_keys())
-        sol._set_privkey(PRIVATE_KEY)
-        sol._has_privkey()
         self.assertFalse(sol._has_keys())
         sol._gen_symkey()
         self.assertTrue(sol._has_keys())

@@ -145,7 +145,7 @@ class CouchDatabase(ObjectStoreDatabase):
             has_conflicts=has_conflicts)
         contents = self._database.get_attachment(cdoc, 'u1db_json')
         if contents:
-            doc.content = json.loads(contents.getvalue())
+            doc.content = json.loads(contents.read())
         else:
             doc.make_tombstone()
         return doc
@@ -313,7 +313,7 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         # retrieve u1db data from couch db
         cdoc = self._database.get(self.U1DB_DATA_DOC_ID)
-        jsonstr = self._database.get_attachment(cdoc, 'u1db_json').getvalue()
+        jsonstr = self._database.get_attachment(cdoc, 'u1db_json').read()
         content = json.loads(jsonstr)
         # set u1db database info
         #self._sync_log = content['sync_log']
@@ -410,7 +410,6 @@ class CouchServerState(ServerState):
         @rtype: CouchDatabase
         """
         # TODO: open couch
-        from leap.soledad.backends.couch import CouchDatabase
         return CouchDatabase.open_database(self.couch_url + '/' + dbname,
                                            create=False)
 

@@ -24,7 +24,7 @@ import os
 import logging
 
 
-from leap.config.baseconfig import BaseConfig
+from leap.common.config.baseconfig import BaseConfig
 
 
 logger = logging.getLogger(name=__name__)

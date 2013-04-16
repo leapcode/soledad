@@ -100,7 +100,7 @@ class LeapDocument(Document):
         """
         Return an encrypted JSON serialization of document's contents.
 
-        @return: The encrpted JSON serialization of document's contents.
+        @return: The encrypted JSON serialization of document's contents.
         @rtype: str
         """
         if not self._soledad:

@@ -51,8 +51,6 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol._init_dirs()
         sol._gpg = self._gpgwrapper_instance()
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        if not sol._has_privkey():
-            sol._set_privkey(PRIVATE_KEY)
         if not sol._has_symkey():
             sol._gen_symkey()
         sol._load_symkey()
@@ -64,7 +62,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         Test if configuration defaults point to the correct place.
         """
-        sol = Soledad(user='leap@leap.se', bootstrap=False)
+        sol = Soledad(user='leap@leap.se', passphrase='123', bootstrap=False)
         self.assertTrue(bool(re.match(
             '.*/\.config/leap/soledad/gnupg', sol._config.get_gnupg_home())))
         self.assertTrue(bool(re.match(
@@ -84,7 +82,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # we use regexp match here because HOME environment variable is
         # changed by the BaseLeapTest class but BaseConfig does not capture
         # that change.
-        sol = Soledad(user='leap@leap.se', bootstrap=False)
+        sol = Soledad(user='leap@leap.se', passphrase='123', bootstrap=False)
         self.assertTrue(bool(re.match(
             '.*/\.config/leap/soledad/gnupg', sol._config.get_gnupg_home())))
         self.assertTrue(bool(re.match(
@@ -116,6 +114,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         f.close()
         sol = Soledad(
             user='leap@leap.se',
+            passphrase='123', 
             bootstrap=False,
             config_path=tmpfile)
         self.assertEqual('value_1', sol._config.get_gnupg_home())
@@ -132,6 +131,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # that change.
         sol = Soledad(
             user='leap@leap.se',
+            passphrase='123', 
             bootstrap=False,
             gnupg_home='value_4',
             secret_path='value_3',

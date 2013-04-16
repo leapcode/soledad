@@ -22,8 +22,8 @@ Soledad - Synchronization Of Locally Encrypted Data Among Devices.
 Soledad is the part of LEAP that manages storage and synchronization of
 application data. It is built on top of U1DB reference Python API and
 implements (1) a SQLCipher backend for local storage in the client, (2) a
-SyncTarget that encrypts data to the user's private OpenPGP key before
-syncing, and (3) a CouchDB backend for remote storage in the server side.
+SyncTarget that encrypts data before syncing, and (3) a CouchDB backend for
+remote storage in the server side.
 """
 
 import os
@@ -39,8 +39,9 @@ except ImportError:
 
 
 from leap.common import events
-from leap.soledad.config import SoledadConfig
+#from leap.common.keymanager.gpgwrapper import GPGWrapper
 from leap.soledad.util import GPGWrapper
+from leap.soledad.config import SoledadConfig
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
@@ -74,8 +75,8 @@ class Soledad(object):
     database and synchronize this database with Soledad server.
 
     This class is also responsible for bootstrapping users' account by
-    creating OpenPGP keys and other cryptographic secrets and/or
-    storing/fetching them on Soledad server.
+    creating cryptographic secrets and/or storing/fetching them on Soledad
+    server.
 
     Soledad uses C{leap.common.events} to signal events. The possible events
     to be signaled are:
@@ -104,7 +105,7 @@ class Soledad(object):
     The length of the secret used for symmetric encryption.
     """
 
-    def __init__(self, user, config_path=None, gnupg_home=None,
+    def __init__(self, user, passphrase, config_path=None, gnupg_home=None,
                  secret_path=None, local_db_path=None,
                  shared_db_url=None, auth_token=None, bootstrap=True):
         """
@@ -112,11 +113,14 @@ class Soledad(object):
 
         @param user: Email address of the user (username@provider).
         @type user: str
+        @param passphrase: The passphrase for locking and unlocking encryption
+            secrets for disk storage.
+        @type passphrase: str
         @param config_path: Path for configuration file.
         @type config_path: str
         @param gnupg_home: Home directory for gnupg.
         @type gnupg_home: str
-        @param secret_path: Path for storing gpg-encrypted key used for
+        @param secret_path: Path for storing encrypted key used for
             symmetric encryption.
         @type secret_path: str
         @param local_db_path: Path for local encrypted storage db.
@@ -132,6 +136,7 @@ class Soledad(object):
         """
         # TODO: allow for fingerprint enforcing.
         self._user = user
+        self._passphrase = passphrase
         self._auth_token = auth_token
         self._init_config(
             config_path=config_path,
@@ -188,9 +193,8 @@ class Soledad(object):
             if not doc:
                 self._init_keys()
             else:
-                self._set_privkey(self.decrypt(doc.content['_privkey'],
-                                               passphrase=self._user_hash()))
-                self._set_symkey(self.decrypt(doc.content['_symkey']))
+                self._set_symkey(self.decrypt(doc.content['_symkey'],
+                                              passphrase=self._user_hash()))
         # Stage 2 - Keys synchronization
         self._assert_server_keys()
         # Stage 3 - Local database initialization
@@ -234,15 +238,9 @@ class Soledad(object):
 
     def _init_keys(self):
         """
-        Generate (if needed) and load OpenPGP keypair and secret for symmetric
-        encryption.
+        Generate (if needed) and load secret for symmetric encryption.
         """
-        # TODO: write tests for methods below.
-        # load/generate OpenPGP keypair
         events.signal(events.SOLEDAD_CREATING_KEYS, self._user)
-        if not self._has_privkey():
-            self._gen_privkey()
-        self._load_privkey()
         # load/generate secret
         if not self._has_symkey():
             self._gen_symkey()
@@ -288,19 +286,15 @@ class Soledad(object):
         # does the file exist in disk?
         if not os.path.isfile(self._config.get_secret_path()):
             return False
-        # is it asymmetrically encrypted?
+        # is it symmetrically encrypted?
         f = open(self._config.get_secret_path(), 'r')
         content = f.read()
-        if not self.is_encrypted_asym(content):
+        if not self.is_encrypted_sym(content):
             raise DocumentNotEncrypted(
                 "File %s is not encrypted!" % self._config.get_secret_path())
         # can we decrypt it?
-        fp = self._gpg.encrypted_to(content)['fingerprint']
-        if fp != self._fingerprint:
-            raise KeyDoesNotExist("Secret for symmetric encryption is "
-                                  "encrypted to key with fingerprint '%s' "
-                                  "which we don't have." % fp)
-        return True
+        result = self._gpg.decrypt(content, passphrase=self._passphrase)
+        return result.status == 'decryption ok'
 
     def _load_symkey(self):
         """
@@ -311,7 +305,8 @@ class Soledad(object):
                                   "encryption but it does not exist on disk.")
         try:
             with open(self._config.get_secret_path()) as f:
-                self._symkey = str(self._gpg.decrypt(f.read()))
+                self._symkey = str(
+                    self._gpg.decrypt(f.read(), passphrase=self._passphrase))
         except IOError:
             raise IOError('Failed to open secret file %s.' %
                           self._config.get_secret_path())
@@ -341,110 +336,11 @@ class Soledad(object):
         self._store_symkey()
 
     def _store_symkey(self):
-        ciphertext = self._gpg.encrypt(self._symkey, self._fingerprint,
-                                       self._fingerprint)
+        ciphertext = self._gpg.encrypt(self._symkey, '', symmetric=True,
+                                       passphrase=self._passphrase)
         f = open(self._config.get_secret_path(), 'w')
         f.write(str(ciphertext))
         f.close()
-
-    #-------------------------------------------------------------------------
-    # Management of OpenPGP keypair
-    #-------------------------------------------------------------------------
-
-    def _has_privkey(self):
-        """
-        Verify if there exists an OpenPGP keypair for this user.
-
-        @return: whether this soledad instance has a private OpenPGP key
-        @rtype: bool
-        """
-        try:
-            self._load_privkey()
-            return True
-        except:
-            return False
-
-    def _gen_privkey(self):
-        """
-        Generate an OpenPGP keypair for the user.
-
-        @return: the fingerprint of the generated key
-        @rtype: str
-        """
-        if self._has_privkey():
-            raise KeyAlreadyExists("Tried to generate OpenPGP keypair but it "
-                                   "already exists on disk.")
-        params = self._gpg.gen_key_input(
-            key_type='RSA',
-            key_length=4096,
-            name_real=self._user,
-            name_email=self._user,
-            name_comment='Generated by LEAP Soledad.')
-        fingerprint = self._gpg.gen_key(params).fingerprint
-        return self._load_privkey(fingerprint)
-
-    def _set_privkey(self, raw_data):
-        """
-        Set private OpenPGP key as the key to be used in this soledad instance.
-
-        @param raw_data: the private key blob
-        @type raw_data: str
-
-        @return: the fingerprint of the key passed as argument
-        @rtype: str
-        """
-        if self._has_privkey():
-            raise KeyAlreadyExists("Tried to define an OpenPGP keypair but "
-                                   "it already exists on disk.")
-        fingerprint = self._gpg.import_keys(raw_data).fingerprints[0]
-        return self._load_privkey(fingerprint)
-
-    def _load_privkey(self, fingerprint=None):
-        """
-        Assert private key exists in local keyring and load its fingerprint to
-        memory.
-
-        This method either looks for a key with fingerprint given by the
-        parameter or searches for a key bound to the user's email address if
-        no finfgerprint is provided.
-
-        Raises a LookupError if a key (either for the given fingerprint or for
-        self._user if that was not provided) was not found.
-
-        @param fingerprint: optional fingerprint for forcing a specific key to
-            be loaded
-        @type fingerprint: str
-
-        @return: the fingerprint of the loaded key
-        @rtype: str
-        """
-        # TODO: guarantee encrypted storage of private keys.
-        try:
-            if fingerprint:
-                self._fingerprint = self._gpg.find_key_by_fingerprint(
-                    fingerprint,
-                    secret=True)['fingerprint']
-            else:
-                self._fingerprint = self._gpg.find_key_by_email(
-                    self._user,
-                    secret=True)['fingerprint']
-            return self._fingerprint
-        except LookupError:
-            raise KeyDoesNotExist('OpenPGP private key but it does not exist '
-                                  'on local keyring.')
-
-    def publish_pubkey(self, keyserver):
-        """
-        Publish OpenPGP public key to a keyserver.
-
-        @param keyserver: the keyserver url
-        @type keyserver: str
-
-        @return: whether the action succeeded
-        @rtype: bool
-        """
-        # TODO: this has to talk to LEAP's Nickserver.
-        pass
 
     #-------------------------------------------------------------------------
     # General crypto utility methods.
@@ -452,27 +348,23 @@ class Soledad(object):
 
     def _has_keys(self):
         """
-        Return whether this instance has both the private OpenPGP key and the
-        key for symmetric encryption.
+        Return whether this instance has the key for symmetric encryption.
 
         @return: whether keys are available for this instance
         @rtype: bool
         """
-        return self._has_privkey() and self._has_symkey()
+        return self._has_symkey()
 
     def _load_keys(self):
         """
-        Load the OpenPGP private key and the key for symmetric encryption from
-        persistent storage.
+        Load the key for symmetric encryption from persistent storage.
         """
-        self._load_privkey()
         self._load_symkey()
 
     def _gen_keys(self):
         """
-        Generate an OpenPGP keypair and a key for symmetric encryption.
+        Generate a key for symmetric encryption.
         """
-        self._gen_privkey()
         self._gen_symkey()
 
     def _user_hash(self):
@@ -510,22 +402,12 @@ class Soledad(object):
             return
         doc = self._get_keys_doc()
         if doc:
-            remote_privkey = self.decrypt(doc.content['_privkey'],
-                                          # TODO: change passphrase.
-                                          passphrase=self._user_hash())
-            remote_symkey = self.decrypt(doc.content['_symkey'])
-            result = self._gpg.import_keys(remote_privkey)
-            # TODO: is the following behaviour not expected in any scenario?
-            assert result.fingerprints[0] == self._fingerprint
+            remote_symkey = self.decrypt(doc.content['_symkey'],
+                                         passphrase=self._user_hash())
             assert remote_symkey == self._symkey
         else:
             events.signal(events.SOLEDAD_UPLOADING_KEYS, self._user)
-            privkey = self._gpg.export_keys(self._fingerprint, secret=True)
             content = {
-                '_privkey': self.encrypt(privkey,
-                                         # TODO: change passphrase
-                                         passphrase=self._user_hash(),
-                                         symmetric=True),
                 '_symkey': self.encrypt(self._symkey),
             }
             doc = LeapDocument(doc_id=self._user_hash(), soledad=self)
@@ -533,14 +415,12 @@ class Soledad(object):
             self._shared_db.put_doc(doc)
             events.signal(events.SOLEDAD_DONE_UPLOADING_KEYS, self._user)
 
-    def _assert_remote_keys(self):
-        privkey, symkey = self._retrieve_keys()
-
     #-------------------------------------------------------------------------
     # Data encryption and decryption
     #-------------------------------------------------------------------------
 
-    def encrypt(self, data, sign=None, passphrase=None, symmetric=False):
+    def encrypt(self, data, fingerprint=None, sign=None, passphrase=None,
+                symmetric=False):
         """
         Encrypt data.
 
@@ -556,7 +436,7 @@ class Soledad(object):
         @return: the encrypted data
         @rtype: str
         """
-        return str(self._gpg.encrypt(data, self._fingerprint, sign=sign,
+        return str(self._gpg.encrypt(data, fingerprint, sign=sign,
                                      passphrase=passphrase,
                                      symmetric=symmetric))
 
@@ -828,7 +708,6 @@ class Soledad(object):
         """
         data = json.dumps({
             'user': self._user,
-            'privkey': self._gpg.export_keys(self._fingerprint, secret=True),
             'symkey': self._symkey,
         })
         if passphrase:
@@ -857,8 +736,6 @@ class Soledad(object):
             data = str(self._gpg.decrypt(data, passphrase=passphrase))
         data = json.loads(data)
         self._user = data['user']
-        self._gpg.import_keys(data['privkey'])
-        self._load_privkey()
         self._symkey = data['symkey']
         self._store_symkey()
         # TODO: make this work well with bootstrap.
