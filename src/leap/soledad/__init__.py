@@ -628,6 +628,25 @@ class Soledad(object):
         """
         return self._db.create_doc(content, doc_id=doc_id)
 
+    def create_doc_from_json(self, json, doc_id=None):
+        """
+        Create a new document.
+
+        You can optionally specify the document identifier, but the document
+        must not already exist. See 'put_doc' if you want to override an
+        existing document.
+        If the database specifies a maximum document size and the document
+        exceeds it, create will fail and raise a DocumentTooBig exception.
+
+        @param json: The JSON document string
+        @type json: str
+        @param doc_id: An optional identifier specifying the document id.
+        @type doc_id:
+        @return: The new cocument
+        @rtype: LeapDocument
+        """
+        return self._db.create_doc_from_json(json, doc_id=doc_id)
+
     def get_doc_conflicts(self, doc_id):
         """
         Get the list of conflicts for the given document.
