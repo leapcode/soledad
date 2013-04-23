@@ -25,8 +25,7 @@ from binascii import b2a_base64
 from hashlib import sha256
 
 
-from leap.common.keymanager import KeyManager
-from leap.soledad.util import GPGWrapper
+from leap.common.keymanager import openpgp
 
 
 class NoSymmetricSecret(Exception):
@@ -40,42 +39,32 @@ class SoledadCrypto(object):
     General cryptographic functionality.
     """
 
-    def __init__(self, gnupg_home, symkey=None):
+    def __init__(self, soledad):
         """
         Initialize the crypto object.
 
-        @param gnupg_home: Home of the gpg instance.
-        @type gnupg_home: str
-        @param symkey: A key to use for symmetric encryption.
-        @type symkey: str
+        @param soledad: A Soledad instance for key lookup.
+        @type soledad: leap.soledad.Soledad
         """
-        self._gpg = GPGWrapper(gnupghome=gnupg_home)
-        self._symkey = symkey
+        self._soledad = soledad
+        self._pgp = openpgp.OpenPGPScheme(self._soledad)
+        self._symkey = None
 
-    def encrypt(self, data, recipients=None, sign=None, passphrase=None,
-                symmetric=False):
+    def encrypt_asym(self, data, key):
         """
         Encrypt data.
 
         @param data: the data to be encrypted
         @type data: str
-        @param recipients: to whom C{data} should be encrypted 
-        @type recipients: list or str
-        @param sign: the fingerprint of key to be used for signature
-        @type sign: str
-        @param passphrase: the passphrase to be used for encryption
-        @type passphrase: str
-        @param symmetric: whether the encryption scheme should be symmetric
-        @type symmetric: bool
+        @param key: the key to be used for encryption
+        @type key: str
 
         @return: the encrypted data
         @rtype: str
         """
-        return str(self._gpg.encrypt(data, recipients, sign=sign,
-                                     passphrase=passphrase,
-                                     symmetric=symmetric))
+        return openpgp.encrypt_asym(data, key)
 
-    def encrypt_symmetric(self, data, passphrase, sign=None):
+    def encrypt_sym(self, data, passphrase):
         """
         Encrypt C{data} using a {password}.
 
@@ -83,18 +72,13 @@ class SoledadCrypto(object):
         @type data: str
         @param passphrase: the passphrase to use for encryption
         @type passphrase: str
-        @param data: the data to be encrypted
-        @param sign: the fingerprint of key to be used for signature
-        @type sign: str
 
         @return: the encrypted data
         @rtype: str
         """
-        return self.encrypt(data, sign=sign,
-                            passphrase=passphrase,
-                            symmetric=True)
+        return openpgp.encrypt_sym(data, passphrase)
 
-    def decrypt(self, data, passphrase=None):
+    def decrypt_asym(self, data):
         """
         Decrypt data.
 
@@ -106,9 +90,10 @@ class SoledadCrypto(object):
         @return: the decrypted data
         @rtype: str
         """
-        return str(self._gpg.decrypt(data, passphrase=passphrase))
+        key = self._pgp.get_key(self._soledad.address, private=True)
+        return openpgp.decrypt_asym(data, key)
 
-    def decrypt_symmetric(self, data, passphrase):
+    def decrypt_sym(self, data, passphrase):
         """
         Decrypt data using symmetric secret.
 
@@ -120,7 +105,7 @@ class SoledadCrypto(object):
         @return: the decrypted data
         @rtype: str
         """
-        return self.decrypt(data, passphrase=passphrase)
+        return openpgp.decrypt_sym(data, passphrase)
 
     def is_encrypted(self, data):
         """
@@ -132,7 +117,7 @@ class SoledadCrypto(object):
         @return: whether the data is a cyphertext
         @rtype: bool
         """
-        return self._gpg.is_encrypted(data)
+        return openpgp.is_encrypted(data)
 
     def is_encrypted_sym(self, data):
         """
@@ -141,7 +126,7 @@ class SoledadCrypto(object):
         @return: whether data is encrypted to a symmetric key
         @rtype: bool
         """
-        return self._gpg.is_encrypted_sym(data)
+        return openpgp.is_encrypted_sym(data)
 
     def is_encrypted_asym(self, data):
         """
@@ -151,14 +136,14 @@ class SoledadCrypto(object):
         @return: whether data is encrypted to an OpenPGP private key
         @rtype: bool
         """
-        return self._gpg.is_encrypted_asym(data)
+        return openpgp.is_encrypted_asym(data)
 
-    def _hash_passphrase(self, suffix):
+    def passphrase_hash(self, suffix):
         """
         Generate a passphrase for symmetric encryption.
 
-        The password is derived from C{suffix} and the secret for
-        symmetric encryption previously loaded.
+        The password is derived from the secret for symmetric encryption and
+        a C{suffix} that is appended to the secret prior to hashing.
 
         @param suffix: Will be appended to the symmetric key before hashing.
         @type suffix: str
@@ -172,9 +157,9 @@ class SoledadCrypto(object):
         return b2a_base64(
             sha256('%s%s' % (self._symkey, suffix)).digest())[:-1]
 
-   #
-   # symkey setters/getters
-   #
+    #
+    # symkey setters/getters
+    #
 
     def _get_symkey(self):
         return self._symkey

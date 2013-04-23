@@ -50,7 +50,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
     def test__init_db(self):
         sol = self._soledad_instance()
         sol._init_dirs()
-        sol._crypto = SoledadCrypto(self.tempdir+'/gnupg')
+        sol._crypto = SoledadCrypto(sol)
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
         if not sol._has_symkey():
             sol._gen_symkey()
@@ -63,7 +63,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         Test if configuration defaults point to the correct place.
         """
-        sol = Soledad(user='leap@leap.se', passphrase='123', bootstrap=False)
+        sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False)
         self.assertTrue(bool(re.match(
             '.*/\.config/leap/soledad/gnupg', sol._config.get_gnupg_home())))
         self.assertTrue(bool(re.match(
@@ -83,7 +83,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # we use regexp match here because HOME environment variable is
         # changed by the BaseLeapTest class but BaseConfig does not capture
         # that change.
-        sol = Soledad(user='leap@leap.se', passphrase='123', bootstrap=False)
+        sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False)
         self.assertTrue(bool(re.match(
             '.*/\.config/leap/soledad/gnupg', sol._config.get_gnupg_home())))
         self.assertTrue(bool(re.match(
@@ -114,8 +114,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
         f.write(json.dumps(config_values))
         f.close()
         sol = Soledad(
-            user='leap@leap.se',
-            passphrase='123', 
+            'leap@leap.se',
+            passphrase='123',
             bootstrap=False,
             config_path=tmpfile)
         self.assertEqual('value_1', sol._config.get_gnupg_home())
@@ -131,8 +131,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # changed by the BaseLeapTest class but BaseConfig does not capture
         # that change.
         sol = Soledad(
-            user='leap@leap.se',
-            passphrase='123', 
+            'leap@leap.se',
+            passphrase='123',
             bootstrap=False,
             gnupg_home='value_4',
             secret_path='value_3',

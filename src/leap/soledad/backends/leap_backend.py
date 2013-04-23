@@ -35,6 +35,9 @@ from u1db.remote.http_database import HTTPDatabase
 from u1db.errors import BrokenSyncStream
 
 
+from leap.common.keymanager import KeyManager
+
+
 class NoDefaultKey(Exception):
     """
     Exception to signal that there's no default OpenPGP key configured.
@@ -120,18 +123,18 @@ class LeapDocument(Document):
         """
         if not self._crypto:
             raise NoSoledadCryptoInstance()
-        return self._crypto.encrypt_symmetric(
+        return self._crypto.encrypt_sym(
             self.get_json(),
-            self._crypto._hash_passphrase(self.doc_id))
+            self._crypto.passphrase_hash(self.doc_id))
 
     def set_encrypted_content(self, cyphertext):
         """
         Decrypt C{cyphertext} and set document's content.
         contents.
         """
-        plaintext = self._crypto.decrypt_symmetric(
+        plaintext = self._crypto.decrypt_sym(
             cyphertext,
-            self._crypto._hash_passphrase(self.doc_id))
+            self._crypto.passphrase_hash(self.doc_id))
         self.set_json(plaintext)
         self.encryption_scheme = EncryptionSchemes.NONE
 
@@ -299,14 +302,14 @@ class LeapSyncTarget(HTTPSyncTarget):
                         raise DocumentNotEncrypted(
                             'Incoming document\'s contents should be '
                             'encrypted with a symmetric key.')
-                    plain_json = self._crypto.decrypt_symmetric(
+                    plain_json = self._crypto.decrypt_sym(
                         enc_json, self._crypto._symkey)
                 elif entry['encryption_scheme'] == EncryptionScheme.PUBKEY:
                     if not self._crypto.is_encrypted_asym(enc_json):
                         raise DocumentNotEncrypted(
                             'Incoming document\'s contents should be '
                             'encrypted to the user\'s public key.')
-                    plain_json = self._crypto.decrypt(enc_json)
+                    plain_json = self._crypto.decrypt_asym(enc_json)
                 else:
                     raise DocumentNotEncrypted(
                         "Incoming document from sync is not encrypted.")

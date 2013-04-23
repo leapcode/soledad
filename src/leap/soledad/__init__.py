@@ -43,7 +43,6 @@ from hashlib import sha256
 
 
 from leap.common import events
-#from leap.common.keymanager.gpgwrapper import GPGWrapper
 from leap.soledad.config import SoledadConfig
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
@@ -108,14 +107,14 @@ class Soledad(object):
     The length of the secret used for symmetric encryption.
     """
 
-    def __init__(self, user, passphrase, config_path=None, gnupg_home=None,
+    def __init__(self, address, passphrase, config_path=None, gnupg_home=None,
                  secret_path=None, local_db_path=None,
                  shared_db_url=None, auth_token=None, bootstrap=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
-        @param user: Email address of the user (username@provider).
-        @type user: str
+        @param address: User's address in the form C{user@provider}.
+        @type address: str
         @param passphrase: The passphrase for locking and unlocking encryption
             secrets for disk storage.
         @type passphrase: str
@@ -138,7 +137,7 @@ class Soledad(object):
         @type bootstrap: bool
         """
         # TODO: allow for fingerprint enforcing.
-        self._user = user
+        self._address = address
         self._passphrase = passphrase
         self._auth_token = auth_token
         self._init_config(
@@ -179,7 +178,7 @@ class Soledad(object):
         # TODO: log each bootstrap step.
         # Stage 0  - Local environment setup
         self._init_dirs()
-        self._crypto = SoledadCrypto(self._config.get_gnupg_home())
+        self._crypto = SoledadCrypto(self)
         if self._config.get_shared_db_url() and self._auth_token:
             # TODO: eliminate need to create db here.
             self._shared_db = SoledadSharedDatabase.open_database(
@@ -192,12 +191,14 @@ class Soledad(object):
         if self._has_keys():
             self._load_keys()
         else:
-            doc = self._get_keys_doc()
+            doc = self._fetch_keys_from_shared_db()
             if not doc:
                 self._init_keys()
             else:
-                self._set_symkey(self.decrypt(doc.content['_symkey'],
-                                              passphrase=self._hash_user()))
+                self._set_symkey(
+                    self._crypto.decrypt_sym(
+                        doc.content['_symkey'],
+                        passphrase=self._address_hash()))
         # Stage 2 - Keys synchronization
         self._assert_server_keys()
         # Stage 3 - Local database initialization
@@ -243,12 +244,13 @@ class Soledad(object):
         """
         Generate (if needed) and load secret for symmetric encryption.
         """
-        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._user)
+        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._address)
         # load/generate secret
         if not self._has_symkey():
             self._gen_symkey()
         self._load_symkey()
-        events.signal(events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._user)
+        events.signal(
+            events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._address)
 
     def _init_db(self):
         """
@@ -293,7 +295,8 @@ class Soledad(object):
             raise DocumentNotEncrypted(
                 "File %s is not encrypted!" % self._config.get_secret_path())
         # can we decrypt it?
-        cyphertext = self._crypto.decrypt(content, passphrase=self._passphrase)
+        cyphertext = self._crypto.decrypt_sym(
+            content, passphrase=self._passphrase)
         return bool(cyphertext)
 
     def _load_symkey(self):
@@ -306,7 +309,8 @@ class Soledad(object):
         try:
             with open(self._config.get_secret_path()) as f:
                 self._symkey = \
-                    self._crypto.decrypt(f.read(), passphrase=self._passphrase)
+                    self._crypto.decrypt_sym(
+                        f.read(), passphrase=self._passphrase)
                 self._crypto.symkey = self._symkey
         except IOError:
             raise IOError('Failed to open secret file %s.' %
@@ -317,10 +321,11 @@ class Soledad(object):
         Generate a secret for symmetric encryption and store in a local
         encrypted file.
         """
-        self._set_symkey(''.join(
+        symkey = ''.join(
             random.choice(
                 string.ascii_letters +
-                string.digits) for x in range(self.SECRET_LENGTH)))
+                string.digits) for x in range(self.SECRET_LENGTH))
+        self._set_symkey(symkey)
 
     def _set_symkey(self, symkey):
         """
@@ -338,9 +343,8 @@ class Soledad(object):
         self._store_symkey()
 
     def _store_symkey(self):
-        ciphertext = self._crypto.encrypt(
-            self._symkey, symmetric=True,
-            passphrase=self._passphrase)
+        ciphertext = self._crypto.encrypt_sym(
+            self._symkey, self._passphrase)
         f = open(self._config.get_secret_path(), 'w')
         f.write(str(ciphertext))
         f.close()
@@ -370,7 +374,7 @@ class Soledad(object):
         """
         self._gen_symkey()
 
-    def _hash_user(self):
+    def _address_hash(self):
         """
         Calculate a hash for storing/retrieving key material on shared
         database, based on user's address.
@@ -379,9 +383,9 @@ class Soledad(object):
         @rtype: str
         """
         return b2a_base64(
-            sha256('user-%s' % self._user).digest())[:-1]
+            sha256('address-%s' % self._address).digest())[:-1]
 
-    def _get_keys_doc(self):
+    def _fetch_keys_from_shared_db(self):
         """
         Retrieve the document with encrypted key material from the shared
         database.
@@ -389,12 +393,14 @@ class Soledad(object):
         @return: a document with encrypted key material in its contents
         @rtype: LeapDocument
         """
-        events.signal(events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._user)
+        events.signal(
+            events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._address)
         # TODO: change below to raise appropriate exceptions
         if not self._shared_db:
             return None
-        doc = self._shared_db.get_doc_unauth(self._hash_user())
-        events.signal(events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._user)
+        doc = self._shared_db.get_doc_unauth(self._address_hash())
+        events.signal(
+            events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._address)
         return doc
 
     def _assert_server_keys(self):
@@ -404,20 +410,24 @@ class Soledad(object):
         assert self._has_keys()
         if not self._shared_db:
             return
-        doc = self._get_keys_doc()
+        doc = self._fetch_keys_from_shared_db()
         if doc:
-            remote_symkey = self.decrypt(doc.content['_symkey'],
-                                         passphrase=self._hash_user())
+            remote_symkey = self.decrypt_sym(
+                doc.content['_symkey'],
+                passphrase=self._address_hash())
             assert remote_symkey == self._symkey
         else:
-            events.signal(events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._user)
+            events.signal(
+                events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._address)
             content = {
-                '_symkey': self.encrypt(self._symkey),
+                '_symkey': self.encrypt_sym(self._symkey, self._passphrase),
             }
-            doc = LeapDocument(doc_id=self._hash_user(), crypto=self._crypto)
+            doc = LeapDocument(doc_id=self._address_hash(),
+                               crypto=self._crypto)
             doc.content = content
             self._shared_db.put_doc(doc)
-            events.signal(events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._user)
+            events.signal(
+                events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._address)
 
     #-------------------------------------------------------------------------
     # Document storage, retrieval and sync
@@ -497,7 +507,6 @@ class Soledad(object):
         """
         return self._db.get_all_docs(include_deleted)
 
-
     def create_doc(self, content, doc_id=None):
         """
         Create a new document in the local encrypted database.
@@ -569,7 +578,7 @@ class Soledad(object):
         """
         # TODO: create authentication scheme for sync with server.
         local_gen = self._db.sync(url, creds=None, autocreate=True)
-        events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._user)
+        events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._address)
         return local_gen
 
     def need_sync(self, url):
@@ -587,10 +596,10 @@ class Soledad(object):
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
-            events.signal(events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._user)
+            events.signal(
+                events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._address)
             return True
         return False
-
 
     #-------------------------------------------------------------------------
     # Recovery document export and import
@@ -623,13 +632,11 @@ class Soledad(object):
         @rtype: str
         """
         data = json.dumps({
-            'user': self._user,
+            'address': self._address,
             'symkey': self._symkey,
         })
         if passphrase:
-            data = self._crypto.encrypt(data, None, sign=None,
-                                        passphrase=passphrase,
-                                        symmetric=True)
+            data = self._crypto.encrypt_sym(data, passphrase)
         return data
 
     def import_recovery_document(self, data, passphrase=None):
@@ -649,14 +656,23 @@ class Soledad(object):
             raise DocumentNotEncrypted("You provided a password but the "
                                        "recovery document is not encrypted.")
         if passphrase:
-            data = str(self._crypto.decrypt(data, passphrase=passphrase))
+            data = self._crypto.decrypt_sym(data, passphrase=passphrase)
         data = json.loads(data)
-        self._user = data['user']
+        self._address = data['address']
         self._symkey = data['symkey']
         self._crypto.symkey = self._symkey
         self._store_symkey()
         # TODO: make this work well with bootstrap.
         self._load_keys()
+
+    #
+    # Setters/getters
+    #
+
+    def _get_address(self):
+        return self._address
+
+    address = property(_get_address, doc='The user address.')
 
 
 __all__ = ['backends', 'util', 'server', 'shared_db']

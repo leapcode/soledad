@@ -77,7 +77,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document(None)
         self.assertEqual(
             {
-                'user': self._soledad._user,
+                'address': self._soledad._address,
                 'symkey': self._soledad._symkey
             },
             json.loads(rd),
@@ -89,10 +89,10 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(True,
                          self._soledad._crypto.is_encrypted_sym(rd))
         data = {
-            'user': self._soledad._user,
+            'address': self._soledad._address,
             'symkey': self._soledad._symkey,
         }
-        raw_data = json.loads(str(self._soledad._crypto.decrypt(
+        raw_data = json.loads(str(self._soledad._crypto.decrypt_sym(
             rd,
             passphrase='123456')))
         self.assertEqual(
@@ -111,10 +111,10 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
         s._init_dirs()
-        s._crypto = SoledadCrypto(gnupg_home)
+        s._crypto = SoledadCrypto(s)
         s.import_recovery_document(rd, None)
-        self.assertEqual(self._soledad._user,
-                         s._user, 'Failed setting user email.')
+        self.assertEqual(self._soledad._address,
+                         s._address, 'Failed setting user email.')
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
@@ -124,10 +124,10 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='3')
         s._init_dirs()
-        s._crypto = SoledadCrypto(gnupg_home)
+        s._crypto = SoledadCrypto(s)
         s.import_recovery_document(rd, '123456')
-        self.assertEqual(self._soledad._user,
-                         s._user, 'Failed setting user email.')
+        self.assertEqual(self._soledad._address,
+                         s._address, 'Failed setting user email.')
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
@@ -138,7 +138,7 @@ class CryptoMethodsTestCase(BaseSoledadTest):
     def test__gen_symkey(self):
         sol = self._soledad_instance(user='user@leap.se', prefix='/3')
         sol._init_dirs()
-        sol._crypto = SoledadCrypto("%s/3/gnupg" % self.tempdir)
+        sol._crypto = SoledadCrypto(sol)
         self.assertFalse(sol._has_symkey(), "Should not have a symkey at "
                                             "this point")
         sol._gen_symkey()
@@ -147,7 +147,7 @@ class CryptoMethodsTestCase(BaseSoledadTest):
     def test__has_keys(self):
         sol = self._soledad_instance(user='leap@leap.se', prefix='/5')
         sol._init_dirs()
-        sol._crypto = SoledadCrypto("%s/5/gnupg" % self.tempdir)
+        sol._crypto = SoledadCrypto(sol)
         self.assertFalse(sol._has_keys())
         sol._gen_symkey()
         self.assertTrue(sol._has_keys())

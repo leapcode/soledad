@@ -36,7 +36,7 @@ class BaseSoledadTest(BaseLeapTest):
         self._soledad = self._soledad_instance(user=self.email)
         self._soledad._init_dirs()
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        self._soledad._crypto = SoledadCrypto(self.gnupg_home)
+        self._soledad._crypto = SoledadCrypto(self._soledad)
         if not self._soledad._has_symkey():
             self._soledad._gen_symkey()
         self._soledad._load_symkey()
