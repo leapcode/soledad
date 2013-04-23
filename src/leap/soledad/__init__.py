@@ -29,7 +29,7 @@ remote storage in the server side.
 import os
 import string
 import random
-import hmac
+import hashlib
 import configparser
 import re
 try:
@@ -38,9 +38,12 @@ except ImportError:
     import json  # noqa
 
 
+from binascii import b2a_base64
+from hashlib import sha256
+
+
 from leap.common import events
 #from leap.common.keymanager.gpgwrapper import GPGWrapper
-from leap.soledad.util import GPGWrapper
 from leap.soledad.config import SoledadConfig
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
@@ -176,7 +179,7 @@ class Soledad(object):
         # TODO: log each bootstrap step.
         # Stage 0  - Local environment setup
         self._init_dirs()
-        self._gpg = GPGWrapper(gnupghome=self._config.get_gnupg_home())
+        self._crypto = SoledadCrypto(self._config.get_gnupg_home())
         if self._config.get_shared_db_url() and self._auth_token:
             # TODO: eliminate need to create db here.
             self._shared_db = SoledadSharedDatabase.open_database(
@@ -194,7 +197,7 @@ class Soledad(object):
                 self._init_keys()
             else:
                 self._set_symkey(self.decrypt(doc.content['_symkey'],
-                                              passphrase=self._user_hash()))
+                                              passphrase=self._hash_user()))
         # Stage 2 - Keys synchronization
         self._assert_server_keys()
         # Stage 3 - Local database initialization
@@ -259,7 +262,7 @@ class Soledad(object):
             self._symkey,
             create=True,
             document_factory=LeapDocument,
-            soledad=self)
+            crypto=self._crypto)
 
     def close(self):
         """
@@ -270,9 +273,6 @@ class Soledad(object):
     #-------------------------------------------------------------------------
     # Management of secret for symmetric encryption
     #-------------------------------------------------------------------------
-
-    # TODO: refactor the following methods to somewhere out of here
-    # (a new class SoledadCrypto, maybe?)
 
     def _has_symkey(self):
         """
@@ -289,12 +289,12 @@ class Soledad(object):
         # is it symmetrically encrypted?
         f = open(self._config.get_secret_path(), 'r')
         content = f.read()
-        if not self.is_encrypted_sym(content):
+        if not self._crypto.is_encrypted_sym(content):
             raise DocumentNotEncrypted(
                 "File %s is not encrypted!" % self._config.get_secret_path())
         # can we decrypt it?
-        result = self._gpg.decrypt(content, passphrase=self._passphrase)
-        return result.status == 'decryption ok'
+        cyphertext = self._crypto.decrypt(content, passphrase=self._passphrase)
+        return bool(cyphertext)
 
     def _load_symkey(self):
         """
@@ -305,8 +305,9 @@ class Soledad(object):
                                   "encryption but it does not exist on disk.")
         try:
             with open(self._config.get_secret_path()) as f:
-                self._symkey = str(
-                    self._gpg.decrypt(f.read(), passphrase=self._passphrase))
+                self._symkey = \
+                    self._crypto.decrypt(f.read(), passphrase=self._passphrase)
+                self._crypto.symkey = self._symkey
         except IOError:
             raise IOError('Failed to open secret file %s.' %
                           self._config.get_secret_path())
@@ -333,11 +334,13 @@ class Soledad(object):
                                    "symmetric encryption but it already "
                                    "exists on disk.")
         self._symkey = symkey
+        self._crypto.symkey = self._symkey
         self._store_symkey()
 
     def _store_symkey(self):
-        ciphertext = self._gpg.encrypt(self._symkey, '', symmetric=True,
-                                       passphrase=self._passphrase)
+        ciphertext = self._crypto.encrypt(
+            self._symkey, symmetric=True,
+            passphrase=self._passphrase)
         f = open(self._config.get_secret_path(), 'w')
         f.write(str(ciphertext))
         f.close()
@@ -367,15 +370,16 @@ class Soledad(object):
         """
         self._gen_symkey()
 
-    def _user_hash(self):
+    def _hash_user(self):
         """
         Calculate a hash for storing/retrieving key material on shared
-        database, based on user's email.
+        database, based on user's address.
 
         @return: the hash
         @rtype: str
         """
-        return hmac.new(self._user, 'user').hexdigest()
+        return b2a_base64(
+            sha256('user-%s' % self._user).digest())[:-1]
 
     def _get_keys_doc(self):
         """
@@ -389,7 +393,7 @@ class Soledad(object):
         # TODO: change below to raise appropriate exceptions
         if not self._shared_db:
             return None
-        doc = self._shared_db.get_doc_unauth(self._user_hash())
+        doc = self._shared_db.get_doc_unauth(self._hash_user())
         events.signal(events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._user)
         return doc
 
@@ -403,137 +407,17 @@ class Soledad(object):
         doc = self._get_keys_doc()
         if doc:
             remote_symkey = self.decrypt(doc.content['_symkey'],
-                                         passphrase=self._user_hash())
+                                         passphrase=self._hash_user())
             assert remote_symkey == self._symkey
         else:
             events.signal(events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._user)
             content = {
                 '_symkey': self.encrypt(self._symkey),
             }
-            doc = LeapDocument(doc_id=self._user_hash(), soledad=self)
+            doc = LeapDocument(doc_id=self._hash_user(), crypto=self._crypto)
             doc.content = content
             self._shared_db.put_doc(doc)
             events.signal(events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._user)
-
-    #-------------------------------------------------------------------------
-    # Data encryption and decryption
-    #-------------------------------------------------------------------------
-
-    def encrypt(self, data, fingerprint=None, sign=None, passphrase=None,
-                symmetric=False):
-        """
-        Encrypt data.
-
-        @param data: the data to be encrypted
-        @type data: str
-        @param sign: the fingerprint of key to be used for signature
-        @type sign: str
-        @param passphrase: the passphrase to be used for encryption
-        @type passphrase: str
-        @param symmetric: whether the encryption scheme should be symmetric
-        @type symmetric: bool
-
-        @return: the encrypted data
-        @rtype: str
-        """
-        return str(self._gpg.encrypt(data, fingerprint, sign=sign,
-                                     passphrase=passphrase,
-                                     symmetric=symmetric))
-
-    def encrypt_symmetric(self, doc_id, data, sign=None):
-        """
-        Encrypt data using a password.
-
-        The password is derived from the document id and the secret for
-        symmetric encryption previously generated/loaded.
-
-        @param doc_id: the document id
-        @type doc_id: str
-        @param data: the data to be encrypted
-        @type data: str
-        @param sign: the fingerprint of key to be used for signature
-        @type sign: str
-
-        @return: the encrypted data
-        @rtype: str
-        """
-        return self.encrypt(data, sign=sign,
-                            passphrase=self._hmac_passphrase(doc_id),
-                            symmetric=True)
-
-    def decrypt(self, data, passphrase=None):
-        """
-        Decrypt data.
-
-        @param data: the data to be decrypted
-        @type data: str
-        @param passphrase: the passphrase to be used for decryption
-        @type passphrase: str
-
-        @return: the decrypted data
-        @rtype: str
-        """
-        return str(self._gpg.decrypt(data, passphrase=passphrase))
-
-    def decrypt_symmetric(self, doc_id, data):
-        """
-        Decrypt data using symmetric secret.
-
-        @param doc_id: the document id
-        @type doc_id: str
-        @param data: the data to be decrypted
-        @type data: str
-
-        @return: the decrypted data
-        @rtype: str
-        """
-        return self.decrypt(data, passphrase=self._hmac_passphrase(doc_id))
-
-    def _hmac_passphrase(self, doc_id):
-        """
-        Generate a passphrase for symmetric encryption.
-
-        The password is derived from the document id and the secret for
-        symmetric encryption previously generated/loaded.
-
-        @param doc_id: the document id
-        @type doc_id: str
-
-        @return: the passphrase
-        @rtype: str
-        """
-        return hmac.new(self._symkey, doc_id).hexdigest()
-
-    def is_encrypted(self, data):
-        """
-        Test whether some chunk of data is a cyphertext.
-
-        @param data: the data to be tested
-        @type data: str
-
-        @return: whether the data is a cyphertext
-        @rtype: bool
-        """
-        return self._gpg.is_encrypted(data)
-
-    def is_encrypted_sym(self, data):
-        """
-        Test whether some chunk of data was encrypted with a symmetric key.
-
-        @return: whether data is encrypted to a symmetric key
-        @rtype: bool
-        """
-        return self._gpg.is_encrypted_sym(data)
-
-    def is_encrypted_asym(self, data):
-        """
-        Test whether some chunk of data was encrypted to an OpenPGP private
-        key.
-
-        @return: whether data is encrypted to an OpenPGP private key
-        @rtype: bool
-        """
-        return self._gpg.is_encrypted_asym(data)
 
     #-------------------------------------------------------------------------
     # Document storage, retrieval and sync
@@ -699,7 +583,7 @@ class Soledad(object):
         @rtype: bool
         """
         # TODO: create auth scheme for sync with server
-        target = LeapSyncTarget(url, creds=None, soledad=self)
+        target = LeapSyncTarget(url, creds=None, crypto=self._crypto)
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
@@ -743,9 +627,9 @@ class Soledad(object):
             'symkey': self._symkey,
         })
         if passphrase:
-            data = str(self._gpg.encrypt(data, None, sign=None,
-                                         passphrase=passphrase,
-                                         symmetric=True))
+            data = self._crypto.encrypt(data, None, sign=None,
+                                        passphrase=passphrase,
+                                        symmetric=True)
         return data
 
     def import_recovery_document(self, data, passphrase=None):
@@ -761,14 +645,15 @@ class Soledad(object):
         if self._has_keys():
             raise KeyAlreadyExists("You tried to import a recovery document "
                                    "but secret keys are already present.")
-        if passphrase and not self._gpg.is_encrypted_sym(data):
+        if passphrase and not self._crypto.is_encrypted_sym(data):
             raise DocumentNotEncrypted("You provided a password but the "
                                        "recovery document is not encrypted.")
         if passphrase:
-            data = str(self._gpg.decrypt(data, passphrase=passphrase))
+            data = str(self._crypto.decrypt(data, passphrase=passphrase))
         data = json.loads(data)
         self._user = data['user']
         self._symkey = data['symkey']
+        self._crypto.symkey = self._symkey
         self._store_symkey()
         # TODO: make this work well with bootstrap.
         self._load_keys()

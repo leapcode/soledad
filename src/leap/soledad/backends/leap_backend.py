@@ -42,7 +42,7 @@ class NoDefaultKey(Exception):
     pass
 
 
-class NoSoledadInstance(Exception):
+class NoSoledadCryptoInstance(Exception):
     """
     Exception to signal that no Soledad instance was found.
     """
@@ -69,7 +69,7 @@ class LeapDocument(Document):
     """
 
     def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False,
-                 encrypted_json=None, soledad=None, syncable=True):
+                 encrypted_json=None, crypto=None, syncable=True):
         """
         Container for handling an encryptable document.
 
@@ -84,14 +84,14 @@ class LeapDocument(Document):
         @param encrypted_json: The encrypted JSON string for this document. If
             given, the decrypted value supersedes any raw json string given.
         @type encrypted_json: str
-        @param soledad: An instance of Soledad so we can encrypt/decrypt
+        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type soledad: soledad.Soledad
+        @type crypto: soledad.Soledad
         @param syncable: Should this document be synced with remote replicas?
         @type syncable: bool
         """
         Document.__init__(self, doc_id, rev, json, has_conflicts)
-        self._soledad = soledad
+        self._crypto = crypto
         self._syncable = syncable
         if encrypted_json:
             self.set_encrypted_json(encrypted_json)
@@ -103,17 +103,20 @@ class LeapDocument(Document):
         @return: The encrypted JSON serialization of document's contents.
         @rtype: str
         """
-        if not self._soledad:
-            raise NoSoledadInstance()
-        return self._soledad.encrypt_symmetric(self.doc_id,
-                                               self.get_json())
+        if not self._crypto:
+            raise NoSoledadCryptoInstance()
+        return self._crypto.encrypt_symmetric(
+            self.get_json(),
+            self._crypto._hash_passphrase(self.doc_id))
 
     def set_encrypted_content(self, cyphertext):
         """
         Decrypt C{cyphertext} and set document's content.
         contents.
         """
-        plaintext = self._soledad.decrypt_symmetric(self.doc_id, cyphertext)
+        plaintext = self._crypto.decrypt_symmetric(
+            cyphertext,
+            self._crypto._hash_passphrase(self.doc_id))
         self.set_json(plaintext)
 
     def get_encrypted_json(self):
@@ -131,8 +134,8 @@ class LeapDocument(Document):
         Set document's content based on a valid JSON string containing the
         encrypted document's contents.
         """
-        if not self._soledad:
-            raise NoSoledadInstance()
+        if not self._crypto:
+            raise NoSoledadCryptoInstance()
         cyphertext = json.loads(encrypted_json)['_encrypted_json']
         self.set_encrypted_content(cyphertext)
 
@@ -196,7 +199,7 @@ class LeapSyncTarget(HTTPSyncTarget):
     receiving.
     """
 
-    def __init__(self, url, creds=None, soledad=None):
+    def __init__(self, url, creds=None, crypto=None):
         """
         Initialize the LeapSyncTarget.
 
@@ -210,7 +213,7 @@ class LeapSyncTarget(HTTPSyncTarget):
         @type soledad: soledad.Soledad
         """
         HTTPSyncTarget.__init__(self, url, creds)
-        self._soledad = soledad
+        self._crypto = crypto
 
     def _parse_sync_stream(self, data, return_doc_cb, ensure_callback=None):
         """
@@ -244,15 +247,15 @@ class LeapSyncTarget(HTTPSyncTarget):
                 line, comma = utils.check_and_strip_comma(entry)
                 entry = json.loads(line)
                 # decrypt after receiving from server.
-                if not self._soledad:
-                    raise NoSoledadInstance()
+                if not self._crypto:
+                    raise NoSoledadCryptoInstance()
                 enc_json = json.loads(entry['content'])['_encrypted_json']
-                if not self._soledad.is_encrypted_sym(enc_json):
+                if not self._crypto.is_encrypted_sym(enc_json):
                     raise DocumentNotEncrypted(
                         "Incoming document from sync is not encrypted.")
                 doc = LeapDocument(entry['id'], entry['rev'],
                                    encrypted_json=entry['content'],
-                                   soledad=self._soledad)
+                                   crypto=self._crypto)
                 return_doc_cb(doc, entry['gen'], entry['trans_id'])
         if parts[-1] != ']':
             try:
@@ -300,7 +303,7 @@ class LeapSyncTarget(HTTPSyncTarget):
                 # encrypt and verify before sending to server.
                 enc_json = json.loads(
                     doc.get_encrypted_json())['_encrypted_json']
-                if not self._soledad.is_encrypted_sym(enc_json):
+                if not self._crypto.is_encrypted_sym(enc_json):
                     raise DocumentNotEncrypted(
                         "Could not encrypt document before sync.")
                 size += prepare(id=doc.doc_id, rev=doc.rev,

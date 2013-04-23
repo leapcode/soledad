@@ -28,7 +28,7 @@ def make_leap_document_for_test(test, doc_id, rev, content,
                                 has_conflicts=False):
     return leap_backend.LeapDocument(
         doc_id, rev, content, has_conflicts=has_conflicts,
-        soledad=test._soledad)
+        crypto=test._soledad._crypto)
 
 
 def make_leap_encrypted_document_for_test(test, doc_id, rev, encrypted_content,
@@ -36,7 +36,7 @@ def make_leap_encrypted_document_for_test(test, doc_id, rev, encrypted_content,
     return leap_backend.LeapDocument(
         doc_id, rev, encrypted_json=encrypted_content,
         has_conflicts=has_conflicts,
-        soledad=test._soledad)
+        crypto=test._soledad.crypto)
 
 
 LEAP_SCENARIOS = [
@@ -134,7 +134,7 @@ class TestLeapParsingSyncStream(test_remote_sync_target.TestParsingSyncStream):
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n{},\r\n]", None)
-        self.assertRaises(leap_backend.NoSoledadInstance,
+        self.assertRaises(leap_backend.NoSoledadCryptoInstance,
                           tgt._parse_sync_stream,
                           '[\r\n{},\r\n{"id": "i", "rev": "r", '
                           '"content": "{}", "gen": 3, "trans_id": "T-sid"}'

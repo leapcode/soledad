@@ -38,7 +38,7 @@ from u1db import (
 from leap.soledad.backends.leap_backend import LeapDocument
 
 
-def open(path, password, create=True, document_factory=None, soledad=None):
+def open(path, password, create=True, document_factory=None, crypto=None):
     """Open a database at the given location.
 
     Will raise u1db.errors.DatabaseDoesNotExist if create=False and the
@@ -58,7 +58,7 @@ def open(path, password, create=True, document_factory=None, soledad=None):
     """
     return SQLCipherDatabase.open_database(
         path, password, create=create, document_factory=document_factory,
-        soledad=soledad)
+        crypto=crypto)
 
 
 class DatabaseIsNotEncrypted(Exception):
@@ -78,7 +78,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         db_handle.cursor().execute("PRAGMA key = '%s'" % key)
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
-                 soledad=None):
+                 crypto=None):
         """
         Create a new sqlcipher file.
 
@@ -89,23 +89,24 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @param document_factory: A function that will be called with the same
             parameters as Document.__init__.
         @type document_factory: callable
-        @param soledad: An instance of Soledad so we can encrypt/decrypt
+        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type soledad: soledad.Soledad
+        @type crypto: soledad.crypto.SoledadCrypto
         """
         self._check_if_db_is_encrypted(sqlcipher_file)
         self._db_handle = dbapi2.connect(sqlcipher_file)
         SQLCipherDatabase.set_pragma_key(self._db_handle, password)
         self._real_replica_uid = None
         self._ensure_schema()
-        self._soledad = soledad
+        self._crypto = crypto
 
         def factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
                     encrypted_json=None, syncable=True):
             return LeapDocument(doc_id=doc_id, rev=rev, json=json,
                                 has_conflicts=has_conflicts,
                                 encrypted_json=encrypted_json,
-                                syncable=syncable, soledad=self._soledad)
+                                syncable=syncable,
+                                crypto=self._crypto)
         self.set_document_factory(factory)
 
     def _check_if_db_is_encrypted(self, sqlcipher_file):
@@ -131,7 +132,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     @classmethod
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
-                       soledad=None):
+                       crypto=None):
         """
         Open a SQLCipher database.
 
@@ -142,9 +143,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @param document_factory: A function that will be called with the same
             parameters as Document.__init__.
         @type document_factory: callable
-        @param soledad: An instance of Soledad so we can encrypt/decrypt
+        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type soledad: soledad.Soledad
+        @type crypto: soledad.crypto.SoledadCrypto
 
         @return: The database object.
         @rtype: SQLCipherDatabase
@@ -171,11 +172,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             time.sleep(cls.WAIT_FOR_PARALLEL_INIT_HALF_INTERVAL)
         return SQLCipherDatabase._sqlite_registry[v](
             sqlcipher_file, password, document_factory=document_factory,
-            soledad=soledad)
+            crypto=crypto)
 
     @classmethod
     def open_database(cls, sqlcipher_file, password, create, backend_cls=None,
-                      document_factory=None, soledad=None):
+                      document_factory=None, crypto=None):
         """
         Open a SQLCipher database.
 
@@ -191,9 +192,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @param document_factory: A function that will be called with the same
             parameters as Document.__init__.
         @type document_factory: callable
-        @param soledad: An instance of Soledad so we can encrypt/decrypt
+        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type soledad: soledad.Soledad
+        @type crypto: soledad.crypto.SoledadCrypto
 
         @return: The database object.
         @rtype: SQLCipherDatabase
@@ -201,7 +202,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         try:
             return cls._open_database(sqlcipher_file, password,
                                       document_factory=document_factory,
-                                      soledad=soledad)
+                                      crypto=crypto)
         except errors.DatabaseDoesNotExist:
             if not create:
                 raise
@@ -211,7 +212,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 backend_cls = SQLCipherDatabase
             return backend_cls(sqlcipher_file, password,
                                document_factory=document_factory,
-                               soledad=soledad)
+                               crypto=crypto)
 
     def sync(self, url, creds=None, autocreate=True):
         """
@@ -234,7 +235,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self,
             LeapSyncTarget(url,
                            creds=creds,
-                           soledad=self._soledad)).sync(autocreate=autocreate)
+                           crypto=self._crypto)).sync(autocreate=autocreate)
 
     def _extra_schema_init(self, c):
         """

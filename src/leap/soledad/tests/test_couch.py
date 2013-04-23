@@ -60,7 +60,6 @@ class CouchDBWrapper(object):
         os.mkdir(os.path.join(self.tempdir, 'lib'))
         os.mkdir(os.path.join(self.tempdir, 'log'))
         args = ['couchdb', '-n', '-a', confPath]
-        print args
         #null = open('/dev/null', 'w')
         self.process = subprocess.Popen(
             args, env=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

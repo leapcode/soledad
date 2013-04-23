@@ -32,6 +32,7 @@ except ImportError:
 
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad import Soledad
+from leap.soledad.crypto import SoledadCrypto
 
 
 class AuxMethodsTestCase(BaseSoledadTest):
@@ -49,7 +50,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
     def test__init_db(self):
         sol = self._soledad_instance()
         sol._init_dirs()
-        sol._gpg = self._gpgwrapper_instance()
+        sol._crypto = SoledadCrypto(self.tempdir+'/gnupg')
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
         if not sol._has_symkey():
             sol._gen_symkey()

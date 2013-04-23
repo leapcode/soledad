@@ -32,7 +32,7 @@ from leap.soledad.tests import (
     PRIVATE_KEY,
 )
 from leap.soledad import KeyAlreadyExists
-from leap.soledad.util import GPGWrapper
+from leap.soledad.crypto import SoledadCrypto
 
 try:
     import simplejson as json
@@ -49,11 +49,11 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         """
         Test getting and setting encrypted content.
         """
-        doc1 = LeapDocument(soledad=self._soledad)
+        doc1 = LeapDocument(crypto=self._soledad._crypto)
         doc1.content = {'key': 'val'}
         doc2 = LeapDocument(doc_id=doc1.doc_id,
                             encrypted_json=doc1.get_encrypted_json(),
-                            soledad=self._soledad)
+                            crypto=self._soledad._crypto)
         res1 = doc1.get_json()
         res2 = doc2.get_json()
         self.assertEqual(res1, res2, 'incorrect document encryption')
@@ -62,12 +62,12 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         """
         Test for successful symmetric encryption.
         """
-        doc1 = LeapDocument(soledad=self._soledad)
+        doc1 = LeapDocument(crypto=self._soledad._crypto)
         doc1.content = {'key': 'val'}
         enc_json = json.loads(doc1.get_encrypted_json())['_encrypted_json']
         self.assertEqual(
             True,
-            self._soledad._gpg.is_encrypted_sym(enc_json),
+            self._soledad._crypto.is_encrypted_sym(enc_json),
             "could not encrypt with passphrase.")
 
 
@@ -87,12 +87,12 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
     def test_export_recovery_document_crypt(self):
         rd = self._soledad.export_recovery_document('123456')
         self.assertEqual(True,
-                         self._soledad._gpg.is_encrypted_sym(rd))
+                         self._soledad._crypto.is_encrypted_sym(rd))
         data = {
             'user': self._soledad._user,
             'symkey': self._soledad._symkey,
         }
-        raw_data = json.loads(str(self._soledad._gpg.decrypt(
+        raw_data = json.loads(str(self._soledad._crypto.decrypt(
             rd,
             passphrase='123456')))
         self.assertEqual(
@@ -111,7 +111,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
         s._init_dirs()
-        s._gpg = GPGWrapper(gnupghome=gnupg_home)
+        s._crypto = SoledadCrypto(gnupg_home)
         s.import_recovery_document(rd, None)
         self.assertEqual(self._soledad._user,
                          s._user, 'Failed setting user email.')
@@ -124,7 +124,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='3')
         s._init_dirs()
-        s._gpg = GPGWrapper(gnupghome=gnupg_home)
+        s._crypto = SoledadCrypto(gnupg_home)
         s.import_recovery_document(rd, '123456')
         self.assertEqual(self._soledad._user,
                          s._user, 'Failed setting user email.')
@@ -138,7 +138,7 @@ class CryptoMethodsTestCase(BaseSoledadTest):
     def test__gen_symkey(self):
         sol = self._soledad_instance(user='user@leap.se', prefix='/3')
         sol._init_dirs()
-        sol._gpg = GPGWrapper(gnupghome="%s/gnupg3" % self.tempdir)
+        sol._crypto = SoledadCrypto("%s/3/gnupg" % self.tempdir)
         self.assertFalse(sol._has_symkey(), "Should not have a symkey at "
                                             "this point")
         sol._gen_symkey()
@@ -147,7 +147,7 @@ class CryptoMethodsTestCase(BaseSoledadTest):
     def test__has_keys(self):
         sol = self._soledad_instance(user='leap@leap.se', prefix='/5')
         sol._init_dirs()
-        sol._gpg = GPGWrapper(gnupghome=self.tempdir+"/5/gnupg")
+        sol._crypto = SoledadCrypto("%s/5/gnupg" % self.tempdir)
         self.assertFalse(sol._has_keys())
         sol._gen_symkey()
         self.assertTrue(sol._has_keys())
