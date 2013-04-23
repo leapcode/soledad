@@ -3,6 +3,8 @@ Tests to make sure Soledad provides U1DB functionality and more.
 """
 
 import u1db
+
+
 from leap.soledad import Soledad
 from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.backends.leap_backend import LeapDocument

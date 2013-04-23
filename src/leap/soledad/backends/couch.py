@@ -35,6 +35,8 @@ from u1db.remote.server_state import ServerState
 from u1db.errors import DatabaseDoesNotExist
 from couchdb.client import Server, Document as CouchDocument
 from couchdb.http import ResourceNotFound
+
+
 from leap.soledad.backends.objectstore import (
     ObjectStoreDatabase,
     ObjectStoreSyncTarget,
@@ -142,7 +144,8 @@ class CouchDatabase(ObjectStoreDatabase):
         doc = self._factory(
             doc_id=doc_id,
             rev=cdoc['u1db_rev'],
-            has_conflicts=has_conflicts)
+            has_conflicts=has_conflicts,
+            encryption_scheme=cdoc['encryption_scheme'])
         contents = self._database.get_attachment(cdoc, 'u1db_json')
         if contents:
             doc.content = json.loads(contents.read())
@@ -192,12 +195,14 @@ class CouchDatabase(ObjectStoreDatabase):
         # prepare couch's Document
         cdoc = CouchDocument()
         cdoc['_id'] = doc.doc_id
-        # we have to guarantee that couch's _rev is cosistent
+        # we have to guarantee that couch's _rev is consistent
         old_cdoc = self._database.get(doc.doc_id)
         if old_cdoc is not None:
             cdoc['_rev'] = old_cdoc['_rev']
         # store u1db's rev
         cdoc['u1db_rev'] = doc.rev
+        # store document's encryption scheme
+        cdoc['encryption_scheme'] = doc.encryption_scheme
         # save doc in db
         self._database.save(cdoc)
         # store u1db's content as json string

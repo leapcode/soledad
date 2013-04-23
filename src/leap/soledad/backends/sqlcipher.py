@@ -19,23 +19,22 @@
 """A U1DB backend that uses SQLCipher as its persistence layer."""
 
 import os
-from pysqlcipher import dbapi2
 import time
 
-# TODO: uncomment imports below after solving circular dependency issue
-# between leap_client and soledad.
-#from leap import util
-from u1db.backends import sqlite_backend
-#util.logger.debug(
-#    "Monkey-patching u1db.backends.sqlite_backend with pysqlcipher.dbapi2..."
-#)
-sqlite_backend.dbapi2 = dbapi2
 
+from u1db.backends import sqlite_backend
+from pysqlcipher import dbapi2
 from u1db import (
     errors,
 )
+from leap.soledad.backends.leap_backend import (
+    LeapDocument,
+    EncryptionSchemes,
+)
 
-from leap.soledad.backends.leap_backend import LeapDocument
+
+# Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
+sqlite_backend.dbapi2 = dbapi2
 
 
 def open(path, password, create=True, document_factory=None, crypto=None):
@@ -101,12 +100,14 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         self._crypto = crypto
 
         def factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
-                    encrypted_json=None, syncable=True):
+                    encrypted_json=None, syncable=True,
+                    encryption_scheme=EncryptionSchemes.NONE):
             return LeapDocument(doc_id=doc_id, rev=rev, json=json,
                                 has_conflicts=has_conflicts,
                                 encrypted_json=encrypted_json,
+                                crypto=self._crypto,
                                 syncable=syncable,
-                                crypto=self._crypto)
+                                encryption_scheme=encryption_scheme)
         self.set_document_factory(factory)
 
     def _check_if_db_is_encrypted(self, sqlcipher_file):
@@ -247,6 +248,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         c.execute(
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
+        c.execute(
+            'ALTER TABLE document '
+            'ADD COLUMN encryption_scheme TEXT NOT NULL DEFAULT \'%s\'' %
+            EncryptionSchemes.NONE)
 
     def _put_and_update_indexes(self, old_doc, doc):
         """
@@ -260,8 +265,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
             self, old_doc, doc)
         c = self._db_handle.cursor()
-        c.execute('UPDATE document SET syncable=? WHERE doc_id=?',
-                  (doc.syncable, doc.doc_id))
+        c.execute('UPDATE document SET syncable=?, encryption_scheme=? '
+                  'WHERE doc_id=?',
+                  (doc.syncable, doc.encryption_scheme, doc.doc_id))
 
     def _get_doc(self, doc_id, check_for_conflicts=False):
         """
@@ -281,9 +287,12 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self, doc_id, check_for_conflicts)
         if doc:
             c = self._db_handle.cursor()
-            c.execute('SELECT syncable FROM document WHERE doc_id=?',
+            c.execute('SELECT syncable, encryption_scheme FROM document '
+                      'WHERE doc_id=?',
                       (doc.doc_id,))
-            doc.syncable = bool(c.fetchone()[0])
+            result = c.fetchone()
+            doc.syncable = bool(result[0])
+            doc.encryption_scheme = result[1]
         return doc
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)

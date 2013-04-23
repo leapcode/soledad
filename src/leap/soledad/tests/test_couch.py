@@ -15,6 +15,10 @@ try:
     import simplejson as json
 except ImportError:
     import json  # noqa
+from leap.soledad.backends.leap_backend import (
+    LeapDocument,
+    EncryptionSchemes,
+)
 
 
 #-----------------------------------------------------------------------------
@@ -164,10 +168,14 @@ def copy_couch_database_for_test(test, db):
     return new_db
 
 
+def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
+    return LeapDocument(doc_id, rev, content, has_conflicts=has_conflicts)
+
+
 COUCH_SCENARIOS = [
     ('couch', {'make_database_for_test': make_couch_database_for_test,
                'copy_database_for_test': copy_couch_database_for_test,
-               'make_document_for_test': tests.make_document_for_test, }),
+               'make_document_for_test': make_document_for_test, }),
 ]
 
 
@@ -403,6 +411,31 @@ class CouchDatabaseStorageTests(CouchDBTestCase):
                                  'u1db_tests')
         content = self._fetch_u1db_data(db)
         self.assertEqual(db._replica_uid, content['replica_uid'])
+
+    def test_store_encryption_scheme(self):
+        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
+                                 'u1db_tests')
+        doc = db.create_doc_from_json(tests.simple_doc)
+        # assert that docs have no encryption_scheme by default
+        self.assertEqual(EncryptionSchemes.NONE, doc.encryption_scheme)
+        # assert that we can store a different value
+        doc.encryption_scheme = EncryptionSchemes.PUBKEY
+        db.put_doc(doc)
+        self.assertEqual(
+            EncryptionSchemes.PUBKEY,
+            db.get_doc(doc.doc_id).encryption_scheme)
+        # assert that we can store another different value
+        doc.encryption_scheme = EncryptionSchemes.SYMKEY
+        db.put_doc(doc)
+        self.assertEqual(
+            EncryptionSchemes.SYMKEY,
+            db.get_doc(doc.doc_id).encryption_scheme)
+        # assert that we can store the default value
+        doc.encryption_scheme = EncryptionSchemes.NONE
+        db.put_doc(doc)
+        self.assertEqual(
+            EncryptionSchemes.NONE,
+            db.get_doc(doc.doc_id).encryption_scheme)
 
 
 load_tests = tests.load_with_scenarios

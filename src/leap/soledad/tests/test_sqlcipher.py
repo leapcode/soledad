@@ -21,7 +21,10 @@ from leap.soledad.backends.sqlcipher import (
     DatabaseIsNotEncrypted,
 )
 from leap.soledad.backends.sqlcipher import open as u1db_open
-from leap.soledad.backends.leap_backend import LeapDocument
+from leap.soledad.backends.leap_backend import (
+    LeapDocument,
+    EncryptionSchemes,
+)
 
 # u1db tests stuff.
 from leap.soledad.tests import u1db_tests as tests
@@ -342,6 +345,29 @@ class TestSQLCipherPartialExpandDatabase(
         self.db.put_doc(doc)
         self.assertEqual(True, self.db.get_doc(doc.doc_id).syncable)
 
+    def test_store_encryption_scheme(self):
+        doc = self.db.create_doc_from_json(tests.simple_doc)
+        # assert that docs have no encryption_scheme by default
+        self.assertEqual(EncryptionSchemes.NONE, doc.encryption_scheme)
+        # assert that we can store a different value
+        doc.encryption_scheme = EncryptionSchemes.PUBKEY
+        self.db.put_doc(doc)
+        self.assertEqual(
+            EncryptionSchemes.PUBKEY,
+            self.db.get_doc(doc.doc_id).encryption_scheme)
+        # assert that we can store another different value
+        doc.encryption_scheme = EncryptionSchemes.SYMKEY
+        self.db.put_doc(doc)
+        self.assertEqual(
+            EncryptionSchemes.SYMKEY,
+            self.db.get_doc(doc.doc_id).encryption_scheme)
+        # assert that we can store the default value
+        doc.encryption_scheme = EncryptionSchemes.NONE
+        self.db.put_doc(doc)
+        self.assertEqual(
+            EncryptionSchemes.NONE,
+            self.db.get_doc(doc.doc_id).encryption_scheme)
+
 
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_open`.
@@ -413,7 +439,7 @@ def sync_via_synchronizer_and_leap(test, db_source, db_target,
 sync_scenarios.append(('pyleap', {
     'make_database_for_test': test_sync.make_database_for_http_test,
     'copy_database_for_test': test_sync.copy_database_for_http_test,
-    'make_document_for_test': tests.make_document_for_test,
+    'make_document_for_test': make_document_for_test,
     'make_app_with_state': tests.test_remote_sync_target.make_http_app,
     'do_sync': sync_via_synchronizer_and_leap,
 }))
