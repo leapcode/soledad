@@ -539,6 +539,111 @@ class Soledad(object):
         """
         return self._db.create_doc_from_json(json, doc_id=doc_id)
 
+    def create_index(self, index_name, *index_expressions):
+        """
+        Create an named index, which can then be queried for future lookups.
+        Creating an index which already exists is not an error, and is cheap.
+        Creating an index which does not match the index_expressions of the
+        existing index is an error.
+        Creating an index will block until the expressions have been evaluated
+        and the index generated.
+
+        @param index_name: A unique name which can be used as a key prefix
+        @type index_name: str
+        @param index_expressions: index expressions defining the index
+            information.
+        @type index_expressions: dict
+
+            Examples:
+
+            "fieldname", or "fieldname.subfieldname" to index alphabetically
+            sorted on the contents of a field.
+
+            "number(fieldname, width)", "lower(fieldname)"
+        """
+        return self._db.create_index(index_name, *index_expressions)
+
+    def delete_index(self, index_name):
+        """
+        Remove a named index.
+
+        @param index_name: The name of the index we are removing
+        @type index_name: str
+        """
+        return self._db.delete_index(index_name)
+
+    def list_indexes(self):
+        """
+        List the definitions of all known indexes.
+
+        @return: A list of [('index-name', ['field', 'field2'])] definitions.
+        @rtype: list
+        """
+        return self._db.list_indexes()
+
+    def get_from_index(self, index_name, *key_values):
+        """
+        Return documents that match the keys supplied.
+
+        You must supply exactly the same number of values as have been defined
+        in the index. It is possible to do a prefix match by using '*' to
+        indicate a wildcard match. You can only supply '*' to trailing entries,
+        (eg 'val', '*', '*' is allowed, but '*', 'val', 'val' is not.)
+        It is also possible to append a '*' to the last supplied value (eg
+        'val*', '*', '*' or 'val', 'val*', '*', but not 'val*', 'val', '*')
+
+        @param index_name: The index to query
+        @type index_name: str
+        @param key_values: values to match. eg, if you have
+            an index with 3 fields then you would have:
+            get_from_index(index_name, val1, val2, val3)
+        @type key_values: tuple
+        @return: List of [Document]
+        @rtype: list
+        """
+        return self._db.get_from_index(index_name, *key_values)
+
+    def get_range_from_index(self, index_name, start_value, end_value):
+        """
+        Return documents that fall within the specified range.
+
+        Both ends of the range are inclusive. For both start_value and
+        end_value, one must supply exactly the same number of values as have
+        been defined in the index, or pass None. In case of a single column
+        index, a string is accepted as an alternative for a tuple with a single
+        value. It is possible to do a prefix match by using '*' to indicate
+        a wildcard match. You can only supply '*' to trailing entries, (eg
+        'val', '*', '*' is allowed, but '*', 'val', 'val' is not.) It is also
+        possible to append a '*' to the last supplied value (eg 'val*', '*',
+        '*' or 'val', 'val*', '*', but not 'val*', 'val', '*')
+
+        @param index_name: The index to query
+        @type index_name: str
+        @param start_values: tuples of values that define the lower bound of
+            the range. eg, if you have an index with 3 fields then you would
+            have: (val1, val2, val3)
+        @type start_values: tuple
+        @param end_values: tuples of values that define the upper bound of the
+            range. eg, if you have an index with 3 fields then you would have:
+            (val1, val2, val3)
+        @type end_values: tuple
+        @return: List of [Document]
+        @rtype: list
+        """
+        return self._db.get_range_from_index(
+            index_name, start_value, end_value)
+
+    def get_index_keys(self, index_name):
+        """
+        Return all keys under which documents are indexed in this index.
+
+        @param index_name: The index to query
+        @type index_name: str
+        @return: [] A list of tuples of indexed keys.
+        @rtype: list
+        """
+        return self._db.get_index_keys(index_name)
+
     def get_doc_conflicts(self, doc_id):
         """
         Get the list of conflicts for the given document.
@@ -548,7 +653,6 @@ class Soledad(object):
 
         @return: a list of the document entries that are conflicted
         @rtype: list
-
         """
         return self._db.get_doc_conflicts(doc_id)
 
