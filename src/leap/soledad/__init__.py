@@ -38,7 +38,6 @@ except ImportError:
     import json  # noqa
 
 
-from binascii import b2a_base64
 from hashlib import sha256
 
 
@@ -51,6 +50,7 @@ from leap.soledad.backends.leap_backend import (
     LeapSyncTarget,
 )
 from leap.soledad.shared_db import SoledadSharedDatabase
+from leap.soledad.crypto import SoledadCrypto
 
 
 class KeyDoesNotExist(Exception):
@@ -382,8 +382,7 @@ class Soledad(object):
         @return: the hash
         @rtype: str
         """
-        return b2a_base64(
-            sha256('address-%s' % self._address).digest())[:-1]
+        return sha256('address-%s' % self._address).hexdigest()
 
     def _fetch_keys_from_shared_db(self):
         """

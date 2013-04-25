@@ -21,7 +21,6 @@ Cryptographic utilities for Soledad.
 """
 
 
-from binascii import b2a_base64
 from hashlib import sha256
 
 
@@ -154,8 +153,7 @@ class SoledadCrypto(object):
         """
         if self._symkey is None:
             raise NoSymmetricSecret()
-        return b2a_base64(
-            sha256('%s%s' % (self._symkey, suffix)).digest())[:-1]
+        return sha256('%s%s' % (self._symkey, suffix)).hexdigest()
 
     #
     # symkey setters/getters
