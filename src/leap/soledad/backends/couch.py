@@ -144,8 +144,7 @@ class CouchDatabase(ObjectStoreDatabase):
         doc = self._factory(
             doc_id=doc_id,
             rev=cdoc['u1db_rev'],
-            has_conflicts=has_conflicts,
-            encryption_scheme=cdoc['encryption_scheme'])
+            has_conflicts=has_conflicts)
         contents = self._database.get_attachment(cdoc, 'u1db_json')
         if contents:
             doc.content = json.loads(contents.read())
@@ -201,8 +200,6 @@ class CouchDatabase(ObjectStoreDatabase):
             cdoc['_rev'] = old_cdoc['_rev']
         # store u1db's rev
         cdoc['u1db_rev'] = doc.rev
-        # store document's encryption scheme
-        cdoc['encryption_scheme'] = doc.encryption_scheme
         # save doc in db
         self._database.save(cdoc)
         # store u1db's content as json string

@@ -421,8 +421,7 @@ class Soledad(object):
             content = {
                 '_symkey': self.encrypt_sym(self._symkey, self._passphrase),
             }
-            doc = LeapDocument(doc_id=self._address_hash(),
-                               crypto=self._crypto)
+            doc = LeapDocument(doc_id=self._address_hash())
             doc.content = content
             self._shared_db.put_doc(doc)
             events.signal(

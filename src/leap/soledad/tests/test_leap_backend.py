@@ -5,6 +5,10 @@ For these tests to run, a leap server has to be running on (default) port
 """
 
 import u1db
+try:
+    import simplejson as json
+except ImportError:
+    import json  # noqa
 
 
 from leap.soledad.backends import leap_backend
@@ -29,16 +33,7 @@ from leap.soledad.tests.u1db_tests import test_https
 def make_leap_document_for_test(test, doc_id, rev, content,
                                 has_conflicts=False):
     return leap_backend.LeapDocument(
-        doc_id, rev, content, has_conflicts=has_conflicts,
-        crypto=test._soledad._crypto)
-
-
-def make_leap_encrypted_document_for_test(test, doc_id, rev, encrypted_content,
-                                          has_conflicts=False):
-    return leap_backend.LeapDocument(
-        doc_id, rev, encrypted_json=encrypted_content,
-        has_conflicts=has_conflicts,
-        crypto=test._soledad.crypto)
+        doc_id, rev, content, has_conflicts=has_conflicts)
 
 
 LEAP_SCENARIOS = [
@@ -94,9 +89,22 @@ class TestLeapSyncTargetBasics(
         self.assertEqual('/', remote_target._url.path)
 
 
-class TestLeapParsingSyncStream(test_remote_sync_target.TestParsingSyncStream):
+class TestLeapParsingSyncStream(
+        test_remote_sync_target.TestParsingSyncStream,
+        BaseSoledadTest):
+
+    def setUp(self):
+        test_remote_sync_target.TestParsingSyncStream.setUp(self)
+        BaseSoledadTest.setUp(self)
+
+    def tearDown(self):
+        test_remote_sync_target.TestParsingSyncStream.tearDown(self)
+        BaseSoledadTest.tearDown(self)
 
     def test_wrong_start(self):
+        """
+        Test adapted to use a LeapSyncTarget.
+        """
         tgt = leap_backend.LeapSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
@@ -109,6 +117,9 @@ class TestLeapParsingSyncStream(test_remote_sync_target.TestParsingSyncStream):
                           tgt._parse_sync_stream, "", None)
 
     def test_wrong_end(self):
+        """
+        Test adapted to use a LeapSyncTarget.
+        """
         tgt = leap_backend.LeapSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
@@ -118,6 +129,9 @@ class TestLeapParsingSyncStream(test_remote_sync_target.TestParsingSyncStream):
                           tgt._parse_sync_stream, "[\r\n", None)
 
     def test_missing_comma(self):
+        """
+        Test adapted to use a LeapSyncTarget.
+        """
         tgt = leap_backend.LeapSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
@@ -126,21 +140,32 @@ class TestLeapParsingSyncStream(test_remote_sync_target.TestParsingSyncStream):
                           '"content": "c", "gen": 3}\r\n]', None)
 
     def test_no_entries(self):
+        """
+        Test adapted to use a LeapSyncTarget.
+        """
         tgt = leap_backend.LeapSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n]", None)
 
     def test_extra_comma(self):
-        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+        """
+        Test adapted to use encrypted content.
+        """
+        doc = leap_backend.LeapDocument('i')
+        doc.content = {}
+        enc_json = leap_backend.encrypt_doc_json(
+            self._soledad._crypto, doc.doc_id, doc.get_json())
+        tgt = leap_backend.LeapSyncTarget(
+            "http://foo/foo", crypto=self._soledad._crypto)
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n{},\r\n]", None)
-        self.assertRaises(leap_backend.NoSoledadCryptoInstance,
+        self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream,
                           '[\r\n{},\r\n{"id": "i", "rev": "r", '
-                          '"content": "{}", "gen": 3, "trans_id": "T-sid"}'
-                          ',\r\n]',
+                          '"content": %s, "gen": 3, "trans_id": "T-sid"}'
+                          ',\r\n]' % json.dumps(enc_json),
                           lambda doc, gen, trans_id: None)
 
     def test_error_in_stream(self):
