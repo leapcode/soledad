@@ -116,36 +116,34 @@ class SoledadAuthMiddleware(object):
         """
         if self.prefix and not environ['PATH_INFO'].startswith(self.prefix):
             return self._error(start_response, 400, "bad request")
+        auth = environ.get('HTTP_AUTHORIZATION')
+        if not auth:
+            return self._error(start_response, 401, "unauthorized",
+                               "Missing Token Authentication.")
+        scheme, encoded = auth.split(None, 1)
+        if scheme.lower() != 'token':
+            return self._error(
+                start_response, 401, "unauthorized",
+                "Missing Token Authentication")
+        address, token = encoded.decode('base64').split(':', 1)
+        try:
+            self.verify_token(environ, address, token)
+        except Unauthorized:
+            return self._error(
+                start_response, 401, "unauthorized",
+                "Incorrect address or token.")
+        del environ['HTTP_AUTHORIZATION']
         shift_path_info(environ)
-        qs = parse_qs(environ.get('QUERY_STRING'), strict_parsing=True)
-        if 'auth_token' not in qs:
-            if self.need_auth(environ):
-                return self._error(start_response, 401, "unauthorized",
-                                   "Missing Authentication Token.")
-        else:
-            token = qs['auth_token'][0]
-            try:
-                self.verify_token(environ, token)
-            except Unauthorized:
-                return self._error(
-                    start_response, 401, "unauthorized",
-                    "Incorrect password or login.")
-            # remove auth token from query string.
-            del qs['auth_token']
-            qs_str = ''
-            if qs:
-                qs_str = reduce(lambda x, y: '&'.join([x, y]),
-                                map(lambda (x, y): '='.join([x, str(y)]),
-                                    qs.iteritems()))
-            environ['QUERY_STRING'] = qs_str
         return self.app(environ, start_response)
 
-    def verify_token(self, environ, token):
+    def verify_token(self, environ, address, token):
         """
         Verify if token is valid for authenticating this request.
 
         @param environ: Dictionary containing CGI variables.
         @type environ: dict
+        @param token: The user address.
+        @type token: str
         @param token: The authentication token.
         @type token: str
 
@@ -195,6 +193,10 @@ class SoledadApp(http_app.HTTPApp):
         @return: HTTP application results.
         @rtype: list
         """
+        # TODO: this is a hack for tests to pass, we should remove it asap.
+        #if environ['CONTENT_LENGTH'] == '':
+        #    environ['CONTENT_LENGTH'] = 1
+        #import ipdb; ipdb.set_trace()
         return http_app.HTTPApp.__call__(self, environ, start_response)
 
 

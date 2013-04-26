@@ -394,3 +394,15 @@ class LeapSyncTarget(HTTPSyncTarget):
         res = self._parse_sync_stream(data, return_doc_cb, ensure_callback)
         data = None
         return res['new_generation'], res['new_transaction_id']
+
+    def set_token_credentials(self, address, token):
+        self._creds = {'token': (address, token)}
+
+    def _sign_request(self, method, url_query, params):
+        if 'token' in self._creds:
+            address, token = self._creds['token']
+            auth = '%s:%s' % (address, token)
+            return [('Authorization', 'Token %s' % auth.encode('base64'))]
+        else:
+            return HTTPSyncTarget._sign_request(
+                self, method, url_query, params)

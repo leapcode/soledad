@@ -667,7 +667,7 @@ class Soledad(object):
         """
         return self._db.resolve_doc(doc, conflicted_doc_revs)
 
-    def sync(self, url):
+    def sync(self, url, creds=None):
         """
         Synchronize the local encrypted replica with a remote replica.
 
@@ -679,7 +679,7 @@ class Soledad(object):
         @rtype: str
         """
         # TODO: create authentication scheme for sync with server.
-        local_gen = self._db.sync(url, creds=None, autocreate=True)
+        local_gen = self._db.sync(url, creds=creds, autocreate=True)
         events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._address)
         return local_gen
 
