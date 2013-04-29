@@ -356,9 +356,8 @@ class Soledad(object):
     def _store_symkey(self):
         ciphertext = self._crypto.encrypt_sym(
             self._symkey, self._passphrase)
-        f = open(self._config.get_secret_path(), 'w')
-        f.write(str(ciphertext))
-        f.close()
+        with open(self._config.get_secret_path(), 'w') as f:
+            f.write(ciphertext)
 
     #-------------------------------------------------------------------------
     # General crypto utility methods.
