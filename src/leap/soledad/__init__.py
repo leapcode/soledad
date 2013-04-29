@@ -28,9 +28,6 @@ remote storage in the server side.
 
 import os
 import string
-import hashlib
-import configparser
-import re
 import binascii
 import logging
 try:
@@ -43,6 +40,7 @@ from hashlib import sha256
 
 
 from leap.common import events
+from leap.common.check import leap_assert
 from leap.soledad.config import SoledadConfig
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
@@ -119,6 +117,12 @@ class Soledad(object):
     SECRET_LENGTH = 50
     """
     The length of the secret used for symmetric encryption.
+    """
+
+    SYMKEY_KEY = '_symkey'
+    ADDRESS_KEY = '_address'
+    """
+    Key used to access symmetric keys in recovery documents.
     """
 
     def __init__(self, address, passphrase, config_path=None,
@@ -208,7 +212,7 @@ class Soledad(object):
             else:
                 self._set_symkey(
                     self._crypto.decrypt_sym(
-                        doc.content['_symkey'],
+                        doc.content[self.KEY_SYMKEY],
                         passphrase=self._address_hash()))
         # Stage 2 - Keys synchronization
         self._assert_server_keys()
@@ -416,20 +420,26 @@ class Soledad(object):
         """
         Assert our key copies are the same as server's ones.
         """
-        assert self._has_keys()
+        leap_assert(
+            self._has_keys(),
+            'Tried to send keys to server but they don\'t exist in local '
+            'storage.')
         if not self._shared_db:
             return
         doc = self._fetch_keys_from_shared_db()
         if doc:
             remote_symkey = self.decrypt_sym(
-                doc.content['_symkey'],
+                doc.content[self.SYMKEY_KEY],
                 passphrase=self._address_hash())
-            assert remote_symkey == self._symkey
+            leap_assert(
+                remote_symkey == self._symkey,
+                'Local and remote symmetric secrets differ!')
         else:
             events.signal(
                 events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._address)
             content = {
-                '_symkey': self.encrypt_sym(self._symkey, self._passphrase),
+                self.SYMKEY_KEY: self.encrypt_sym(
+                    self._symkey, self._passphrase),
             }
             doc = LeapDocument(doc_id=self._address_hash())
             doc.content = content
@@ -744,8 +754,8 @@ class Soledad(object):
         @rtype: str
         """
         data = json.dumps({
-            'address': self._address,
-            'symkey': self._symkey,
+            self.ADDRESS_KEY: self._address,
+            self.SYMKEY_KEY: self._symkey,
         })
         if passphrase:
             data = self._crypto.encrypt_sym(data, passphrase)
@@ -770,8 +780,8 @@ class Soledad(object):
         if passphrase:
             data = self._crypto.decrypt_sym(data, passphrase=passphrase)
         data = json.loads(data)
-        self._address = data['address']
-        self._symkey = data['symkey']
+        self._address = data[self.ADDRESS_KEY]
+        self._symkey = data[self.SYMKEY_KEY]
         self._crypto.symkey = self._symkey
         self._store_symkey()
         # TODO: make this work well with bootstrap.

@@ -35,6 +35,9 @@ from leap.soledad.backends.leap_backend import (
     decrypt_doc_json,
     EncryptionSchemes,
     LeapSyncTarget,
+    ENC_JSON_KEY,
+    ENC_SCHEME_KEY,
+    MAC_KEY,
 )
 from leap.soledad.backends.couch import CouchDatabase
 from leap.soledad import KeyAlreadyExists, Soledad
@@ -79,7 +82,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         enc_json = json.loads(
             encrypt_doc_json(
                 self._soledad._crypto,
-                doc1.doc_id, doc1.get_json()))['_encrypted_json']
+                doc1.doc_id, doc1.get_json()))[ENC_JSON_KEY]
         self.assertEqual(
             True,
             self._soledad._crypto.is_encrypted_sym(enc_json),
@@ -182,8 +185,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document(None)
         self.assertEqual(
             {
-                'address': self._soledad._address,
-                'symkey': self._soledad._symkey
+                self._soledad.ADDRESS_KEY: self._soledad._address,
+                self._soledad.SYMKEY_KEY: self._soledad._symkey
             },
             json.loads(rd),
             "Could not export raw recovery document."
@@ -194,12 +197,12 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(True,
                          self._soledad._crypto.is_encrypted_sym(rd))
         data = {
-            'address': self._soledad._address,
-            'symkey': self._soledad._symkey,
+            self._soledad.ADDRESS_KEY: self._soledad._address,
+            self._soledad.SYMKEY_KEY: self._soledad._symkey,
         }
-        raw_data = json.loads(str(self._soledad._crypto.decrypt_sym(
+        raw_data = json.loads(self._soledad._crypto.decrypt_sym(
             rd,
-            passphrase='123456')))
+            passphrase='123456'))
         self.assertEqual(
             raw_data,
             data,

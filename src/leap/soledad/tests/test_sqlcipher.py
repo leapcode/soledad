@@ -31,6 +31,9 @@ from leap.soledad.backends.leap_backend import (
     EncryptionSchemes,
     decrypt_doc_json,
     encrypt_doc_json,
+    ENC_JSON_KEY,
+    ENC_SCHEME_KEY,
+    MAC_KEY,
 )
 
 # u1db tests stuff.
@@ -518,7 +521,7 @@ class SQLCipherDatabaseSyncTests(
         # make sure db2 now has the exact same thing
         doc1 = self.db1.get_doc('doc')
         doc2 = self.db1.get_doc('doc')
-        if '_encryption_scheme' in doc2.content:
+        if ENC_SCHEME_KEY in doc2.content:
             doc2.set_json(
                 decrypt_doc_json(
                     self._soledad._crypto, doc2, doc2.get_json()))
@@ -579,7 +582,7 @@ class SQLCipherDatabaseSyncTests(
         self.assertFalse(doc2.has_conflicts)
         self.sync(self.db2, db3)
         doc3 = db3.get_doc('the-doc')
-        if '_encryption_scheme' in doc3.content:
+        if ENC_SCHEME_KEY in doc3.content:
             doc3.set_json(
                 decrypt_doc_json(
                     self._soledad._crypto, doc3.doc_id, doc3.get_json()))
@@ -595,7 +598,7 @@ class SQLCipherDatabaseSyncTests(
             doc.doc_id, doc.rev, tests.simple_doc, False)
         doc2 = self.db2.get_doc(doc.doc_id)
          # decrypt to compare it it is the case
-        if '_encryption_scheme' in doc2.content:
+        if ENC_SCHEME_KEY in doc2.content:
             doc2 = self.db2.get_doc(doc.doc_id)
             doc2.set_json(
                 decrypt_doc_json(
@@ -652,7 +655,7 @@ class SQLCipherSyncTargetTests(
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
         # decrypt doc1 for comparison if needed
         tmpdoc = self.db.get_doc('doc-id')
-        if '_encryption_scheme' in tmpdoc.content:
+        if ENC_SCHEME_KEY in tmpdoc.content:
             tmpdoc.set_json(
                 decrypt_doc_json(
                     self._soledad._crypto, tmpdoc.doc_id,
@@ -681,7 +684,7 @@ class SQLCipherSyncTargetTests(
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
         # decrypt doc1 for comparison if needed
         tmpdoc1 = self.db.get_doc('doc-id')
-        if '_encryption_scheme' in tmpdoc1.content:
+        if ENC_SCHEME_KEY in tmpdoc1.content:
             tmpdoc1.set_json(
                 decrypt_doc_json(
                     self._soledad._crypto, tmpdoc1.doc_id,
@@ -691,7 +694,7 @@ class SQLCipherSyncTargetTests(
         self.assertFalse(tmpdoc1.has_conflicts)
         # decrypt doc2 for comparison if needed
         tmpdoc2 = self.db.get_doc('doc-id2')
-        if '_encryption_scheme' in tmpdoc2.content:
+        if ENC_SCHEME_KEY in tmpdoc2.content:
             tmpdoc2.set_json(
                 decrypt_doc_json(
                     self._soledad._crypto, tmpdoc2.doc_id,

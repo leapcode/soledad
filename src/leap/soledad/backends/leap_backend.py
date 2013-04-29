@@ -39,6 +39,10 @@ from leap.common.keymanager import KeyManager
 from leap.common.check import leap_assert
 
 
+#
+# Exceptions
+#
+
 class NoDefaultKey(Exception):
     """
     Exception to signal that there's no default OpenPGP key configured.
@@ -84,6 +88,11 @@ class EncryptionSchemes(object):
 # Crypto utilities for a LeapDocument.
 #
 
+ENC_JSON_KEY = '_enc_json'
+ENC_SCHEME_KEY = '_enc_scheme'
+MAC_KEY = '_mac'
+
+
 def encrypt_doc_json(crypto, doc_id, doc_json):
     """
     Return a valid JSON string containing the C{doc} content encrypted to
@@ -92,7 +101,7 @@ def encrypt_doc_json(crypto, doc_id, doc_json):
     The returned JSON string is the serialization of the following dictionary:
 
         {
-            '_encrypted_json': encrypt_sym(doc_content),
+            ENC_JSON_KEY: encrypt_sym(doc_content),
             '_encryption_scheme: 'symkey',
         }
 
@@ -112,8 +121,8 @@ def encrypt_doc_json(crypto, doc_id, doc_json):
     if not crypto.is_encrypted_sym(ciphertext):
         raise DocumentNotEncrypted('Failed encrypting document.')
     return json.dumps({
-        '_encrypted_json': ciphertext,
-        '_encryption_scheme': EncryptionSchemes.SYMKEY,
+        ENC_JSON_KEY: ciphertext,
+        ENC_SCHEME_KEY: EncryptionSchemes.SYMKEY,
     })
 
 
@@ -126,8 +135,8 @@ def decrypt_doc_json(crypto, doc_id, doc_json):
     following dictionary:
 
         {
-            '_encrypted_json': enc_blob,
-            '_encryption_scheme': enc_scheme,
+            ENC_JSON_KEY: enc_blob,
+            ENC_SCHEME_KEY: enc_scheme,
         }
 
     C{enc_blob} is the encryption of the JSON serialization of the document's
@@ -150,8 +159,8 @@ def decrypt_doc_json(crypto, doc_id, doc_json):
     leap_assert(isinstance(doc_json, str))
     leap_assert(doc_json != '')
     content = json.loads(doc_json)
-    ciphertext = content['_encrypted_json']
-    enc_scheme = content['_encryption_scheme']
+    ciphertext = content[ENC_JSON_KEY]
+    enc_scheme = content[ENC_SCHEME_KEY]
     plainjson = None
     if enc_scheme == EncryptionSchemes.SYMKEY:
         if not crypto.is_encrypted_sym(ciphertext):
@@ -315,8 +324,8 @@ class LeapSyncTarget(HTTPSyncTarget):
                 # if arriving content was symmetrically encrypted, we decrypt
                 # it.
                 doc = LeapDocument(entry['id'], entry['rev'], entry['content'])
-                if doc.content and '_encryption_scheme' in doc.content:
-                    if doc.content['_encryption_scheme'] == \
+                if doc.content and ENC_SCHEME_KEY in doc.content:
+                    if doc.content[ENC_SCHEME_KEY] == \
                             EncryptionSchemes.SYMKEY:
                         doc.set_json(
                             decrypt_doc_json(
