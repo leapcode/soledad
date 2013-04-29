@@ -28,10 +28,10 @@ remote storage in the server side.
 
 import os
 import string
-import random
 import hashlib
 import configparser
 import re
+import binascii
 try:
     import simplejson as json
 except ImportError:
@@ -201,7 +201,8 @@ class Soledad(object):
         # Stage 3 - Local database initialization
         self._init_db()
 
-    def _init_config(self, **kwargs):
+    def _init_config(self, config_path, secret_path, local_db_path,
+                     shared_db_url):
         """
         Initialize configuration using SoledadConfig.
 
@@ -214,16 +215,17 @@ class Soledad(object):
         @type kwargs: dict
         """
         self._config = SoledadConfig()
-        config_file = kwargs.get('config_path', None)
-        if config_file is not None:
-            self._config.load(path=config_file)
+        if config_path is not None:
+            self._config.load(path=config_path)
         else:
             self._config.load(data='')
         # overwrite config with passed parameters
-        for param in ['secret_path', 'local_db_path',
-                      'shared_db_url']:
-            if param in kwargs and kwargs[param] is not None:
-                self._config._config_checker.config[param] = kwargs[param]
+        if secret_path is not None:
+            self._config._config_checker.config['secret_path'] = secret_path
+        if local_db_path is not None:
+            self._config._config_checker.config['local_db_path'] = local_db_path
+        if shared_db_url is not None:
+            self._config._config_checker.config['shared_db_url'] = shared_db_url
 
     def _init_dirs(self):
         """
@@ -291,9 +293,9 @@ class Soledad(object):
             raise DocumentNotEncrypted(
                 "File %s is not encrypted!" % self._config.get_secret_path())
         # can we decrypt it?
-        cyphertext = self._crypto.decrypt_sym(
+        plaintext = self._crypto.decrypt_sym(
             content, passphrase=self._passphrase)
-        return bool(cyphertext)
+        return plaintext != ''
 
     def _load_symkey(self):
         """
@@ -317,10 +319,7 @@ class Soledad(object):
         Generate a secret for symmetric encryption and store in a local
         encrypted file.
         """
-        symkey = ''.join(
-            random.choice(
-                string.ascii_letters +
-                string.digits) for x in range(self.SECRET_LENGTH))
+        symkey = binascii.b2a_base64(os.urandom(self.SECRET_LENGTH))
         self._set_symkey(symkey)
 
     def _set_symkey(self, symkey):
