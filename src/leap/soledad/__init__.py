@@ -307,8 +307,8 @@ class Soledad(object):
         if not os.path.isfile(self._config.get_secret_path()):
             return False
         # is it symmetrically encrypted?
-        f = open(self._config.get_secret_path(), 'r')
-        content = f.read()
+        with open(self._config.get_secret_path(), 'r') as f:
+            content = f.read()
         if not self._crypto.is_encrypted_sym(content):
             raise DocumentNotEncrypted(
                 "File %s is not encrypted!" % self._config.get_secret_path())
