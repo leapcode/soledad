@@ -324,15 +324,11 @@ class Soledad(object):
         if not self._has_symkey():
             raise KeyDoesNotExist("Tried to load key for symmetric "
                                   "encryption but it does not exist on disk.")
-        try:
-            with open(self._config.get_secret_path()) as f:
-                self._symkey = \
-                    self._crypto.decrypt_sym(
-                        f.read(), passphrase=self._passphrase)
-                self._crypto.symkey = self._symkey
-        except IOError:
-            raise IOError('Failed to open secret file %s.' %
-                          self._config.get_secret_path())
+        with open(self._config.get_secret_path()) as f:
+            self._symkey = \
+                self._crypto.decrypt_sym(
+                    f.read(), passphrase=self._passphrase)
+            self._crypto.symkey = self._symkey
 
     def _gen_symkey(self):
         """
