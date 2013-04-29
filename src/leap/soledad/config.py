@@ -24,13 +24,16 @@ import os
 import logging
 
 
+from xdg import BaseDirectory
 from leap.common.config.baseconfig import BaseConfig
 
 
 logger = logging.getLogger(name=__name__)
 
 
-PREFIX = os.environ['HOME'] + '/.config/leap/soledad'
+PREFIX = os.path.join(
+    BaseDirectory.xdg_config_home,
+    'leap', 'soledad')
 
 
 soledad_config_spec = {
