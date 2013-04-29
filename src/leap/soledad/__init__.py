@@ -215,7 +215,7 @@ class Soledad(object):
                         doc.content[self.KEY_SYMKEY],
                         passphrase=self._address_hash()))
         # Stage 2 - Keys synchronization
-        self._assert_server_keys()
+        self._assert_keys_in_shared_db()
         # Stage 3 - Local database initialization
         self._init_db()
 
@@ -416,9 +416,14 @@ class Soledad(object):
             events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._address)
         return doc
 
-    def _assert_server_keys(self):
+    def _assert_keys_in_shared_db(self):
         """
-        Assert our key copies are the same as server's ones.
+        Assert local keys are the same as shared db's ones.
+
+        Try to fetch keys from shared recovery database. If they already exist
+        in the remote db, assert that that data is the same as local data.
+        Otherwise, upload keys to shared recovery database.
+
         """
         leap_assert(
             self._has_keys(),
