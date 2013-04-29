@@ -32,6 +32,7 @@ import hashlib
 import configparser
 import re
 import binascii
+import logging
 try:
     import simplejson as json
 except ImportError:
@@ -53,6 +54,13 @@ from leap.soledad.shared_db import SoledadSharedDatabase
 from leap.soledad.crypto import SoledadCrypto
 
 
+logger = logging.getLogger(name=__name__)
+
+
+#
+# Exceptions
+#
+
 class KeyDoesNotExist(Exception):
     """
     Soledad attempted to find a key that does not exist locally.
@@ -65,9 +73,15 @@ class KeyAlreadyExists(Exception):
     """
 
 
-#-----------------------------------------------------------------------------
+class NotADirectory(Exception):
+    """
+    Expected a path for a directory but got some other thing.
+    """
+
+
+#
 # Soledad: local encrypted storage and remote encrypted sync.
-#-----------------------------------------------------------------------------
+#
 
 class Soledad(object):
     """
@@ -235,8 +249,14 @@ class Soledad(object):
             lambda x: os.path.dirname(x),
             [self._config.get_local_db_path(), self._config.get_secret_path()])
         for path in paths:
-            if not os.path.isdir(path):
-                os.makedirs(path)
+            if not os.path.isfile(path):
+                if not os.path.isdir(path):
+                    logger.info('Creating directory: %s.' % path)
+                    os.makedirs(path)
+                else:
+                    logger.warning('Using existent directory: %s.' % path)
+            else:
+                raise NotADirectory(path)
 
     def _init_keys(self):
         """
