@@ -20,8 +20,9 @@
 Tests for cryptographic related stuff.
 """
 
-
 import os
+import shutil
+import tempfile
 try:
     import simplejson as json
 except ImportError:
@@ -33,15 +34,20 @@ from leap.soledad.backends.leap_backend import (
     encrypt_doc_json,
     decrypt_doc_json,
     EncryptionSchemes,
+    LeapSyncTarget,
 )
-from leap.soledad import KeyAlreadyExists
+from leap.soledad.backends.couch import CouchDatabase
+from leap.soledad import KeyAlreadyExists, Soledad
 from leap.soledad.crypto import SoledadCrypto
-from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.tests import BaseSoledadTest
+from leap.soledad.tests.test_couch import CouchDBTestCase
 from leap.soledad.tests import (
     KEY_FINGERPRINT,
     PRIVATE_KEY,
 )
+from leap.soledad.tests.u1db_tests import simple_doc, nested_doc, TestCaseWithServer
+from leap.soledad.tests.test_leap_backend import make_leap_document_for_test
+from leap.soledad.backends.couch import CouchServerState
 
 
 class EncryptedSyncTestCase(BaseSoledadTest):
@@ -78,6 +84,96 @@ class EncryptedSyncTestCase(BaseSoledadTest):
             True,
             self._soledad._crypto.is_encrypted_sym(enc_json),
             "could not encrypt with passphrase.")
+
+
+#from leap.soledad.server import SoledadApp, SoledadAuthMiddleware
+#
+#
+#def make_token_leap_app(test, state):
+#    app = SoledadApp(state)
+#    application = SoledadAuthMiddleware(app, prefix='/soledad/')
+#    return application
+#
+#
+#def leap_sync_target(test, path):
+#    return LeapSyncTarget(test.getURL(path))
+#
+#
+#def token_leap_sync_target(test, path):
+#    st = leap_sync_target(test, 'soledad/' + path)
+#    st.set_token_credentials('any_user', 'any_token')
+#    return st
+#
+#
+#class EncryptedCouchSyncTest(CouchDBTestCase, TestCaseWithServer):
+#
+#    make_app_with_state = make_token_leap_app
+#
+#    make_document_for_test = make_leap_document_for_test
+#
+#    sync_target = token_leap_sync_target
+#
+#    def make_app(self):
+#        # potential hook point
+#        self.request_state = CouchServerState(self._couch_url)
+#        return self.make_app_with_state(self.request_state)
+#
+#    def _soledad_instance(self, user='leap@leap.se', prefix='',
+#                          bootstrap=False, gnupg_home='/gnupg',
+#                          secret_path='/secret.gpg',
+#                          local_db_path='/soledad.u1db'):
+#        return Soledad(
+#            user,
+#            '123',
+#            gnupg_home=self.tempdir+prefix+gnupg_home,
+#            secret_path=self.tempdir+prefix+secret_path,
+#            local_db_path=self.tempdir+prefix+local_db_path,
+#            bootstrap=bootstrap)
+#
+#    def setUp(self):
+#        CouchDBTestCase.setUp(self)
+#        TestCaseWithServer.setUp(self)
+#        self.tempdir = tempfile.mkdtemp(suffix='.couch.test')
+#        # initialize soledad by hand so we can control keys
+#        self._soledad = self._soledad_instance('leap@leap.se')
+#        self._soledad._init_dirs()
+#        self._soledad._crypto = SoledadCrypto(self._soledad)
+#        if not self._soledad._has_symkey():
+#            self._soledad._gen_symkey()
+#        self._soledad._load_symkey()
+#        self._soledad._init_db()
+#
+#    def tearDown(self):
+#        shutil.rmtree(self.tempdir)
+#
+#    def test_encrypted_sym_sync(self):
+#        # get direct access to couchdb
+#        import ipdb; ipdb.set_trace()
+#        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+#        db = CouchDatabase(self._couch_url, 'testdb')
+#        # create and encrypt a doc to insert directly in couchdb
+#        doc = LeapDocument('doc-id')
+#        doc.set_json(
+#            encrypt_doc_json(
+#                self._soledad._crypto, 'doc-id', json.dumps(simple_doc)))
+#        db.put_doc(doc)
+#        # setup credentials for access to soledad server
+#        creds = {
+#            'token': {
+#                'address': 'leap@leap.se',
+#                'token': '1234',
+#            }
+#        }
+#        # sync local soledad db with server
+#        self.assertTrue(self._soledad.get_doc('doc-id') is None)
+#        self.startServer()
+#        # TODO fix sync for test.
+#        #self._soledad.sync(self.getURL('soledad/testdb'), creds)
+#        # get and check doc
+#        doc = self._soledad.get_doc('doc-id')
+#        # TODO: fix below.
+#        #self.assertTrue(doc is not None)
+#        #self.assertTrue(doc.content == simple_doc)
 
 
 class RecoveryDocumentTestCase(BaseSoledadTest):
@@ -117,7 +213,6 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_import_recovery_document_raw(self):
         rd = self._soledad.export_recovery_document(None)
-        gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
         s._init_dirs()
         s._crypto = SoledadCrypto(s)
@@ -130,7 +225,6 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_import_recovery_document_crypt(self):
         rd = self._soledad.export_recovery_document('123456')
-        gnupg_home = self.gnupg_home = "%s/gnupg2" % self.tempdir
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='3')
         s._init_dirs()
         s._crypto = SoledadCrypto(s)

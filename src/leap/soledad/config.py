@@ -37,11 +37,6 @@ soledad_config_spec = {
     'description': 'sample soledad config',
     'type': 'object',
     'properties': {
-        'gnupg_home': {
-            'type': unicode,
-            'default': PREFIX + '/gnupg',
-            'required': True,
-        },
         'secret_path': {
             'type': unicode,
             'default': PREFIX + '/secret.gpg',
@@ -68,9 +63,6 @@ class SoledadConfig(BaseConfig):
         Returns the spec object for the specific configuration
         """
         return soledad_config_spec
-
-    def get_gnupg_home(self):
-        return self._safe_get_value("gnupg_home")
 
     def get_secret_path(self):
         return self._safe_get_value("secret_path")

@@ -23,7 +23,6 @@ class BaseSoledadTest(BaseLeapTest):
 
     def setUp(self):
         # config info
-        self.gnupg_home = "%s/gnupg" % self.tempdir
         self.db1_file = "%s/db1.u1db" % self.tempdir
         self.db2_file = "%s/db2.u1db" % self.tempdir
         self.email = 'leap@leap.se'
@@ -48,13 +47,11 @@ class BaseSoledadTest(BaseLeapTest):
         self._soledad.close()
 
     def _soledad_instance(self, user='leap@leap.se', prefix='',
-                          bootstrap=False, gnupg_home='/gnupg',
-                          secret_path='/secret.gpg',
+                          bootstrap=False, secret_path='/secret.gpg',
                           local_db_path='/soledad.u1db'):
         return Soledad(
             user,
             '123',
-            gnupg_home=self.tempdir+prefix+gnupg_home,
             secret_path=self.tempdir+prefix+secret_path,
             local_db_path=self.tempdir+prefix+local_db_path,
             bootstrap=bootstrap)

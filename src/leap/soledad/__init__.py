@@ -107,7 +107,7 @@ class Soledad(object):
     The length of the secret used for symmetric encryption.
     """
 
-    def __init__(self, address, passphrase, config_path=None, gnupg_home=None,
+    def __init__(self, address, passphrase, config_path=None,
                  secret_path=None, local_db_path=None,
                  shared_db_url=None, auth_token=None, bootstrap=True):
         """
@@ -120,8 +120,6 @@ class Soledad(object):
         @type passphrase: str
         @param config_path: Path for configuration file.
         @type config_path: str
-        @param gnupg_home: Home directory for gnupg.
-        @type gnupg_home: str
         @param secret_path: Path for storing encrypted key used for
             symmetric encryption.
         @type secret_path: str
@@ -142,7 +140,6 @@ class Soledad(object):
         self._auth_token = auth_token
         self._init_config(
             config_path=config_path,
-            gnupg_home=gnupg_home,
             secret_path=secret_path,
             local_db_path=local_db_path,
             shared_db_url=shared_db_url,
@@ -223,7 +220,7 @@ class Soledad(object):
         else:
             self._config.load(data='')
         # overwrite config with passed parameters
-        for param in ['gnupg_home', 'secret_path', 'local_db_path',
+        for param in ['secret_path', 'local_db_path',
                       'shared_db_url']:
             if param in kwargs and kwargs[param] is not None:
                 self._config._config_checker.config[param] = kwargs[param]
@@ -234,8 +231,7 @@ class Soledad(object):
         """
         paths = map(
             lambda x: os.path.dirname(x),
-            [self._config.get_gnupg_home(), self._config.get_local_db_path(),
-             self._config.get_secret_path()])
+            [self._config.get_local_db_path(), self._config.get_secret_path()])
         for path in paths:
             if not os.path.isdir(path):
                 os.makedirs(path)

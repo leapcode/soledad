@@ -41,10 +41,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol = self._soledad_instance(prefix='/_init_dirs')
         sol._init_dirs()
         local_db_dir = os.path.dirname(sol._config.get_local_db_path())
-        gnupg_home = os.path.dirname(sol._config.get_gnupg_home())
         secret_path = os.path.dirname(sol._config.get_secret_path())
         self.assertTrue(os.path.isdir(local_db_dir))
-        self.assertTrue(os.path.isdir(gnupg_home))
         self.assertTrue(os.path.isdir(secret_path))
 
     def test__init_db(self):
@@ -65,8 +63,6 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False)
         self.assertTrue(bool(re.match(
-            '.*/\.config/leap/soledad/gnupg', sol._config.get_gnupg_home())))
-        self.assertTrue(bool(re.match(
             '.*/\.config/leap/soledad/secret.gpg',
             sol._config.get_secret_path())))
         self.assertTrue(bool(re.match(
@@ -85,8 +81,6 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # that change.
         sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False)
         self.assertTrue(bool(re.match(
-            '.*/\.config/leap/soledad/gnupg', sol._config.get_gnupg_home())))
-        self.assertTrue(bool(re.match(
             '.*/\.config/leap/soledad/secret.gpg',
             sol._config.get_secret_path())))
         self.assertTrue(bool(re.match(
@@ -104,10 +98,9 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # changed by the BaseLeapTest class but BaseConfig does not capture
         # that change.
         config_values = {
-            "gnupg_home": "value_1",
-            "secret_path": "value_2",
-            "local_db_path": "value_3",
-            "shared_db_url": "value_4"
+            "secret_path": "value_1",
+            "local_db_path": "value_2",
+            "shared_db_url": "value_3"
         }
         tmpfile = tempfile.mktemp(dir=self.tempdir)
         f = open(tmpfile, 'w')
@@ -118,10 +111,9 @@ class AuxMethodsTestCase(BaseSoledadTest):
             passphrase='123',
             bootstrap=False,
             config_path=tmpfile)
-        self.assertEqual('value_1', sol._config.get_gnupg_home())
-        self.assertEqual('value_2', sol._config.get_secret_path())
-        self.assertEqual('value_3', sol._config.get_local_db_path())
-        self.assertEqual('value_4', sol._config.get_shared_db_url())
+        self.assertEqual('value_1', sol._config.get_secret_path())
+        self.assertEqual('value_2', sol._config.get_local_db_path())
+        self.assertEqual('value_3', sol._config.get_shared_db_url())
 
     def test__init_config_from_params(self):
         """
@@ -134,11 +126,9 @@ class AuxMethodsTestCase(BaseSoledadTest):
             'leap@leap.se',
             passphrase='123',
             bootstrap=False,
-            gnupg_home='value_4',
             secret_path='value_3',
             local_db_path='value_2',
             shared_db_url='value_1')
-        self.assertEqual('value_4', sol._config.get_gnupg_home())
         self.assertEqual('value_3', sol._config.get_secret_path())
         self.assertEqual('value_2', sol._config.get_local_db_path())
         self.assertEqual('value_1', sol._config.get_shared_db_url())
