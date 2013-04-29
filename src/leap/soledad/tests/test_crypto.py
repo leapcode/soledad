@@ -48,7 +48,11 @@ from leap.soledad.tests import (
     KEY_FINGERPRINT,
     PRIVATE_KEY,
 )
-from leap.soledad.tests.u1db_tests import simple_doc, nested_doc, TestCaseWithServer
+from leap.soledad.tests.u1db_tests import (
+    simple_doc,
+    nested_doc,
+    TestCaseWithServer,
+)
 from leap.soledad.tests.test_leap_backend import make_leap_document_for_test
 from leap.soledad.backends.couch import CouchServerState
 

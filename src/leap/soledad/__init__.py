@@ -241,9 +241,11 @@ class Soledad(object):
         if secret_path is not None:
             self._config._config_checker.config['secret_path'] = secret_path
         if local_db_path is not None:
-            self._config._config_checker.config['local_db_path'] = local_db_path
+            self._config._config_checker.config['local_db_path'] = \
+                local_db_path
         if shared_db_url is not None:
-            self._config._config_checker.config['shared_db_url'] = shared_db_url
+            self._config._config_checker.config['shared_db_url'] = \
+                shared_db_url
 
     def _init_dirs(self):
         """

@@ -29,7 +29,10 @@ except ImportError:
 
 from base64 import b64encode, b64decode
 from u1db import errors
-from u1db.sync import LocalSyncTarget
+from u1db.sync import (
+    LocalSyncTarget,
+    Synchronizer,
+)
 from u1db.backends.inmemory import InMemoryIndex
 from u1db.remote.server_state import ServerState
 from u1db.errors import DatabaseDoesNotExist
@@ -54,6 +57,17 @@ class CouchDatabase(ObjectStoreDatabase):
     """
     A U1DB backend that uses Couch as its persistence layer.
     """
+
+    U1DB_TRANSACTION_LOG_KEY = 'transaction_log'
+    U1DB_CONFLICTS_KEY = 'conflicts'
+    U1DB_OTHER_GENERATIONS_KEY = 'other_generations'
+    U1DB_INDEXES_KEY = 'indexes'
+    U1DB_REPLICA_UID_KEY = 'replica_uid'
+
+    COUCH_ID_KEY = '_id'
+    COUCH_REV_KEY = '_rev'
+    COUCH_U1DB_ATTACHMENT_KEY = 'u1db_json'
+    COUCH_U1DB_REV_KEY = 'u1db_rev'
 
     @classmethod
     def open_database(cls, url, create):
@@ -143,9 +157,11 @@ class CouchDatabase(ObjectStoreDatabase):
             has_conflicts = self._has_conflicts(doc_id)
         doc = self._factory(
             doc_id=doc_id,
-            rev=cdoc['u1db_rev'],
+            rev=cdoc[self.COUCH_U1DB_REV_KEY],
             has_conflicts=has_conflicts)
-        contents = self._database.get_attachment(cdoc, 'u1db_json')
+        contents = self._database.get_attachment(
+            cdoc,
+            self.COUCH_U1DB_ATTACHMENT_KEY)
         if contents:
             doc.content = json.loads(contents.read())
         else:
@@ -193,21 +209,24 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         # prepare couch's Document
         cdoc = CouchDocument()
-        cdoc['_id'] = doc.doc_id
+        cdoc[self.COUCH_ID_KEY] = doc.doc_id
         # we have to guarantee that couch's _rev is consistent
         old_cdoc = self._database.get(doc.doc_id)
         if old_cdoc is not None:
-            cdoc['_rev'] = old_cdoc['_rev']
+            cdoc[self.COUCH_REV_KEY] = old_cdoc[self.COUCH_REV_KEY]
         # store u1db's rev
-        cdoc['u1db_rev'] = doc.rev
+        cdoc[self.COUCH_U1DB_REV_KEY] = doc.rev
         # save doc in db
         self._database.save(cdoc)
         # store u1db's content as json string
         if not doc.is_tombstone():
-            self._database.put_attachment(cdoc, doc.get_json(),
-                                          filename='u1db_json')
+            self._database.put_attachment(
+                cdoc, doc.get_json(),
+                filename=self.COUCH_U1DB_ATTACHMENT_KEY)
         else:
-            self._database.delete_attachment(cdoc, 'u1db_json')
+            self._database.delete_attachment(
+                cdoc,
+                self.COUCH_U1DB_ATTACHMENT_KEY)
 
     def get_sync_target(self):
         """
@@ -273,7 +292,6 @@ class CouchDatabase(ObjectStoreDatabase):
         @return: The local generation before the synchronisation was performed.
         @rtype: int
         """
-        from u1db.sync import Synchronizer
         return Synchronizer(self, CouchSyncTarget(url, creds=creds)).sync(
             autocreate=autocreate)
 
@@ -300,11 +318,11 @@ class CouchDatabase(ObjectStoreDatabase):
         # TODO: prevent user from overwriting a document with the same doc_id
         # as this one.
         doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
-        doc.content = {'transaction_log': [],
-                       'conflicts': b64encode(json.dumps({})),
-                       'other_generations': {},
-                       'indexes': b64encode(json.dumps({})),
-                       'replica_uid': self._replica_uid}
+        doc.content = {self.U1DB_TRANSACTION_LOG_KEY: [],
+                       self.U1DB_CONFLICTS_KEY: b64encode(json.dumps({})),
+                       self.U1DB_OTHER_GENERATIONS_KEY: {},
+                       self.U1DB_INDEXES_KEY: b64encode(json.dumps({})),
+                       self.U1DB_REPLICA_UID_KEY: self._replica_uid}
         self._put_doc(doc)
 
     def _fetch_u1db_data(self):
@@ -315,18 +333,19 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         # retrieve u1db data from couch db
         cdoc = self._database.get(self.U1DB_DATA_DOC_ID)
-        jsonstr = self._database.get_attachment(cdoc, 'u1db_json').read()
+        jsonstr = self._database.get_attachment(
+            cdoc, self.COUCH_U1DB_ATTACHMENT_KEY).read()
         content = json.loads(jsonstr)
         # set u1db database info
-        #self._sync_log = content['sync_log']
-        self._transaction_log = content['transaction_log']
-        self._conflicts = json.loads(b64decode(content['conflicts']))
-        self._other_generations = content['other_generations']
+        self._transaction_log = content[self.U1DB_TRANSACTION_LOG_KEY]
+        self._conflicts = json.loads(
+            b64decode(content[self.U1DB_CONFLICTS_KEY]))
+        self._other_generations = content[self.U1DB_OTHER_GENERATIONS_KEY]
         self._indexes = self._load_indexes_from_json(
-            b64decode(content['indexes']))
-        self._replica_uid = content['replica_uid']
+            b64decode(content[self.U1DB_INDEXES_KEY]))
+        self._replica_uid = content[self.U1DB_REPLICA_UID_KEY]
         # save couch _rev
-        self._couch_rev = cdoc['_rev']
+        self._couch_rev = cdoc[self.COUCH_REV_KEY]
 
     def _store_u1db_data(self):
         """
@@ -336,20 +355,24 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
         doc.content = {
-            'transaction_log': self._transaction_log,
+            self.U1DB_TRANSACTION_LOG_KEY: self._transaction_log,
             # Here, the b64 encode ensures that document content
             # does not cause strange behaviour in couchdb because
             # of encoding.
-            'conflicts': b64encode(json.dumps(self._conflicts)),
-            'other_generations': self._other_generations,
-            'indexes': b64encode(self._dump_indexes_as_json()),
-            'replica_uid': self._replica_uid,
-            '_rev': self._couch_rev}
+            self.U1DB_CONFLICTS_KEY: b64encode(json.dumps(self._conflicts)),
+            self.U1DB_OTHER_GENERATIONS_KEY: self._other_generations,
+            self.U1DB_INDEXES_KEY: b64encode(self._dump_indexes_as_json()),
+            self.U1DB_REPLICA_UID_KEY: self._replica_uid,
+            self.COUCH_REV_KEY: self._couch_rev}
         self._put_doc(doc)
 
     #-------------------------------------------------------------------------
     # Couch specific methods
     #-------------------------------------------------------------------------
+
+    INDEX_NAME_KEY = 'name'
+    INDEX_DEFINITION_KEY = 'definition'
+    INDEX_VALUES_KEY = 'values'
 
     def delete_database(self):
         """
@@ -364,7 +387,7 @@ class CouchDatabase(ObjectStoreDatabase):
         indexes = {}
         for name, idx in self._indexes.iteritems():
             indexes[name] = {}
-            for attr in ['name', 'definition', 'values']:
+            for attr in [INDEX_NAME_KEY, INDEX_DEFINITION_KEY, INDEX_VALUES_KEY]:
                 indexes[name][attr] = getattr(idx, '_' + attr)
         return json.dumps(indexes)
 
@@ -381,8 +404,8 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         dict = {}
         for name, idx_dict in json.loads(indexes).iteritems():
-            idx = InMemoryIndex(name, idx_dict['definition'])
-            idx._values = idx_dict['values']
+            idx = InMemoryIndex(name, idx_dict[INDEX_DEFINITION_KEY])
+            idx._values = idx_dict[INDEX_VALUES_KEY]
             dict[name] = idx
         return dict
 
@@ -425,7 +448,6 @@ class CouchServerState(ServerState):
         @return: The CouchDatabase object and the replica uid.
         @rtype: (CouchDatabase, str)
         """
-        from leap.soledad.backends.couch import CouchDatabase
         db = CouchDatabase.open_database(self.couch_url + '/' + dbname,
                                          create=True)
         return db, db._replica_uid
@@ -437,5 +459,4 @@ class CouchServerState(ServerState):
         @param dbname: The name of the database to delete.
         @type dbname: str
         """
-        from leap.soledad.backends.couch import CouchDatabase
         CouchDatabase.delete_database(self.couch_url + '/' + dbname)
