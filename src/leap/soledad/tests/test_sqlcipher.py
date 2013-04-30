@@ -458,6 +458,13 @@ sync_scenarios.append(('pyleap', {
 
 class SQLCipherDatabaseSyncTests(
         test_sync.DatabaseSyncTests, BaseSoledadTest):
+    """
+    Test for succesfull sync between SQLCipher and LeapBackend.
+
+    Some of the tests in this class had to be adapted because the remote
+    backend always receive encrypted content, and so it can not rely on
+    document's content comparison to try to autoresolve conflicts.
+    """
 
     scenarios = sync_scenarios
 
@@ -470,6 +477,12 @@ class SQLCipherDatabaseSyncTests(
         BaseSoledadTest.tearDown(self)
 
     def test_sync_autoresolves(self):
+        """
+        Test for sync autoresolve remote.
+
+        This test was adapted because the remote database receives encrypted
+        content and so it can't compare documents contents to autoresolve.
+        """
         # The remote database can't autoresolve conflicts based on magic
         # content convergence, so we modify this test to leave the possibility
         # of the remode document ending up in conflicted state.
@@ -490,6 +503,11 @@ class SQLCipherDatabaseSyncTests(
         self.assertTrue(v.is_newer(vectorclock.VectorClockRev(rev2)))
 
     def test_sync_autoresolves_moar(self):
+        """
+        Test for sync autoresolve local.
+
+        This test was adapted to decrypt remote content before assert.
+        """
         # here we test that when a database that has a conflicted document is
         # the source of a sync, and the target database has a revision of the
         # conflicted document that is newer than the source database's, and
@@ -561,16 +579,29 @@ class SQLCipherDatabaseSyncTests(
         #
         # Despite that, in Soledad we suppose that the server never syncs, so
         # it never has conflicted documents. Also, if it had, convergence
-        # would not be possible in terms of document's contents.
+        # would not be possible by checking document's contents because they
+        # would be encrypted in server.
         #
         # Therefore we suppress this test.
         pass
 
     def test_sync_autoresolves_moar_backwards_three(self):
+        # here we would test that when a database that has a conflicted
+        # document is the target of a sync, and the source database has a
+        # revision of the conflicted document that is newer than the target
+        # database's, and that source's database's document's content is the
+        # same as the target's document's conflict's, the target's document's
+        # conflict gets autoresolved, and the document's revision bumped.
+        #
         # We use the same reasoning from the last test to suppress this one.
         pass
 
     def test_sync_propagates_resolution(self):
+        """
+        Test if synchronization propagates resolution.
+
+        This test was adapted to decrypt remote content before assert.
+        """
         self.db1 = self.create_database('test1', 'both')
         self.db2 = self.create_database('test2', 'both')
         doc1 = self.db1.create_doc_from_json('{"a": 1}', doc_id='the-doc')
@@ -614,6 +645,11 @@ class SQLCipherDatabaseSyncTests(
         self.assertFalse(doc3.has_conflicts)
 
     def test_sync_puts_changes(self):
+        """
+        Test if sync puts changes in remote replica.
+
+        This test was adapted to decrypt remote content before assert.
+        """
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         doc = self.db1.create_doc_from_json(tests.simple_doc)
