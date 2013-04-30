@@ -30,12 +30,14 @@ try:
 except ImportError:
     import json  # noqa
 
+from u1db.remote import http_app
 
-from urlparse import parse_qs
-from wsgiref.util import shift_path_info
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
-from u1db.remote import http_app
+from twisted.python import log
+
+from couchdb.client import Server
+
 from leap.soledad.backends.couch import CouchServerState
 
 
@@ -57,7 +59,17 @@ class SoledadAuthMiddleware(object):
     Some special databases can be read without authentication.
     """
 
-    def __init__(self, app, prefix, public_dbs=None):
+    TOKENS_DB = "tokens"
+    TOKENS_TYPE_KEY = "type"
+    TOKENS_TYPE_DEF = "Token"
+    TOKENS_USER_ID_KEY = "user_id"
+
+    HTTP_AUTH_KEY = "HTTP_AUTHORIZATION"
+    PATH_INFO_KEY = "PATH_INFO"
+
+    CONTENT_TYPE_JSON = ('content-type', 'application/json')
+
+    def __init__(self, app):
         """
         Initialize the Soledad Authentication Middleware.
 
@@ -65,13 +77,8 @@ class SoledadAuthMiddleware(object):
         @type app: u1db.remote.http_app.HTTPApp
         @param prefix: Auth app path prefix.
         @type prefix: str
-        @param public_dbs: List of databases that should bypass
-            authentication.
-        @type public_dbs: list
         """
-        self.app = app
-        self.prefix = prefix
-        self.public_dbs = public_dbs
+        self._app = app
 
     def _error(self, start_response, status, description, message=None):
         """
@@ -94,7 +101,7 @@ class SoledadAuthMiddleware(object):
         @rtype list
         """
         start_response("%d %s" % (status, httplib.responses[status]),
-                       [('content-type', 'application/json')])
+                       [self.CONTENT_TYPE_JSON])
         err = {"error": description}
         if message:
             err['message'] = message
@@ -114,27 +121,27 @@ class SoledadAuthMiddleware(object):
         error message otherwise.
         @rtype: list
         """
-        if self.prefix and not environ['PATH_INFO'].startswith(self.prefix):
-            return self._error(start_response, 400, "bad request")
-        auth = environ.get('HTTP_AUTHORIZATION')
+
+        unauth_err = lambda msg: self._error(start_response,
+                                             401,
+                                             "unauthorized",
+                                             msg)
+
+        auth = environ.get(self.HTTP_AUTH_KEY)
         if not auth:
-            return self._error(start_response, 401, "unauthorized",
-                               "Missing Token Authentication.")
+            return unauth_err("Missing Token Authentication.")
+
         scheme, encoded = auth.split(None, 1)
         if scheme.lower() != 'token':
-            return self._error(
-                start_response, 401, "unauthorized",
-                "Missing Token Authentication")
+            return unauth_err("Missing Token Authentication")
+
         uuid, token = encoded.decode('base64').split(':', 1)
-        try:
-            self.verify_token(environ, uuid, token)
-        except Unauthorized:
-            return self._error(
-                start_response, 401, "unauthorized",
-                "Incorrect uuid or token.")
-        del environ['HTTP_AUTHORIZATION']
-        shift_path_info(environ)
-        return self.app(environ, start_response)
+        if not self.verify_token(environ, uuid, token):
+            return unauth_err("Incorrect address or token.")
+
+        del environ[self.HTTP_AUTH_KEY]
+
+        return self._app(environ, start_response)
 
     def verify_token(self, environ, uuid, token):
         """
@@ -150,9 +157,20 @@ class SoledadAuthMiddleware(object):
         @return: Whether the token is valid for authenticating the request.
         @rtype: bool
         """
-        # TODO: implement token verification
+
+        server = Server(url=self._app.state.couch_url)
+        try:
+            dbname = self.TOKENS_DB
+            db = server[dbname]
+            token = db.get(token)
+            if token is None:
+                return False
+            return token[self.TOKENS_TYPE_KEY] == self.TOKENS_TYPE_DEF and \
+                token[self.TOKENS_USER_ID_KEY] == uuid
+        except Exception as e:
+            log.err(e)
+            return False
         return True
-        #raise NotImplementedError(self.verify_token)
 
     def need_auth(self, environ):
         """
@@ -167,8 +185,8 @@ class SoledadAuthMiddleware(object):
         @rtype: bool
         """
         # TODO: design unauth verification.
-        # TODO: include public_dbs here or remove it from code.
-        return not environ.get('PATH_INFO').startswith('/shared/')
+        return not environ.get(self.PATH_INFO_KEY).startswith('/shared/')
+
 
 
 #-----------------------------------------------------------------------------
@@ -193,10 +211,6 @@ class SoledadApp(http_app.HTTPApp):
         @return: HTTP application results.
         @rtype: list
         """
-        # TODO: this is a hack for tests to pass, we should remove it asap.
-        #if environ['CONTENT_LENGTH'] == '':
-        #    environ['CONTENT_LENGTH'] = 1
-        #import ipdb; ipdb.set_trace()
         return http_app.HTTPApp.__call__(self, environ, start_response)
 
 
@@ -216,9 +230,6 @@ def load_configuration(file_path):
     """
     conf = {
         'couch_url': 'http://localhost:5984',
-        'working_dir': '/tmp',
-        'public_dbs': 'keys',
-        'prefix': '/soledad/',
     }
     config = configparser.ConfigParser()
     config.read(file_path)
@@ -236,14 +247,10 @@ def load_configuration(file_path):
 #-----------------------------------------------------------------------------
 
 # TODO: create command-line option for choosing config file.
-conf = load_configuration('/etc/leap/soledad-server.ini')
+conf = load_configuration('/etc/leap/soledad-server.conf')
 state = CouchServerState(conf['couch_url'])
-# TODO: change working dir to something meaningful (maybe eliminate it)
-state.set_workingdir(conf['working_dir'])
 
 application = SoledadAuthMiddleware(
-    SoledadApp(state),
-    conf['prefix'],
-    conf['public_dbs'].split(','))
+    SoledadApp(state))
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), application)
