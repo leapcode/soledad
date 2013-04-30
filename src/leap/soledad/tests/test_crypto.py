@@ -167,7 +167,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 #        # setup credentials for access to soledad server
 #        creds = {
 #            'token': {
-#                'address': 'leap@leap.se',
+#                'uuid': 'leap@leap.se',
 #                'token': '1234',
 #            }
 #        }
@@ -189,7 +189,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         rd = self._soledad.export_recovery_document(None)
         self.assertEqual(
             {
-                self._soledad.ADDRESS_KEY: self._soledad._address,
+                self._soledad.UUID_KEY: self._soledad._uuid,
                 self._soledad.SYMKEY_KEY: self._soledad._symkey
             },
             json.loads(rd),
@@ -201,7 +201,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(True,
                          self._soledad._crypto.is_encrypted_sym(rd))
         data = {
-            self._soledad.ADDRESS_KEY: self._soledad._address,
+            self._soledad.UUID_KEY: self._soledad._uuid,
             self._soledad.SYMKEY_KEY: self._soledad._symkey,
         }
         raw_data = json.loads(self._soledad._crypto.decrypt_sym(
@@ -224,8 +224,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         s._init_dirs()
         s._crypto = SoledadCrypto(s)
         s.import_recovery_document(rd, None)
-        self.assertEqual(self._soledad._address,
-                         s._address, 'Failed setting user email.')
+        self.assertEqual(self._soledad._uuid,
+                         s._uuid, 'Failed setting user uuid.')
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')
@@ -236,8 +236,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         s._init_dirs()
         s._crypto = SoledadCrypto(s)
         s.import_recovery_document(rd, '123456')
-        self.assertEqual(self._soledad._address,
-                         s._address, 'Failed setting user email.')
+        self.assertEqual(self._soledad._uuid,
+                         s._uuid, 'Failed setting user uuid.')
         self.assertEqual(self._soledad._symkey,
                          s._symkey,
                          'Failed settinng secret for symmetric encryption.')

@@ -126,7 +126,7 @@ class Soledad(object):
     """
 
     SYMKEY_KEY = '_symkey'
-    ADDRESS_KEY = '_address'
+    UUID_KEY = '_uuid'
     """
     Key used to access symmetric keys in recovery documents.
     """
@@ -138,14 +138,14 @@ class Soledad(object):
     Prefix for default values for path.
     """
 
-    def __init__(self, address, passphrase, secret_path=None,
+    def __init__(self, uuid, passphrase, secret_path=None,
                  local_db_path=None, server_url=None, auth_token=None,
                  bootstrap=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
-        @param address: User's address in the form C{user@provider}.
-        @type address: str
+        @param uuid: User's uuid.
+        @type uuid: str
         @param passphrase: The passphrase for locking and unlocking encryption
             secrets for disk storage.
         @type passphrase: str
@@ -165,7 +165,7 @@ class Soledad(object):
         @type bootstrap: bool
         """
         # TODO: allow for fingerprint enforcing.
-        self._address = address
+        self._uuid = uuid
         self._passphrase = passphrase
         self._set_token(auth_token)
         self._init_config(secret_path, local_db_path, server_url)
@@ -243,7 +243,7 @@ class Soledad(object):
                 self._set_symkey(
                     self._crypto.decrypt_sym(
                         doc.content[self.KEY_SYMKEY],
-                        passphrase=self._address_hash()))
+                        passphrase=self._passphrase))
         # Stage 2 - Keys synchronization
         self._assert_keys_in_shared_db()
         # Stage 3 - Local database initialization
@@ -270,13 +270,13 @@ class Soledad(object):
         """
         Generate (if needed) and load secret for symmetric encryption.
         """
-        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._address)
+        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._uuid)
         # load/generate secret
         if not self._has_symkey():
             self._gen_symkey()
         self._load_symkey()
         events.signal(
-            events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._address)
+            events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
 
     def _init_db(self):
         """
@@ -399,15 +399,15 @@ class Soledad(object):
         """
         self._gen_symkey()
 
-    def _address_hash(self):
+    def _uuid_hash(self):
         """
         Calculate a hash for storing/retrieving key material on shared
-        database, based on user's address.
+        database, based on user's uuid.
 
         @return: the hash
         @rtype: str
         """
-        return sha256('address-%s' % self._address).hexdigest()
+        return sha256('uuid-%s' % self._uuid).hexdigest()
 
     def _shared_db(self):
         """
@@ -427,10 +427,10 @@ class Soledad(object):
         @rtype: LeapDocument
         """
         events.signal(
-            events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._address)
-        doc = self._shared_db().get_doc_unauth(self._address_hash())
+            events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
+        doc = self._shared_db().get_doc_unauth(self._uuid_hash())
         events.signal(
-            events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._address)
+            events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
 
     def _assert_keys_in_shared_db(self):
@@ -456,16 +456,16 @@ class Soledad(object):
                 'Local and remote symmetric secrets differ!')
         else:
             events.signal(
-                events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._address)
+                events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._uuid)
             content = {
                 self.SYMKEY_KEY: self._crypto.encrypt_sym(
                     self._symkey, self._passphrase),
             }
-            doc = LeapDocument(doc_id=self._address_hash())
+            doc = LeapDocument(doc_id=self._uuid_hash())
             doc.content = content
             self._shared_db().put_doc(doc)
             events.signal(
-                events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._address)
+                events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
     #
     # Document storage, retrieval and sync.
@@ -719,7 +719,7 @@ class Soledad(object):
         @rtype: str
         """
         local_gen = self._db.sync(self.server_url, creds=self._creds, autocreate=True)
-        events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._address)
+        events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._uuid)
         return local_gen
 
     def need_sync(self, url):
@@ -737,7 +737,7 @@ class Soledad(object):
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
             events.signal(
-                events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._address)
+                events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._uuid)
             return True
         return False
 
@@ -749,7 +749,7 @@ class Soledad(object):
 
             self._{
                 'token': {
-                    'address': 'user@provider',
+                    'uuid': '<uuid>'
                     'token': '<token>'
             }
 
@@ -758,7 +758,7 @@ class Soledad(object):
         """
         self._creds = {
             'token': {
-                'address': self._address,
+                'uuid': self._uuid,
                 'token': token,
             }
         }
@@ -802,7 +802,7 @@ class Soledad(object):
         @rtype: str
         """
         data = json.dumps({
-            self.ADDRESS_KEY: self._address,
+            self.UUID_KEY: self._uuid,
             self.SYMKEY_KEY: self._symkey,
         })
         if passphrase:
@@ -828,7 +828,7 @@ class Soledad(object):
         if passphrase:
             data = self._crypto.decrypt_sym(data, passphrase=passphrase)
         data = json.loads(data)
-        self._address = data[self.ADDRESS_KEY]
+        self._uuid = data[self.UUID_KEY]
         self._symkey = data[self.SYMKEY_KEY]
         self._crypto.symkey = self._symkey
         self._store_symkey()
@@ -839,10 +839,10 @@ class Soledad(object):
     # Setters/getters
     #
 
-    def _get_address(self):
-        return self._address
+    def _get_uuid(self):
+        return self._uuid
 
-    address = property(_get_address, doc='The user address.')
+    uuid = property(_get_uuid, doc='The user uuid.')
 
     def _get_secret_path(self):
         return self._secret_path

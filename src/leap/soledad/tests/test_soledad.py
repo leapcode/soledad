@@ -105,7 +105,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         Ensure the shared db is queried with the correct doc_id.
         """
         self._soledad._shared_db = Mock()
-        doc_id = self._soledad._address_hash()
+        doc_id = self._soledad._uuid_hash()
         self._soledad._fetch_keys_from_shared_db()
         self.assertTrue(
             self._soledad._shared_db.get_doc_unauth.assert_called_once(doc_id),
@@ -128,7 +128,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
                 return self
 
         self._soledad._shared_db = MockSharedDB()
-        doc_id = self._soledad._address_hash()
+        doc_id = self._soledad._uuid_hash()
         self._soledad._assert_keys_in_shared_db()
         self.assertTrue(
             self._soledad._shared_db().get_doc_unauth.assert_called_once_with(

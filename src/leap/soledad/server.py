@@ -125,25 +125,25 @@ class SoledadAuthMiddleware(object):
             return self._error(
                 start_response, 401, "unauthorized",
                 "Missing Token Authentication")
-        address, token = encoded.decode('base64').split(':', 1)
+        uuid, token = encoded.decode('base64').split(':', 1)
         try:
-            self.verify_token(environ, address, token)
+            self.verify_token(environ, uuid, token)
         except Unauthorized:
             return self._error(
                 start_response, 401, "unauthorized",
-                "Incorrect address or token.")
+                "Incorrect uuid or token.")
         del environ['HTTP_AUTHORIZATION']
         shift_path_info(environ)
         return self.app(environ, start_response)
 
-    def verify_token(self, environ, address, token):
+    def verify_token(self, environ, uuid, token):
         """
         Verify if token is valid for authenticating this request.
 
         @param environ: Dictionary containing CGI variables.
         @type environ: dict
-        @param token: The user address.
-        @type token: str
+        @param uuid: The user's uuid.
+        @type uuid: str
         @param token: The authentication token.
         @type token: str
 

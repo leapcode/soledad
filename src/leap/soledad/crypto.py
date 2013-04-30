@@ -49,20 +49,6 @@ class SoledadCrypto(object):
         self._pgp = openpgp.OpenPGPScheme(self._soledad)
         self._symkey = None
 
-    def encrypt_asym(self, data, key):
-        """
-        Encrypt data.
-
-        @param data: the data to be encrypted
-        @type data: str
-        @param key: the key to be used for encryption
-        @type key: str
-
-        @return: the encrypted data
-        @rtype: str
-        """
-        return openpgp.encrypt_asym(data, key)
-
     def encrypt_sym(self, data, passphrase):
         """
         Encrypt C{data} using a {password}.
@@ -76,21 +62,6 @@ class SoledadCrypto(object):
         @rtype: str
         """
         return openpgp.encrypt_sym(data, passphrase)
-
-    def decrypt_asym(self, data):
-        """
-        Decrypt data.
-
-        @param data: the data to be decrypted
-        @type data: str
-        @param passphrase: the passphrase to be used for decryption
-        @type passphrase: str
-
-        @return: the decrypted data
-        @rtype: str
-        """
-        key = self._pgp.get_key(self._soledad.address, private=True)
-        return openpgp.decrypt_asym(data, key)
 
     def decrypt_sym(self, data, passphrase):
         """
@@ -126,16 +97,6 @@ class SoledadCrypto(object):
         @rtype: bool
         """
         return openpgp.is_encrypted_sym(data)
-
-    def is_encrypted_asym(self, data):
-        """
-        Test whether some chunk of data was encrypted to an OpenPGP private
-        key.
-
-        @return: whether data is encrypted to an OpenPGP private key
-        @rtype: bool
-        """
-        return openpgp.is_encrypted_asym(data)
 
     def passphrase_hash(self, suffix):
         """

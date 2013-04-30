@@ -27,16 +27,16 @@ they can do token-based auth requests to the Soledad server.
 from u1db.remote.http_client import HTTPClientBase
 
 
-def set_token_credentials(self, address, token):
+def set_token_credentials(self, uuid, token):
     """
     Store given credentials so we can sign the request later.
 
-    @param address: The user's address.
-    @type address: str
+    @param uuid: The user's uuid.
+    @type uuid: str
     @param token: The authentication token.
     @type token: str
     """
-    self._creds = {'token': (address, token)}
+    self._creds = {'token': (uuid, token)}
 
 
 def _sign_request(self, method, url_query, params):
@@ -51,8 +51,8 @@ def _sign_request(self, method, url_query, params):
     @type param: list
     """
     if 'token' in self._creds:
-        address, token = self._creds['token']
-        auth = '%s:%s' % (address, token)
+        uuid, token = self._creds['token']
+        auth = '%s:%s' % (uuid, token)
         return [('Authorization', 'Token %s' % auth.encode('base64'))]
     else:
         return HTTPClientBase._sign_request(self, method, url_query, params)
