@@ -192,7 +192,7 @@ class Soledad(object):
             raise NoServerUrl()
 
     #
-    # initialization methods
+    # initialization/destruction methods
     #
 
     def _bootstrap(self):
@@ -297,6 +297,12 @@ class Soledad(object):
         Close underlying U1DB database.
         """
         self._db.close()
+
+    def __del__(self):
+        """
+        Make sure local database is closed when object is destroyed.
+        """
+        self.close()
 
     #
     # Management of secret for symmetric encryption.
