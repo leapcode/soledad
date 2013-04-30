@@ -105,11 +105,20 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         """
         Ensure the shared db is queried with the correct doc_id.
         """
-        self._soledad._shared_db = Mock()
+
+        class MockSharedDB(object):
+
+            get_doc = Mock(return_value=None)
+
+            def __call__(self):
+                return self
+
+        self._soledad._shared_db = MockSharedDB()
         doc_id = self._soledad._uuid_hash()
         self._soledad._fetch_keys_from_shared_db()
         self.assertTrue(
-            self._soledad._shared_db.get_doc_unauth.assert_called_once(doc_id),
+            self._soledad._shared_db().get_doc.assert_called_once_with(
+                doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
 
     def test__assert_keys_in_shared_db(self):
@@ -122,7 +131,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
 
         class MockSharedDB(object):
 
-            get_doc_unauth = Mock(return_value=None)
+            get_doc = Mock(return_value=None)
             put_doc = Mock(side_effect=_put_doc_side_effect)
 
             def __call__(self):
@@ -132,7 +141,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         doc_id = self._soledad._uuid_hash()
         self._soledad._assert_keys_in_shared_db()
         self.assertTrue(
-            self._soledad._shared_db().get_doc_unauth.assert_called_once_with(
+            self._soledad._shared_db().get_doc.assert_called_once_with(
                 doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
         self.assertTrue(

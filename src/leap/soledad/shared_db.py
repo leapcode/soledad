@@ -54,12 +54,8 @@ class Unauthorized(Exception):
 
 class SoledadSharedDatabase(http_database.HTTPDatabase):
     """
-    This is a shared remote database that holds users' encrypted keys.
-
-    An authorization token is attached to every request other than
-    get_doc_unauth, which has the purpose of retrieving encrypted content from
-    the shared database without the need to associate user information with
-    the request.
+    This is a shared recovery database that enables users to store their
+    encryption secrets in the server and retrieve them afterwards.
     """
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
@@ -124,20 +120,3 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         http_database.HTTPDatabase.__init__(self, url, document_factory,
                                             creds)
-
-    def get_doc_unauth(self, doc_id):
-        """
-        Modified method to allow for unauth request.
-
-        This is the only (public) way to make an unauthenticaded request on
-        the shared database.
-
-        @param doc_id: The document id.
-        @type doc_id: str
-
-        @return: The requested document.
-        @rtype: Document
-        """
-        db = http_database.HTTPDatabase(self._url.geturl(),
-                                        document_factory=self._factory)
-        return db.get_doc(doc_id)

@@ -422,7 +422,7 @@ class Soledad(object):
         """
         events.signal(
             events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
-        doc = self._shared_db().get_doc_unauth(self._uuid_hash())
+        doc = self._shared_db().get_doc(self._uuid_hash())
         events.signal(
             events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
