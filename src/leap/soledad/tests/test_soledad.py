@@ -66,6 +66,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         Test if configuration defaults point to the correct place.
         """
         sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False,
+                      secret_path=None, local_db_path=None,
                       server_url='')  # otherwise Soledad will fail.
         self.assertEquals(
             os.path.join(sol.DEFAULT_PREFIX, 'secret.gpg'),

@@ -77,12 +77,6 @@ class NotADirectory(Exception):
     """
 
 
-class NoServerUrl(Exception):
-    """
-    Tried to get access to shared recovery database but there's no URL for it.
-    """
-
-
 #
 # Soledad: local encrypted storage and remote encrypted sync.
 #
@@ -138,9 +132,8 @@ class Soledad(object):
     Prefix for default values for path.
     """
 
-    def __init__(self, uuid, passphrase, secret_path=None,
-                 local_db_path=None, server_url=None, auth_token=None,
-                 bootstrap=True):
+    def __init__(self, uuid, passphrase, secret_path, local_db_path,
+                 server_url, auth_token=None, bootstrap=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -167,8 +160,8 @@ class Soledad(object):
         # TODO: allow for fingerprint enforcing.
         self._uuid = uuid
         self._passphrase = passphrase
-        self._set_token(auth_token)
         self._init_config(secret_path, local_db_path, server_url)
+        self._set_token(auth_token)
         if bootstrap:
             self._bootstrap()
 
@@ -188,8 +181,9 @@ class Soledad(object):
                 self.DEFAULT_PREFIX, 'soledad.u1db')
         # initialize server_url
         self._server_url = server_url
-        if self._server_url is None:
-            raise NoServerUrl()
+        leap_assert(
+            self._server_url is not None,
+            'Missing URL for Soledad server.')
 
     #
     # initialization/destruction methods
