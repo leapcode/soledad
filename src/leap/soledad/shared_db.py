@@ -30,6 +30,12 @@ from u1db import errors
 from u1db.remote import http_database
 
 
+from leap.soledad.auth import (
+    set_token_credentials,
+    _sign_request,
+)
+
+
 #-----------------------------------------------------------------------------
 # Soledad shared database
 #-----------------------------------------------------------------------------
@@ -58,8 +64,20 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
 
+    #
+    # Token auth methods.
+    #
+
+    set_token_credentials = set_token_credentials
+
+    _sign_request = _sign_request
+
+    #
+    # Modified HTTPDatabase methods.
+    #
+
     @staticmethod
-    def open_database(url, create, token=None):
+    def open_database(url, create, creds=None):
         # TODO: users should not be able to create the shared database, so we
         # have to remove this from here in the future.
         """
@@ -76,7 +94,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         @return: The shared database in the given url.
         @rtype: SoledadSharedDatabase
         """
-        db = SoledadSharedDatabase(url, token=token)
+        db = SoledadSharedDatabase(url, creds=creds)
         db.open(create)
         return db
 
@@ -92,7 +110,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         """
         raise Unauthorized("Can't delete shared database.")
 
-    def __init__(self, url, document_factory=None, creds=None, token=None):
+    def __init__(self, url, document_factory=None, creds=None):
         """
         Initialize database with auth token and encryption powers.
 
@@ -103,82 +121,9 @@ class SoledadSharedDatabase(http_database.HTTPDatabase):
         @param creds: A tuple containing the authentication method and
             credentials.
         @type creds: tuple
-        @param token: An authentication token for accessing the shared db.
-        @type token: str
         """
-        self._token = token
         http_database.HTTPDatabase.__init__(self, url, document_factory,
                                             creds)
-
-    def _request(self, method, url_parts, params=None, body=None,
-                 content_type=None, auth=True):
-        """
-        Perform token-based http request.
-
-        @param method: The HTTP method for the request.
-        @type method: str
-        @param url_parts: A list with extra parts for the URL.
-        @type url_parts: list
-        @param params: Parameters to be added as query string.
-        @type params: dict
-        @param body: The body of the request (must be JSON serializable).
-        @type body: object
-        @param content_type: The content-type of the request.
-        @type content_type: str
-        @param auth: Should the request be authenticated?
-        @type auth: bool
-
-        @raise u1db.errors.Unavailable: If response status is 503.
-        @raise u1db.errors.HTTPError: If response status is neither 200, 201
-            or 503
-
-        @return: The headers and body of the HTTP response.
-        @rtype: tuple
-        """
-        # add `auth-token` as a request parameter
-        if auth:
-            if not self._token:
-                raise NoTokenForAuth()
-            if not params:
-                params = {}
-            params['auth_token'] = self._token
-        return http_database.HTTPDatabase._request(
-            self,
-            method, url_parts,
-            params,
-            body,
-            content_type)
-
-    def _request_json(self, method, url_parts, params=None, body=None,
-                      content_type=None, auth=True):
-        """
-        Perform token-based http request and deserialize the JSON results.
-
-        @param method: The HTTP method for the request.
-        @type method: str
-        @param url_parts: A list with extra parts for the URL.
-        @type url_parts: list
-        @param params: Parameters to be added as query string.
-        @type params: dict
-        @param body: The body of the request (must be JSON serializable).
-        @type body: object
-        @param content_type: The content-type of the request.
-        @type content_type: str
-        @param auth: Should the request be authenticated?
-        @type auth: bool
-
-        @raise u1db.errors.Unavailable: If response status is 503.
-        @raise u1db.errors.HTTPError: If response status is neither 200, 201
-            or 503
-
-        @return: The headers and body of the HTTP response.
-        @rtype: tuple
-        """
-        # allow for token-authenticated requests.
-        res, headers = self._request(method, url_parts,
-                                     params=params, body=body,
-                                     content_type=content_type, auth=auth)
-        return json.loads(res), headers
 
     def get_doc_unauth(self, doc_id):
         """

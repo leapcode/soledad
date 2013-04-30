@@ -77,6 +77,12 @@ class NotADirectory(Exception):
     """
 
 
+class NoSharedDbUrl(Exception):
+    """
+    Tried to get access to shared recovery database but there's no URL for it.
+    """
+
+
 #
 # Soledad: local encrypted storage and remote encrypted sync.
 #
@@ -155,7 +161,7 @@ class Soledad(object):
         # TODO: allow for fingerprint enforcing.
         self._address = address
         self._passphrase = passphrase
-        self._auth_token = auth_token
+        self._set_token(auth_token)
         self._init_config(
             config_path=config_path,
             secret_path=secret_path,
@@ -194,22 +200,22 @@ class Soledad(object):
         # Stage 0  - Local environment setup
         self._init_dirs()
         self._crypto = SoledadCrypto(self)
-        if self._config.get_shared_db_url() and self._auth_token:
-            # TODO: eliminate need to create db here.
-            self._shared_db = SoledadSharedDatabase.open_database(
-                self._config.get_shared_db_url(),
-                True,
-                token=self._auth_token)
-        else:
-            self._shared_db = None
         # Stage 1 - Keys generation/loading
         if self._has_keys():
             self._load_keys()
         else:
+            logger.info(
+                'Trying to fetch cryptographic secrets from shared recovery '
+                'database...')
             doc = self._fetch_keys_from_shared_db()
             if not doc:
+                logger.info(
+                    'No cryptographic secrets found, creating new secrets...')
                 self._init_keys()
             else:
+                logger.info(
+                    'Found cryptographic secrets in shared recovery '
+                    'database.')
                 self._set_symkey(
                     self._crypto.decrypt_sym(
                         doc.content[self.KEY_SYMKEY],
@@ -218,6 +224,18 @@ class Soledad(object):
         self._assert_keys_in_shared_db()
         # Stage 3 - Local database initialization
         self._init_db()
+
+    def _shared_db(self):
+        """
+        Return an instance of the shared recovery database object.
+        """
+        if self._config.get_shared_db_url():
+            return SoledadSharedDatabase.open_database(
+                self._config.get_shared_db_url(),
+                False,  # TODO: eliminate need to create db here.
+                creds=self._creds)
+        else:
+            raise NoSharedDbUrl()
 
     def _init_config(self, config_path, secret_path, local_db_path,
                      shared_db_url):
@@ -382,6 +400,7 @@ class Soledad(object):
         """
         Load the key for symmetric encryption from persistent storage.
         """
+        logger.info('Loading cryptographic secrets from local storage...')
         self._load_symkey()
 
     def _gen_keys(self):
@@ -410,10 +429,7 @@ class Soledad(object):
         """
         events.signal(
             events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._address)
-        # TODO: change below to raise appropriate exceptions
-        if not self._shared_db:
-            return None
-        doc = self._shared_db.get_doc_unauth(self._address_hash())
+        doc = self._shared_db().get_doc_unauth(self._address_hash())
         events.signal(
             events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._address)
         return doc
@@ -431,11 +447,9 @@ class Soledad(object):
             self._has_keys(),
             'Tried to send keys to server but they don\'t exist in local '
             'storage.')
-        if not self._shared_db:
-            return
         doc = self._fetch_keys_from_shared_db()
         if doc:
-            remote_symkey = self.decrypt_sym(
+            remote_symkey = self._crypto.decrypt_sym(
                 doc.content[self.SYMKEY_KEY],
                 passphrase=self._address_hash())
             leap_assert(
@@ -445,12 +459,12 @@ class Soledad(object):
             events.signal(
                 events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._address)
             content = {
-                self.SYMKEY_KEY: self.encrypt_sym(
+                self.SYMKEY_KEY: self._crypto.encrypt_sym(
                     self._symkey, self._passphrase),
             }
             doc = LeapDocument(doc_id=self._address_hash())
             doc.content = content
-            self._shared_db.put_doc(doc)
+            self._shared_db().put_doc(doc)
             events.signal(
                 events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._address)
 
@@ -694,7 +708,7 @@ class Soledad(object):
         """
         return self._db.resolve_doc(doc, conflicted_doc_revs)
 
-    def sync(self, url, creds=None):
+    def sync(self, url):
         """
         Synchronize the local encrypted replica with a remote replica.
 
@@ -705,8 +719,7 @@ class Soledad(object):
             performed.
         @rtype: str
         """
-        # TODO: create authentication scheme for sync with server.
-        local_gen = self._db.sync(url, creds=creds, autocreate=True)
+        local_gen = self._db.sync(url, creds=self._creds, autocreate=True)
         events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._address)
         return local_gen
 
@@ -720,8 +733,7 @@ class Soledad(object):
         @return: Whether remote replica and local replica differ.
         @rtype: bool
         """
-        # TODO: create auth scheme for sync with server
-        target = LeapSyncTarget(url, creds=None, crypto=self._crypto)
+        target = LeapSyncTarget(url, creds=self._creds, crypto=self._crypto)
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
@@ -729,6 +741,36 @@ class Soledad(object):
                 events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._address)
             return True
         return False
+
+    def _set_token(self, token):
+        """
+        Set the authentication token for remote database access.
+
+        Build the credentials dictionary with the following format:
+
+            self._{
+                'token': {
+                    'address': 'user@provider',
+                    'token': '<token>'
+            }
+
+        @param token: The authentication token.
+        @type token: str
+        """
+        self._creds = {
+            'token': {
+                'address': self._address,
+                'token': token,
+            }
+        }
+
+    def _get_token(self):
+        """
+        Return current token from credentials dictionary.
+        """
+        return self._creds['token']['token']
+
+    token = property(_get_token, _set_token, doc='The authentication Token.')
 
     #-------------------------------------------------------------------------
     # Recovery document export and import

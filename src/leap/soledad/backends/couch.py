@@ -387,7 +387,8 @@ class CouchDatabase(ObjectStoreDatabase):
         indexes = {}
         for name, idx in self._indexes.iteritems():
             indexes[name] = {}
-            for attr in [INDEX_NAME_KEY, INDEX_DEFINITION_KEY, INDEX_VALUES_KEY]:
+            for attr in [self.INDEX_NAME_KEY, self.INDEX_DEFINITION_KEY,
+                         self.INDEX_VALUES_KEY]:
                 indexes[name][attr] = getattr(idx, '_' + attr)
         return json.dumps(indexes)
 
@@ -404,8 +405,8 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         dict = {}
         for name, idx_dict in json.loads(indexes).iteritems():
-            idx = InMemoryIndex(name, idx_dict[INDEX_DEFINITION_KEY])
-            idx._values = idx_dict[INDEX_VALUES_KEY]
+            idx = InMemoryIndex(name, idx_dict[self.INDEX_DEFINITION_KEY])
+            idx._values = idx_dict[self.INDEX_VALUES_KEY]
             dict[name] = idx
         return dict
 
@@ -435,8 +436,9 @@ class CouchServerState(ServerState):
         @rtype: CouchDatabase
         """
         # TODO: open couch
-        return CouchDatabase.open_database(self.couch_url + '/' + dbname,
-                                           create=False)
+        return CouchDatabase.open_database(
+            self.couch_url + '/' + dbname,
+            create=False)
 
     def ensure_database(self, dbname):
         """
@@ -448,8 +450,9 @@ class CouchServerState(ServerState):
         @return: The CouchDatabase object and the replica uid.
         @rtype: (CouchDatabase, str)
         """
-        db = CouchDatabase.open_database(self.couch_url + '/' + dbname,
-                                         create=True)
+        db = CouchDatabase.open_database(
+            self.couch_url + '/' + dbname,
+            create=True)
         return db, db._replica_uid
 
     def delete_database(self, dbname):

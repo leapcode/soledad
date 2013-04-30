@@ -53,6 +53,7 @@ dependency_links = [
 
 
 tests_requirements = [
+    'mock',
     'nose2',
     'testscenarios',
 ]

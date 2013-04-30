@@ -30,32 +30,21 @@ except ImportError:
 
 from u1db import Document
 from u1db.remote import utils
-from u1db.remote.http_target import HTTPSyncTarget
-from u1db.remote.http_database import HTTPDatabase
 from u1db.errors import BrokenSyncStream
+from u1db.remote.http_target import HTTPSyncTarget
 
 
 from leap.common.keymanager import KeyManager
 from leap.common.check import leap_assert
+from leap.soledad.auth import (
+    set_token_credentials,
+    _sign_request,
+)
 
 
 #
 # Exceptions
 #
-
-class NoDefaultKey(Exception):
-    """
-    Exception to signal that there's no default OpenPGP key configured.
-    """
-    pass
-
-
-class NoSoledadCryptoInstance(Exception):
-    """
-    Exception to signal that no Soledad instance was found.
-    """
-    pass
-
 
 class DocumentNotEncrypted(Exception):
     """
@@ -267,6 +256,18 @@ class LeapSyncTarget(HTTPSyncTarget):
     receiving.
     """
 
+    #
+    # Token auth methods.
+    #
+
+    set_token_credentials = set_token_credentials
+
+    _sign_request = _sign_request
+
+    #
+    # Modified HTTPSyncTarget methods.
+    #
+
     @staticmethod
     def connect(url, crypto=None):
         return LeapSyncTarget(url, crypto=crypto)
@@ -403,15 +404,3 @@ class LeapSyncTarget(HTTPSyncTarget):
         res = self._parse_sync_stream(data, return_doc_cb, ensure_callback)
         data = None
         return res['new_generation'], res['new_transaction_id']
-
-    def set_token_credentials(self, address, token):
-        self._creds = {'token': (address, token)}
-
-    def _sign_request(self, method, url_query, params):
-        if 'token' in self._creds:
-            address, token = self._creds['token']
-            auth = '%s:%s' % (address, token)
-            return [('Authorization', 'Token %s' % auth.encode('base64'))]
-        else:
-            return HTTPSyncTarget._sign_request(
-                self, method, url_query, params)

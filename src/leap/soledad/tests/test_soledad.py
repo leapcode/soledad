@@ -30,9 +30,13 @@ except ImportError:
     import json  # noqa
 
 
+from mock import Mock
+from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad import Soledad
 from leap.soledad.crypto import SoledadCrypto
+from leap.soledad.shared_db import SoledadSharedDatabase
+from leap.soledad.backends.leap_backend import LeapDocument
 
 
 class AuxMethodsTestCase(BaseSoledadTest):
@@ -132,3 +136,56 @@ class AuxMethodsTestCase(BaseSoledadTest):
         self.assertEqual('value_3', sol._config.get_secret_path())
         self.assertEqual('value_2', sol._config.get_local_db_path())
         self.assertEqual('value_1', sol._config.get_shared_db_url())
+
+
+class SoledadSharedDBTestCase(BaseSoledadTest):
+    """
+    These tests ensure the functionalities of the shared recovery database.
+    """
+
+    def setUp(self):
+        BaseSoledadTest.setUp(self)
+        self._shared_db = SoledadSharedDatabase(
+            'https://provider/', LeapDocument, None)
+
+    def test__fetch_keys_from_shared_db(self):
+        """
+        Ensure the shared db is queried with the correct doc_id.
+        """
+        self._soledad._shared_db = Mock()
+        doc_id = self._soledad._address_hash()
+        self._soledad._fetch_keys_from_shared_db()
+        self.assertTrue(
+            self._soledad._shared_db.get_doc_unauth.assert_called_once(doc_id),
+            'Wrong doc_id when fetching recovery document.')
+
+    def test__assert_keys_in_shared_db(self):
+        """
+        Ensure recovery document is put into shared recover db.
+        """
+
+        def _put_doc_side_effect(doc):
+            self._doc_put = doc
+
+        class MockSharedDB(object):
+
+            get_doc_unauth = Mock(return_value=None)
+            put_doc = Mock(side_effect=_put_doc_side_effect)
+
+            def __call__(self):
+                return self
+
+        self._soledad._shared_db = MockSharedDB()
+        doc_id = self._soledad._address_hash()
+        self._soledad._assert_keys_in_shared_db()
+        self.assertTrue(
+            self._soledad._shared_db().get_doc_unauth.assert_called_once_with(
+                doc_id) is None,
+            'Wrong doc_id when fetching recovery document.')
+        self.assertTrue(
+            self._soledad._shared_db.put_doc.assert_called_once_with(
+                self._doc_put) is None,
+            'Wrong document when putting recovery document.')
+        self.assertTrue(
+            self._doc_put.doc_id == doc_id,
+            'Wrong doc_id when putting recovery document.')
