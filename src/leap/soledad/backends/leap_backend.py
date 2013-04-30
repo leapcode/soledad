@@ -290,8 +290,12 @@ class LeapSyncTarget(HTTPSyncTarget):
 
     def _parse_sync_stream(self, data, return_doc_cb, ensure_callback=None):
         """
-        Does the same as parent's method but ensures incoming content will be
-        decrypted.
+        Parse incoming synchronization stream and insert documents in the
+        local database.
+
+        If an incoming document's encryption scheme is equal to
+        EncryptionSchemes.SYMKEY, then this method will decrypt it with
+        Soledad's symmetric key.
 
         @param data: The body of the HTTP response.
         @type data: str
@@ -301,7 +305,10 @@ class LeapSyncTarget(HTTPSyncTarget):
             target_replica_uid, if it was just created.
         @type ensure_callback: function
 
-        @return: The parsed sync stream.
+        @raise BrokenSyncStream: If C{data} is malformed.
+
+        @return: A dictionary representing the first line of the response got
+            from remote replica.
         @rtype: list of str
         """
         parts = data.splitlines()  # one at a time
@@ -352,7 +359,31 @@ class LeapSyncTarget(HTTPSyncTarget):
                       last_known_generation, last_known_trans_id,
                       return_doc_cb, ensure_callback=None):
         """
-        Does the same as parent's method but encrypts content before syncing.
+        Find out which documents the remote database does not know about,
+        encrypt and send them.
+
+        This does the same as the parent's method but encrypts content before
+        syncing.
+
+        @param docs_by_generations: A list of (doc_id, generation, trans_id)
+            of local documents that were changed since the last local
+            generation the remote replica knows about. 
+        @type docs_by_generations: list of tuples
+        @param source_replica_uid: The uid of the source replica.
+        @type source_replica_uid: str
+        @param last_known_generation: Target's last known generation.
+        @type last_known_generation: int
+        @param last_known_trans_id: Target's last known transaction id.
+        @type last_known_trans_id: str
+        @param return_doc_cb: A callback for inserting received documents from
+            target.
+        @type return_doc_cb: function
+        @param ensure_callback: A callback that ensures we know the target
+            replica uid if the target replica was just created.
+        @type ensure_callback: function
+
+        @return: The new generation and transaction id of the target replica.
+        @rtype: tuple
         """
         self._ensure_connection()
         if self._trace_hook:  # for tests
