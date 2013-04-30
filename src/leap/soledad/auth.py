@@ -18,6 +18,9 @@
 
 """
 Methods for token-based authentication.
+
+These methods have to be included in all classes that extend HTTPClient so
+they can do token-based auth requests to the Soledad server.
 """
 
 
@@ -25,10 +28,28 @@ from u1db.remote.http_client import HTTPClientBase
 
 
 def set_token_credentials(self, address, token):
+    """
+    Store given credentials so we can sign the request later.
+
+    @param address: The user's address.
+    @type address: str
+    @param token: The authentication token.
+    @type token: str
+    """
     self._creds = {'token': (address, token)}
 
 
 def _sign_request(self, method, url_query, params):
+    """
+    Return an authorization header to be included in the HTTP request.
+
+    @param method: The HTTP method.
+    @type method: str
+    @param url_query: The URL query string.
+    @type url_query: str
+    @param params: A list with encoded query parameters.
+    @type param: list
+    """
     if 'token' in self._creds:
         address, token = self._creds['token']
         auth = '%s:%s' % (address, token)
