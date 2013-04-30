@@ -36,12 +36,12 @@ except ImportError:
     import json  # noqa
 
 
+from xdg import BaseDirectory
 from hashlib import sha256
 
 
 from leap.common import events
 from leap.common.check import leap_assert
-from leap.soledad.config import SoledadConfig
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
@@ -77,7 +77,7 @@ class NotADirectory(Exception):
     """
 
 
-class NoSharedDbUrl(Exception):
+class NoServerUrl(Exception):
     """
     Tried to get access to shared recovery database but there's no URL for it.
     """
@@ -131,9 +131,16 @@ class Soledad(object):
     Key used to access symmetric keys in recovery documents.
     """
 
-    def __init__(self, address, passphrase, config_path=None,
-                 secret_path=None, local_db_path=None,
-                 shared_db_url=None, auth_token=None, bootstrap=True):
+    DEFAULT_PREFIX = os.path.join(
+        BaseDirectory.xdg_config_home,
+        'leap', 'soledad')
+    """
+    Prefix for default values for path.
+    """
+
+    def __init__(self, address, passphrase, secret_path=None,
+                 local_db_path=None, server_url=None, auth_token=None,
+                 bootstrap=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -142,16 +149,15 @@ class Soledad(object):
         @param passphrase: The passphrase for locking and unlocking encryption
             secrets for disk storage.
         @type passphrase: str
-        @param config_path: Path for configuration file.
-        @type config_path: str
         @param secret_path: Path for storing encrypted key used for
             symmetric encryption.
         @type secret_path: str
         @param local_db_path: Path for local encrypted storage db.
         @type local_db_path: str
-        @param shared_db_url: URL for shared Soledad DB for key storage and
-            unauth retrieval.
-        @type shared_db_url: str
+        @param server_url: URL for Soledad server. This is used either to sync
+            with the user's remote db and to interact with the shared recovery
+            database.
+        @type server_url: str
         @param auth_token: Authorization token for accessing remote databases.
         @type auth_token: str
         @param bootstrap: True/False, should bootstrap this instance? Mostly
@@ -162,14 +168,32 @@ class Soledad(object):
         self._address = address
         self._passphrase = passphrase
         self._set_token(auth_token)
-        self._init_config(
-            config_path=config_path,
-            secret_path=secret_path,
-            local_db_path=local_db_path,
-            shared_db_url=shared_db_url,
-        )
+        self._init_config(secret_path, local_db_path, server_url)
         if bootstrap:
             self._bootstrap()
+
+    def _init_config(self, secret_path, local_db_path, server_url):
+        """
+        Initialize configuration using default values for missing params.
+        """
+        # initialize secret_path
+        self._secret_path = secret_path
+        if self._secret_path is None:
+            self._secret_path = os.path.join(
+                self.DEFAULT_PREFIX, 'secret.gpg')
+        # initialize local_db_path
+        self._local_db_path = local_db_path
+        if self._local_db_path is None:
+            self._local_db_path = os.path.join(
+                self.DEFAULT_PREFIX, 'soledad.u1db')
+        # initialize server_url
+        self._server_url = server_url
+        if self._server_url is None:
+            raise NoServerUrl()
+
+    #
+    # initialization methods
+    #
 
     def _bootstrap(self):
         """
@@ -225,53 +249,13 @@ class Soledad(object):
         # Stage 3 - Local database initialization
         self._init_db()
 
-    def _shared_db(self):
-        """
-        Return an instance of the shared recovery database object.
-        """
-        if self._config.get_shared_db_url():
-            return SoledadSharedDatabase.open_database(
-                self._config.get_shared_db_url(),
-                False,  # TODO: eliminate need to create db here.
-                creds=self._creds)
-        else:
-            raise NoSharedDbUrl()
-
-    def _init_config(self, config_path, secret_path, local_db_path,
-                     shared_db_url):
-        """
-        Initialize configuration using SoledadConfig.
-
-        Soledad configuration makes use of BaseLeapConfig to load values from
-        a file or from default configuration. Parameters passed as arguments
-        for this method will supersede file and default values.
-
-        @param kwargs: a dictionary with configuration parameter values passed
-            when instantiating this Soledad instance.
-        @type kwargs: dict
-        """
-        self._config = SoledadConfig()
-        if config_path is not None:
-            self._config.load(path=config_path)
-        else:
-            self._config.load(data='')
-        # overwrite config with passed parameters
-        if secret_path is not None:
-            self._config._config_checker.config['secret_path'] = secret_path
-        if local_db_path is not None:
-            self._config._config_checker.config['local_db_path'] = \
-                local_db_path
-        if shared_db_url is not None:
-            self._config._config_checker.config['shared_db_url'] = \
-                shared_db_url
-
     def _init_dirs(self):
         """
         Create work directories.
         """
         paths = map(
             lambda x: os.path.dirname(x),
-            [self._config.get_local_db_path(), self._config.get_secret_path()])
+            [self.local_db_path, self.secret_path])
         for path in paths:
             if not os.path.isfile(path):
                 if not os.path.isdir(path):
@@ -302,7 +286,7 @@ class Soledad(object):
         # TODO: verify if secret for sqlcipher should be the same as the
         # one for symmetric encryption.
         self._db = sqlcipher.open(
-            self._config.get_local_db_path(),
+            self.local_db_path,
             self._symkey,
             create=True,
             document_factory=LeapDocument,
@@ -314,9 +298,9 @@ class Soledad(object):
         """
         self._db.close()
 
-    #-------------------------------------------------------------------------
-    # Management of secret for symmetric encryption
-    #-------------------------------------------------------------------------
+    #
+    # Management of secret for symmetric encryption.
+    #
 
     def _has_symkey(self):
         """
@@ -328,14 +312,14 @@ class Soledad(object):
         @rtype: bool
         """
         # does the file exist in disk?
-        if not os.path.isfile(self._config.get_secret_path()):
+        if not os.path.isfile(self.secret_path):
             return False
         # is it symmetrically encrypted?
-        with open(self._config.get_secret_path(), 'r') as f:
+        with open(self.secret_path, 'r') as f:
             content = f.read()
         if not self._crypto.is_encrypted_sym(content):
             raise DocumentNotEncrypted(
-                "File %s is not encrypted!" % self._config.get_secret_path())
+                "File %s is not encrypted!" % self.secret_path)
         # can we decrypt it?
         plaintext = self._crypto.decrypt_sym(
             content, passphrase=self._passphrase)
@@ -348,7 +332,7 @@ class Soledad(object):
         if not self._has_symkey():
             raise KeyDoesNotExist("Tried to load key for symmetric "
                                   "encryption but it does not exist on disk.")
-        with open(self._config.get_secret_path()) as f:
+        with open(self.secret_path) as f:
             self._symkey = \
                 self._crypto.decrypt_sym(
                     f.read(), passphrase=self._passphrase)
@@ -380,12 +364,12 @@ class Soledad(object):
     def _store_symkey(self):
         ciphertext = self._crypto.encrypt_sym(
             self._symkey, self._passphrase)
-        with open(self._config.get_secret_path(), 'w') as f:
+        with open(self.secret_path, 'w') as f:
             f.write(ciphertext)
 
-    #-------------------------------------------------------------------------
+    #
     # General crypto utility methods.
-    #-------------------------------------------------------------------------
+    #
 
     def _has_keys(self):
         """
@@ -419,6 +403,15 @@ class Soledad(object):
         """
         return sha256('address-%s' % self._address).hexdigest()
 
+    def _shared_db(self):
+        """
+        Return an instance of the shared recovery database object.
+        """
+        return SoledadSharedDatabase.open_database(
+            self.server_url,
+            False,  # TODO: eliminate need to create db here.
+            creds=self._creds)
+
     def _fetch_keys_from_shared_db(self):
         """
         Retrieve the document with encrypted key material from the shared
@@ -451,7 +444,7 @@ class Soledad(object):
         if doc:
             remote_symkey = self._crypto.decrypt_sym(
                 doc.content[self.SYMKEY_KEY],
-                passphrase=self._address_hash())
+                passphrase=self._passphrase)
             leap_assert(
                 remote_symkey == self._symkey,
                 'Local and remote symmetric secrets differ!')
@@ -468,9 +461,9 @@ class Soledad(object):
             events.signal(
                 events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._address)
 
-    #-------------------------------------------------------------------------
-    # Document storage, retrieval and sync
-    #-------------------------------------------------------------------------
+    #
+    # Document storage, retrieval and sync.
+    #
 
     # TODO: refactor the following methods to somewhere out of here
     # (SoledadLocalDatabase, maybe?)
@@ -708,7 +701,7 @@ class Soledad(object):
         """
         return self._db.resolve_doc(doc, conflicted_doc_revs)
 
-    def sync(self, url):
+    def sync(self):
         """
         Synchronize the local encrypted replica with a remote replica.
 
@@ -719,7 +712,7 @@ class Soledad(object):
             performed.
         @rtype: str
         """
-        local_gen = self._db.sync(url, creds=self._creds, autocreate=True)
+        local_gen = self._db.sync(self.server_url, creds=self._creds, autocreate=True)
         events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._address)
         return local_gen
 
@@ -772,9 +765,9 @@ class Soledad(object):
 
     token = property(_get_token, _set_token, doc='The authentication Token.')
 
-    #-------------------------------------------------------------------------
-    # Recovery document export and import
-    #-------------------------------------------------------------------------
+    #
+    # Recovery document export and import methods.
+    #
 
     def export_recovery_document(self, passphrase=None):
         """
@@ -845,5 +838,23 @@ class Soledad(object):
 
     address = property(_get_address, doc='The user address.')
 
+    def _get_secret_path(self):
+        return self._secret_path
 
-__all__ = ['backends', 'util', 'server', 'shared_db']
+    secret_path = property(
+        _get_secret_path,
+        doc='The path for the file containing the encrypted symmetric secret.')
+
+    def _get_local_db_path(self):
+        return self._local_db_path
+
+    local_db_path = property(
+        _get_local_db_path,
+        doc='The path for the local database replica.')
+
+    def _get_server_url(self):
+        return self._server_url
+
+    server_url = property(
+        _get_server_url,
+        doc='The URL of the Soledad server.')
