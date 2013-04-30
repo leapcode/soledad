@@ -41,6 +41,7 @@ install_requirements = [
     #   - https://twistedmatrix.com/trac/wiki/FrequentlyAskedQuestions
     'twisted==13.0.0', # TODO: maybe we just want twisted-web?
     'u1db',
+    'requests',
 ]
 
 
