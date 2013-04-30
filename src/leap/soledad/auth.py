@@ -21,6 +21,9 @@ Methods for token-based authentication.
 """
 
 
+from u1db.remote.http_client import HTTPClientBase
+
+
 def set_token_credentials(self, address, token):
     self._creds = {'token': (address, token)}
 
@@ -30,3 +33,5 @@ def _sign_request(self, method, url_query, params):
         address, token = self._creds['token']
         auth = '%s:%s' % (address, token)
         return [('Authorization', 'Token %s' % auth.encode('base64'))]
+    else:
+        return HTTPClientBase._sign_request(self, method, url_query, params)

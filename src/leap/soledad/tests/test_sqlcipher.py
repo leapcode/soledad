@@ -1,4 +1,25 @@
-"""Test sqlcipher backend internals."""
+# -*- coding: utf-8 -*-
+# test_sqlcipher.py
+# Copyright (C) 2013 LEAP
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+
+"""
+Test sqlcipher backend internals.
+"""
+
 
 import os
 import time
@@ -11,6 +32,7 @@ import threading
 from pysqlcipher import dbapi2
 from StringIO import StringIO
 
+
 # u1db stuff.
 from u1db import (
     errors,
@@ -19,6 +41,7 @@ from u1db import (
     vectorclock,
 )
 from u1db.backends.sqlite_backend import SQLitePartialExpandDatabase
+
 
 # soledad stuff.
 from leap.soledad.backends.sqlcipher import (
@@ -35,6 +58,7 @@ from leap.soledad.backends.leap_backend import (
     ENC_SCHEME_KEY,
     MAC_KEY,
 )
+
 
 # u1db tests stuff.
 from leap.soledad.tests import u1db_tests as tests, BaseSoledadTest
