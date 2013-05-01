@@ -21,16 +21,18 @@ Test Leap backend bits.
 """
 
 import u1db
+import os
 try:
     import simplejson as json
 except ImportError:
     import json  # noqa
 import cStringIO
 
-
+from u1db.sync import Synchronizer
 from u1db.remote import (
     http_client,
     http_database,
+    http_target,
 )
 
 
@@ -53,6 +55,7 @@ from leap.soledad.tests.u1db_tests import test_http_client
 from leap.soledad.tests.u1db_tests import test_document
 from leap.soledad.tests.u1db_tests import test_remote_sync_target
 from leap.soledad.tests.u1db_tests import test_https
+from leap.soledad.tests.u1db_tests import test_sync
 
 
 #-----------------------------------------------------------------------------
@@ -559,7 +562,7 @@ def token_leap_https_sync_target(test, host, path):
 
 
 #-----------------------------------------------------------------------------
-# The following tests come from `u1db.tests.test_https`.
+# The following tests come from `u1db.tests.test_http_database`.
 #-----------------------------------------------------------------------------
 
 class _HTTPDatabase(http_database.HTTPDatabase):
@@ -591,6 +594,203 @@ class TestHTTPDatabaseWithCreds(test_http_database.TestHTTPDatabaseCtrWithCreds)
             'token': 'auth-token',
         }})
         self.assertIn('token', db1._creds)
+
+
+#-----------------------------------------------------------------------------
+# The following tests come from `u1db.tests.test_sync`.
+#-----------------------------------------------------------------------------
+
+def _make_local_db_and_leap_target(test, path='test'):
+    test.startServer()
+    db = test.request_state._create_database(os.path.basename(path))
+    st = leap_backend.LeapSyncTarget.connect(
+        test.getURL(path), crypto=test._soledad._crypto)
+    return db, st
+
+
+def _make_local_db_and_token_leap_target(test):
+    db, st = _make_local_db_and_leap_target(test, 'test')
+    st.set_token_credentials('user-uuid', 'auth-token')
+    return db, st
+
+
+target_scenarios = [
+    ('token_leap', {'create_db_and_target':
+                    _make_local_db_and_token_leap_target,
+                    'make_app_with_state': make_token_soledad_app}),
+]
+
+
+class LeapDatabaseSyncTargetTests(
+        test_sync.DatabaseSyncTargetTests, BaseSoledadTest):
+
+    scenarios = (
+        tests.multiply_scenarios(
+            tests.DatabaseBaseTests.scenarios,
+            target_scenarios))
+
+    def test_sync_exchange(self):
+        """
+        Test sync exchange.
+
+        This test was adapted to decrypt remote content before assert.
+        """
+        doc = self.make_document('doc-id', 'replica:1', tests.simple_doc)
+        docs_by_gen = [
+            (doc, 10,
+             'T-sid')]
+        new_gen, trans_id = self.st.sync_exchange(
+            docs_by_gen, 'replica', last_known_generation=0,
+            last_known_trans_id=None, return_doc_cb=self.receive_doc)
+        # -- (possibly) decrypt and compare
+        tmpdoc = self.db.get_doc('doc-id')
+        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
+            tmpdoc.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
+        self.assertEqual(doc, tmpdoc)
+        # -- end of decrypt and compare
+        self.assertTransactionLog(['doc-id'], self.db)
+        last_trans_id = self.getLastTransId(self.db)
+        self.assertEqual(([], 1, last_trans_id),
+                         (self.other_changes, new_gen, last_trans_id))
+        self.assertEqual(10, self.st.get_sync_info('replica')[3])
+
+    def test_sync_exchange_push_many(self):
+        docs_by_gen = [
+            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
+            (self.make_document('doc-id2', 'replica:1', tests.nested_doc), 11,
+             'T-2')]
+        new_gen, trans_id = self.st.sync_exchange(
+            docs_by_gen, 'replica', last_known_generation=0,
+            last_known_trans_id=None, return_doc_cb=self.receive_doc)
+        # -- (possibly) decrypt and compare
+        tmpdoc = self.db.get_doc('doc-id')
+        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
+            tmpdoc.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
+        self.assertEqual(
+            self.make_document('doc-id', 'replica:1', tests.simple_doc),
+            tmpdoc)
+        # -- end of decrypt and compare
+        # -- (possibly) decrypt and compare
+        tmpdoc = self.db.get_doc('doc-id2')
+        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
+            tmpdoc.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
+        self.assertEqual(
+            self.make_document('doc-id2', 'replica:1', tests.nested_doc),
+            tmpdoc)
+        # -- end of decrypt and compare
+        self.assertTransactionLog(['doc-id', 'doc-id2'], self.db)
+        last_trans_id = self.getLastTransId(self.db)
+        self.assertEqual(([], 2, last_trans_id),
+                         (self.other_changes, new_gen, trans_id))
+        self.assertEqual(11, self.st.get_sync_info('replica')[3])
+
+    def test_sync_exchange_returns_many_new_docs(self):
+        doc = self.db.create_doc_from_json(tests.simple_doc)
+        doc2 = self.db.create_doc_from_json(tests.nested_doc)
+        self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
+        new_gen, _ = self.st.sync_exchange(
+            [], 'other-replica', last_known_generation=0,
+            last_known_trans_id=None, return_doc_cb=self.receive_doc)
+        self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
+        self.assertEqual(2, new_gen)
+        self.assertEqual(
+            [(doc.doc_id, doc.rev, 1),
+             (doc2.doc_id, doc2.rev, 2)],
+            [c[:-3]+c[-2:-1] for c in self.other_changes])
+        self.assertEqual(
+            json.loads(tests.simple_doc),
+            json.loads(self.other_changes[0][2]))
+        self.assertEqual(
+            json.loads(tests.nested_doc),
+            json.loads(self.other_changes[1][2]))
+        if self.whitebox:
+            self.assertEqual(
+                self.db._last_exchange_log['return'],
+                {'last_gen': 2, 'docs':
+                 [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
+
+
+class TestLeapDbSync(test_sync.TestDbSync, BaseSoledadTest):
+    """Test db.sync remote sync shortcut"""
+
+    scenarios = [
+        ('py-http', {
+            'make_app_with_state': make_soledad_app,
+            'make_database_for_test': tests.make_memory_database_for_test,
+        }),
+        ('py-token-http', {
+            'make_app_with_state': make_token_soledad_app,
+            'make_database_for_test': tests.make_memory_database_for_test,
+            'token': True
+        }),
+    ]
+
+    oauth = False
+    token = False
+
+    def do_sync(self, target_name):
+        """
+        Perform sync using LeapSyncTarget and Token auth.
+        """
+        if self.token:
+            extra = dict(creds={'token': {
+                'uuid': 'user-uuid',
+                'token': 'auth-token',
+            }})
+            target_url = self.getURL(target_name)
+            return Synchronizer(
+                self.db,
+                leap_backend.LeapSyncTarget(
+                    target_url,
+                    crypto=self._soledad._crypto,
+                    **extra)).sync(autocreate=True)
+        else:
+            return test_sync.TestDbSync.do_sync(self, target_name)
+
+    def test_db_sync(self):
+        """
+        Test sync.
+
+        Adapted to check for encrypted content.
+        """
+        doc1 = self.db.create_doc_from_json(tests.simple_doc)
+        doc2 = self.db2.create_doc_from_json(tests.nested_doc)
+        local_gen_before_sync = self.do_sync('test2.db')
+        gen, _, changes = self.db.whats_changed(local_gen_before_sync)
+        self.assertEqual(1, len(changes))
+        self.assertEqual(doc2.doc_id, changes[0][0])
+        self.assertEqual(1, gen - local_gen_before_sync)
+        self.assertGetEncryptedDoc(self.db2, doc1.doc_id, doc1.rev, tests.simple_doc,
+                          False)
+        self.assertGetEncryptedDoc(self.db, doc2.doc_id, doc2.rev, tests.nested_doc,
+                          False)
+
+    def test_db_sync_autocreate(self):
+        """
+        Test sync.
+
+        Adapted to check for encrypted content.
+        """
+        doc1 = self.db.create_doc_from_json(tests.simple_doc)
+        local_gen_before_sync = self.do_sync('test3.db')
+        gen, _, changes = self.db.whats_changed(local_gen_before_sync)
+        self.assertEqual(0, gen - local_gen_before_sync)
+        db3 = self.request_state.open_database('test3.db')
+        gen, _, changes = db3.whats_changed()
+        self.assertEqual(1, len(changes))
+        self.assertEqual(doc1.doc_id, changes[0][0])
+        self.assertGetEncryptedDoc(db3, doc1.doc_id, doc1.rev, tests.simple_doc,
+                          False)
+        t_gen, _ = self.db._get_replica_gen_and_trans_id('test3.db')
+        s_gen, _ = db3._get_replica_gen_and_trans_id('test1')
+        self.assertEqual(1, t_gen)
+        self.assertEqual(1, s_gen)
 
 
 load_tests = tests.load_with_scenarios
