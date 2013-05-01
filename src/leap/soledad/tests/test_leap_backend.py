@@ -25,6 +25,7 @@ try:
     import simplejson as json
 except ImportError:
     import json  # noqa
+import cStringIO
 
 
 from leap.soledad.backends import leap_backend
@@ -105,6 +106,10 @@ class TestLeapPyDocument(test_document.TestPyDocument, BaseSoledadTest):
 
 class TestLeapSyncTargetBasics(
         test_remote_sync_target.TestHTTPSyncTargetBasics):
+    """
+    Some tests had to be copied to this class so we can instantiate our own
+    target.
+    """
 
     def test_parse_url(self):
         remote_target = leap_backend.LeapSyncTarget('http://127.0.0.1:12345/')
@@ -114,12 +119,13 @@ class TestLeapSyncTargetBasics(
         self.assertEqual('/', remote_target._url.path)
 
 
-# Monkey patch test class so it uses our sync target.
-test_remote_sync_target.http_target.HTTPSyncTarget = leap_backend.LeapSyncTarget
-
 class TestLeapParsingSyncStream(
         test_remote_sync_target.TestParsingSyncStream,
         BaseSoledadTest):
+    """
+    Some tests had to be copied to this class so we can instantiate our own
+    target.
+    """
 
     def setUp(self):
         test_remote_sync_target.TestParsingSyncStream.setUp(self)
@@ -149,9 +155,65 @@ class TestLeapParsingSyncStream(
                           ',\r\n]' % json.dumps(enc_json),
                           lambda doc, gen, trans_id: None)
 
+    def test_wrong_start(self):
+        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream, "{}\r\n]", None)
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream, "\r\n{}\r\n]", None)
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream, "", None)
+
+    def test_wrong_end(self):
+        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream, "[\r\n{}", None)
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream, "[\r\n", None)
+
+    def test_missing_comma(self):
+        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream,
+                          '[\r\n{}\r\n{"id": "i", "rev": "r", '
+                          '"content": "c", "gen": 3}\r\n]', None)
+
+    def test_no_entries(self):
+        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream, "[\r\n]", None)
+
+    def test_error_in_stream(self):
+        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+
+        self.assertRaises(u1db.errors.Unavailable,
+                          tgt._parse_sync_stream,
+                          '[\r\n{"new_generation": 0},'
+                          '\r\n{"error": "unavailable"}\r\n', None)
+
+        self.assertRaises(u1db.errors.Unavailable,
+                          tgt._parse_sync_stream,
+                          '[\r\n{"error": "unavailable"}\r\n', None)
+
+        self.assertRaises(u1db.errors.BrokenSyncStream,
+                          tgt._parse_sync_stream,
+                          '[\r\n{"error": "?"}\r\n', None)
+
+
+#
+# functions for TestRemoteSyncTargets
+#
 
 def leap_sync_target(test, path):
-    return leap_backend.LeapSyncTarget(test.getURL(path))
+    return leap_backend.LeapSyncTarget(
+        test.getURL(path), crypto=test._soledad._crypto)
 
 
 def oauth_leap_sync_target(test, path):
@@ -161,7 +223,8 @@ def oauth_leap_sync_target(test, path):
     return st
 
 
-class TestRemoteSyncTargets(tests.TestCaseWithServer):
+class TestLeapSyncTarget(
+    test_remote_sync_target.TestRemoteSyncTargets, BaseSoledadTest):
 
     scenarios = [
         ('http', {'make_app_with_state': make_soledad_app,
@@ -172,6 +235,142 @@ class TestRemoteSyncTargets(tests.TestCaseWithServer):
                         'sync_target': oauth_leap_sync_target}),
     ]
 
+    def test_sync_exchange_send(self):
+        """
+        Test for sync exchanging send of document.
+
+        This test was adapted to decrypt remote content before assert.
+        """
+        self.startServer()
+        db = self.request_state._create_database('test')
+        remote_target = self.getSyncTarget('test')
+        other_docs = []
+
+        def receive_doc(doc):
+            other_docs.append((doc.doc_id, doc.rev, doc.get_json()))
+
+        doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        new_gen, trans_id = remote_target.sync_exchange(
+            [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
+            last_known_trans_id=None, return_doc_cb=receive_doc)
+        self.assertEqual(1, new_gen)
+        # (possibly) decrypt and compare
+        doc2 = db.get_doc('doc-here')
+        if leap_backend.ENC_SCHEME_KEY in doc2.content:
+            doc2.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, doc2.doc_id, doc2.get_json()))
+        self.assertEqual(doc, doc2)
+
+    def test_sync_exchange_send_failure_and_retry_scenario(self):
+        """
+        Test for sync exchange failure and retry.
+
+        This test was adapted to decrypt remote content before assert.
+        """
+        self.startServer()
+
+        def blackhole_getstderr(inst):
+            return cStringIO.StringIO()
+
+        self.patch(self.server.RequestHandlerClass, 'get_stderr',
+                   blackhole_getstderr)
+        db = self.request_state._create_database('test')
+        _put_doc_if_newer = db._put_doc_if_newer
+        trigger_ids = ['doc-here2']
+
+        def bomb_put_doc_if_newer(doc, save_conflict,
+                                  replica_uid=None, replica_gen=None,
+                                  replica_trans_id=None):
+            if doc.doc_id in trigger_ids:
+                raise Exception
+            return _put_doc_if_newer(doc, save_conflict=save_conflict,
+                                     replica_uid=replica_uid,
+                                     replica_gen=replica_gen,
+                                     replica_trans_id=replica_trans_id)
+        self.patch(db, '_put_doc_if_newer', bomb_put_doc_if_newer)
+        remote_target = self.getSyncTarget('test')
+        other_changes = []
+
+        def receive_doc(doc, gen, trans_id):
+            other_changes.append(
+                (doc.doc_id, doc.rev, doc.get_json(), gen, trans_id))
+
+        doc1 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        doc2 = self.make_document('doc-here2', 'replica:1',
+                                  '{"value": "here2"}')
+        self.assertRaises(
+            u1db.errors.HTTPError,
+            remote_target.sync_exchange,
+            [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
+            'replica', last_known_generation=0, last_known_trans_id=None,
+            return_doc_cb=receive_doc)
+        # -- (possibly) decrypt and compare
+        tmpdoc = db.get_doc('doc-here')
+        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
+            tmpdoc.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
+        self.assertEqual(doc1, tmpdoc)
+        # -- end of decrypt and compare
+        self.assertEqual(
+            (10, 'T-sid'), db._get_replica_gen_and_trans_id('replica'))
+        self.assertEqual([], other_changes)
+        # retry
+        trigger_ids = []
+        new_gen, trans_id = remote_target.sync_exchange(
+            [(doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
+            last_known_trans_id=None, return_doc_cb=receive_doc)
+        # -- (possibly) decrypt and compare
+        tmpdoc = db.get_doc('doc-here2')
+        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
+            tmpdoc.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
+        self.assertEqual(doc2, tmpdoc)
+        # -- end of decrypt and compare
+        self.assertEqual(
+            (11, 'T-sud'), db._get_replica_gen_and_trans_id('replica'))
+        self.assertEqual(2, new_gen)
+        # bounced back to us
+        self.assertEqual(
+            ('doc-here', 'replica:1', '{"value": "here"}', 1),
+            other_changes[0][:-1])
+
+    def test_sync_exchange_send_ensure_callback(self):
+        """
+        Test for sync exchange failure and retry.
+
+        This test was adapted to decrypt remote content before assert.
+        """
+        self.startServer()
+        remote_target = self.getSyncTarget('test')
+        other_docs = []
+        replica_uid_box = []
+
+        def receive_doc(doc):
+            other_docs.append((doc.doc_id, doc.rev, doc.get_json()))
+
+        def ensure_cb(replica_uid):
+            replica_uid_box.append(replica_uid)
+
+        doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        new_gen, trans_id = remote_target.sync_exchange(
+            [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
+            last_known_trans_id=None, return_doc_cb=receive_doc,
+            ensure_callback=ensure_cb)
+        self.assertEqual(1, new_gen)
+        db = self.request_state.open_database('test')
+        self.assertEqual(1, len(replica_uid_box))
+        self.assertEqual(db._replica_uid, replica_uid_box[0])
+        # -- (possibly) decrypt and compare
+        tmpdoc = db.get_doc('doc-here')
+        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
+            tmpdoc.set_json(
+                leap_backend.decrypt_doc_json(
+                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
+        self.assertEqual(doc, tmpdoc)
+        # -- end of decrypt and compare
 
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_https`.
@@ -179,7 +378,9 @@ class TestRemoteSyncTargets(tests.TestCaseWithServer):
 
 def oauth_https_sync_target(test, host, path):
     _, port = test.server.server_address
-    st = leap_backend.LeapSyncTarget('https://%s:%d/~/%s' % (host, port, path))
+    st = leap_backend.LeapSyncTarget(
+        'https://%s:%d/~/%s' % (host, port, path),
+        crypto=test._soledad._crypto)
     st.set_oauth_credentials(tests.consumer1.key, tests.consumer1.secret,
                              tests.token1.key, tests.token1.secret)
     return st
