@@ -48,6 +48,8 @@ from leap.soledad.backends.leap_backend import (
     DocumentNotEncrypted,
     LeapSyncTarget,
 )
+
+from leap.soledad import shared_db
 from leap.soledad.shared_db import SoledadSharedDatabase
 from leap.soledad.crypto import SoledadCrypto
 
@@ -133,7 +135,7 @@ class Soledad(object):
     """
 
     def __init__(self, uuid, passphrase, secret_path, local_db_path,
-                 server_url, auth_token=None, bootstrap=True):
+                 server_url, cert_file, auth_token=None, bootstrap=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -151,6 +153,9 @@ class Soledad(object):
             with the user's remote db and to interact with the shared recovery
             database.
         @type server_url: str
+        @param cert_file: Path to the SSL certificate to use in the
+            connection to the server_url.
+        @type cert_file: str
         @param auth_token: Authorization token for accessing remote databases.
         @type auth_token: str
         @param bootstrap: True/False, should bootstrap this instance? Mostly
@@ -162,6 +167,9 @@ class Soledad(object):
         self._passphrase = passphrase
         self._init_config(secret_path, local_db_path, server_url)
         self._set_token(auth_token)
+
+        shared_db.SOLEDAD_CERT = cert_file
+
         if bootstrap:
             self._bootstrap()
 

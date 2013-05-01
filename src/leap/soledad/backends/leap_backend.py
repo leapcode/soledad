@@ -41,7 +41,6 @@ from leap.soledad.auth import (
     _sign_request,
 )
 
-
 #
 # Exceptions
 #
@@ -367,7 +366,7 @@ class LeapSyncTarget(HTTPSyncTarget):
 
         @param docs_by_generations: A list of (doc_id, generation, trans_id)
             of local documents that were changed since the last local
-            generation the remote replica knows about. 
+            generation the remote replica knows about.
         @type docs_by_generations: list of tuples
         @param source_replica_uid: The uid of the source replica.
         @type source_replica_uid: str
