@@ -405,13 +405,8 @@ class TestLeapSyncTarget(
             [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=receive_doc)
         self.assertEqual(1, new_gen)
-        # (possibly) decrypt and compare
-        doc2 = db.get_doc('doc-here')
-        if leap_backend.ENC_SCHEME_KEY in doc2.content:
-            doc2.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, doc2.doc_id, doc2.get_json()))
-        self.assertEqual(doc, doc2)
+        self.assertGetEncryptedDoc(
+            db, 'doc-here', 'replica:1', '{"value": "here"}', False)
 
     def test_sync_exchange_send_failure_and_retry_scenario(self):
         """
@@ -419,6 +414,7 @@ class TestLeapSyncTarget(
 
         This test was adapted to decrypt remote content before assert.
         """
+
         self.startServer()
 
         def blackhole_getstderr(inst):
@@ -456,14 +452,9 @@ class TestLeapSyncTarget(
             [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
             'replica', last_known_generation=0, last_known_trans_id=None,
             return_doc_cb=receive_doc)
-        # -- (possibly) decrypt and compare
-        tmpdoc = db.get_doc('doc-here')
-        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
-        self.assertEqual(doc1, tmpdoc)
-        # -- end of decrypt and compare
+        self.assertGetEncryptedDoc(
+            db, 'doc-here', 'replica:1', '{"value": "here"}',
+            False)
         self.assertEqual(
             (10, 'T-sid'), db._get_replica_gen_and_trans_id('replica'))
         self.assertEqual([], other_changes)
@@ -472,14 +463,9 @@ class TestLeapSyncTarget(
         new_gen, trans_id = remote_target.sync_exchange(
             [(doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=receive_doc)
-        # -- (possibly) decrypt and compare
-        tmpdoc = db.get_doc('doc-here2')
-        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
-        self.assertEqual(doc2, tmpdoc)
-        # -- end of decrypt and compare
+        self.assertGetEncryptedDoc(
+            db, 'doc-here2', 'replica:1', '{"value": "here2"}',
+            False)
         self.assertEqual(
             (11, 'T-sud'), db._get_replica_gen_and_trans_id('replica'))
         self.assertEqual(2, new_gen)
@@ -514,14 +500,9 @@ class TestLeapSyncTarget(
         db = self.request_state.open_database('test')
         self.assertEqual(1, len(replica_uid_box))
         self.assertEqual(db._replica_uid, replica_uid_box[0])
-        # -- (possibly) decrypt and compare
-        tmpdoc = db.get_doc('doc-here')
-        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
-        self.assertEqual(doc, tmpdoc)
-        # -- end of decrypt and compare
+        self.assertGetEncryptedDoc(
+            db, 'doc-here', 'replica:1', '{"value": "here"}', False)
+
 
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_https`.
@@ -635,28 +616,27 @@ class LeapDatabaseSyncTargetTests(
 
         This test was adapted to decrypt remote content before assert.
         """
-        doc = self.make_document('doc-id', 'replica:1', tests.simple_doc)
         docs_by_gen = [
-            (doc, 10,
+            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
              'T-sid')]
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
-        # -- (possibly) decrypt and compare
-        tmpdoc = self.db.get_doc('doc-id')
-        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
-        self.assertEqual(doc, tmpdoc)
-        # -- end of decrypt and compare
+        self.assertGetEncryptedDoc(
+            self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertTransactionLog(['doc-id'], self.db)
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 1, last_trans_id),
                          (self.other_changes, new_gen, last_trans_id))
         self.assertEqual(10, self.st.get_sync_info('replica')[3])
 
+
     def test_sync_exchange_push_many(self):
+        """
+        Test sync exchange.
+
+        This test was adapted to decrypt remote content before assert.
+        """
         docs_by_gen = [
             (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
             (self.make_document('doc-id2', 'replica:1', tests.nested_doc), 11,
@@ -664,33 +644,25 @@ class LeapDatabaseSyncTargetTests(
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
-        # -- (possibly) decrypt and compare
-        tmpdoc = self.db.get_doc('doc-id')
-        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
-        self.assertEqual(
-            self.make_document('doc-id', 'replica:1', tests.simple_doc),
-            tmpdoc)
-        # -- end of decrypt and compare
-        # -- (possibly) decrypt and compare
-        tmpdoc = self.db.get_doc('doc-id2')
-        if leap_backend.ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                leap_backend.decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id, tmpdoc.get_json()))
-        self.assertEqual(
-            self.make_document('doc-id2', 'replica:1', tests.nested_doc),
-            tmpdoc)
-        # -- end of decrypt and compare
+        self.assertGetEncryptedDoc(
+            self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
+        self.assertGetEncryptedDoc(
+            self.db, 'doc-id2', 'replica:1', tests.nested_doc, False)
         self.assertTransactionLog(['doc-id', 'doc-id2'], self.db)
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 2, last_trans_id),
                          (self.other_changes, new_gen, trans_id))
         self.assertEqual(11, self.st.get_sync_info('replica')[3])
 
+
     def test_sync_exchange_returns_many_new_docs(self):
+        """
+        Test sync exchange.
+
+        This test was adapted to avoid JSON serialization comparison as local
+        and remote representations might differ. It looks directly at the
+        doc's contents instead.
+        """
         doc = self.db.create_doc_from_json(tests.simple_doc)
         doc2 = self.db.create_doc_from_json(tests.nested_doc)
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)

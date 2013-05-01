@@ -53,7 +53,6 @@ from leap.soledad.backends.leap_backend import (
     LeapDocument,
     EncryptionSchemes,
     decrypt_doc_json,
-    encrypt_doc_json,
     ENC_JSON_KEY,
     ENC_SCHEME_KEY,
     MAC_KEY,
@@ -562,12 +561,9 @@ class SQLCipherDatabaseSyncTests(
         self.sync(self.db1, self.db2)
         # make sure db2 now has the exact same thing
         doc1 = self.db1.get_doc('doc')
-        doc2 = self.db2.get_doc('doc')
-        if ENC_SCHEME_KEY in doc2.content:
-            doc2.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, doc2.doc_id, doc2.get_json()))
-        self.assertEqual(doc1, doc2)
+        self.assertGetEncryptedDoc(
+            self.db2,
+            doc1.doc_id, doc1.rev, doc1.get_json(), False)
 
     def test_sync_autoresolves_moar_backwards(self):
         # here we would test that when a database that has a conflicted
@@ -654,16 +650,8 @@ class SQLCipherDatabaseSyncTests(
         self.db2 = self.create_database('test2', 'target')
         doc = self.db1.create_doc_from_json(tests.simple_doc)
         self.assertEqual(1, self.sync(self.db1, self.db2))
-        exp_doc = self.make_document(
-            doc.doc_id, doc.rev, tests.simple_doc, False)
-        doc2 = self.db2.get_doc(doc.doc_id)
-         # decrypt to compare it it is the case
-        if ENC_SCHEME_KEY in doc2.content:
-            doc2 = self.db2.get_doc(doc.doc_id)
-            doc2.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, doc.doc_id, doc2.get_json()))
-        self.assertEqual(exp_doc, doc2)
+        self.assertGetEncryptedDoc(
+            self.db2, doc.doc_id, doc.rev, tests.simple_doc, False)
         self.assertEqual(1, self.db1._get_replica_gen_and_trans_id('test2')[0])
         self.assertEqual(1, self.db2._get_replica_gen_and_trans_id('test1')[0])
         self.assertLastExchangeLog(
@@ -713,16 +701,8 @@ class SQLCipherSyncTargetTests(
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
-        # decrypt doc1 for comparison if needed
-        tmpdoc = self.db.get_doc('doc-id')
-        if ENC_SCHEME_KEY in tmpdoc.content:
-            tmpdoc.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc.doc_id,
-                    tmpdoc.get_json()))
-        self.assertEqual(tmpdoc.rev, 'replica:1')
-        self.assertEqual(tmpdoc.content, json.loads(tests.simple_doc))
-        self.assertFalse(tmpdoc.has_conflicts)
+        self.assertGetEncryptedDoc(
+            self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertTransactionLog(['doc-id'], self.db)
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 1, last_trans_id),
@@ -735,33 +715,16 @@ class SQLCipherSyncTargetTests(
         sever-side.
         """
         docs_by_gen = [
-            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
-             'T-1'),
+            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
             (self.make_document('doc-id2', 'replica:1', tests.nested_doc), 11,
              'T-2')]
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
-        # decrypt doc1 for comparison if needed
-        tmpdoc1 = self.db.get_doc('doc-id')
-        if ENC_SCHEME_KEY in tmpdoc1.content:
-            tmpdoc1.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc1.doc_id,
-                    tmpdoc1.get_json()))
-        self.assertEqual(tmpdoc1.rev, 'replica:1')
-        self.assertEqual(tmpdoc1.content, json.loads(tests.simple_doc))
-        self.assertFalse(tmpdoc1.has_conflicts)
-        # decrypt doc2 for comparison if needed
-        tmpdoc2 = self.db.get_doc('doc-id2')
-        if ENC_SCHEME_KEY in tmpdoc2.content:
-            tmpdoc2.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, tmpdoc2.doc_id,
-                    tmpdoc2.get_json()))
-        self.assertEqual(tmpdoc2.rev, 'replica:1')
-        self.assertEqual(tmpdoc2.content, json.loads(tests.nested_doc))
-        self.assertFalse(tmpdoc2.has_conflicts)
+        self.assertGetEncryptedDoc(
+            self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
+        self.assertGetEncryptedDoc(
+            self.db, 'doc-id2', 'replica:1', tests.nested_doc, False)
         self.assertTransactionLog(['doc-id', 'doc-id2'], self.db)
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 2, last_trans_id),
