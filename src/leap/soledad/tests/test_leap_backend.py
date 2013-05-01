@@ -28,7 +28,10 @@ except ImportError:
 import cStringIO
 
 
-from u1db.remote import http_client
+from u1db.remote import (
+    http_client,
+    http_database,
+)
 
 
 from leap.soledad.backends import leap_backend
@@ -553,5 +556,41 @@ def token_leap_https_sync_target(test, host, path):
 #                        'make_document_for_test': make_leap_document_for_test,
 #                        'sync_target': token_leap_https_sync_target}),
 #    ]
+
+
+#-----------------------------------------------------------------------------
+# The following tests come from `u1db.tests.test_https`.
+#-----------------------------------------------------------------------------
+
+class _HTTPDatabase(http_database.HTTPDatabase):
+    """
+    Wraps our token auth implementation.
+    """
+
+    def set_token_credentials(self, uuid, token):
+        auth.set_token_credentials(self, uuid, token)
+
+    def _sign_request(self, method, url_query, params):
+        return auth._sign_request(self, method, url_query, params)
+
+
+class TestHTTPDatabaseWithCreds(test_http_database.TestHTTPDatabaseCtrWithCreds):
+
+    def test_get_sync_target_inherits_token_credentials(self):
+        # this test was from TestDatabaseSimpleOperations but we put it here
+        # for convenience.
+        self.db = _HTTPDatabase('dbase')
+        self.db.set_token_credentials('user-uuid', 'auth-token')
+        st = self.db.get_sync_target()
+        self.assertEqual(self.db._creds, st._creds)
+
+
+    def test_ctr_with_creds(self):
+        db1 = _HTTPDatabase('http://dbs/db', creds={'token': {
+            'uuid': 'user-uuid',
+            'token': 'auth-token',
+        }})
+        self.assertIn('token', db1._creds)
+
 
 load_tests = tests.load_with_scenarios
