@@ -143,10 +143,10 @@ def decrypt_doc_json(crypto, doc_id, doc_json):
     @return: The JSON serialization of the decrypted content.
     @rtype: str
     """
-    leap_assert(isinstance(doc_id, str))
-    leap_assert(doc_id != '')
-    leap_assert(isinstance(doc_json, str))
-    leap_assert(doc_json != '')
+    leap_assert(isinstance(doc_id, str), 'Document id is not a string.')
+    leap_assert(doc_id != '', 'Received empty document id.')
+    leap_assert(isinstance(doc_json, str), 'Document JSON is not a string.')
+    leap_assert(doc_json != '', 'Received empty document JSON.')
     content = json.loads(doc_json)
     ciphertext = content[ENC_JSON_KEY]
     enc_scheme = content[ENC_SCHEME_KEY]
