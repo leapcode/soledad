@@ -26,8 +26,6 @@ except ImportError:
     import json  # noqa
 
 
-from u1db import errors
-
 from u1db.remote import http_database, http_client
 
 

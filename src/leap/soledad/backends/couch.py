@@ -29,10 +29,7 @@ except ImportError:
 
 from base64 import b64encode, b64decode
 from u1db import errors
-from u1db.sync import (
-    LocalSyncTarget,
-    Synchronizer,
-)
+from u1db.sync import Synchronizer
 from u1db.backends.inmemory import InMemoryIndex
 from u1db.remote.server_state import ServerState
 from u1db.errors import DatabaseDoesNotExist

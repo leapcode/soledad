@@ -264,7 +264,7 @@ class Soledad(object):
                     logger.info('Creating directory: %s.' % path)
                     os.makedirs(path)
                 else:
-                    logger.warning('Using existent directory: %s.' % path)
+                    logger.info('Using existent directory: %s.' % path)
             else:
                 raise NotADirectory(path)
 
@@ -325,7 +325,8 @@ class Soledad(object):
         # does the file exist in disk?
         if not os.path.isfile(self.secret_path):
             return False
-        # is it symmetrically encrypted?
+        # is it symfetrically encrypted?
+        content = None
         with open(self.secret_path, 'r') as f:
             content = f.read()
         if not self._crypto.is_encrypted_sym(content):

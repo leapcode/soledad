@@ -21,7 +21,6 @@ A U1DB backend for encrypting data before sending to server and decrypting
 after receiving.
 """
 
-import uuid
 try:
     import simplejson as json
 except ImportError:
@@ -89,8 +88,9 @@ def encrypt_doc_json(crypto, doc_id, doc_json):
     The returned JSON string is the serialization of the following dictionary:
 
         {
-            ENC_JSON_KEY: encrypt_sym(doc_content),
-            '_encryption_scheme: 'symkey',
+            '_enc_json': encrypt_sym(doc_content),
+            '_enc_scheme': 'symkey',
+            '_mac': <mac> [Not implemented yet]
         }
 
     @param crypto: A SoledadCryto instance to perform the encryption.
@@ -160,7 +160,7 @@ def decrypt_doc_json(crypto, doc_id, doc_json):
             ciphertext,
             crypto.passphrase_hash(doc_id))
     else:
-        raise UnknownEncryptionScheme(enc_scheme)
+        raise UnknownEncryptionSchemes(enc_scheme)
     return plainjson
 
 

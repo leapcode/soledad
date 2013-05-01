@@ -27,10 +27,7 @@ from pysqlcipher import dbapi2
 from u1db import (
     errors,
 )
-from leap.soledad.backends.leap_backend import (
-    LeapDocument,
-    EncryptionSchemes,
-)
+from leap.soledad.backends.leap_backend import LeapDocument
 
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
