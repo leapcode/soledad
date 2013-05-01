@@ -33,6 +33,7 @@ from leap.soledad.server import (
     SoledadApp,
     SoledadAuthMiddleware
 )
+from leap.soledad import auth
 
 
 from leap.soledad.tests import u1db_tests as tests
@@ -62,6 +63,19 @@ def make_soledad_app(state):
     return SoledadApp(state)
 
 
+def make_token_soledad_app(state):
+    app = SoledadApp(state)
+
+    def verify_token(environ, uuid, token):
+        if uuid == 'user-uuid' and token == 'auth-token':
+            return True
+        return False
+
+    application = SoledadAuthMiddleware(app)
+    application.verify_token = verify_token
+    return application
+
+
 LEAP_SCENARIOS = [
     ('http', {
         'make_database_for_test': test_backends.make_http_database_for_test,
@@ -71,9 +85,52 @@ LEAP_SCENARIOS = [
 ]
 
 
+def make_token_http_database_for_test(test, replica_uid):
+    http_db = test_backends.make_http_database_for_test(test, replica_uid, 'test')
+    http_db.set_token_credentials = auth.set_token_credentials
+
+    def _sign_request(method, url_query, params):
+        return auth._sign_request(http_db, method, url_query, params)
+
+    http_db._sign_request = _sign_request
+    http_db.set_token_credentials(http_db, 'user-uuid', 'auth-token')
+    return http_db
+
+
+def copy_token_http_database_for_test(test, db):
+    # DO NOT COPY OR REUSE THIS CODE OUTSIDE TESTS: COPYING U1DB DATABASES IS
+    # THE WRONG THING TO DO, THE ONLY REASON WE DO SO HERE IS TO TEST THAT WE
+    # CORRECTLY DETECT IT HAPPENING SO THAT WE CAN RAISE ERRORS RATHER THAN
+    # CORRUPT USER DATA. USE SYNC INSTEAD, OR WE WILL SEND NINJA TO YOUR
+    # HOUSE.
+    http_db = test.request_state._copy_database(db)
+    http_db.set_token_credentials = auth.set_token_credentials
+
+    def _sign_request(method, url_query, params):
+        return auth._sign_request(http_db, method, url_query, params)
+
+    http_db._sign_request = _sign_request
+    http_db.set_token_credentials(http_db, 'user-uuid', 'auth-token')
+    return http_db
+
+
 class LeapTests(test_backends.AllDatabaseTests, BaseSoledadTest):
 
-    scenarios = LEAP_SCENARIOS
+    scenarios = LEAP_SCENARIOS + [
+        ('oauth_http', {'make_database_for_test':
+                        test_backends.make_oauth_http_database_for_test,
+                        'copy_database_for_test':
+                        test_backends.copy_oauth_http_database_for_test,
+                        'make_document_for_test': make_leap_document_for_test,
+                        'make_app_with_state': make_oauth_http_app}),
+        ('token_http', {'make_database_for_test':
+                        make_token_http_database_for_test,
+                        'copy_database_for_test':
+                        copy_token_http_database_for_test,
+                        'make_document_for_test': make_leap_document_for_test,
+                        'make_app_with_state': make_token_soledad_app,
+                        })
+    ]
 
 
 #-----------------------------------------------------------------------------
@@ -84,7 +141,34 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
     """
     This class should be used to test Token auth.
     """
-    pass
+
+    def getClient(self, **kwds):
+        self.startServer()
+        client = http_client.HTTPClientBase(self.getURL('dbase'), **kwds)
+        client.set_token_credentials = auth.set_token_credentials
+
+        def _sign_request(method, url_query, params):
+            return auth._sign_request(http_db, method, url_query, params)
+
+        client._sign_request = _sign_request
+
+    def test_oauth(self):
+        """
+        Suppress oauth test (we test for token auth here).
+        """
+        pass
+
+    def test_oauth_ctr_creds(self):
+        """
+        Suppress oauth test (we test for token auth here).
+        """
+        pass
+
+    def test_oauth_Unauthorized(self):
+        """
+        Suppress oauth test (we test for token auth here).
+        """
+        pass
 
 
 #-----------------------------------------------------------------------------
@@ -229,18 +313,6 @@ def token_leap_sync_target(test, path):
     st = leap_sync_target(test, path)
     st.set_token_credentials('user-uuid', 'auth-token')
     return st
-
-def make_token_soledad_app(state):
-    app = SoledadApp(state)
-
-    def verify_token(environ, uuid, token):
-        if uuid == 'user-uuid' and token == 'auth-token':
-            return True
-        return False
-
-    application = SoledadAuthMiddleware(app)
-    application.verify_token = verify_token
-    return application
 
 
 class TestLeapSyncTarget(
