@@ -22,6 +22,7 @@ Test ObjectStore and Couch backend bits.
 
 import re
 import copy
+import shutil
 from base64 import b64decode
 from leap.soledad.backends import couch
 from leap.soledad.tests import u1db_tests as tests
@@ -116,7 +117,7 @@ stderr:
         """
         self.process.terminate()
         self.process.communicate()
-        os.system("rm -rf %s" % self.tempdir)
+        shutil.rmtree(self.tempdir)
 
 
 class CouchDBTestCase(unittest.TestCase):
