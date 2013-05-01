@@ -290,7 +290,10 @@ class Soledad(object):
         """
         Close underlying U1DB database.
         """
-        self._db.close()
+        if hasattr(self, '_db') and isinstance(
+                self._db,
+                sqlcipher.SQLCipherDatabase):
+            self._db.close()
 
     def __del__(self):
         """
