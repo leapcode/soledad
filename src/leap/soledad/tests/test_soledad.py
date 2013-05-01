@@ -67,7 +67,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False,
                       secret_path=None, local_db_path=None,
-                      server_url='')  # otherwise Soledad will fail.
+                      server_url='', cert_file=None)  # otherwise Soledad will fail.
         self.assertEquals(
             os.path.join(sol.DEFAULT_PREFIX, 'secret.gpg'),
             sol.secret_path)
@@ -85,7 +85,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
             bootstrap=False,
             secret_path='value_3',
             local_db_path='value_2',
-            server_url='value_1')
+            server_url='value_1',
+            cert_file=None)
         self.assertEqual('value_3', sol.secret_path)
         self.assertEqual('value_2', sol.local_db_path)
         self.assertEqual('value_1', sol.server_url)

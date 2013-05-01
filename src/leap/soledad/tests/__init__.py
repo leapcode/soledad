@@ -55,6 +55,7 @@ class BaseSoledadTest(BaseLeapTest):
             secret_path=self.tempdir+prefix+secret_path,
             local_db_path=self.tempdir+prefix+local_db_path,
             server_url='',  # Soledad will fail if not given an url.
+            cert_file=None,
             bootstrap=bootstrap)
 
 

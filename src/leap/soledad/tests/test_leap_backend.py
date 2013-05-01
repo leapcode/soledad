@@ -29,7 +29,10 @@ import cStringIO
 
 
 from leap.soledad.backends import leap_backend
-from leap.soledad.server import SoledadApp
+from leap.soledad.server import (
+    SoledadApp,
+    SoledadAuthMiddleware
+)
 
 
 from leap.soledad.tests import u1db_tests as tests
@@ -222,6 +225,23 @@ def oauth_leap_sync_target(test, path):
                              tests.token1.key, tests.token1.secret)
     return st
 
+def token_leap_sync_target(test, path):
+    st = leap_sync_target(test, path)
+    st.set_token_credentials('user-uuid', 'auth-token')
+    return st
+
+def make_token_soledad_app(state):
+    app = SoledadApp(state)
+
+    def verify_token(environ, uuid, token):
+        if uuid == 'user-uuid' and token == 'auth-token':
+            return True
+        return False
+
+    application = SoledadAuthMiddleware(app)
+    application.verify_token = verify_token
+    return application
+
 
 class TestLeapSyncTarget(
     test_remote_sync_target.TestRemoteSyncTargets, BaseSoledadTest):
@@ -233,6 +253,9 @@ class TestLeapSyncTarget(
         ('oauth_http', {'make_app_with_state': make_oauth_http_app,
                         'make_document_for_test': make_leap_document_for_test,
                         'sync_target': oauth_leap_sync_target}),
+        ('token_soledad', {'make_app_with_state': make_token_soledad_app,
+                        'make_document_for_test': make_leap_document_for_test,
+                        'sync_target': token_leap_sync_target}),
     ]
 
     def test_sync_exchange_send(self):
@@ -385,15 +408,28 @@ def oauth_https_sync_target(test, host, path):
                              tests.token1.key, tests.token1.secret)
     return st
 
+def token_leap_https_sync_target(test, host, path):
+    _, port = test.server.server_address
+    st = leap_backend.LeapSyncTarget(
+        'https://%s:%d/~/%s' % (host, port, path),
+        crypto=test._soledad._crypto)
+    st.set_token_credentials('user-uuid', 'auth-token')
+    return st
 
-class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
-                                     BaseSoledadTest):
 
-    scenarios = [
-        ('oauth_https', {'server_def': test_https.https_server_def,
-                         'make_app_with_state': make_oauth_http_app,
-                         'make_document_for_test': make_leap_document_for_test,
-                         'sync_target': oauth_https_sync_target,
-                         }), ]
+#class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
+#                                     BaseSoledadTest):
+#
+#    scenarios = [
+#        ('oauth_https', {'server_def': test_https.https_server_def,
+#                         'make_app_with_state': make_oauth_http_app,
+#                         'make_document_for_test': make_leap_document_for_test,
+#                         'sync_target': oauth_https_sync_target,
+#                         }),
+#        ('token_soledad_https', {'server_def': test_https.https_server_def,
+#                        'make_app_with_state': make_token_soledad_app,
+#                        'make_document_for_test': make_leap_document_for_test,
+#                        'sync_target': token_leap_https_sync_target}),
+#    ]
 
 load_tests = tests.load_with_scenarios
