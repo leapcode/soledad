@@ -562,11 +562,11 @@ class SQLCipherDatabaseSyncTests(
         self.sync(self.db1, self.db2)
         # make sure db2 now has the exact same thing
         doc1 = self.db1.get_doc('doc')
-        doc2 = self.db1.get_doc('doc')
+        doc2 = self.db2.get_doc('doc')
         if ENC_SCHEME_KEY in doc2.content:
             doc2.set_json(
                 decrypt_doc_json(
-                    self._soledad._crypto, doc2, doc2.get_json()))
+                    self._soledad._crypto, doc2.doc_id, doc2.get_json()))
         self.assertEqual(doc1, doc2)
 
     def test_sync_autoresolves_moar_backwards(self):
