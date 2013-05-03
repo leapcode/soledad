@@ -420,7 +420,7 @@ class CouchServerState(ServerState):
     """
 
     def __init__(self, couch_url):
-        self.couch_url = couch_url
+        self._couch_url = couch_url
 
     def open_database(self, dbname):
         """
@@ -434,7 +434,7 @@ class CouchServerState(ServerState):
         """
         # TODO: open couch
         return CouchDatabase.open_database(
-            self.couch_url + '/' + dbname,
+            self._couch_url + '/' + dbname,
             create=False)
 
     def ensure_database(self, dbname):
@@ -448,7 +448,7 @@ class CouchServerState(ServerState):
         @rtype: (CouchDatabase, str)
         """
         db = CouchDatabase.open_database(
-            self.couch_url + '/' + dbname,
+            self._couch_url + '/' + dbname,
             create=True)
         return db, db._replica_uid
 
@@ -459,4 +459,4 @@ class CouchServerState(ServerState):
         @param dbname: The name of the database to delete.
         @type dbname: str
         """
-        CouchDatabase.delete_database(self.couch_url + '/' + dbname)
+        CouchDatabase.delete_database(self._couch_url + '/' + dbname)
