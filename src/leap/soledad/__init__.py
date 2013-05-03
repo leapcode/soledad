@@ -42,6 +42,7 @@ from hashlib import sha256
 
 from leap.common import events
 from leap.common.check import leap_assert
+from leap.common.files import mkdir_p
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
@@ -254,19 +255,15 @@ class Soledad(object):
     def _init_dirs(self):
         """
         Create work directories.
+
+        @raise OSError: in case file exists and is not a dir.
         """
         paths = map(
             lambda x: os.path.dirname(x),
             [self.local_db_path, self.secret_path])
         for path in paths:
-            if not os.path.isfile(path):
-                if not os.path.isdir(path):
-                    logger.info('Creating directory: %s.' % path)
-                    os.makedirs(path)
-                else:
-                    logger.info('Using existent directory: %s.' % path)
-            else:
-                raise NotADirectory(path)
+            logger.info('Creating directory: %s.' % path)
+            mkdir_p(path)
 
     def _init_keys(self):
         """

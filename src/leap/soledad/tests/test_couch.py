@@ -24,6 +24,9 @@ import re
 import copy
 import shutil
 from base64 import b64decode
+
+from leap.common.files import mkdir_p
+
 from leap.soledad.backends import couch
 from leap.soledad.tests import u1db_tests as tests
 from leap.soledad.tests.u1db_tests import test_backends
@@ -77,8 +80,8 @@ class CouchDBWrapper(object):
         handle.close()
 
         # create the dirs from the template
-        os.mkdir(os.path.join(self.tempdir, 'lib'))
-        os.mkdir(os.path.join(self.tempdir, 'log'))
+        mkdir_p(os.path.join(self.tempdir, 'lib'))
+        mkdir_p(os.path.join(self.tempdir, 'log'))
         args = ['couchdb', '-n', '-a', confPath]
         #null = open('/dev/null', 'w')
         self.process = subprocess.Popen(
