@@ -35,10 +35,7 @@ from u1db.remote.http_target import HTTPSyncTarget
 
 from leap.common.keymanager import KeyManager
 from leap.common.check import leap_assert
-from leap.soledad.auth import (
-    set_token_credentials,
-    _sign_request,
-)
+from leap.soledad.auth import TokenBasedAuth
 
 #
 # Exceptions
@@ -249,7 +246,7 @@ class LeapDocument(Document):
 # LeapSyncTarget
 #
 
-class LeapSyncTarget(HTTPSyncTarget):
+class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
     """
     A SyncTarget that encrypts data before sending and decrypts data after
     receiving.
@@ -259,9 +256,32 @@ class LeapSyncTarget(HTTPSyncTarget):
     # Token auth methods.
     #
 
-    set_token_credentials = set_token_credentials
+    def set_token_credentials(self, uuid, token):
+        """
+        Store given credentials so we can sign the request later.
 
-    _sign_request = _sign_request
+        @param uuid: The user's uuid.
+        @type uuid: str
+        @param token: The authentication token.
+        @type token: str
+        """
+        TokenBasedAuth.set_token_credentials(self, uuid, token)
+
+    def _sign_request(self, method, url_query, params):
+        """
+        Return an authorization header to be included in the HTTP request.
+
+        @param method: The HTTP method.
+        @type method: str
+        @param url_query: The URL query string.
+        @type url_query: str
+        @param params: A list with encoded query parameters.
+        @type param: list
+
+        @return: The Authorization header.
+        @rtype: list of tuple
+        """
+        return TokenBasedAuth._sign_request(self, method, url_query, params)
 
     #
     # Modified HTTPSyncTarget methods.

@@ -95,14 +95,20 @@ LEAP_SCENARIOS = [
 
 
 def make_token_http_database_for_test(test, replica_uid):
-    http_db = test_backends.make_http_database_for_test(test, replica_uid, 'test')
-    http_db.set_token_credentials = auth.set_token_credentials
+    test.startServer()
+    test.request_state._create_database(replica_uid)
 
-    def _sign_request(method, url_query, params):
-        return auth._sign_request(http_db, method, url_query, params)
+    class _HTTPDatabaseWithToken(
+            http_database.HTTPDatabase, auth.TokenBasedAuth):
 
-    http_db._sign_request = _sign_request
-    http_db.set_token_credentials(http_db, 'user-uuid', 'auth-token')
+        def set_token_credentials(self, uuid, token):
+            auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
+
+        def _sign_request(self, method, url_query, params):
+            return auth.TokenBasedAuth._sign_request(self, method, url_query, params)
+
+    http_db = _HTTPDatabaseWithToken(test.getURL('test'))
+    http_db.set_token_credentials('user-uuid', 'auth-token')
     return http_db
 
 
@@ -113,12 +119,6 @@ def copy_token_http_database_for_test(test, db):
     # CORRUPT USER DATA. USE SYNC INSTEAD, OR WE WILL SEND NINJA TO YOUR
     # HOUSE.
     http_db = test.request_state._copy_database(db)
-    http_db.set_token_credentials = auth.set_token_credentials
-
-    def _sign_request(method, url_query, params):
-        return auth._sign_request(http_db, method, url_query, params)
-
-    http_db._sign_request = _sign_request
     http_db.set_token_credentials(http_db, 'user-uuid', 'auth-token')
     return http_db
 
@@ -154,13 +154,14 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
     def getClientWithToken(self, **kwds):
         self.startServer()
 
-        class _HTTPClientWithToken(http_client.HTTPClientBase):
+        class _HTTPClientWithToken(
+                http_client.HTTPClientBase, auth.TokenBasedAuth):
 
             def set_token_credentials(self, uuid, token):
-                auth.set_token_credentials(self, uuid, token)
+                auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
 
             def _sign_request(self, method, url_query, params):
-                return auth._sign_request(self, method, url_query, params)
+                return auth.TokenBasedAuth._sign_request(self, method, url_query, params)
 
         return _HTTPClientWithToken(self.getURL('dbase'), **kwds)
 
@@ -546,16 +547,17 @@ def token_leap_https_sync_target(test, host, path):
 # The following tests come from `u1db.tests.test_http_database`.
 #-----------------------------------------------------------------------------
 
-class _HTTPDatabase(http_database.HTTPDatabase):
+class _HTTPDatabase(http_database.HTTPDatabase, auth.TokenBasedAuth):
     """
     Wraps our token auth implementation.
     """
 
     def set_token_credentials(self, uuid, token):
-        auth.set_token_credentials(self, uuid, token)
+        auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
 
     def _sign_request(self, method, url_query, params):
-        return auth._sign_request(self, method, url_query, params)
+        return auth.TokenBasedAuth._sign_request(
+            self, method, url_query, params)
 
 
 class TestHTTPDatabaseWithCreds(test_http_database.TestHTTPDatabaseCtrWithCreds):

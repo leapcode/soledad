@@ -27,32 +27,44 @@ they can do token-based auth requests to the Soledad server.
 from u1db.remote.http_client import HTTPClientBase
 
 
-def set_token_credentials(self, uuid, token):
+class TokenBasedAuth(object):
     """
-    Store given credentials so we can sign the request later.
-
-    @param uuid: The user's uuid.
-    @type uuid: str
-    @param token: The authentication token.
-    @type token: str
+    Encapsulate token-auth methods for classes that inherit from
+    u1db.remote.http_client.HTTPClient.
     """
-    self._creds = {'token': (uuid, token)}
+
+    def set_token_credentials(self, uuid, token):
+        """
+        Store given credentials so we can sign the request later.
+
+        @param uuid: The user's uuid.
+        @type uuid: str
+        @param token: The authentication token.
+        @type token: str
+        """
+        self._creds = {'token': (uuid, token)}
 
 
-def _sign_request(self, method, url_query, params):
-    """
-    Return an authorization header to be included in the HTTP request.
+    def _sign_request(self, method, url_query, params):
+        """
+        Return an authorization header to be included in the HTTP request, in
+        the form:
 
-    @param method: The HTTP method.
-    @type method: str
-    @param url_query: The URL query string.
-    @type url_query: str
-    @param params: A list with encoded query parameters.
-    @type param: list
-    """
-    if 'token' in self._creds:
-        uuid, token = self._creds['token']
-        auth = '%s:%s' % (uuid, token)
-        return [('Authorization', 'Token %s' % auth.encode('base64')[:-1])]
-    else:
-        return HTTPClientBase._sign_request(self, method, url_query, params)
+            [('Authorization', 'Token <base64 encoded creds')]
+
+        @param method: The HTTP method.
+        @type method: str
+        @param url_query: The URL query string.
+        @type url_query: str
+        @param params: A list with encoded query parameters.
+        @type param: list
+
+        @return: The Authorization header.
+        @rtype: list of tuple
+        """
+        if 'token' in self._creds:
+            uuid, token = self._creds['token']
+            auth = '%s:%s' % (uuid, token)
+            return [('Authorization', 'Token %s' % auth.encode('base64')[:-1])]
+        else:
+            return HTTPClientBase._sign_request(self, method, url_query, params)
