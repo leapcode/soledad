@@ -81,5 +81,6 @@ setup(
     test_suite='nose2.collector.collector',
     install_requires=install_requirements,
     tests_require=tests_requirements,
-    dependency_links=dependency_links
+    dependency_links=dependency_links,
+    data_files = [("/etc/init.d/", ["pkg/soledad"])]
 )

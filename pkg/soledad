@@ -1,0 +1,62 @@
+#!/bin/sh
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+
+twistd -n web --wsgi=leap.soledad.server.application --https=2424 --certificate=server.pem --privkey=server.pem --port=65534
+
+pidfile=/var/run/soledad.pid \
+rundir=/var/lib/soledad/ \
+obj=leap.soledad.server.application \
+logfile=/var/log/soledad.log \
+https_port=2424 \
+plain_port=65534 \
+cert_path=/etc/leap/soledad-server.pem \
+privkey_path=/etc/leap/soledad-server.pem
+
+[ -r /etc/default/soledad ] && . /etc/default/soledad
+
+test -x /usr/bin/twistd || exit 0
+test -r $file || exit 0
+test -r /etc/leap/ || exit 0
+
+
+case "$1" in
+    start)
+        echo -n "Starting soledad: twistd"
+        HOME="/var/lib/soledad/" \
+          start-stop-daemon --start --quiet --exec /usr/bin/twistd -- \
+                          --pidfile=$pidfile \
+                          --logfile=$logfile \
+                          web \
+                          --wsgi=$obj \
+                          --https=$https_port \
+                          --certificate=$cert_path \
+                          --privkey=$privkey_path \
+                          --port=$plain_port
+        echo "."
+    ;;
+
+    stop)
+        echo -n "Stopping soledad: twistd"
+        start-stop-daemon --stop --quiet  \
+            --pidfile $pidfile
+        echo "."
+    ;;
+
+    restart)
+        $0 stop
+        $0 start
+    ;;
+
+    force-reload)
+        $0 restart
+    ;;
+
+    *)
+        echo "Usage: /etc/init.d/soledad {start|stop|restart|force-reload}" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
