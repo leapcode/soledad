@@ -39,7 +39,8 @@ install_requirements = [
     # platform-supplied package, or install Twisted by downloading a tarball,
     # unpacking it, and running setup.py."
     #   - https://twistedmatrix.com/trac/wiki/FrequentlyAskedQuestions
-    'twisted==13.0.0', # TODO: maybe we just want twisted-web?
+    'twisted==13.0.0',  # TODO: maybe we just want twisted-web?
+    # twisted cannot be installed separately using pip.
     'u1db',
     'requests',
     'six==1.1',
@@ -49,8 +50,8 @@ install_requirements = [
 
 # TODO: change below so we get stable versions of modules.
 dependency_links = [
-    'git+git://git.futeisha.org/pysqlcipher.git@develop#egg=pysqlcipher',
-    'git+ssh://code.leap.se/leap_pycommon.git@develop#egg=leap.common',
+    #'git+git://git.futeisha.org/pysqlcipher.git@develop#egg=pysqlcipher',
+    #'git+ssh://code.leap.se/leap_pycommon.git@develop#egg=leap.common',
     'http://twistedmatrix.com/Releases/Twisted/13.0/Twisted-13.0.0.tar.bz2#egg=twisted-13.0.0'
 ]
 
