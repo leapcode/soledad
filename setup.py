@@ -79,7 +79,7 @@ setup(
     namespace_packages=["leap"],
     packages=find_packages('src', exclude=['leap.soledad.tests']),
     package_dir={'': 'src'},
-    test_suite='nose2.collector.collector',
+    test_suite='leap.soledad.tests',
     install_requires=install_requirements,
     tests_require=tests_requirements,
     dependency_links=dependency_links,
