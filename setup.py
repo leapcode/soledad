@@ -42,6 +42,7 @@ install_requirements = [
     'twisted==13.0.0', # TODO: maybe we just want twisted-web?
     'u1db',
     'requests',
+    'six==1.1',
 ]
 
 
