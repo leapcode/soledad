@@ -43,6 +43,7 @@ install_requirements = [
     'u1db',
     'requests',
     'six==1.1',
+    'pysqlite',
 ]
 
 
