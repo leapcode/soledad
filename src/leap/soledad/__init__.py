@@ -245,7 +245,7 @@ class Soledad(object):
                     'database.')
                 self._set_symkey(
                     self._crypto.decrypt_sym(
-                        doc.content[self.KEY_SYMKEY],
+                        doc.content[self.SYMKEY_KEY],
                         passphrase=self._passphrase))
         # Stage 2 - Keys synchronization
         self._assert_keys_in_shared_db()

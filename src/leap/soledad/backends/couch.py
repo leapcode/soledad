@@ -460,3 +460,22 @@ class CouchServerState(ServerState):
         @type dbname: str
         """
         CouchDatabase.delete_database(self._couch_url + '/' + dbname)
+
+    def _set_couch_url(self, url):
+        """
+        Set the couchdb URL
+
+        @param url: CouchDB URL
+        @type url: str
+        """
+        self._couch_url = url
+
+    def _get_couch_url(self):
+        """
+        Return CouchDB URL
+
+        @rtype: str
+        """
+        return self._couch_url
+
+    couch_url = property(_get_couch_url, _set_couch_url, doc='CouchDB URL')
