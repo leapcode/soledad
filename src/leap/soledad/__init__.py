@@ -30,6 +30,7 @@ import os
 import string
 import binascii
 import logging
+import urlparse
 try:
     import simplejson as json
 except ImportError:
@@ -417,7 +418,7 @@ class Soledad(object):
         Return an instance of the shared recovery database object.
         """
         return SoledadSharedDatabase.open_database(
-            self.server_url,
+            urlparse.urljoin(self.server_url, 'shared'),
             False,  # TODO: eliminate need to create db here.
             creds=self._creds)
 
@@ -721,7 +722,9 @@ class Soledad(object):
             performed.
         @rtype: str
         """
-        local_gen = self._db.sync(self.server_url, creds=self._creds, autocreate=True)
+        local_gen = self._db.sync(
+            urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
+            creds=self._creds, autocreate=True)
         events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._uuid)
         return local_gen
 
