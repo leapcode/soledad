@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
+import os
 from setuptools import (
     setup,
     find_packages
@@ -39,7 +39,7 @@ install_requirements = [
     # platform-supplied package, or install Twisted by downloading a tarball,
     # unpacking it, and running setup.py."
     #   - https://twistedmatrix.com/trac/wiki/FrequentlyAskedQuestions
-    'twisted==13.0.0',  # TODO: maybe we just want twisted-web?
+    'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
     # twisted cannot be installed separately using pip.
     'u1db',
     'requests',
@@ -62,12 +62,17 @@ tests_requirements = [
     'testscenarios',
 ]
 
+if os.environ.get('VIRTUAL_ENV', None):
+    data_files = None
+else:
+    # XXX this should go only for linux/mac
+    data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
 setup(
     name='leap.soledad',
     # TODO: change version according to decisions regarding soledad versus
     # leap client versions.
-    version='0.0.1-dev',
+    version='0.0.2-dev',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -85,5 +90,5 @@ setup(
     install_requires=install_requirements,
     tests_require=tests_requirements,
     dependency_links=dependency_links,
-    data_files = [("/etc/init.d/", ["pkg/soledad"])]
+    data_files = data_files
 )
