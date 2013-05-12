@@ -45,18 +45,18 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol = self._soledad_instance(prefix='/_init_dirs')
         sol._init_dirs()
         local_db_dir = os.path.dirname(sol.local_db_path)
-        secret_path = os.path.dirname(sol.secret_path)
+        secrets_path = os.path.dirname(sol.secrets_path)
         self.assertTrue(os.path.isdir(local_db_dir))
-        self.assertTrue(os.path.isdir(secret_path))
+        self.assertTrue(os.path.isdir(secrets_path))
 
     def test__init_db(self):
         sol = self._soledad_instance()
         sol._init_dirs()
         sol._crypto = SoledadCrypto(sol)
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        if not sol._has_symkey():
-            sol._gen_symkey()
-        sol._load_symkey()
+        if not sol._has_secret():
+            sol._gen_secret()
+        sol._load_secret()
         sol._init_db()
         from leap.soledad.backends.sqlcipher import SQLCipherDatabase
         self.assertIsInstance(sol._db, SQLCipherDatabase)
@@ -66,11 +66,11 @@ class AuxMethodsTestCase(BaseSoledadTest):
         Test if configuration defaults point to the correct place.
         """
         sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False,
-                      secret_path=None, local_db_path=None,
+                      secrets_path=None, local_db_path=None,
                       server_url='', cert_file=None)  # otherwise Soledad will fail.
         self.assertEquals(
-            os.path.join(sol.DEFAULT_PREFIX, 'secret.gpg'),
-            sol.secret_path)
+            os.path.join(sol.DEFAULT_PREFIX, Soledad.STORAGE_SECRETS_FILE_NAME),
+            sol.secrets_path)
         self.assertEquals(
             os.path.join(sol.DEFAULT_PREFIX, 'soledad.u1db'),
             sol.local_db_path)
@@ -83,11 +83,11 @@ class AuxMethodsTestCase(BaseSoledadTest):
             'leap@leap.se',
             passphrase='123',
             bootstrap=False,
-            secret_path='value_3',
+            secrets_path='value_3',
             local_db_path='value_2',
             server_url='value_1',
             cert_file=None)
-        self.assertEqual('value_3', sol.secret_path)
+        self.assertEqual('value_3', sol.secrets_path)
         self.assertEqual('value_2', sol.local_db_path)
         self.assertEqual('value_1', sol.server_url)
 
@@ -102,7 +102,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         self._shared_db = SoledadSharedDatabase(
             'https://provider/', LeapDocument, None)
 
-    def test__fetch_keys_from_shared_db(self):
+    def test__get_secrets_from_shared_db(self):
         """
         Ensure the shared db is queried with the correct doc_id.
         """
@@ -116,13 +116,13 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
 
         self._soledad._shared_db = MockSharedDB()
         doc_id = self._soledad._uuid_hash()
-        self._soledad._fetch_keys_from_shared_db()
+        self._soledad._get_secrets_from_shared_db()
         self.assertTrue(
             self._soledad._shared_db().get_doc.assert_called_once_with(
                 doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
 
-    def test__assert_keys_in_shared_db(self):
+    def test__put_secrets_in_shared_db(self):
         """
         Ensure recovery document is put into shared recover db.
         """
@@ -140,7 +140,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
 
         self._soledad._shared_db = MockSharedDB()
         doc_id = self._soledad._uuid_hash()
-        self._soledad._assert_keys_in_shared_db()
+        self._soledad._put_secrets_in_shared_db()
         self.assertTrue(
             self._soledad._shared_db().get_doc.assert_called_once_with(
                 doc_id) is None,

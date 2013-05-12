@@ -45,6 +45,7 @@ install_requirements = [
     'requests',
     'six==1.1',
     'pysqlite',
+    'scrypt',
 ]
 
 

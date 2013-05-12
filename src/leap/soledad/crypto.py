@@ -47,7 +47,7 @@ class SoledadCrypto(object):
         """
         self._soledad = soledad
         self._pgp = openpgp.OpenPGPScheme(self._soledad)
-        self._symkey = None
+        self._secret = None
 
     def encrypt_sym(self, data, passphrase):
         """
@@ -112,19 +112,19 @@ class SoledadCrypto(object):
         @rtype: str
         @raise NoSymmetricSecret: if no symmetric secret was supplied.
         """
-        if self._symkey is None:
+        if self._secret is None:
             raise NoSymmetricSecret()
-        return sha256('%s%s' % (self._symkey, suffix)).hexdigest()
+        return sha256('%s%s' % (self._secret, suffix)).hexdigest()
 
     #
-    # symkey setters/getters
+    # secret setters/getters
     #
 
-    def _get_symkey(self):
-        return self._symkey
+    def _get_secret(self):
+        return self._secret
 
-    def _set_symkey(self, symkey):
-        self._symkey = symkey
+    def _set_secret(self, secret):
+        self._secret = secret
 
-    symkey = property(_get_symkey, _set_symkey,
+    secret = property(_get_secret, _set_secret,
                       doc='The key used for symmetric encryption')

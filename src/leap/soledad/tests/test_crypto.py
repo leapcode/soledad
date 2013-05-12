@@ -127,13 +127,13 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 #
 #    def _soledad_instance(self, user='leap@leap.se', prefix='',
 #                          bootstrap=False, gnupg_home='/gnupg',
-#                          secret_path='/secret.gpg',
+#                          secrets_path='/secret.gpg',
 #                          local_db_path='/soledad.u1db'):
 #        return Soledad(
 #            user,
 #            '123',
 #            gnupg_home=self.tempdir+prefix+gnupg_home,
-#            secret_path=self.tempdir+prefix+secret_path,
+#            secrets_path=self.tempdir+prefix+secrets_path,
 #            local_db_path=self.tempdir+prefix+local_db_path,
 #            bootstrap=bootstrap)
 #
@@ -145,9 +145,9 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 #        self._soledad = self._soledad_instance('leap@leap.se')
 #        self._soledad._init_dirs()
 #        self._soledad._crypto = SoledadCrypto(self._soledad)
-#        if not self._soledad._has_symkey():
-#            self._soledad._gen_symkey()
-#        self._soledad._load_symkey()
+#        if not self._soledad._has_get_storage_secret()():
+#            self._soledad._gen_get_storage_secret()()
+#        self._soledad._load_get_storage_secret()()
 #        self._soledad._init_db()
 #
 #    def tearDown(self):
@@ -186,15 +186,15 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_export_recovery_document_raw(self):
-        rd = self._soledad.export_recovery_document(None)
-        self.assertEqual(
-            {
-                self._soledad.UUID_KEY: self._soledad._uuid,
-                self._soledad.SYMKEY_KEY: self._soledad._symkey
-            },
-            json.loads(rd),
-            "Could not export raw recovery document."
-        )
+        rd = json.loads(self._soledad.export_recovery_document(None))
+        secret_id = rd[self._soledad.STORAGE_SECRETS_KEY].items()[0][0]
+        secret = rd[self._soledad.STORAGE_SECRETS_KEY][secret_id]
+        self.assertEqual(secret_id, self._soledad._secret_id)
+        self.assertEqual(secret, self._soledad._secrets[secret_id])
+        self.assertTrue(self._soledad.CIPHER_KEY in secret)
+        self.assertTrue(secret[self._soledad.CIPHER_KEY] == 'aes256')
+        self.assertTrue(self._soledad.LENGTH_KEY in secret)
+        self.assertTrue(self._soledad.SECRET_KEY in secret)
 
     def test_export_recovery_document_crypt(self):
         rd = self._soledad.export_recovery_document('123456')
@@ -202,7 +202,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
                          self._soledad._crypto.is_encrypted_sym(rd))
         data = {
             self._soledad.UUID_KEY: self._soledad._uuid,
-            self._soledad.SYMKEY_KEY: self._soledad._symkey,
+            self._soledad.STORAGE_SECRETS_KEY: self._soledad._secrets,
         }
         raw_data = json.loads(self._soledad._crypto.decrypt_sym(
             rd,
@@ -213,11 +213,6 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
             "Could not export raw recovery document."
         )
 
-    def test_import_recovery_document_raises_exception(self):
-        rd = self._soledad.export_recovery_document(None)
-        self.assertRaises(KeyAlreadyExists,
-                          self._soledad.import_recovery_document, rd, None)
-
     def test_import_recovery_document_raw(self):
         rd = self._soledad.export_recovery_document(None)
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
@@ -226,8 +221,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         s.import_recovery_document(rd, None)
         self.assertEqual(self._soledad._uuid,
                          s._uuid, 'Failed setting user uuid.')
-        self.assertEqual(self._soledad._symkey,
-                         s._symkey,
+        self.assertEqual(self._soledad._get_storage_secret(),
+                         s._get_storage_secret(),
                          'Failed settinng secret for symmetric encryption.')
 
     def test_import_recovery_document_crypt(self):
@@ -238,26 +233,26 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         s.import_recovery_document(rd, '123456')
         self.assertEqual(self._soledad._uuid,
                          s._uuid, 'Failed setting user uuid.')
-        self.assertEqual(self._soledad._symkey,
-                         s._symkey,
+        self.assertEqual(self._soledad._get_storage_secret(),
+                         s._get_storage_secret(),
                          'Failed settinng secret for symmetric encryption.')
 
 
 class CryptoMethodsTestCase(BaseSoledadTest):
 
-    def test__gen_symkey(self):
+    def test__gen_secret(self):
         sol = self._soledad_instance(user='user@leap.se', prefix='/3')
         sol._init_dirs()
         sol._crypto = SoledadCrypto(sol)
-        self.assertFalse(sol._has_symkey(), "Should not have a symkey at "
+        self.assertFalse(sol._has_secret(), "Should not have a secret at "
                                             "this point")
-        sol._gen_symkey()
-        self.assertTrue(sol._has_symkey(), "Could not generate symkey.")
+        sol._gen_secret()
+        self.assertTrue(sol._has_secret(), "Could not generate secret.")
 
-    def test__has_keys(self):
+    def test__has_secret(self):
         sol = self._soledad_instance(user='leap@leap.se', prefix='/5')
         sol._init_dirs()
         sol._crypto = SoledadCrypto(sol)
-        self.assertFalse(sol._has_keys())
-        sol._gen_symkey()
-        self.assertTrue(sol._has_keys())
+        self.assertFalse(sol._has_secret())
+        sol._gen_secret()
+        self.assertTrue(sol._has_secret())

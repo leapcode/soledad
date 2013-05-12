@@ -40,9 +40,9 @@ class BaseSoledadTest(BaseLeapTest):
         self._soledad._init_dirs()
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
         self._soledad._crypto = SoledadCrypto(self._soledad)
-        if not self._soledad._has_symkey():
-            self._soledad._gen_symkey()
-        self._soledad._load_symkey()
+        if not self._soledad._has_secret():
+            self._soledad._gen_secret()
+        self._soledad._load_secret()
         self._soledad._init_db()
 
     def tearDown(self):
@@ -51,12 +51,13 @@ class BaseSoledadTest(BaseLeapTest):
         self._soledad.close()
 
     def _soledad_instance(self, user='leap@leap.se', prefix='',
-                          bootstrap=False, secret_path='/secret.gpg',
+                          bootstrap=False,
+                          secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
                           local_db_path='/soledad.u1db'):
         return Soledad(
             user,
             '123',
-            secret_path=self.tempdir+prefix+secret_path,
+            secrets_path=self.tempdir+prefix+secrets_path,
             local_db_path=self.tempdir+prefix+local_db_path,
             server_url='',  # Soledad will fail if not given an url.
             cert_file=None,
