@@ -33,10 +33,18 @@ import logging
 import urlparse
 import simplejson as json
 import scrypt
+import httplib
+import socket
+import ssl
 
 
 from xdg import BaseDirectory
 from hashlib import sha256
+from u1db.remote import http_client
+from u1db.remote.ssl_match_hostname import (  # noqa
+    CertificateError,
+    match_hostname,
+)
 
 
 from leap.common import events
@@ -56,6 +64,13 @@ from leap.soledad.crypto import SoledadCrypto
 
 
 logger = logging.getLogger(name=__name__)
+
+
+SOLEDAD_CERT = None
+"""
+Path to the certificate file used to certify the SSL connection between
+Soledad client and server.
+"""
 
 
 #
@@ -99,7 +114,6 @@ def base64_encode(data):
 #
 # Soledad: local encrypted storage and remote encrypted sync.
 #
-
 
 class Soledad(object):
     """
@@ -204,7 +218,7 @@ class Soledad(object):
         self._init_config(secrets_path, local_db_path, server_url)
         self._set_token(auth_token)
         # configure SSL certificate
-        shared_db.SOLEDAD_CERT = cert_file
+        SOLEDAD_CERT = cert_file
         # initiate bootstrap sequence
         self._bootstrap()
 
@@ -959,3 +973,29 @@ class Soledad(object):
     server_url = property(
         _get_server_url,
         doc='The URL of the Soledad server.')
+
+
+#-----------------------------------------------------------------------------
+# Monkey patching u1db to be able to provide a custom SSL cert
+#-----------------------------------------------------------------------------
+
+class VerifiedHTTPSConnection(httplib.HTTPSConnection):
+    """HTTPSConnection verifying server side certificates."""
+    # derived from httplib.py
+
+    def connect(self):
+        "Connect to a host on a given (SSL) port."
+        sock = socket.create_connection((self.host, self.port),
+                                        self.timeout, self.source_address)
+        if self._tunnel_host:
+            self.sock = sock
+            self._tunnel()
+        self.sock = ssl.wrap_socket(sock, self.key_file, self.cert_file,
+                                    ssl_version=ssl.PROTOCOL_SSLv3,
+                                    cert_reqs=ssl.CERT_REQUIRED,
+                                    ca_certs=SOLEDAD_CERT)
+        match_hostname(self.sock.getpeercert(), self.host)
+
+
+old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
+http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection

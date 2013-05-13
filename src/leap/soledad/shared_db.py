@@ -26,38 +26,11 @@ except ImportError:
     import json  # noqa
 
 
-from u1db.remote import http_database, http_client
+from u1db.remote import http_database
 
 
 from leap.soledad.auth import TokenBasedAuth
 
-SOLEDAD_CERT = None
-
-#-----------------------------------------------------------------------------
-# Monkey patching u1db to be able to provide a custom SSL cert
-#-----------------------------------------------------------------------------
-
-import httplib
-import socket
-import ssl
-
-class VerifiedHTTPSConnection(httplib.HTTPSConnection):
-    """HTTPSConnection verifying server side certificates."""
-    # derived from httplib.py
-
-    def connect(self):
-        "Connect to a host on a given (SSL) port."
-        sock = socket.create_connection((self.host, self.port),
-                                        self.timeout, self.source_address)
-        if self._tunnel_host:
-            self.sock = sock
-            self._tunnel()
-        self.sock = ssl.wrap_socket(sock, self.key_file, SOLEDAD_CERT,
-                                    ssl_version=ssl.PROTOCOL_SSLv3,
-                                    cert_reqs=ssl.CERT_REQUIRED,
-                                    ca_certs=SOLEDAD_CERT)
-
-http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection
 
 #-----------------------------------------------------------------------------
 # Soledad shared database

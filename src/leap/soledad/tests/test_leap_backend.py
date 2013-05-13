@@ -22,6 +22,7 @@ Test Leap backend bits.
 
 import u1db
 import os
+import ssl
 try:
     import simplejson as json
 except ImportError:
@@ -35,7 +36,7 @@ from u1db.remote import (
     http_target,
 )
 
-
+from leap import soledad
 from leap.soledad.backends import leap_backend
 from leap.soledad.server import (
     SoledadApp,
@@ -509,39 +510,63 @@ class TestLeapSyncTarget(
 # The following tests come from `u1db.tests.test_https`.
 #-----------------------------------------------------------------------------
 
-def oauth_https_sync_target(test, host, path):
-    _, port = test.server.server_address
-    st = leap_backend.LeapSyncTarget(
-        'https://%s:%d/~/%s' % (host, port, path),
-        crypto=test._soledad._crypto)
-    st.set_oauth_credentials(tests.consumer1.key, tests.consumer1.secret,
-                             tests.token1.key, tests.token1.secret)
-    return st
-
 def token_leap_https_sync_target(test, host, path):
     _, port = test.server.server_address
     st = leap_backend.LeapSyncTarget(
-        'https://%s:%d/~/%s' % (host, port, path),
+        'https://%s:%d/%s' % (host, port, path),
         crypto=test._soledad._crypto)
     st.set_token_credentials('user-uuid', 'auth-token')
     return st
 
 
-#class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
-#                                     BaseSoledadTest):
-#
-#    scenarios = [
-#        ('oauth_https', {'server_def': test_https.https_server_def,
-#                         'make_app_with_state': make_oauth_http_app,
-#                         'make_document_for_test': make_leap_document_for_test,
-#                         'sync_target': oauth_https_sync_target,
-#                         }),
-#        ('token_soledad_https', {'server_def': test_https.https_server_def,
-#                        'make_app_with_state': make_token_soledad_app,
-#                        'make_document_for_test': make_leap_document_for_test,
-#                        'sync_target': token_leap_https_sync_target}),
-#    ]
+class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
+                                     BaseSoledadTest):
 
+    scenarios = [
+        ('token_soledad_https', {'server_def': test_https.https_server_def,
+                        'make_app_with_state': make_token_soledad_app,
+                        'make_document_for_test': make_leap_document_for_test,
+                        'sync_target': token_leap_https_sync_target}),
+    ]
+
+    def setUp(self):
+        # the parent constructor undoes our SSL monkey patch to ensure tests
+        # run smoothly with standard u1db.
+        test_https.TestHttpSyncTargetHttpsSupport.setUp(self)
+        # so here monkey patch again to test our functionality.
+        http_client._VerifiedHTTPSConnection = soledad.VerifiedHTTPSConnection
+        soledad.SOLEDAD_CERT = http_client.CA_CERTS
+
+    def test_working(self):
+        """
+        Test that SSL connections work well.
+
+        This test was adapted to patch Soledad's HTTPS connection custom class
+        with the intended CA certificates.
+        """
+        self.startServer()
+        db = self.request_state._create_database('test')
+        self.patch(soledad, 'SOLEDAD_CERT', self.cacert_pem)
+        remote_target = self.getSyncTarget('localhost', 'test')
+        remote_target.record_sync_info('other-id', 2, 'T-id')
+        self.assertEqual(
+            (2, 'T-id'), db._get_replica_gen_and_trans_id('other-id'))
+
+    def test_host_mismatch(self):
+        """
+        Test that SSL connections to a hostname different than the one in the
+        certificate raise CertificateError.
+
+        This test was adapted to patch Soledad's HTTPS connection custom class
+        with the intended CA certificates.
+        """
+        self.startServer()
+        self.request_state._create_database('test')
+        self.patch(soledad, 'SOLEDAD_CERT', self.cacert_pem)
+        remote_target = self.getSyncTarget('127.0.0.1', 'test')
+        self.assertRaises(
+            http_client.CertificateError, remote_target.record_sync_info,
+            'other-id', 2, 'T-id')
 
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_http_database`.

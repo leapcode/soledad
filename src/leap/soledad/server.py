@@ -121,7 +121,6 @@ class SoledadAuthMiddleware(object):
         error message otherwise.
         @rtype: list
         """
-
         unauth_err = lambda msg: self._error(start_response,
                                              401,
                                              "unauthorized",

@@ -6,13 +6,13 @@ import sys
 
 from paste import httpserver
 
-from leap.soledad.tests import u1db_tests as tests
-
 from u1db.remote import (
     http_client,
     http_target,
 )
 
+from leap import soledad
+from leap.soledad.tests import u1db_tests as tests
 from leap.soledad.tests.u1db_tests.test_remote_sync_target import (
     make_oauth_http_app,
 )
@@ -69,6 +69,12 @@ class TestHttpSyncTargetHttpsSupport(tests.TestCaseWithServer):
             self.skipTest("Requires pyOpenSSL")
         self.cacert_pem = os.path.join(os.path.dirname(__file__),
                                        'testing-certs', 'cacert.pem')
+        # The default u1db http_client class for doing HTTPS only does HTTPS
+        # if the platform is linux. Because of this, soledad replaces that
+        # class with one that will do HTTPS independent of the platform. In
+        # order to maintain the compatibility with u1db default tests, we undo
+        # that replacement here.
+        http_client._VerifiedHTTPSConnection = soledad.old__VerifiedHTTPSConnection
         super(TestHttpSyncTargetHttpsSupport, self).setUp()
 
     def getSyncTarget(self, host, path=None):
