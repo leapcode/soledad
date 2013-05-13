@@ -170,7 +170,7 @@ class Soledad(object):
     """
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
-                 server_url, cert_file, auth_token=None, bootstrap=True):
+                 server_url, cert_file, auth_token=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -193,9 +193,6 @@ class Soledad(object):
         @type cert_file: str
         @param auth_token: Authorization token for accessing remote databases.
         @type auth_token: str
-        @param bootstrap: True/False, should bootstrap this instance? Mostly
-            for testing purposes but can be useful for initialization control.
-        @type bootstrap: bool
         """
         # get config params
         self._uuid = uuid
@@ -208,8 +205,8 @@ class Soledad(object):
         self._set_token(auth_token)
         # configure SSL certificate
         shared_db.SOLEDAD_CERT = cert_file
-        if bootstrap:
-            self._bootstrap()
+        # initiate bootstrap sequence
+        self._bootstrap()
 
     def _init_config(self, secrets_path, local_db_path, server_url):
         """
@@ -241,18 +238,15 @@ class Soledad(object):
 
         Soledad Client bootstrap is the following sequence of stages:
 
-        * Stage 0 - Local environment setup.
+        * stage 0 - local environment setup.
             - directory initialization.
-            - gnupg wrapper initialization.
-        * Stage 1 - Keys generation/loading:
-            - if keys exists locally, load them.
-            - else, if keys exists in server, download them.
-            - else, generate keys.
-        * Stage 2 - Keys synchronization:
-            - if keys exist in server, confirm we have the same keys
-              locally.
-            - else, send keys to server.
-        * Stage 3 - Database initialization.
+            - crypto submodule initialization
+        * stage 1 - secret generation/loading:
+            - if secrets exist locally, load them.
+            - else, if secrets exist in server, download them.
+            - else, generate a new secret.
+        * stage 2 - store secrets in server.
+        * stage 3 - database initialization.
 
         This method decides which bootstrap stages have already been performed
         and performs the missing ones in order.
@@ -261,27 +255,31 @@ class Soledad(object):
         #       interrupted).
         # TODO: write tests for bootstrap stages.
         # TODO: log each bootstrap step.
-        # Stage 0  - Local environment setup
+        # stage 0  - socal environment setup
         self._init_dirs()
         self._crypto = SoledadCrypto(self)
-        # Stage 1 - Keys generation/loading
-        if not self._has_secret():
+        # stage 1 - secret generation/loading
+        if not self._has_secret():  # try to load from local storage.
             logger.info(
                 'Trying to fetch cryptographic secrets from shared recovery '
                 'database...')
+            # there are no secrets in local storage, so try to fetch encrypted
+            # secrets from server.
             doc = self._get_secrets_from_shared_db()
-            if not doc:
-                logger.info(
-                    'No cryptographic secrets found, creating new secrets...')
-                self._init_keys()
-            else:
+            if doc:
+                # found secrets in server, so import them.
                 logger.info(
                     'Found cryptographic secrets in shared recovery '
                     'database.')
                 self.import_recovery_document(
                         doc.content[self.SECRET_KEY],
                         passphrase=self._passphrase)
-        # Stage 2 - Keys synchronization
+            else:
+                # there are no secrets in server also, so generate a secret.
+                logger.info(
+                    'No cryptographic secrets found, creating new secrets...')
+                self._set_secret_id(self._gen_secret())
+        # Stage 2 - storage of encrypted secrets in the server.
         self._put_secrets_in_shared_db()
         # Stage 3 - Local database initialization
         self._init_db()
@@ -298,17 +296,6 @@ class Soledad(object):
         for path in paths:
             logger.info('Creating directory: %s.' % path)
             mkdir_p(path)
-
-    def _init_keys(self):
-        """
-        Generate (if needed) and load secret for symmetric encryption.
-        """
-        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._uuid)
-        # load/generate secret
-        if not self._has_secret():
-            self._set_secret_id(self._gen_secret())
-        events.signal(
-            events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
 
     def _init_db(self):
         """
@@ -374,9 +361,9 @@ class Soledad(object):
         self._secret_id = secret_id
         self._crypto.secret = self._get_storage_secret()
 
-    def _load_secret(self):
+    def _load_secrets(self):
         """
-        Load symmetric storage secret from local file.
+        Load storage secrets from local file.
 
         The content of the file has the following format:
 
@@ -425,7 +412,7 @@ class Soledad(object):
             return True
         # try to load from disk
         try:
-            self._load_secret()
+            self._load_secrets()
             return True
         except DecryptionFailed:
             logger.error('Could not decrypt storage secret.')
@@ -479,6 +466,8 @@ class Soledad(object):
                 base64_encode(key)),
         }
         self._store_secrets()
+        events.signal(
+            events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
         return secret_id
 
     def _store_secrets(self):

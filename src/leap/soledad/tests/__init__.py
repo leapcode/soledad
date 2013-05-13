@@ -3,6 +3,7 @@ Tests to make sure Soledad provides U1DB functionality and more.
 """
 
 import u1db
+from mock import Mock
 
 
 from leap.soledad import Soledad
@@ -37,31 +38,36 @@ class BaseSoledadTest(BaseLeapTest):
                               document_factory=LeapDocument)
         # initialize soledad by hand so we can control keys
         self._soledad = self._soledad_instance(user=self.email)
-        self._soledad._init_dirs()
-        #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        self._soledad._crypto = SoledadCrypto(self._soledad)
-        if not self._soledad._has_secret():
-            self._soledad._gen_secret()
-        self._soledad._load_secret()
-        self._soledad._init_db()
 
     def tearDown(self):
         self._db1.close()
         self._db2.close()
         self._soledad.close()
 
-    def _soledad_instance(self, user='leap@leap.se', prefix='',
-                          bootstrap=False,
+    def _soledad_instance(self, user='leap@leap.se', passphrase='123', prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
-                          local_db_path='/soledad.u1db'):
+                          local_db_path='/soledad.u1db', server_url='',
+                          cert_file=None):
+
+        def _put_doc_side_effect(doc):
+            self._doc_put = doc
+
+        class MockSharedDB(object):
+
+            get_doc = Mock(return_value=None)
+            put_doc = Mock(side_effect=_put_doc_side_effect)
+
+            def __call__(self):
+                return self
+
+        Soledad._shared_db = MockSharedDB()
         return Soledad(
             user,
-            '123',
+            passphrase,
             secrets_path=self.tempdir+prefix+secrets_path,
             local_db_path=self.tempdir+prefix+local_db_path,
-            server_url='',  # Soledad will fail if not given an url.
-            cert_file=None,
-            bootstrap=bootstrap)
+            server_url=server_url,  # Soledad will fail if not given an url.
+            cert_file=cert_file)
 
     def assertGetEncryptedDoc(self, db, doc_id, doc_rev, content, has_conflicts):
         """Assert that the document in the database looks correct."""

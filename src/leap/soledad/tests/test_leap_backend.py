@@ -618,6 +618,7 @@ class LeapDatabaseSyncTargetTests(
 
         This test was adapted to decrypt remote content before assert.
         """
+        sol = _make_local_db_and_leap_target(self)
         docs_by_gen = [
             (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
              'T-sid')]

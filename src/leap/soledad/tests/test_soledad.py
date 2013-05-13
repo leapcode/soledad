@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # test_soledad.py
 # Copyright (C) 2013 LEAP
 #
@@ -30,7 +29,6 @@ except ImportError:
     import json  # noqa
 
 
-from mock import Mock
 from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad import Soledad
@@ -56,7 +54,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         #self._soledad._gpg.import_keys(PUBLIC_KEY)
         if not sol._has_secret():
             sol._gen_secret()
-        sol._load_secret()
+        sol._load_secrets()
         sol._init_db()
         from leap.soledad.backends.sqlcipher import SQLCipherDatabase
         self.assertIsInstance(sol._db, SQLCipherDatabase)
@@ -65,9 +63,10 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         Test if configuration defaults point to the correct place.
         """
-        sol = Soledad('leap@leap.se', passphrase='123', bootstrap=False,
-                      secrets_path=None, local_db_path=None,
-                      server_url='', cert_file=None)  # otherwise Soledad will fail.
+        sol = Soledad(
+            'leap@leap.se', passphrase='123',
+            secrets_path=None, local_db_path=None,
+            server_url='', cert_file=None)  # otherwise Soledad will fail.
         self.assertEquals(
             os.path.join(sol.DEFAULT_PREFIX, Soledad.STORAGE_SECRETS_FILE_NAME),
             sol.secrets_path)
@@ -79,16 +78,15 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         Test if configuration is correctly read from file.
         """
-        sol = Soledad(
+        sol = self._soledad_instance(
             'leap@leap.se',
             passphrase='123',
-            bootstrap=False,
             secrets_path='value_3',
             local_db_path='value_2',
             server_url='value_1',
             cert_file=None)
-        self.assertEqual('value_3', sol.secrets_path)
-        self.assertEqual('value_2', sol.local_db_path)
+        self.assertEqual(self.tempdir+'value_3', sol.secrets_path)
+        self.assertEqual(self.tempdir+'value_2', sol.local_db_path)
         self.assertEqual('value_1', sol.server_url)
 
 
@@ -106,19 +104,10 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         """
         Ensure the shared db is queried with the correct doc_id.
         """
-
-        class MockSharedDB(object):
-
-            get_doc = Mock(return_value=None)
-
-            def __call__(self):
-                return self
-
-        self._soledad._shared_db = MockSharedDB()
         doc_id = self._soledad._uuid_hash()
         self._soledad._get_secrets_from_shared_db()
         self.assertTrue(
-            self._soledad._shared_db().get_doc.assert_called_once_with(
+            self._soledad._shared_db().get_doc.assert_called_with(
                 doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
 
@@ -126,27 +115,14 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         """
         Ensure recovery document is put into shared recover db.
         """
-
-        def _put_doc_side_effect(doc):
-            self._doc_put = doc
-
-        class MockSharedDB(object):
-
-            get_doc = Mock(return_value=None)
-            put_doc = Mock(side_effect=_put_doc_side_effect)
-
-            def __call__(self):
-                return self
-
-        self._soledad._shared_db = MockSharedDB()
         doc_id = self._soledad._uuid_hash()
         self._soledad._put_secrets_in_shared_db()
         self.assertTrue(
-            self._soledad._shared_db().get_doc.assert_called_once_with(
+            self._soledad._shared_db().get_doc.assert_called_with(
                 doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
         self.assertTrue(
-            self._soledad._shared_db.put_doc.assert_called_once_with(
+            self._soledad._shared_db.put_doc.assert_called_with(
                 self._doc_put) is None,
             'Wrong document when putting recovery document.')
         self.assertTrue(

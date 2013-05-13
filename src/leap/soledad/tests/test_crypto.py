@@ -216,9 +216,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
     def test_import_recovery_document_raw(self):
         rd = self._soledad.export_recovery_document(None)
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
-        s._init_dirs()
-        s._crypto = SoledadCrypto(s)
         s.import_recovery_document(rd, None)
+        s._set_secret_id(self._soledad._secret_id)
         self.assertEqual(self._soledad._uuid,
                          s._uuid, 'Failed setting user uuid.')
         self.assertEqual(self._soledad._get_storage_secret(),
@@ -228,8 +227,6 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
     def test_import_recovery_document_crypt(self):
         rd = self._soledad.export_recovery_document('123456')
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='3')
-        s._init_dirs()
-        s._crypto = SoledadCrypto(s)
         s.import_recovery_document(rd, '123456')
         self.assertEqual(self._soledad._uuid,
                          s._uuid, 'Failed setting user uuid.')
@@ -242,17 +239,5 @@ class CryptoMethodsTestCase(BaseSoledadTest):
 
     def test__gen_secret(self):
         sol = self._soledad_instance(user='user@leap.se', prefix='/3')
-        sol._init_dirs()
-        sol._crypto = SoledadCrypto(sol)
-        self.assertFalse(sol._has_secret(), "Should not have a secret at "
-                                            "this point")
-        sol._gen_secret()
-        self.assertTrue(sol._has_secret(), "Could not generate secret.")
-
-    def test__has_secret(self):
-        sol = self._soledad_instance(user='leap@leap.se', prefix='/5')
-        sol._init_dirs()
-        sol._crypto = SoledadCrypto(sol)
-        self.assertFalse(sol._has_secret())
-        sol._gen_secret()
-        self.assertTrue(sol._has_secret())
+        self.assertTrue(sol._has_secret(), "Should have a secret at "
+                                           "this point")
