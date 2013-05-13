@@ -1,0 +1,6 @@
+  o Change the local storage of the storage secret:
+      * Use scrypt to derive a key for the encryption of the storage secret.
+      * Store secret in a file called 'soledad.json' by default.
+      * Also store the salt and encryption details, as defined in the spec.
+      * This change is not backwards compatible (i.e. all previously stored
+        secrets are incompatible with this new encryption and storage scheme).

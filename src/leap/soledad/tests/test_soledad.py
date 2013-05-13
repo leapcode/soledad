@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # test_soledad.py
 # Copyright (C) 2013 LEAP
 #
