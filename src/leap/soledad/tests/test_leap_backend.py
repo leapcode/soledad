@@ -286,8 +286,7 @@ class TestLeapParsingSyncStream(
         """
         doc = leap_backend.LeapDocument('i')
         doc.content = {}
-        enc_json = leap_backend.encrypt_doc_json(
-            self._soledad._crypto, doc.doc_id, doc.get_json())
+        enc_json = leap_backend.encrypt_doc(self._soledad._crypto, doc)
         tgt = leap_backend.LeapSyncTarget(
             "http://foo/foo", crypto=self._soledad._crypto)
 

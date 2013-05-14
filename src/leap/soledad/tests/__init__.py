@@ -10,7 +10,7 @@ from leap.soledad import Soledad
 from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
-    decrypt_doc_json,
+    decrypt_doc,
     ENC_SCHEME_KEY,
 )
 from leap.common.testing.basetest import BaseLeapTest
@@ -75,9 +75,7 @@ class BaseSoledadTest(BaseLeapTest):
                                      has_conflicts=has_conflicts)
         doc = db.get_doc(doc_id)
         if ENC_SCHEME_KEY in doc.content:
-            doc.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, doc.doc_id, doc.get_json()))
+            doc.set_json(decrypt_doc(self._soledad._crypto, doc))
         self.assertEqual(exp_doc.doc_id, doc.doc_id)
         self.assertEqual(exp_doc.rev, doc.rev)
         self.assertEqual(exp_doc.has_conflicts, doc.has_conflicts)

@@ -52,10 +52,9 @@ from leap.soledad.backends.sqlcipher import open as u1db_open
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
     EncryptionSchemes,
-    decrypt_doc_json,
+    decrypt_doc,
     ENC_JSON_KEY,
     ENC_SCHEME_KEY,
-    MAC_KEY,
 )
 
 
@@ -634,9 +633,7 @@ class SQLCipherDatabaseSyncTests(
         self.sync(self.db2, db3)
         doc3 = db3.get_doc('the-doc')
         if ENC_SCHEME_KEY in doc3.content:
-            doc3.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, doc3.doc_id, doc3.get_json()))
+            doc3.set_json(decrypt_doc(self._soledad._crypto, doc3))
         self.assertEqual(doc4.get_json(), doc3.get_json())
         self.assertFalse(doc3.has_conflicts)
 
