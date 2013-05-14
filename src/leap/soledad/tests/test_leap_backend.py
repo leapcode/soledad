@@ -284,7 +284,7 @@ class TestLeapParsingSyncStream(
         """
         Test adapted to use encrypted content.
         """
-        doc = leap_backend.LeapDocument('i')
+        doc = leap_backend.LeapDocument('i', rev='r')
         doc.content = {}
         enc_json = leap_backend.encrypt_doc(self._soledad._crypto, doc)
         tgt = leap_backend.LeapSyncTarget(

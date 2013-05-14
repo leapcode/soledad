@@ -373,7 +373,6 @@ class Soledad(object):
         This method will also replace the secret in the crypto object.
         """
         self._secret_id = secret_id
-        self._crypto.secret = self._get_storage_secret()
 
     def _load_secrets(self):
         """
@@ -942,7 +941,7 @@ class Soledad(object):
         # set uuid
         self._uuid = data[self.UUID_KEY]
         # choose first secret to use
-        self._set_secret_id(self._secrets.items()[0][0])
+        self._set_secret_id(data[self.STORAGE_SECRETS_KEY].items()[0][0])
 
     #
     # Setters/getters
@@ -973,6 +972,10 @@ class Soledad(object):
     server_url = property(
         _get_server_url,
         doc='The URL of the Soledad server.')
+
+    storage_secret = property(
+        _get_storage_secret,
+        doc='The secret used for symmetric encryption.')
 
 
 #-----------------------------------------------------------------------------
