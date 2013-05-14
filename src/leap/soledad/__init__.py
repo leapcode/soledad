@@ -306,7 +306,7 @@ class Soledad(object):
         """
         paths = map(
             lambda x: os.path.dirname(x),
-            [self.local_db_path, self._secrets_path])
+            [self._local_db_path, self._secrets_path])
         for path in paths:
             logger.info('Creating directory: %s.' % path)
             mkdir_p(path)
@@ -319,7 +319,7 @@ class Soledad(object):
         # TODO: verify if secret for sqlcipher should be the same as the
         # one for symmetric encryption.
         self._db = sqlcipher.open(
-            self.local_db_path,
+            self._local_db_path,
             self._get_storage_secret(),
             create=True,
             document_factory=LeapDocument,
