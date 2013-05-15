@@ -218,6 +218,7 @@ class Soledad(object):
         self._init_config(secrets_path, local_db_path, server_url)
         self._set_token(auth_token)
         # configure SSL certificate
+        global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
         # initiate bootstrap sequence
         self._bootstrap()
@@ -990,11 +991,12 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         if self._tunnel_host:
             self.sock = sock
             self._tunnel()
-        self.sock = ssl.wrap_socket(sock, self.key_file, self.cert_file,
-                                    ssl_version=ssl.PROTOCOL_SSLv3,
-                                    cert_reqs=ssl.CERT_REQUIRED,
-                                    ca_certs=SOLEDAD_CERT)
-        match_hostname(self.sock.getpeercert(), self.host)
+
+        self.sock = ssl.wrap_socket(sock,
+                                    ca_certs=SOLEDAD_CERT,
+                                    cert_reqs=ssl.CERT_REQUIRED)
+        # TODO: enable this when the certificate is fixed
+        #match_hostname(self.sock.getpeercert(), self.host)
 
 
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
