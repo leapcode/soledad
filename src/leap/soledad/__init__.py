@@ -400,7 +400,7 @@ class Soledad(object):
         """
         # does the file exist in disk?
         if not os.path.isfile(self._secrets_path):
-            raise IOError('File does not exist: %s' % self._secrets_path) 
+            raise IOError('File does not exist: %s' % self._secrets_path)
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
@@ -431,7 +431,7 @@ class Soledad(object):
             return True
         except DecryptionFailed:
             logger.error('Could not decrypt storage secret.')
-        except IOError, e: 
+        except IOError, e:
             logger.error('IOError: %s' % str(e))
         return False
 
@@ -995,8 +995,7 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         self.sock = ssl.wrap_socket(sock,
                                     ca_certs=SOLEDAD_CERT,
                                     cert_reqs=ssl.CERT_REQUIRED)
-        # TODO: enable this when the certificate is fixed
-        #match_hostname(self.sock.getpeercert(), self.host)
+        match_hostname(self.sock.getpeercert(), self.host)
 
 
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
