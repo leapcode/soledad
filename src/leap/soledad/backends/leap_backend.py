@@ -25,6 +25,8 @@ try:
     import simplejson as json
 except ImportError:
     import json  # noqa
+import hashlib
+import hmac
 
 
 from u1db import Document
@@ -37,6 +39,7 @@ from leap.common.keymanager import KeyManager
 from leap.common.check import leap_assert
 from leap.soledad.auth import TokenBasedAuth
 
+
 #
 # Exceptions
 #
@@ -48,9 +51,24 @@ class DocumentNotEncrypted(Exception):
     pass
 
 
-class UnknownEncryptionSchemes(Exception):
+class UnknownEncryptionScheme(Exception):
     """
     Raised when trying to decrypt from unknown encryption schemes.
+    """
+    pass
+
+
+class UnknownMacMethod(Exception):
+    """
+    Raised when trying to authenticate document's content with unknown MAC
+    mehtod.
+    """
+    pass
+
+
+class WrongMac(Exception):
+    """
+    Raised when failing to authenticate document's contents based on MAC.
     """
 
 
@@ -68,6 +86,14 @@ class EncryptionSchemes(object):
     PUBKEY = 'pubkey'
 
 
+class MacMethods(object):
+    """
+    Representation of MAC methods used to authenticate document's contents.
+    """
+
+    HMAC = 'hmac'
+
+
 #
 # Crypto utilities for a LeapDocument.
 #
@@ -75,53 +101,95 @@ class EncryptionSchemes(object):
 ENC_JSON_KEY = '_enc_json'
 ENC_SCHEME_KEY = '_enc_scheme'
 MAC_KEY = '_mac'
+MAC_METHOD_KEY = '_mac_method'
 
 
-def encrypt_doc_json(crypto, doc_id, doc_json):
+def mac_doc(crypto, doc_id, doc_rev, ciphertext, mac_method):
     """
-    Return a valid JSON string containing the C{doc} content encrypted to
-    a symmetric key and the encryption scheme.
+    Calculate a MAC for C{doc} using C{ciphertext}.
 
-    The returned JSON string is the serialization of the following dictionary:
+    Current MAC method used is HMAC, with the following parameters:
 
-        {
-            '_enc_json': encrypt_sym(doc_content),
-            '_enc_scheme': 'symkey',
-            '_mac': <mac> [Not implemented yet]
-        }
+        * key: sha256(storage_secret, doc_id)
+        * msg: doc_id + doc_rev + ciphertext
+        * digestmod: sha256
 
-    @param crypto: A SoledadCryto instance to perform the encryption.
+    @param crypto: A SoledadCryto instance used to perform the encryption.
     @type crypto: leap.soledad.crypto.SoledadCrypto
-    @param doc_id: The unique id of the document.
+    @param doc_id: The id of the document.
     @type doc_id: str
-    @param doc_json: The JSON serialization of the document's contents.
-    @type doc_json: str
+    @param doc_rev: The revision of the document.
+    @type doc_rev: str
+    @param ciphertext: The content of the document.
+    @type ciphertext: str
+    @param mac_method: The MAC method to use.
+    @type mac_method: str
 
-    @return: The JSON serialization representing the encrypted content.
+    @return: The calculated MAC.
     @rtype: str
     """
+    if mac_method == MacMethods.HMAC:
+        return hmac.new(
+            crypto.doc_mac_key(doc_id),
+            str(doc_id) + str(doc_rev) + ciphertext,
+            hashlib.sha256).hexdigest()
+    # raise if we do not know how to handle this MAC method
+    raise UnknownMacMethod('Unknown MAC method: %s.' % mac_method)
+
+
+def encrypt_doc(crypto, doc):
+    """
+    Encrypt C{doc}'s content.
+
+    Return a valid JSON string representing the following:
+
+        {
+            ENC_JSON_KEY: '<encrypted doc JSON string>',
+            ENC_SCHEME_KEY: 'symkey',
+            MAC_KEY: '<mac>'
+            MAC_METHOD_KEY: 'hmac'
+        }
+
+    @param crypto: A SoledadCryto instance used to perform the encryption.
+    @type crypto: leap.soledad.crypto.SoledadCrypto
+    @param doc: The document with contents to be encrypted.
+    @type doc: LeapDocument
+
+    @return: The JSON serialization of the dict representing the encrypted
+        content.
+    @rtype: str
+    """
+    leap_assert(doc.is_tombstone() is False)
+    # encrypt content
     ciphertext = crypto.encrypt_sym(
-        doc_json,
-        crypto.passphrase_hash(doc_id))
+        doc.get_json(),
+        crypto.doc_passphrase(doc.doc_id))
+    # verify it is indeed encrypted
     if not crypto.is_encrypted_sym(ciphertext):
         raise DocumentNotEncrypted('Failed encrypting document.')
+    # update doc's content with encrypted version
     return json.dumps({
         ENC_JSON_KEY: ciphertext,
         ENC_SCHEME_KEY: EncryptionSchemes.SYMKEY,
+        MAC_KEY: mac_doc(
+            crypto, doc.doc_id, doc.rev, ciphertext, MacMethods.HMAC),
+        MAC_METHOD_KEY: MacMethods.HMAC,
     })
 
 
-def decrypt_doc_json(crypto, doc_id, doc_json):
+def decrypt_doc(crypto, doc):
     """
-    Return a JSON serialization of the decrypted content contained in
-    C{encrypted_json}.
+    Decrypt C{doc}'s content.
 
-    The C{encrypted_json} parameter is the JSON serialization of the
-    following dictionary:
+    Return the JSON string representation of the document's decrypted content.
+
+    The content of the document should have the following structure:
 
         {
-            ENC_JSON_KEY: enc_blob,
-            ENC_SCHEME_KEY: enc_scheme,
+            ENC_JSON_KEY: '<enc_blob>',
+            ENC_SCHEME_KEY: '<enc_scheme>',
+            MAC_KEY: '<mac>'
+            MAC_METHOD_KEY: 'hmac'
         }
 
     C{enc_blob} is the encryption of the JSON serialization of the document's
@@ -130,22 +198,27 @@ def decrypt_doc_json(crypto, doc_id, doc_json):
 
     @param crypto: A SoledadCryto instance to perform the encryption.
     @type crypto: leap.soledad.crypto.SoledadCrypto
-    @param doc_id: The unique id of the document.
-    @type doc_id: str
-    @param doc_json: The JSON serialization representation of the encrypted
-        document's contents.
-    @type doc_json: str
+    @param doc: The document to be decrypted.
+    @type doc: LeapDocument
 
     @return: The JSON serialization of the decrypted content.
     @rtype: str
     """
-    leap_assert(isinstance(doc_id, str), 'Document id is not a string.')
-    leap_assert(doc_id != '', 'Received empty document id.')
-    leap_assert(isinstance(doc_json, str), 'Document JSON is not a string.')
-    leap_assert(doc_json != '', 'Received empty document JSON.')
-    content = json.loads(doc_json)
-    ciphertext = content[ENC_JSON_KEY]
-    enc_scheme = content[ENC_SCHEME_KEY]
+    leap_assert(doc.is_tombstone() is False)
+    leap_assert(ENC_JSON_KEY in doc.content)
+    leap_assert(ENC_SCHEME_KEY in doc.content)
+    leap_assert(MAC_KEY in doc.content)
+    leap_assert(MAC_METHOD_KEY in doc.content)
+    # verify MAC
+    mac = mac_doc(
+        crypto, doc.doc_id, doc.rev,
+        doc.content[ENC_JSON_KEY],
+        doc.content[MAC_METHOD_KEY])
+    if doc.content[MAC_KEY] != mac:
+        raise WrongMac('Could not authenticate document\'s contents.')
+    # decrypt doc's content
+    ciphertext = doc.content[ENC_JSON_KEY]
+    enc_scheme = doc.content[ENC_SCHEME_KEY]
     plainjson = None
     if enc_scheme == EncryptionSchemes.SYMKEY:
         if not crypto.is_encrypted_sym(ciphertext):
@@ -155,9 +228,9 @@ def decrypt_doc_json(crypto, doc_id, doc_json):
                 'symmetric key.')
         plainjson = crypto.decrypt_sym(
             ciphertext,
-            crypto.passphrase_hash(doc_id))
+            crypto.doc_passphrase(doc.doc_id))
     else:
-        raise UnknownEncryptionSchemes(enc_scheme)
+        raise UnknownEncryptionScheme(enc_scheme)
     return plainjson
 
 
@@ -354,9 +427,7 @@ class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 if doc.content and ENC_SCHEME_KEY in doc.content:
                     if doc.content[ENC_SCHEME_KEY] == \
                             EncryptionSchemes.SYMKEY:
-                        doc.set_json(
-                            decrypt_doc_json(
-                                self._crypto, doc.doc_id, entry['content']))
+                        doc.set_json(decrypt_doc(self._crypto, doc))
                 #-------------------------------------------------------------
                 # end of symmetric decryption
                 #-------------------------------------------------------------
@@ -433,15 +504,14 @@ class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             #-------------------------------------------------------------
             # symmetric encryption of document's contents
             #-------------------------------------------------------------
-            enc_json = doc.get_json()
+            doc_json = doc.get_json()
             if not doc.is_tombstone():
-                enc_json = encrypt_doc_json(
-                    self._crypto, doc.doc_id, doc.get_json())
+                doc_json = encrypt_doc(self._crypto, doc)
             #-------------------------------------------------------------
             # end of symmetric encryption
             #-------------------------------------------------------------
             size += prepare(id=doc.doc_id, rev=doc.rev,
-                            content=enc_json,
+                            content=doc_json,
                             gen=gen, trans_id=trans_id)
         entries.append('\r\n]')
         size += len(entries[-1])

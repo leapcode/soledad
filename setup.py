@@ -26,7 +26,6 @@ install_requirements = [
     'configparser',
     'couchdb',
     'leap.common',
-    'oauth',
     'pysqlcipher',
     'python-gnupg',
     'simplejson',

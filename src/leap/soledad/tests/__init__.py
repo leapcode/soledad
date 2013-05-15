@@ -10,7 +10,7 @@ from leap.soledad import Soledad
 from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
-    decrypt_doc_json,
+    decrypt_doc,
     ENC_SCHEME_KEY,
 )
 from leap.common.testing.basetest import BaseLeapTest
@@ -44,7 +44,8 @@ class BaseSoledadTest(BaseLeapTest):
         self._db2.close()
         self._soledad.close()
 
-    def _soledad_instance(self, user='leap@leap.se', passphrase='123', prefix='',
+    def _soledad_instance(self, user='leap@leap.se', passphrase='123',
+                          prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
                           local_db_path='/soledad.u1db', server_url='',
                           cert_file=None):
@@ -69,15 +70,16 @@ class BaseSoledadTest(BaseLeapTest):
             server_url=server_url,  # Soledad will fail if not given an url.
             cert_file=cert_file)
 
-    def assertGetEncryptedDoc(self, db, doc_id, doc_rev, content, has_conflicts):
-        """Assert that the document in the database looks correct."""
+    def assertGetEncryptedDoc(
+            self, db, doc_id, doc_rev, content, has_conflicts):
+        """
+        Assert that the document in the database looks correct.
+        """
         exp_doc = self.make_document(doc_id, doc_rev, content,
                                      has_conflicts=has_conflicts)
         doc = db.get_doc(doc_id)
         if ENC_SCHEME_KEY in doc.content:
-            doc.set_json(
-                decrypt_doc_json(
-                    self._soledad._crypto, doc.doc_id, doc.get_json()))
+            doc.set_json(decrypt_doc(self._soledad._crypto, doc))
         self.assertEqual(exp_doc.doc_id, doc.doc_id)
         self.assertEqual(exp_doc.rev, doc.rev)
         self.assertEqual(exp_doc.has_conflicts, doc.has_conflicts)

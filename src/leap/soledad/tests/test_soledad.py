@@ -69,7 +69,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
             secrets_path=None, local_db_path=None,
             server_url='', cert_file=None)  # otherwise Soledad will fail.
         self.assertEquals(
-            os.path.join(sol.DEFAULT_PREFIX, Soledad.STORAGE_SECRETS_FILE_NAME),
+            os.path.join(
+                sol.DEFAULT_PREFIX, Soledad.STORAGE_SECRETS_FILE_NAME),
             sol.secrets_path)
         self.assertEquals(
             os.path.join(sol.DEFAULT_PREFIX, 'soledad.u1db'),

@@ -187,7 +187,6 @@ class SoledadAuthMiddleware(object):
         return not environ.get(self.PATH_INFO_KEY).startswith('/shared/')
 
 
-
 #-----------------------------------------------------------------------------
 # Soledad WSGI application
 #-----------------------------------------------------------------------------

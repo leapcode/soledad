@@ -21,7 +21,8 @@ Cryptographic utilities for Soledad.
 """
 
 
-from hashlib import sha256
+import hmac
+import hashlib
 
 
 from leap.common.keymanager import openpgp
@@ -38,6 +39,8 @@ class SoledadCrypto(object):
     General cryptographic functionality.
     """
 
+    MAC_KEY_LENGTH = 64
+
     def __init__(self, soledad):
         """
         Initialize the crypto object.
@@ -47,7 +50,6 @@ class SoledadCrypto(object):
         """
         self._soledad = soledad
         self._pgp = openpgp.OpenPGPScheme(self._soledad)
-        self._secret = None
 
     def encrypt_sym(self, data, passphrase):
         """
@@ -98,33 +100,61 @@ class SoledadCrypto(object):
         """
         return openpgp.is_encrypted_sym(data)
 
-    def passphrase_hash(self, suffix):
+    def doc_passphrase(self, doc_id):
         """
-        Generate a passphrase for symmetric encryption.
+        Generate a passphrase for symmetric encryption of document's contents.
 
-        The password is derived from the secret for symmetric encryption and
-        a C{suffix} that is appended to the secret prior to hashing.
+        The password is derived using HMAC having sha256 as underlying hash
+        function. The key used for HMAC is Soledad's storage secret stripped
+        from the first MAC_KEY_LENGTH characters. The HMAC message is
+        C{doc_id}.
 
-        @param suffix: Will be appended to the symmetric key before hashing.
-        @type suffix: str
+        @param doc_id: The id of the document that will be encrypted using
+            this passphrase.
+        @type doc_id: str
 
-        @return: the passphrase
+        @return: The passphrase.
         @rtype: str
+
         @raise NoSymmetricSecret: if no symmetric secret was supplied.
         """
-        if self._secret is None:
+        if self.secret is None:
             raise NoSymmetricSecret()
-        return sha256('%s%s' % (self._secret, suffix)).hexdigest()
+        return hmac.new(
+            self.secret[self.MAC_KEY_LENGTH:],
+            doc_id,
+            hashlib.sha256).hexdigest()
+
+    def doc_mac_key(self, doc_id):
+        """
+        Generate a key for calculating a MAC for a document whose id is
+        C{doc_id}.
+
+        The key is derived using HMAC having sha256 as underlying hash
+        function. The key used for HMAC is the first MAC_KEY_LENGTH characters
+        of Soledad's storage secret. The HMAC message is C{doc_id}.
+
+        @param doc_id: The id of the document.
+        @type doc_id: str
+
+        @return: The key.
+        @rtype: str
+
+        @raise NoSymmetricSecret: if no symmetric secret was supplied.
+        """
+        if self.secret is None:
+            raise NoSymmetricSecret()
+        return hmac.new(
+            self.secret[:self.MAC_KEY_LENGTH],
+            doc_id,
+            hashlib.sha256).hexdigest()
 
     #
     # secret setters/getters
     #
 
     def _get_secret(self):
-        return self._secret
+        return self._soledad.storage_secret
 
-    def _set_secret(self, secret):
-        self._secret = secret
-
-    secret = property(_get_secret, _set_secret,
-                      doc='The key used for symmetric encryption')
+    secret = property(
+        _get_secret, doc='The secret used for symmetric encryption')

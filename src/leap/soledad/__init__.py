@@ -287,8 +287,8 @@ class Soledad(object):
                     'Found cryptographic secrets in shared recovery '
                     'database.')
                 self.import_recovery_document(
-                        doc.content[self.SECRET_KEY],
-                        passphrase=self._passphrase)
+                    doc.content[self.SECRET_KEY],
+                    passphrase=self._passphrase)
             else:
                 # there are no secrets in server also, so generate a secret.
                 logger.info(
@@ -374,7 +374,6 @@ class Soledad(object):
         This method will also replace the secret in the crypto object.
         """
         self._secret_id = secret_id
-        self._crypto.secret = self._get_storage_secret()
 
     def _load_secrets(self):
         """
@@ -400,14 +399,14 @@ class Soledad(object):
         """
         # does the file exist in disk?
         if not os.path.isfile(self._secrets_path):
-            raise IOError('File does not exist: %s' % self._secrets_path) 
+            raise IOError('File does not exist: %s' % self._secrets_path)
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
         self._secrets = content[self.STORAGE_SECRETS_KEY]
         # choose first secret if no secret_id was given
-        if self._secret_id == None:
+        if self._secret_id is None:
             self._set_secret_id(self._secrets.items()[0][0])
         # check secret is isncrypted
         if not self._crypto.is_encrypted_sym(
@@ -431,7 +430,7 @@ class Soledad(object):
             return True
         except DecryptionFailed:
             logger.error('Could not decrypt storage secret.')
-        except IOError, e: 
+        except IOError, e:
             logger.error('IOError: %s' % str(e))
         return False
 
@@ -943,7 +942,7 @@ class Soledad(object):
         # set uuid
         self._uuid = data[self.UUID_KEY]
         # choose first secret to use
-        self._set_secret_id(self._secrets.items()[0][0])
+        self._set_secret_id(data[self.STORAGE_SECRETS_KEY].items()[0][0])
 
     #
     # Setters/getters
@@ -974,6 +973,10 @@ class Soledad(object):
     server_url = property(
         _get_server_url,
         doc='The URL of the Soledad server.')
+
+    storage_secret = property(
+        _get_storage_secret,
+        doc='The secret used for symmetric encryption.')
 
 
 #-----------------------------------------------------------------------------

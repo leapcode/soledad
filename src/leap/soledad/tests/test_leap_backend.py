@@ -106,7 +106,8 @@ def make_token_http_database_for_test(test, replica_uid):
             auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
 
         def _sign_request(self, method, url_query, params):
-            return auth.TokenBasedAuth._sign_request(self, method, url_query, params)
+            return auth.TokenBasedAuth._sign_request(
+                self, method, url_query, params)
 
     http_db = _HTTPDatabaseWithToken(test.getURL('test'))
     http_db.set_token_credentials('user-uuid', 'auth-token')
@@ -162,7 +163,8 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
                 auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
 
             def _sign_request(self, method, url_query, params):
-                return auth.TokenBasedAuth._sign_request(self, method, url_query, params)
+                return auth.TokenBasedAuth._sign_request(
+                    self, method, url_query, params)
 
         return _HTTPClientWithToken(self.getURL('dbase'), **kwds)
 
@@ -185,7 +187,8 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
         pass
 
     def app(self, environ, start_response):
-        res = test_http_client.TestHTTPClientBase.app(self, environ, start_response)
+        res = test_http_client.TestHTTPClientBase.app(
+            self, environ, start_response)
         if res is not None:
             return res
         # mime solead application here.
@@ -195,13 +198,13 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
                 start_response("401 Unauthorized",
                                [('Content-Type', 'application/json')])
                 return [json.dumps({"error": "unauthorized",
-                                        "message": e.message})]
+                                    "message": e.message})]
             scheme, encoded = auth.split(None, 1)
             if scheme.lower() != 'token':
                 start_response("401 Unauthorized",
                                [('Content-Type', 'application/json')])
                 return [json.dumps({"error": "unauthorized",
-                                        "message": e.message})]
+                                    "message": e.message})]
             uuid, token = encoded.decode('base64').split(':', 1)
             if uuid != 'user-uuid' and token != 'auth-token':
                 return unauth_err("Incorrect address or token.")
@@ -226,7 +229,6 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
         res, headers = cli._request('GET', ['doc', 'token'])
         self.assertEqual(
             ['/dbase/doc/token', 'user-uuid', 'auth-token'], json.loads(res))
-
 
 
 #-----------------------------------------------------------------------------
@@ -284,10 +286,9 @@ class TestLeapParsingSyncStream(
         """
         Test adapted to use encrypted content.
         """
-        doc = leap_backend.LeapDocument('i')
+        doc = leap_backend.LeapDocument('i', rev='r')
         doc.content = {}
-        enc_json = leap_backend.encrypt_doc_json(
-            self._soledad._crypto, doc.doc_id, doc.get_json())
+        enc_json = leap_backend.encrypt_doc(self._soledad._crypto, doc)
         tgt = leap_backend.LeapSyncTarget(
             "http://foo/foo", crypto=self._soledad._crypto)
 
@@ -367,6 +368,7 @@ def oauth_leap_sync_target(test, path):
                              tests.token1.key, tests.token1.secret)
     return st
 
+
 def token_leap_sync_target(test, path):
     st = leap_sync_target(test, path)
     st.set_token_credentials('user-uuid', 'auth-token')
@@ -374,7 +376,7 @@ def token_leap_sync_target(test, path):
 
 
 class TestLeapSyncTarget(
-    test_remote_sync_target.TestRemoteSyncTargets, BaseSoledadTest):
+        test_remote_sync_target.TestRemoteSyncTargets, BaseSoledadTest):
 
     scenarios = [
         ('http', {'make_app_with_state': make_soledad_app,
@@ -383,9 +385,10 @@ class TestLeapSyncTarget(
         ('oauth_http', {'make_app_with_state': make_oauth_http_app,
                         'make_document_for_test': make_leap_document_for_test,
                         'sync_target': oauth_leap_sync_target}),
-        ('token_soledad', {'make_app_with_state': make_token_soledad_app,
-                        'make_document_for_test': make_leap_document_for_test,
-                        'sync_target': token_leap_sync_target}),
+        ('token_soledad',
+            {'make_app_with_state': make_token_soledad_app,
+             'make_document_for_test': make_leap_document_for_test,
+             'sync_target': token_leap_sync_target}),
     ]
 
     def test_sync_exchange_send(self):
@@ -523,10 +526,11 @@ class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
                                      BaseSoledadTest):
 
     scenarios = [
-        ('token_soledad_https', {'server_def': test_https.https_server_def,
-                        'make_app_with_state': make_token_soledad_app,
-                        'make_document_for_test': make_leap_document_for_test,
-                        'sync_target': token_leap_https_sync_target}),
+        ('token_soledad_https',
+            {'server_def': test_https.https_server_def,
+             'make_app_with_state': make_token_soledad_app,
+             'make_document_for_test': make_leap_document_for_test,
+             'sync_target': token_leap_https_sync_target}),
     ]
 
     def setUp(self):
@@ -568,6 +572,7 @@ class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
             http_client.CertificateError, remote_target.record_sync_info,
             'other-id', 2, 'T-id')
 
+
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_http_database`.
 #-----------------------------------------------------------------------------
@@ -585,7 +590,8 @@ class _HTTPDatabase(http_database.HTTPDatabase, auth.TokenBasedAuth):
             self, method, url_query, params)
 
 
-class TestHTTPDatabaseWithCreds(test_http_database.TestHTTPDatabaseCtrWithCreds):
+class TestHTTPDatabaseWithCreds(
+        test_http_database.TestHTTPDatabaseCtrWithCreds):
 
     def test_get_sync_target_inherits_token_credentials(self):
         # this test was from TestDatabaseSimpleOperations but we put it here
@@ -594,7 +600,6 @@ class TestHTTPDatabaseWithCreds(test_http_database.TestHTTPDatabaseCtrWithCreds)
         self.db.set_token_credentials('user-uuid', 'auth-token')
         st = self.db.get_sync_target()
         self.assertEqual(self.db._creds, st._creds)
-
 
     def test_ctr_with_creds(self):
         db1 = _HTTPDatabase('http://dbs/db', creds={'token': {
@@ -658,7 +663,6 @@ class LeapDatabaseSyncTargetTests(
                          (self.other_changes, new_gen, last_trans_id))
         self.assertEqual(10, self.st.get_sync_info('replica')[3])
 
-
     def test_sync_exchange_push_many(self):
         """
         Test sync exchange.
@@ -666,9 +670,10 @@ class LeapDatabaseSyncTargetTests(
         This test was adapted to decrypt remote content before assert.
         """
         docs_by_gen = [
-            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
-            (self.make_document('doc-id2', 'replica:1', tests.nested_doc), 11,
-             'T-2')]
+            (self.make_document(
+                'doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
+            (self.make_document(
+                'doc-id2', 'replica:1', tests.nested_doc), 11, 'T-2')]
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=self.receive_doc)
@@ -681,7 +686,6 @@ class LeapDatabaseSyncTargetTests(
         self.assertEqual(([], 2, last_trans_id),
                          (self.other_changes, new_gen, trans_id))
         self.assertEqual(11, self.st.get_sync_info('replica')[3])
-
 
     def test_sync_exchange_returns_many_new_docs(self):
         """
@@ -766,10 +770,10 @@ class TestLeapDbSync(test_sync.TestDbSync, BaseSoledadTest):
         self.assertEqual(1, len(changes))
         self.assertEqual(doc2.doc_id, changes[0][0])
         self.assertEqual(1, gen - local_gen_before_sync)
-        self.assertGetEncryptedDoc(self.db2, doc1.doc_id, doc1.rev, tests.simple_doc,
-                          False)
-        self.assertGetEncryptedDoc(self.db, doc2.doc_id, doc2.rev, tests.nested_doc,
-                          False)
+        self.assertGetEncryptedDoc(
+            self.db2, doc1.doc_id, doc1.rev, tests.simple_doc, False)
+        self.assertGetEncryptedDoc(
+            self.db, doc2.doc_id, doc2.rev, tests.nested_doc, False)
 
     def test_db_sync_autocreate(self):
         """
@@ -785,8 +789,8 @@ class TestLeapDbSync(test_sync.TestDbSync, BaseSoledadTest):
         gen, _, changes = db3.whats_changed()
         self.assertEqual(1, len(changes))
         self.assertEqual(doc1.doc_id, changes[0][0])
-        self.assertGetEncryptedDoc(db3, doc1.doc_id, doc1.rev, tests.simple_doc,
-                          False)
+        self.assertGetEncryptedDoc(
+            db3, doc1.doc_id, doc1.rev, tests.simple_doc, False)
         t_gen, _ = self.db._get_replica_gen_and_trans_id('test3.db')
         s_gen, _ = db3._get_replica_gen_and_trans_id('test1')
         self.assertEqual(1, t_gen)
