@@ -44,7 +44,8 @@ class BaseSoledadTest(BaseLeapTest):
         self._db2.close()
         self._soledad.close()
 
-    def _soledad_instance(self, user='leap@leap.se', passphrase='123', prefix='',
+    def _soledad_instance(self, user='leap@leap.se', passphrase='123',
+                          prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
                           local_db_path='/soledad.u1db', server_url='',
                           cert_file=None):
@@ -69,8 +70,11 @@ class BaseSoledadTest(BaseLeapTest):
             server_url=server_url,  # Soledad will fail if not given an url.
             cert_file=cert_file)
 
-    def assertGetEncryptedDoc(self, db, doc_id, doc_rev, content, has_conflicts):
-        """Assert that the document in the database looks correct."""
+    def assertGetEncryptedDoc(
+            self, db, doc_id, doc_rev, content, has_conflicts):
+        """
+        Assert that the document in the database looks correct.
+        """
         exp_doc = self.make_document(doc_id, doc_rev, content,
                                      has_conflicts=has_conflicts)
         doc = db.get_doc(doc_id)

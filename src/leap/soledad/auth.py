@@ -44,7 +44,6 @@ class TokenBasedAuth(object):
         """
         self._creds = {'token': (uuid, token)}
 
-
     def _sign_request(self, method, url_query, params):
         """
         Return an authorization header to be included in the HTTP request, in
@@ -67,4 +66,5 @@ class TokenBasedAuth(object):
             auth = '%s:%s' % (uuid, token)
             return [('Authorization', 'Token %s' % auth.encode('base64')[:-1])]
         else:
-            return HTTPClientBase._sign_request(self, method, url_query, params)
+            return HTTPClientBase._sign_request(
+                self, method, url_query, params)

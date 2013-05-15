@@ -75,7 +75,8 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         # encrypt doc
         doc1.set_json(encrypt_doc(self._soledad._crypto, doc1))
         # assert content is different and includes keys
-        self.assertNotEqual(simpledoc, doc1.content,
+        self.assertNotEqual(
+            simpledoc, doc1.content,
             'incorrect document encryption')
         self.assertTrue(ENC_JSON_KEY in doc1.content)
         self.assertTrue(ENC_SCHEME_KEY in doc1.content)
@@ -83,7 +84,6 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         doc1.set_json(decrypt_doc(self._soledad._crypto, doc1))
         self.assertEqual(
             simpledoc, doc1.content, 'incorrect document encryption')
-
 
     def test_encrypt_sym(self):
         """

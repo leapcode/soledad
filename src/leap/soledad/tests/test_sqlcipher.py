@@ -712,7 +712,8 @@ class SQLCipherSyncTargetTests(
         sever-side.
         """
         docs_by_gen = [
-            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
+            (self.make_document(
+                'doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
             (self.make_document('doc-id2', 'replica:1', tests.nested_doc), 11,
              'T-2')]
         new_gen, trans_id = self.st.sync_exchange(
