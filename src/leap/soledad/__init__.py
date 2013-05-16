@@ -998,8 +998,7 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         self.sock = ssl.wrap_socket(sock,
                                     ca_certs=SOLEDAD_CERT,
                                     cert_reqs=ssl.CERT_REQUIRED)
-        # TODO: enable this when the certificate is fixed
-        #match_hostname(self.sock.getpeercert(), self.host)
+        match_hostname(self.sock.getpeercert(), self.host)
 
 
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
