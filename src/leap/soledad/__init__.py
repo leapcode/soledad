@@ -287,8 +287,8 @@ class Soledad(object):
                     'Found cryptographic secrets in shared recovery '
                     'database.')
                 self.import_recovery_document(
-                        doc.content[self.SECRET_KEY],
-                        passphrase=self._passphrase)
+                    doc.content[self.SECRET_KEY],
+                    passphrase=self._passphrase)
             else:
                 # there are no secrets in server also, so generate a secret.
                 logger.info(
@@ -400,7 +400,7 @@ class Soledad(object):
         """
         # does the file exist in disk?
         if not os.path.isfile(self._secrets_path):
-            raise IOError('File does not exist: %s' % self._secrets_path) 
+            raise IOError('File does not exist: %s' % self._secrets_path)
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
@@ -431,7 +431,7 @@ class Soledad(object):
             return True
         except DecryptionFailed:
             logger.error('Could not decrypt storage secret.')
-        except IOError, e: 
+        except IOError, e:
             logger.error('IOError: %s' % str(e))
         return False
 
@@ -528,10 +528,11 @@ class Soledad(object):
         """
         Return an instance of the shared recovery database object.
         """
-        return SoledadSharedDatabase.open_database(
-            urlparse.urljoin(self.server_url, 'shared'),
-            False,  # TODO: eliminate need to create db here.
-            creds=self._creds)
+        if self.server_url:
+            return SoledadSharedDatabase.open_database(
+                urlparse.urljoin(self.server_url, 'shared'),
+                False,  # TODO: eliminate need to create db here.
+                creds=self._creds)
 
     def _get_secrets_from_shared_db(self):
         """
@@ -543,7 +544,10 @@ class Soledad(object):
         """
         events.signal(
             events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
-        doc = self._shared_db().get_doc(self._uuid_hash())
+        db = self._shared_db()
+        if not db:
+            return
+        doc = db.get_doc(self._uuid_hash())
         events.signal(
             events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
@@ -573,7 +577,10 @@ class Soledad(object):
         # upload secrets to server
         events.signal(
             events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._uuid)
-        self._shared_db().put_doc(doc)
+        db = self._shared_db()
+        if not db:
+            return
+        db.put_doc(doc)
         events.signal(
             events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
