@@ -73,7 +73,7 @@ setup(
     name='leap.soledad',
     # TODO: change version according to decisions regarding soledad versus
     # leap client versions.
-    version='0.0.2-dev',
+    version='0.1.0-dev',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
