@@ -27,6 +27,7 @@ except ImportError:
     import json  # noqa
 import hashlib
 import hmac
+import binascii
 
 
 from u1db import Document
@@ -35,6 +36,11 @@ from u1db.errors import BrokenSyncStream
 from u1db.remote.http_target import HTTPSyncTarget
 
 
+from leap.common.crypto import (
+    EncryptionMethods,
+    encrypt_sym,
+    decrypt_sym,
+)
 from leap.common.keymanager import KeyManager
 from leap.common.check import leap_assert
 from leap.soledad.auth import TokenBasedAuth
@@ -100,6 +106,8 @@ class MacMethods(object):
 
 ENC_JSON_KEY = '_enc_json'
 ENC_SCHEME_KEY = '_enc_scheme'
+ENC_METHOD_KEY = '_enc_method'
+ENC_IV_KEY = '_enc_iv'
 MAC_KEY = '_mac'
 MAC_METHOD_KEY = '_mac_method'
 
@@ -132,7 +140,7 @@ def mac_doc(crypto, doc_id, doc_rev, ciphertext, mac_method):
         return hmac.new(
             crypto.doc_mac_key(doc_id),
             str(doc_id) + str(doc_rev) + ciphertext,
-            hashlib.sha256).hexdigest()
+            hashlib.sha256).digest()
     # raise if we do not know how to handle this MAC method
     raise UnknownMacMethod('Unknown MAC method: %s.' % mac_method)
 
@@ -141,11 +149,14 @@ def encrypt_doc(crypto, doc):
     """
     Encrypt C{doc}'s content.
 
-    Return a valid JSON string representing the following:
+    Encrypt doc's contents using AES-256 CTR mode and return a valid JSON
+    string representing the following:
 
         {
             ENC_JSON_KEY: '<encrypted doc JSON string>',
             ENC_SCHEME_KEY: 'symkey',
+            ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
+            ENC_IV_KEY: '<the initial value used to encrypt>',
             MAC_KEY: '<mac>'
             MAC_METHOD_KEY: 'hmac'
         }
@@ -160,19 +171,24 @@ def encrypt_doc(crypto, doc):
     @rtype: str
     """
     leap_assert(doc.is_tombstone() is False)
-    # encrypt content
-    ciphertext = crypto.encrypt_sym(
+    # encrypt content using AES-256 CTR mode
+    iv, ciphertext = encrypt_sym(
         doc.get_json(),
-        crypto.doc_passphrase(doc.doc_id))
-    # verify it is indeed encrypted
-    if not crypto.is_encrypted_sym(ciphertext):
-        raise DocumentNotEncrypted('Failed encrypting document.')
-    # update doc's content with encrypted version
+        crypto.doc_passphrase(doc.doc_id),
+        method=EncryptionMethods.AES_256_CTR)
+    # Return a representation for the encrypted content. In the following, we
+    # convert binary data to hexadecimal representation so the JSON
+    # serialization does not complain about what it tries to serialize.
+    hex_ciphertext = binascii.b2a_hex(ciphertext)
     return json.dumps({
-        ENC_JSON_KEY: ciphertext,
+        ENC_JSON_KEY: hex_ciphertext,
         ENC_SCHEME_KEY: EncryptionSchemes.SYMKEY,
-        MAC_KEY: mac_doc(
-            crypto, doc.doc_id, doc.rev, ciphertext, MacMethods.HMAC),
+        ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
+        ENC_IV_KEY: iv,
+        MAC_KEY: binascii.b2a_hex(mac_doc(  # store the mac as hex.
+            crypto, doc.doc_id, doc.rev,
+            ciphertext,
+            MacMethods.HMAC)),
         MAC_METHOD_KEY: MacMethods.HMAC,
     })
 
@@ -188,13 +204,16 @@ def decrypt_doc(crypto, doc):
         {
             ENC_JSON_KEY: '<enc_blob>',
             ENC_SCHEME_KEY: '<enc_scheme>',
+            ENC_METHOD_KEY: '<enc_method>',
+            ENC_IV_KEY: '<initial value used to encrypt>',  # (optional)
             MAC_KEY: '<mac>'
             MAC_METHOD_KEY: 'hmac'
         }
 
     C{enc_blob} is the encryption of the JSON serialization of the document's
     content. For now Soledad just deals with documents whose C{enc_scheme} is
-    EncryptionSchemes.SYMKEY.
+    EncryptionSchemes.SYMKEY and C{enc_method} is
+    EncryptionMethods.AES_256_CTR.
 
     @param crypto: A SoledadCryto instance to perform the encryption.
     @type crypto: leap.soledad.crypto.SoledadCrypto
@@ -207,28 +226,28 @@ def decrypt_doc(crypto, doc):
     leap_assert(doc.is_tombstone() is False)
     leap_assert(ENC_JSON_KEY in doc.content)
     leap_assert(ENC_SCHEME_KEY in doc.content)
+    leap_assert(ENC_METHOD_KEY in doc.content)
     leap_assert(MAC_KEY in doc.content)
     leap_assert(MAC_METHOD_KEY in doc.content)
     # verify MAC
+    ciphertext = binascii.a2b_hex(  # content is stored as hex.
+        doc.content[ENC_JSON_KEY])
     mac = mac_doc(
         crypto, doc.doc_id, doc.rev,
-        doc.content[ENC_JSON_KEY],
+        ciphertext,
         doc.content[MAC_METHOD_KEY])
-    if doc.content[MAC_KEY] != mac:
+    if binascii.a2b_hex(doc.content[MAC_KEY]) != mac:  # mac is stored as hex.
         raise WrongMac('Could not authenticate document\'s contents.')
     # decrypt doc's content
-    ciphertext = doc.content[ENC_JSON_KEY]
     enc_scheme = doc.content[ENC_SCHEME_KEY]
     plainjson = None
     if enc_scheme == EncryptionSchemes.SYMKEY:
-        if not crypto.is_encrypted_sym(ciphertext):
-            raise DocumentNotEncrypted(
-                'Unable to identify document encryption for incoming '
-                'document, although it is marked as being encrypted with a '
-                'symmetric key.')
-        plainjson = crypto.decrypt_sym(
+        leap_assert(ENC_IV_KEY in doc.content)
+        plainjson = decrypt_sym(
             ciphertext,
-            crypto.doc_passphrase(doc.doc_id))
+            crypto.doc_passphrase(doc.doc_id),
+            method=doc.content[ENC_METHOD_KEY],
+            iv=doc.content[ENC_IV_KEY])
     else:
         raise UnknownEncryptionScheme(enc_scheme)
     return plainjson
