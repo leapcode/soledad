@@ -30,31 +30,12 @@ install_requirements = [
     'pysqlcipher',
     'python-gnupg',
     'simplejson',
-    # "Installation of Twisted using easy_install with a local source directory
-    # is supported. In the past there have been problems using these tools to
-    # upgrade an existing version of Twisted, and these problems likely still
-    # exist. Similarly, there are often problems when Twisted is declared as a
-    # dependency by another project using the setuptools distutils extensions.
-    # You should probably not rely on this functionality. Instead, install a
-    # platform-supplied package, or install Twisted by downloading a tarball,
-    # unpacking it, and running setup.py."
-    #   - https://twistedmatrix.com/trac/wiki/FrequentlyAskedQuestions
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
-    # twisted cannot be installed separately using pip.
     'u1db',
     'requests',
     'six==1.1',
     'pysqlite',
     'scrypt',
-]
-
-
-# TODO: change below so we get stable versions of modules.
-dependency_links = [
-    #'git+git://git.futeisha.org/pysqlcipher.git@develop#egg=pysqlcipher',
-    #'git+ssh://code.leap.se/leap_pycommon.git@develop#egg=leap.common',
-    'http://twistedmatrix.com/Releases/Twisted/13.0/Twisted-13.0.0.tar.bz2'
-    '#egg=twisted-13.0.0'  # break the string to adhere to pep8 style.
 ]
 
 
@@ -96,7 +77,6 @@ setup(
     test_suite='leap.soledad.tests',
     install_requires=install_requirements,
     tests_require=tests_requirements,
-    dependency_links=dependency_links,
     data_files=data_files,
     # the following files are only used for testing, and might be removed if
     # we manage or decide to not install tests in the future.
