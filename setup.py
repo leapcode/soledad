@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
 import os
 from setuptools import (
     setup,
@@ -52,7 +53,8 @@ install_requirements = [
 dependency_links = [
     #'git+git://git.futeisha.org/pysqlcipher.git@develop#egg=pysqlcipher',
     #'git+ssh://code.leap.se/leap_pycommon.git@develop#egg=leap.common',
-    'http://twistedmatrix.com/Releases/Twisted/13.0/Twisted-13.0.0.tar.bz2#egg=twisted-13.0.0'
+    'http://twistedmatrix.com/Releases/Twisted/13.0/Twisted-13.0.0.tar.bz2'
+    '#egg=twisted-13.0.0'  # break the string to adhere to pep8 style.
 ]
 
 
@@ -62,11 +64,13 @@ tests_requirements = [
     'testscenarios',
 ]
 
+
 if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
 else:
     # XXX this should go only for linux/mac
     data_files = [("/etc/init.d/", ["pkg/soledad"])]
+
 
 setup(
     name='leap.soledad',
@@ -90,5 +94,12 @@ setup(
     install_requires=install_requirements,
     tests_require=tests_requirements,
     dependency_links=dependency_links,
-    data_files = data_files
+    data_files=data_files,
+    # the following files are only used for testing, and might be removed if
+    # we manage or decide to not install tests in the future.
+    package_data={
+        'leap.soledad.tests.u1db_tests.testing-certs': [
+            '*.pem', '*.cert', '*.key'
+        ]
+    }
 )
