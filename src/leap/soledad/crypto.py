@@ -123,7 +123,7 @@ class SoledadCrypto(object):
         return hmac.new(
             self.secret[self.MAC_KEY_LENGTH:],
             doc_id,
-            hashlib.sha256).hexdigest()
+            hashlib.sha256).digest()
 
     def doc_mac_key(self, doc_id):
         """
@@ -147,7 +147,7 @@ class SoledadCrypto(object):
         return hmac.new(
             self.secret[:self.MAC_KEY_LENGTH],
             doc_id,
-            hashlib.sha256).hexdigest()
+            hashlib.sha256).digest()
 
     #
     # secret setters/getters

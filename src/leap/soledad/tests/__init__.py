@@ -23,7 +23,7 @@ from leap.common.testing.basetest import BaseLeapTest
 
 class BaseSoledadTest(BaseLeapTest):
     """
-    Instantiates GPG and Soledad for usage in tests.
+    Instantiates Soledad for usage in tests.
     """
 
     def setUp(self):
