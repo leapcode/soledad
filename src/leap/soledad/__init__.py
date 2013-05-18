@@ -546,6 +546,7 @@ class Soledad(object):
             events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db()
         if not db:
+            logger.warning('No shared db found')
             return
         doc = db.get_doc(self._uuid_hash())
         events.signal(
@@ -579,6 +580,7 @@ class Soledad(object):
             events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._uuid)
         db = self._shared_db()
         if not db:
+            logger.warning('No shared db found')
             return
         db.put_doc(doc)
         events.signal(
