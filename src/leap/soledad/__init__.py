@@ -527,10 +527,11 @@ class Soledad(object):
         """
         Return an instance of the shared recovery database object.
         """
-        return SoledadSharedDatabase.open_database(
-            urlparse.urljoin(self.server_url, 'shared'),
-            False,  # TODO: eliminate need to create db here.
-            creds=self._creds)
+        if self.server_url:
+            return SoledadSharedDatabase.open_database(
+                urlparse.urljoin(self.server_url, 'shared'),
+                False,  # TODO: eliminate need to create db here.
+                creds=self._creds)
 
     def _get_secrets_from_shared_db(self):
         """
@@ -542,7 +543,11 @@ class Soledad(object):
         """
         events.signal(
             events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
-        doc = self._shared_db().get_doc(self._uuid_hash())
+        db = self._shared_db()
+        if not db:
+            logger.warning('No shared db found')
+            return
+        doc = db.get_doc(self._uuid_hash())
         events.signal(
             events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
@@ -572,7 +577,11 @@ class Soledad(object):
         # upload secrets to server
         events.signal(
             events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._uuid)
-        self._shared_db().put_doc(doc)
+        db = self._shared_db()
+        if not db:
+            logger.warning('No shared db found')
+            return
+        db.put_doc(doc)
         events.signal(
             events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
