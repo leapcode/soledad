@@ -131,6 +131,11 @@ class Soledad(object):
             finished synchronizing with remote replica.
     """
 
+    LOCAL_DATABASE_FILE_NAME = 'soledad.u1db'
+    """
+    The name of the local SQLCipher U1DB database file.
+    """
+
     STORAGE_SECRETS_FILE_NAME = "soledad.json"
     """
     The name of the file where the storage secrets will be stored.
@@ -187,7 +192,7 @@ class Soledad(object):
     """
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
-                 server_url, cert_file, auth_token=None):
+                 server_url, cert_file, auth_token=None, secret_id=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -216,7 +221,7 @@ class Soledad(object):
         self._passphrase = passphrase
         # init crypto variables
         self._secrets = {}
-        self._secret_id = None
+        self._secret_id = secret_id
         # init config (possibly with default values)
         self._init_config(secrets_path, local_db_path, server_url)
         self._set_token(auth_token)
@@ -239,7 +244,7 @@ class Soledad(object):
         self._local_db_path = local_db_path
         if self._local_db_path is None:
             self._local_db_path = os.path.join(
-                self.DEFAULT_PREFIX, 'soledad.u1db')
+                self.DEFAULT_PREFIX, self.LOCAL_DATABASE_FILE_NAME)
         # initialize server_url
         self._server_url = server_url
         leap_assert(
@@ -399,9 +404,6 @@ class Soledad(object):
                     }
                 }
             }
-
-        @raise leap.common.keymanager.errors.DecryptionFailed: Raised if could
-            not decrypt the secret with the given passphrase.
         """
         # does the file exist in disk?
         if not os.path.isfile(self._secrets_path):
@@ -422,18 +424,16 @@ class Soledad(object):
         @return: Whether there's a storage secret for symmetric encryption.
         @rtype: bool
         """
-        # if the secret is already loaded, return true
-        if self._secret_id is not None and self._secret_id in self._secrets:
-            return True
-        # try to load from disk
+        if self._secret_id is None or self._secret_id not in self._secrets:
+            try:
+                self._load_secrets()  # try to load from disk
+            except IOError, e:
+                logger.error('IOError: %s' % str(e))
         try:
-            self._load_secrets()
+            self._get_storage_secret()
             return True
-        except DecryptionFailed:
-            logger.error('Could not decrypt storage secret.')
-        except IOError, e:
-            logger.error('IOError: %s' % str(e))
-        return False
+        except:
+            return False
 
     def _gen_secret(self):
         """
@@ -953,6 +953,13 @@ class Soledad(object):
         return self._uuid
 
     uuid = property(_get_uuid, doc='The user uuid.')
+
+    def _get_secret_id(self):
+        return self._secret_id
+
+    secret_id = property(
+        _get_secret_id,
+        doc='The active secret id.')
 
     def _get_secrets_path(self):
         return self._secrets_path

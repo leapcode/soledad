@@ -48,7 +48,7 @@ class BaseSoledadTest(BaseLeapTest):
                           prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
                           local_db_path='/soledad.u1db', server_url='',
-                          cert_file=None):
+                          cert_file=None, secret_id=None):
 
         def _put_doc_side_effect(doc):
             self._doc_put = doc
@@ -68,7 +68,8 @@ class BaseSoledadTest(BaseLeapTest):
             secrets_path=self.tempdir+prefix+secrets_path,
             local_db_path=self.tempdir+prefix+local_db_path,
             server_url=server_url,  # Soledad will fail if not given an url.
-            cert_file=cert_file)
+            cert_file=cert_file,
+            secret_id=secret_id)
 
     def assertGetEncryptedDoc(
             self, db, doc_id, doc_rev, content, has_conflicts):

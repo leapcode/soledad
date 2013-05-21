@@ -64,14 +64,21 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         Test if configuration defaults point to the correct place.
         """
-        sol = Soledad(
-            'leap@leap.se', passphrase='123',
-            secrets_path=None, local_db_path=None,
-            server_url='', cert_file=None)  # otherwise Soledad will fail.
+
+        class SoledadMock(Soledad):
+
+            def __init__(self):
+                pass
+
+        # instantiate without initializing so we just test _init_config()
+        sol = SoledadMock()
+        Soledad._init_config(sol, None, None, '')
+        # assert value of secrets_path
         self.assertEquals(
             os.path.join(
                 sol.DEFAULT_PREFIX, Soledad.STORAGE_SECRETS_FILE_NAME),
             sol.secrets_path)
+        # assert value of local_db_path
         self.assertEquals(
             os.path.join(sol.DEFAULT_PREFIX, 'soledad.u1db'),
             sol.local_db_path)

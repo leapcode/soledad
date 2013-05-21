@@ -27,6 +27,7 @@ try:
     import simplejson as json
 except ImportError:
     import json  # noqa
+import hashlib
 
 
 from leap.soledad.backends.leap_backend import (
@@ -204,9 +205,51 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
 class CryptoMethodsTestCase(BaseSoledadTest):
 
     def test__gen_secret(self):
+        # instantiate and save secret_id
+        sol = self._soledad_instance(user='user@leap.se')
+        self.assertTrue(len(sol._secrets) == 1)
+        secret_id_1 = sol.secret_id
+        # assert id is hash of secret
+        self.assertTrue(
+            secret_id_1 == hashlib.sha256(sol.storage_secret).hexdigest())
+        # generate new secret
+        secret_id_2 = sol._gen_secret()
+        self.assertTrue(secret_id_1 != secret_id_2)
+        # re-instantiate
+        sol = self._soledad_instance(
+            user='user@leap.se',
+            secret_id=secret_id_1)
+        # assert ids are valid
+        self.assertTrue(len(sol._secrets) == 2)
+        self.assertTrue(secret_id_1 in sol._secrets)
+        self.assertTrue(secret_id_2 in sol._secrets)
+        # assert format of secret 1
+        self.assertTrue(sol.storage_secret is not None)
+        self.assertIsInstance(sol.storage_secret, str)
+        self.assertTrue(len(sol.storage_secret) == sol.GENERATED_SECRET_LENGTH)
+        # assert format of secret 2
+        sol._set_secret_id(secret_id_2)
+        self.assertTrue(sol.storage_secret is not None)
+        self.assertIsInstance(sol.storage_secret, str)
+        self.assertTrue(len(sol.storage_secret) == sol.GENERATED_SECRET_LENGTH)
+        # assert id is hash of new secret
+        self.assertTrue(
+            secret_id_2 == hashlib.sha256(sol.storage_secret).hexdigest())
+
+
+    def test__has_secret(self):
         sol = self._soledad_instance(user='user@leap.se', prefix='/3')
         self.assertTrue(sol._has_secret(), "Should have a secret at "
                                            "this point")
+        # setting secret id to None should not interfere in the fact we have a
+        # secret.
+        sol._set_secret_id(None)
+        self.assertTrue(sol._has_secret(), "Should have a secret at "
+                                           "this point")
+        # but not being able to decrypt correctly should
+        sol._secrets[sol.secret_id][sol.SECRET_KEY] = None
+        self.assertFalse(sol._has_secret())
+
 
 
 class MacAuthTestCase(BaseSoledadTest):
