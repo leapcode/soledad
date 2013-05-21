@@ -38,6 +38,7 @@ from u1db.remote.http_target import HTTPSyncTarget
 
 from leap.common.crypto import (
     EncryptionMethods,
+    UnknownEncryptionMethod,
     encrypt_sym,
     decrypt_sym,
 )
@@ -242,12 +243,16 @@ def decrypt_doc(crypto, doc):
     enc_scheme = doc.content[ENC_SCHEME_KEY]
     plainjson = None
     if enc_scheme == EncryptionSchemes.SYMKEY:
-        leap_assert(ENC_IV_KEY in doc.content)
-        plainjson = decrypt_sym(
-            ciphertext,
-            crypto.doc_passphrase(doc.doc_id),
-            method=doc.content[ENC_METHOD_KEY],
-            iv=doc.content[ENC_IV_KEY])
+        enc_method = doc.content[ENC_METHOD_KEY]
+        if enc_method == EncryptionMethods.AES_256_CTR:
+            leap_assert(ENC_IV_KEY in doc.content)
+            plainjson = decrypt_sym(
+                ciphertext,
+                crypto.doc_passphrase(doc.doc_id),
+                method=enc_method,
+                iv=doc.content[ENC_IV_KEY])
+        else:
+            raise UnknownEncryptionMethod(enc_method)
     else:
         raise UnknownEncryptionScheme(enc_scheme)
     return plainjson
