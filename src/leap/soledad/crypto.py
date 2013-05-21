@@ -25,7 +25,7 @@ import hmac
 import hashlib
 
 
-from leap.common.keymanager import openpgp
+from leap.common import crypto
 
 
 class NoSymmetricSecret(Exception):
@@ -49,56 +49,46 @@ class SoledadCrypto(object):
         @type soledad: leap.soledad.Soledad
         """
         self._soledad = soledad
-        self._pgp = openpgp.OpenPGPScheme(self._soledad)
 
-    def encrypt_sym(self, data, passphrase):
+    def encrypt_sym(self, data, key,
+                    method=crypto.EncryptionMethods.AES_256_CTR):
         """
         Encrypt C{data} using a {password}.
 
-        @param data: the data to be encrypted
+        Currently, the only  encryption method supported is AES-256 CTR mode.
+
+        @param data: The data to be encrypted.
         @type data: str
-        @param passphrase: the passphrase to use for encryption
-        @type passphrase: str
+        @param key: The key used to encrypt C{data} (must be 256 bits long).
+        @type key: str
+        @param method: The encryption method to use.
+        @type method: str
 
-        @return: the encrypted data
-        @rtype: str
+        @return: A tuple with the initial value and the encrypted data.
+        @rtype: (long, str)
         """
-        return openpgp.encrypt_sym(data, passphrase)
+        return crypto.encrypt_sym(data, key, method)
 
-    def decrypt_sym(self, data, passphrase):
+    def decrypt_sym(self, data, key,
+                    method=crypto.EncryptionMethods.AES_256_CTR, **kwargs):
         """
         Decrypt data using symmetric secret.
 
-        @param data: the data to be decrypted
-        @type data: str
-        @param passphrase: the passphrase to use for decryption
-        @type passphrase: str
+        Currently, the only encryption method supported is AES-256 CTR mode.
 
-        @return: the decrypted data
+        @param data: The data to be decrypted.
+        @type data: str
+        @param key: The key used to decrypt C{data} (must be 256 bits long).
+        @type key: str
+        @param method: The encryption method to use.
+        @type method: str
+        @param kwargs: Other parameters specific to each encryption method.
+        @type kwargs: dict
+
+        @return: The decrypted data.
         @rtype: str
         """
-        return openpgp.decrypt_sym(data, passphrase)
-
-    def is_encrypted(self, data):
-        """
-        Test whether some chunk of data is a cyphertext.
-
-        @param data: the data to be tested
-        @type data: str
-
-        @return: whether the data is a cyphertext
-        @rtype: bool
-        """
-        return openpgp.is_encrypted(data)
-
-    def is_encrypted_sym(self, data):
-        """
-        Test whether some chunk of data was encrypted with a symmetric key.
-
-        @return: whether data is encrypted to a symmetric key
-        @rtype: bool
-        """
-        return openpgp.is_encrypted_sym(data)
+        return crypto.decrypt_sym(data, key, method, **kwargs)
 
     def doc_passphrase(self, doc_id):
         """

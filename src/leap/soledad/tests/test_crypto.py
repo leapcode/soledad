@@ -85,19 +85,6 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         self.assertEqual(
             simpledoc, doc1.content, 'incorrect document encryption')
 
-    def test_encrypt_sym(self):
-        """
-        Test for successful symmetric encryption.
-        """
-        doc1 = LeapDocument()
-        doc1.content = {'key': 'val'}
-        enc_json = json.loads(
-            encrypt_doc(self._soledad._crypto, doc1))[ENC_JSON_KEY]
-        self.assertEqual(
-            True,
-            self._soledad._crypto.is_encrypted_sym(enc_json),
-            "could not encrypt with passphrase.")
-
 
 #from leap.soledad.server import SoledadApp, SoledadAuthMiddleware
 #
@@ -192,7 +179,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_export_recovery_document_raw(self):
-        rd = json.loads(self._soledad.export_recovery_document(None))
+        rd = json.loads(self._soledad.export_recovery_document())
         secret_id = rd[self._soledad.STORAGE_SECRETS_KEY].items()[0][0]
         secret = rd[self._soledad.STORAGE_SECRETS_KEY][secret_id]
         self.assertEqual(secret_id, self._soledad._secret_id)
@@ -202,38 +189,11 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertTrue(self._soledad.LENGTH_KEY in secret)
         self.assertTrue(self._soledad.SECRET_KEY in secret)
 
-    def test_export_recovery_document_crypt(self):
-        rd = self._soledad.export_recovery_document('123456')
-        self.assertEqual(True,
-                         self._soledad._crypto.is_encrypted_sym(rd))
-        data = {
-            self._soledad.UUID_KEY: self._soledad._uuid,
-            self._soledad.STORAGE_SECRETS_KEY: self._soledad._secrets,
-        }
-        raw_data = json.loads(self._soledad._crypto.decrypt_sym(
-            rd,
-            passphrase='123456'))
-        self.assertEqual(
-            raw_data,
-            data,
-            "Could not export raw recovery document."
-        )
-
-    def test_import_recovery_document_raw(self):
+    def test_import_recovery_document(self):
         rd = self._soledad.export_recovery_document(None)
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
-        s.import_recovery_document(rd, None)
+        s.import_recovery_document(rd)
         s._set_secret_id(self._soledad._secret_id)
-        self.assertEqual(self._soledad._uuid,
-                         s._uuid, 'Failed setting user uuid.')
-        self.assertEqual(self._soledad._get_storage_secret(),
-                         s._get_storage_secret(),
-                         'Failed settinng secret for symmetric encryption.')
-
-    def test_import_recovery_document_crypt(self):
-        rd = self._soledad.export_recovery_document('123456')
-        s = self._soledad_instance(user='anotheruser@leap.se', prefix='3')
-        s.import_recovery_document(rd, '123456')
         self.assertEqual(self._soledad._uuid,
                          s._uuid, 'Failed setting user uuid.')
         self.assertEqual(self._soledad._get_storage_secret(),
@@ -263,7 +223,7 @@ class MacAuthTestCase(BaseSoledadTest):
         self.assertTrue(MAC_KEY in doc.content)
         self.assertTrue(MAC_METHOD_KEY in doc.content)
         # mess with MAC
-        doc.content[MAC_KEY] = 'wrongmac'
+        doc.content[MAC_KEY] = '1234567890ABCDEF'
         # try to decrypt doc
         self.assertRaises(
             WrongMac,
