@@ -95,9 +95,10 @@ class SoledadCrypto(object):
         Generate a passphrase for symmetric encryption of document's contents.
 
         The password is derived using HMAC having sha256 as underlying hash
-        function. The key used for HMAC is Soledad's storage secret stripped
-        from the first MAC_KEY_LENGTH characters. The HMAC message is
-        C{doc_id}.
+        function. The key used for HMAC are the first
+        C{soledad.REMOTE_STORAGE_SECRET_KENGTH} bytes of Soledad's storage
+        secret stripped from the first MAC_KEY_LENGTH characters. The HMAC
+        message is C{doc_id}.
 
         @param doc_id: The id of the document that will be encrypted using
             this passphrase.
@@ -111,7 +112,9 @@ class SoledadCrypto(object):
         if self.secret is None:
             raise NoSymmetricSecret()
         return hmac.new(
-            self.secret[self.MAC_KEY_LENGTH:],
+            self.secret[
+                self.MAC_KEY_LENGTH:
+                self._soledad.REMOTE_STORAGE_SECRET_LENGTH],
             doc_id,
             hashlib.sha256).digest()
 

@@ -136,9 +136,23 @@ class Soledad(object):
     The name of the file where the storage secrets will be stored.
     """
 
-    STORAGE_SECRET_LENGTH = 512
+    GENERATED_SECRET_LENGTH = 1024
     """
-    The length of the secret used for symmetric encryption.
+    The length of the generated secret used to derive keys for symmetric
+    encryption for local and remote storage.
+    """
+
+    LOCAL_STORAGE_SECRET_LENGTH = 512
+    """
+    The length of the secret used to derive a passphrase for the SQLCipher
+    database.
+    """
+
+    REMOTE_STORAGE_SECRET_LENGTH = \
+        GENERATED_SECRET_LENGTH - LOCAL_STORAGE_SECRET_LENGTH
+    """
+    The length of the secret used to derive an encryption key and a MAC auth
+    key for remote storage.
     """
 
     SALT_LENGTH = 64
@@ -302,11 +316,15 @@ class Soledad(object):
     def _init_db(self):
         """
         Initialize the U1DB SQLCipher database for local storage.
+
+        The local storage passphrase is hexlified version of the last
+        C{LOCAL_STORAGE_SECRET_LENGTH} bytes of the storage secret.
         """
         self._db = sqlcipher.open(
             self._local_db_path,
             # storage secret is binary but sqlcipher passphrase must be string
-            binascii.b2a_hex(self._get_storage_secret()),
+            binascii.b2a_hex(
+                self._get_storage_secret()[self.LOCAL_STORAGE_SECRET_LENGTH:]),
             create=True,
             document_factory=LeapDocument,
             crypto=self._crypto)
@@ -350,7 +368,7 @@ class Soledad(object):
         )
         # recover the initial value and ciphertext
         iv, ciphertext = self._secrets[self._secret_id][self.SECRET_KEY].split(
-                self.IV_SEPARATOR, 1)
+            self.IV_SEPARATOR, 1)
         iv = int(iv)
         ciphertext = binascii.a2b_base64(ciphertext)
         return self._crypto.decrypt_sym(ciphertext, key, iv=iv)
@@ -445,7 +463,7 @@ class Soledad(object):
         """
         events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
-        secret = os.urandom(self.STORAGE_SECRET_LENGTH)
+        secret = os.urandom(self.GENERATED_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         # generate random salt
         salt = os.urandom(self.SALT_LENGTH)
@@ -481,7 +499,7 @@ class Soledad(object):
                         'kdf_salt': '<salt>'
                         'kdf_length': <len>
                         'cipher': 'aes256',
-                        'length': 512,
+                        'length': 1024,
                         'secret': '<encrypted storage_secret 1>',
                     }
                 }
