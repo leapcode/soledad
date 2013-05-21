@@ -54,7 +54,6 @@ from leap.common.keymanager.errors import DecryptionFailed
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
-    DocumentNotEncrypted,
     LeapSyncTarget,
 )
 
@@ -93,22 +92,6 @@ class NotADirectory(Exception):
     """
     Expected a path for a directory but got some other thing.
     """
-
-
-#
-# Helper functions
-#
-
-def base64_encode(data):
-    """
-    Return the base64 encoded version of C{data}.
-
-    @return: The base64 encoded version of C{data}.
-    @rtype: str
-    """
-    # binascii.b2a_base64 returns a new line character in the end of the
-    # string, so we strip that here.
-    return binascii.b2a_base64(data)[:-1]
 
 
 #
@@ -162,6 +145,12 @@ class Soledad(object):
     """
     The length of the salt used to derive the key for the storage secret
     encryption.
+    """
+
+    IV_SEPARATOR = ":"
+    """
+    A separator used for storing the encryption initial value prepended to the
+    ciphertext.
     """
 
     UUID_KEY = 'uuid'
@@ -286,9 +275,7 @@ class Soledad(object):
                 logger.info(
                     'Found cryptographic secrets in shared recovery '
                     'database.')
-                self.import_recovery_document(
-                    doc.content[self.SECRET_KEY],
-                    passphrase=self._passphrase)
+                self.import_recovery_document(doc.content[self.SECRET_KEY])
             else:
                 # there are no secrets in server also, so generate a secret.
                 logger.info(
@@ -314,14 +301,12 @@ class Soledad(object):
 
     def _init_db(self):
         """
-        Initialize the database for local storage.
+        Initialize the U1DB SQLCipher database for local storage.
         """
-        # instantiate u1db
-        # TODO: verify if secret for sqlcipher should be the same as the
-        # one for symmetric encryption.
         self._db = sqlcipher.open(
             self._local_db_path,
-            self._get_storage_secret(),
+            # storage secret is binary but sqlcipher passphrase must be string
+            binascii.b2a_hex(self._get_storage_secret()),
             create=True,
             document_factory=LeapDocument,
             crypto=self._crypto)
@@ -347,25 +332,28 @@ class Soledad(object):
 
     def _get_storage_secret(self):
         """
-        Return the base64 encoding of the storage secret.
+        Return the storage secret.
 
-        Storage secret is first base64 encoded and then encrypted before being
-        stored. This message only decrypts the stored secret and returns the
-        base64 encoded version.
+        Storage secret is encrypted before being stored. This method decrypts
+        and returns the stored secret.
 
-        @return: The base64 encoding of the storage secret.
+        @return: The storage secret.
         @rtype: str
         """
-        key = base64_encode(
-            scrypt.hash(
-                self._passphrase,
-                # the salt is also stored as base64 encoded string, so make
-                # direct use of this encoded version to derive the encryption
-                # key.
-                self._secrets[self._secret_id][self.KDF_SALT_KEY]))
-        return self._crypto.decrypt_sym(
-            self._secrets[self._secret_id][self.SECRET_KEY],
-            passphrase=key)
+        # calculate the encryption key
+        key = scrypt.hash(
+            self._passphrase,
+            # the salt is stored base64 encoded
+            binascii.a2b_base64(
+                self._secrets[self._secret_id][self.KDF_SALT_KEY]),
+            buflen=32,  # we need a key with 256 bits (32 bytes).
+        )
+        # recover the initial value and ciphertext
+        iv, ciphertext = self._secrets[self._secret_id][self.SECRET_KEY].split(
+                self.IV_SEPARATOR, 1)
+        iv = int(iv)
+        ciphertext = binascii.a2b_base64(ciphertext)
+        return self._crypto.decrypt_sym(ciphertext, key, iv=iv)
 
     def _set_secret_id(self, secret_id):
         """
@@ -408,11 +396,6 @@ class Soledad(object):
         # choose first secret if no secret_id was given
         if self._secret_id is None:
             self._set_secret_id(self._secrets.items()[0][0])
-        # check secret is isncrypted
-        if not self._crypto.is_encrypted_sym(
-                self._secrets[self._secret_id][self.SECRET_KEY]):
-            raise DocumentNotEncrypted(
-                "File %s is not encrypted!" % self._secrets_path)
 
     def _has_secret(self):
         """
@@ -465,19 +448,20 @@ class Soledad(object):
         secret = os.urandom(self.STORAGE_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         # generate random salt
-        base64_salt = base64_encode(os.urandom(self.SALT_LENGTH))
-        key = scrypt.hash(self._passphrase, base64_salt)
+        salt = os.urandom(self.SALT_LENGTH)
+        # get a 256-bit key
+        key = scrypt.hash(self._passphrase, salt, buflen=32)
+        iv, ciphertext = self._crypto.encrypt_sym(secret, key)
         self._secrets[secret_id] = {
             # leap.common.keymanager.openpgp uses AES256 for symmetric
             # encryption.
             self.KDF_KEY: 'scrypt',  # TODO: remove hard coded kdf
-            self.KDF_SALT_KEY: base64_salt,
+            self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
             self.CIPHER_KEY: 'aes256',  # TODO: remove hard coded cipher
             self.LENGTH_KEY: len(secret),
-            self.SECRET_KEY: self._crypto.encrypt_sym(
-                base64_encode(secret),
-                base64_encode(key)),
+            self.SECRET_KEY: '%s%s%s' % (
+                str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
         }
         self._store_secrets()
         events.signal(
@@ -571,8 +555,7 @@ class Soledad(object):
             doc = LeapDocument(doc_id=self._uuid_hash())
         # fill doc with encrypted secrets
         doc.content = {
-            self.SECRET_KEY: self.export_recovery_document(
-                self._passphrase)
+            self.SECRET_KEY: self.export_recovery_document()
         }
         # upload secrets to server
         events.signal(
@@ -923,25 +906,16 @@ class Soledad(object):
             self.UUID_KEY: self._uuid,
             self.STORAGE_SECRETS_KEY: self._secrets,
         })
-        if passphrase:
-            data = self._crypto.encrypt_sym(data, passphrase)
         return data
 
-    def import_recovery_document(self, data, passphrase=None):
+    def import_recovery_document(self, data):
         """
         Import username, provider, private key and key for symmetric
         encryption from a recovery document.
 
         @param data: the recovery document json serialization
         @type data: str
-        @param passphrase: an optional passphrase for decrypting the document
-        @type passphrase: str
         """
-        if passphrase and not self._crypto.is_encrypted_sym(data):
-            raise DocumentNotEncrypted("You provided a password but the "
-                                       "recovery document is not encrypted.")
-        if passphrase:
-            data = self._crypto.decrypt_sym(data, passphrase=passphrase)
         data = json.loads(data)
         # include new secrets in our secret pool.
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
