@@ -199,7 +199,7 @@ class Soledad(object):
         @param uuid: User's uuid.
         @type uuid: str
         @param passphrase: The passphrase for locking and unlocking encryption
-            secrets for disk storage.
+            secrets for local and remote storage.
         @type passphrase: str
         @param secrets_path: Path for storing encrypted key used for
             symmetric encryption.
@@ -294,7 +294,7 @@ class Soledad(object):
                 logger.info(
                     'Found cryptographic secrets in shared recovery '
                     'database.')
-                self.import_recovery_document(doc.content[self.SECRET_KEY])
+                self.import_recovery_document(doc.content)
             else:
                 # there are no secrets in server also, so generate a secret.
                 logger.info(
@@ -572,9 +572,7 @@ class Soledad(object):
         if doc is None:
             doc = LeapDocument(doc_id=self._uuid_hash())
         # fill doc with encrypted secrets
-        doc.content = {
-            self.SECRET_KEY: self.export_recovery_document()
-        }
+        doc.content = self.export_recovery_document(include_uuid=False)
         # upload secrets to server
         events.signal(
             events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._uuid)
@@ -589,9 +587,6 @@ class Soledad(object):
     #
     # Document storage, retrieval and sync.
     #
-
-    # TODO: refactor the following methods to somewhere out of here
-    # (SoledadLocalDatabase, maybe?)
 
     def put_doc(self, doc):
         """
@@ -893,57 +888,56 @@ class Soledad(object):
     token = property(_get_token, _set_token, doc='The authentication Token.')
 
     #
-    # Recovery document export and import methodsecret
-    def export_recovery_document(self, passphrase=None):
+    # Recovery document export and import methods
+    #
+    def export_recovery_document(self, include_uuid=True):
         """
-        Exports username, provider, private key and key for symmetric
-        encryption, optionally encrypted with a password.
+        Export the storage secrets and (optionally) the uuid.
 
-        The LEAP client gives the user the option to export a text file with a
-        complete copy of their private keys and authorization information,
-        either password protected or not. This "recovery document" can be
-        printed or saved electronically as the user sees fit. If the user
-        needs to recover their data, they can load this recover document into
-        any LEAP client. The user can also type the recovery document in
-        manually, although it will be long and very painful to copy manually.
+        A recovery document has the following structure:
 
-        Contents of recovery document:
+            {
+                self.STORAGE_SECRET_KEY: <secrets dict>,
+                self.UUID_KEY: '<uuid>',  # (optional)
+            }
 
-           - username
-           - provider
-           - private key.
-           - key for symmetric encryption
+        @param include_uuid: Should the uuid be included?
+        @type include_uuid: bool
 
-        @param passphrase: an optional passphrase for encrypting the document
-        @type passphrase: str
-
-        @return: the recovery document json serialization
-        @rtype: str
+        @return: The recovery document.
+        @rtype: dict
         """
-        data = json.dumps({
-            self.UUID_KEY: self._uuid,
-            self.STORAGE_SECRETS_KEY: self._secrets,
-        })
+        data = {self.STORAGE_SECRETS_KEY: self._secrets}
+        if include_uuid:
+            data[self.UUID_KEY] = self._uuid
         return data
 
     def import_recovery_document(self, data):
         """
-        Import username, provider, private key and key for symmetric
-        encryption from a recovery document.
+        Import storage secrets for symmetric encryption and uuid (if present)
+        from a recovery document.
 
-        @param data: the recovery document json serialization
-        @type data: str
+        A recovery document has the following structure:
+
+            {
+                self.STORAGE_SECRET_KEY: <secrets dict>,
+                self.UUID_KEY: '<uuid>',  # (optional)
+            }
+
+        @param data: The recovery document.
+        @type data: dict
         """
-        data = json.loads(data)
         # include new secrets in our secret pool.
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
             if secret_id not in self._secrets:
                 self._secrets[secret_id] = secret_data
-        self._store_secrets()
-        # set uuid
-        self._uuid = data[self.UUID_KEY]
-        # choose first secret to use
-        self._set_secret_id(data[self.STORAGE_SECRETS_KEY].items()[0][0])
+        self._store_secrets()  # save new secrets in local file
+        # set uuid if present
+        if self.UUID_KEY in data:
+            self._uuid = data[self.UUID_KEY]
+        # choose first secret to use is none is assigned
+        if self._secret_id is None:
+            self._set_secret_id(data[self.STORAGE_SECRETS_KEY].items()[0][0])
 
     #
     # Setters/getters

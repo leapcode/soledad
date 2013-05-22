@@ -180,7 +180,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_export_recovery_document_raw(self):
-        rd = json.loads(self._soledad.export_recovery_document())
+        rd = self._soledad.export_recovery_document()
         secret_id = rd[self._soledad.STORAGE_SECRETS_KEY].items()[0][0]
         secret = rd[self._soledad.STORAGE_SECRETS_KEY][secret_id]
         self.assertEqual(secret_id, self._soledad._secret_id)
@@ -191,7 +191,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertTrue(self._soledad.SECRET_KEY in secret)
 
     def test_import_recovery_document(self):
-        rd = self._soledad.export_recovery_document(None)
+        rd = self._soledad.export_recovery_document()
         s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
         s.import_recovery_document(rd)
         s._set_secret_id(self._soledad._secret_id)
@@ -238,7 +238,7 @@ class CryptoMethodsTestCase(BaseSoledadTest):
 
 
     def test__has_secret(self):
-        sol = self._soledad_instance(user='user@leap.se', prefix='/3')
+        sol = self._soledad_instance(user='user@leap.se', prefix='/4')
         self.assertTrue(sol._has_secret(), "Should have a secret at "
                                            "this point")
         # setting secret id to None should not interfere in the fact we have a
