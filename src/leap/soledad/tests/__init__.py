@@ -2,6 +2,7 @@
 Tests to make sure Soledad provides U1DB functionality and more.
 """
 
+import os
 import u1db
 from mock import Mock
 
@@ -28,8 +29,8 @@ class BaseSoledadTest(BaseLeapTest):
 
     def setUp(self):
         # config info
-        self.db1_file = "%s/db1.u1db" % self.tempdir
-        self.db2_file = "%s/db2.u1db" % self.tempdir
+        self.db1_file = os.path.join(self.tempdir, "db1.u1db")
+        self.db2_file = os.path.join(self.tempdir, "db2.u1db")
         self.email = 'leap@leap.se'
         # open test dbs
         self._db1 = u1db.open(self.db1_file, create=True,
@@ -42,12 +43,15 @@ class BaseSoledadTest(BaseLeapTest):
     def tearDown(self):
         self._db1.close()
         self._db2.close()
+        for f in [self._soledad._local_db_path, self._soledad._secrets_path]:
+            if os.path.isfile(f):
+                os.unlink(f)
         self._soledad.close()
 
     def _soledad_instance(self, user='leap@leap.se', passphrase='123',
                           prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
-                          local_db_path='/soledad.u1db', server_url='',
+                          local_db_path='soledad.u1db', server_url='',
                           cert_file=None, secret_id=None):
 
         def _put_doc_side_effect(doc):
@@ -65,8 +69,9 @@ class BaseSoledadTest(BaseLeapTest):
         return Soledad(
             user,
             passphrase,
-            secrets_path=self.tempdir+prefix+secrets_path,
-            local_db_path=self.tempdir+prefix+local_db_path,
+            secrets_path=os.path.join(self.tempdir, prefix, secrets_path),
+            local_db_path=os.path.join(
+                self.tempdir, prefix, local_db_path),
             server_url=server_url,  # Soledad will fail if not given an url.
             cert_file=cert_file,
             secret_id=secret_id)

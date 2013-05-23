@@ -32,9 +32,21 @@ except ImportError:
 
 from u1db.remote import http_app
 
+# Keep OpenSSL's tsafe before importing Twisted submodules so we can put
+# it back if Twisted==12.0.0 messes with it.
+from OpenSSL import tsafe
+old_tsafe = tsafe
+
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
 from twisted.python import log
+
+from twisted import version
+if version.base() == "12.0.0":
+    # Put OpenSSL's tsafe back into place. This can probably be removed if we
+    # come to use Twisted>=12.3.0.
+    import sys
+    sys.modules['OpenSSL.tsafe'] = old_tsafe
 
 from couchdb.client import Server
 
@@ -171,21 +183,6 @@ class SoledadAuthMiddleware(object):
             return False
         return True
 
-    def need_auth(self, environ):
-        """
-        Check if action can be performed on database without authentication.
-
-        For now, just allow access to /shared/*.
-
-        @param environ: Dictionary containing CGI variables.
-        @type environ: dict
-
-        @return: Whether the requests needs authentication.
-        @rtype: bool
-        """
-        # TODO: design unauth verification.
-        return not environ.get(self.PATH_INFO_KEY).startswith('/shared/')
-
 
 #-----------------------------------------------------------------------------
 # Soledad WSGI application
@@ -194,6 +191,11 @@ class SoledadAuthMiddleware(object):
 class SoledadApp(http_app.HTTPApp):
     """
     Soledad WSGI application
+    """
+
+    SHARED_DB_NAME = 'shared'
+    """
+    The name of the shared database that holds user's encrypted secrets.
     """
 
     def __call__(self, environ, start_response):
@@ -209,6 +211,8 @@ class SoledadApp(http_app.HTTPApp):
         @return: HTTP application results.
         @rtype: list
         """
+        # ensure the shared database exists
+        self.state.ensure_database(self.SHARED_DB_NAME)
         return http_app.HTTPApp.__call__(self, environ, start_response)
 
 
@@ -244,11 +248,10 @@ def load_configuration(file_path):
 # Run as Twisted WSGI Resource
 #-----------------------------------------------------------------------------
 
-# TODO: create command-line option for choosing config file.
 conf = load_configuration('/etc/leap/soledad-server.conf')
 state = CouchServerState(conf['couch_url'])
 
-application = SoledadAuthMiddleware(
-    SoledadApp(state))
+# WSGI application that may be used by `twistd -web`
+application = SoledadAuthMiddleware(SoledadApp(state))
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), application)

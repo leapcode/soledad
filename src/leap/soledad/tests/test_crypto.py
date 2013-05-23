@@ -192,7 +192,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_import_recovery_document(self):
         rd = self._soledad.export_recovery_document()
-        s = self._soledad_instance(user='anotheruser@leap.se', prefix='/2')
+        s = self._soledad_instance(user='anotheruser@leap.se')
         s.import_recovery_document(rd)
         s._set_secret_id(self._soledad._secret_id)
         self.assertEqual(self._soledad._uuid,
@@ -238,7 +238,7 @@ class CryptoMethodsTestCase(BaseSoledadTest):
 
 
     def test__has_secret(self):
-        sol = self._soledad_instance(user='user@leap.se', prefix='/4')
+        sol = self._soledad_instance(user='user@leap.se')
         self.assertTrue(sol._has_secret(), "Should have a secret at "
                                            "this point")
         # setting secret id to None should not interfere in the fact we have a

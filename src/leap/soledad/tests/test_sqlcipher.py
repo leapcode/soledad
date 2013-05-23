@@ -773,7 +773,7 @@ class SQLCipherEncryptionTest(BaseLeapTest):
                 os.unlink(dbfile)
 
     def setUp(self):
-        self.DB_FILE = self.tempdir + '/test.db'
+        self.DB_FILE = os.path.join(self.tempdir, 'test.db')
         self._delete_dbfiles()
 
     def tearDown(self):

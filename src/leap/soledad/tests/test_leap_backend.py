@@ -46,9 +46,6 @@ from leap.soledad import auth
 
 
 from leap.soledad.tests import u1db_tests as tests
-from leap.soledad.tests.u1db_tests.test_remote_sync_target import (
-    make_oauth_http_app,
-)
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad.tests.u1db_tests import test_backends
 from leap.soledad.tests.u1db_tests import test_http_database
@@ -128,12 +125,6 @@ def copy_token_http_database_for_test(test, db):
 class LeapTests(test_backends.AllDatabaseTests, BaseSoledadTest):
 
     scenarios = LEAP_SCENARIOS + [
-        ('oauth_http', {'make_database_for_test':
-                        test_backends.make_oauth_http_database_for_test,
-                        'copy_database_for_test':
-                        test_backends.copy_oauth_http_database_for_test,
-                        'make_document_for_test': make_leap_document_for_test,
-                        'make_app_with_state': make_oauth_http_app}),
         ('token_http', {'make_database_for_test':
                         make_token_http_database_for_test,
                         'copy_database_for_test':
@@ -362,13 +353,6 @@ def leap_sync_target(test, path):
         test.getURL(path), crypto=test._soledad._crypto)
 
 
-def oauth_leap_sync_target(test, path):
-    st = leap_sync_target(test, '~/' + path)
-    st.set_oauth_credentials(tests.consumer1.key, tests.consumer1.secret,
-                             tests.token1.key, tests.token1.secret)
-    return st
-
-
 def token_leap_sync_target(test, path):
     st = leap_sync_target(test, path)
     st.set_token_credentials('user-uuid', 'auth-token')
@@ -379,12 +363,6 @@ class TestLeapSyncTarget(
         test_remote_sync_target.TestRemoteSyncTargets, BaseSoledadTest):
 
     scenarios = [
-        ('http', {'make_app_with_state': make_soledad_app,
-                  'make_document_for_test': make_leap_document_for_test,
-                  'sync_target': leap_sync_target}),
-        ('oauth_http', {'make_app_with_state': make_oauth_http_app,
-                        'make_document_for_test': make_leap_document_for_test,
-                        'sync_target': oauth_leap_sync_target}),
         ('token_soledad',
             {'make_app_with_state': make_token_soledad_app,
              'make_document_for_test': make_leap_document_for_test,
