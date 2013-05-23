@@ -32,9 +32,21 @@ except ImportError:
 
 from u1db.remote import http_app
 
+# Keep OpenSSL's tsafe before importing Twisted submodules so we can put
+# it back if Twisted==12.0.0 messes with it.
+from OpenSSL import tsafe
+old_tsafe = tsafe
+
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
 from twisted.python import log
+
+from twisted import version
+if version.base() == "12.0.0":
+    # Put OpenSSL's tsafe back into place. This can probably be removed if we
+    # come to use Twisted>=12.3.0.
+    import sys
+    sys.modules['OpenSSL.tsafe'] = old_tsafe
 
 from couchdb.client import Server
 
