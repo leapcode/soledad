@@ -25,6 +25,7 @@ they can do token-based auth requests to the Soledad server.
 
 
 from u1db.remote.http_client import HTTPClientBase
+from u1db import errors
 
 
 class TokenBasedAuth(object):
@@ -66,5 +67,5 @@ class TokenBasedAuth(object):
             auth = '%s:%s' % (uuid, token)
             return [('Authorization', 'Token %s' % auth.encode('base64')[:-1])]
         else:
-            return HTTPClientBase._sign_request(
-                self, method, url_query, params)
+            raise errors.UnknownAuthMethod(
+                'Wrong credentials: %s' % self._creds)
