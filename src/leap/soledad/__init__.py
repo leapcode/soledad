@@ -374,7 +374,6 @@ class Soledad(object):
         # recover the initial value and ciphertext
         iv, ciphertext = self._secrets[self._secret_id][self.SECRET_KEY].split(
             self.IV_SEPARATOR, 1)
-        iv = int(iv)
         ciphertext = binascii.a2b_base64(ciphertext)
         return self._crypto.decrypt_sym(ciphertext, key, iv=iv)
 
