@@ -41,7 +41,7 @@ from leap.soledad.backends.leap_backend import LeapDocument
 class AuxMethodsTestCase(BaseSoledadTest):
 
     def test__init_dirs(self):
-        sol = self._soledad_instance(prefix='/_init_dirs')
+        sol = self._soledad_instance(prefix='_init_dirs')
         sol._init_dirs()
         local_db_dir = os.path.dirname(sol.local_db_path)
         secrets_path = os.path.dirname(sol.secrets_path)
@@ -94,8 +94,12 @@ class AuxMethodsTestCase(BaseSoledadTest):
             local_db_path='value_2',
             server_url='value_1',
             cert_file=None)
-        self.assertEqual(self.tempdir+'value_3', sol.secrets_path)
-        self.assertEqual(self.tempdir+'value_2', sol.local_db_path)
+        self.assertEqual(
+            os.path.join(self.tempdir, 'value_3'),
+            sol.secrets_path)
+        self.assertEqual(
+            os.path.join(self.tempdir, 'value_2'),
+            sol.local_db_path)
         self.assertEqual('value_1', sol.server_url)
 
 
