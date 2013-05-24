@@ -30,7 +30,12 @@ try:
 except ImportError:
     import json  # noqa
 
+
+from hashlib import sha256
+from routes.mapper import Mapper
+from u1db import DBNAME_CONSTRAINTS
 from u1db.remote import http_app
+
 
 # Keep OpenSSL's tsafe before importing Twisted submodules so we can put
 # it back if Twisted==12.0.0 messes with it.
@@ -50,6 +55,7 @@ if version.base() == "12.0.0":
 
 from couchdb.client import Server
 
+from leap.soledad import SECRETS_DOC_ID_HASH_PREFIX
 from leap.soledad.backends.couch import CouchServerState
 
 
@@ -61,6 +67,115 @@ class Unauthorized(Exception):
     """
     User authentication failed.
     """
+
+
+class URLToAuth(object):
+    """
+    Verify if actions can be performed by a user.
+    """
+
+    HTTP_METHOD_GET = 'GET'
+    HTTP_METHOD_PUT = 'PUT'
+    HTTP_METHOD_DELETE = 'DELETE'
+    HTTP_METHOD_POST = 'POST'
+
+    def __init__(self, uuid):
+        """
+        Initialize the mapper.
+
+        The C{uuid} is used to create the rules that will either allow or
+        disallow the user to perform specific actions.
+
+        @param uuid: The user uuid.
+        @type uuid: str
+        """
+        self._map = Mapper(controller_scan=None)
+        self._register_auth_info(self._uuid_dbname(uuid))
+
+    def is_authorized(self, environ):
+        """
+        Return whether an HTTP request that produced the CGI C{environ}
+        corresponds to an authorized action.
+
+        @param environ: Dictionary containing CGI variables.
+        @type environ: dict
+
+        @return: Whether the action is authorized or not.
+        @rtype: bool
+        """
+        return self._map.match(environ=environ) is not None
+
+    def _register(self, pattern, http_methods):
+        """
+        Register a C{pattern} in the mapper as valid for C{http_methods}.
+
+        @param pattern: The URL pattern that corresponds to the user action.
+        @type pattern: str
+        @param http_methods: A list of authorized HTTP methods.
+        @type http_methods: list of str
+        """
+        self._map.connect(
+            None, pattern, http_methods=http_methods,
+            conditions=dict(method=http_methods),
+            requirements={'dbname': DBNAME_CONSTRAINTS})
+
+    def _uuid_dbname(self, uuid):
+        """
+        Return the database name corresponding to C{uuid}.
+
+        @param uuid: The user uid.
+        @type uuid: str
+
+        @return: The database name corresponding to C{uuid}.
+        @rtype: str
+        """
+        return sha256('%s%s' % (SECRETS_DOC_ID_HASH_PREFIX, uuid)).hexdigest()
+
+    def _register_auth_info(self, dbname):
+        """
+        Register the authorization info in the mapper using C{dbname} as the
+        user's database name.
+
+        This method sets up the following authorization rules:
+
+            URL path                      | Authorized actions
+            --------------------------------------------------
+            /                             | GET
+            /shared-db                    | GET
+            /shared-db/docs               | -
+            /shared-db/doc/{id}           | GET, PUT, DELETE
+            /shared-db/sync-from/{source} | -
+            /user-db                      | GET, PUT, DELETE
+            /user-db/docs                 | -
+            /user-db/doc/{id}             | -
+            /user-db/sync-from/{source}   | GET, PUT, POST
+
+        @param dbname: The name of the user's database.
+        @type dbname: str
+        """
+        # auth info for global resource
+        self._register('/', [self.HTTP_METHOD_GET])
+        # auth info for shared-db database resource
+        self._register(
+            '/%s' % SoledadApp.SHARED_DB_NAME,
+            [self.HTTP_METHOD_GET])
+        # auth info for shared-db doc resource
+        self._register(
+            '/%s/doc/{id:.*}' % SoledadApp.SHARED_DB_NAME,
+            [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
+             self.HTTP_METHOD_DELETE])
+        # auth info for user-db database resource
+        self._register(
+            '/%s' % dbname,
+            [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
+             self.HTTP_METHOD_DELETE])
+        # auth info for user-db sync resource
+        self._register(
+            '/%s/sync-from/{source_replica_uid}' % dbname,
+            [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
+             self.HTTP_METHOD_POST])
+        # generate the regular expressions
+        self._map.create_regs()
 
 
 class SoledadAuthMiddleware(object):
@@ -150,6 +265,9 @@ class SoledadAuthMiddleware(object):
         if not self.verify_token(environ, uuid, token):
             return unauth_err("Incorrect address or token.")
 
+        if not self.verify_action(uuid, environ):
+            return unauth_err("Unauthorized action.")
+
         del environ[self.HTTP_AUTH_KEY]
 
         return self._app(environ, start_response)
@@ -182,6 +300,22 @@ class SoledadAuthMiddleware(object):
             log.err(e)
             return False
         return True
+
+    def verify_action(self, uuid, environ):
+        """
+        Verify if the user is authorized to perform the requested action over
+        the requested database.
+
+        @param uuid: The user's uuid.
+        @type uuid: str
+        @param environ: Dictionary containing CGI variables.
+        @type environ: dict
+
+        @return: Whether the user is authorize to perform the requested action
+            over the requested db.
+        @rtype: bool
+        """
+        return URLToAuth(uuid).is_authorized(environ)
 
 
 #-----------------------------------------------------------------------------

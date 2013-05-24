@@ -35,12 +35,13 @@ from u1db.remote import (
     http_database,
     http_target,
 )
+from routes.mapper import Mapper
 
 from leap import soledad
 from leap.soledad.backends import leap_backend
 from leap.soledad.server import (
     SoledadApp,
-    SoledadAuthMiddleware
+    SoledadAuthMiddleware,
 )
 from leap.soledad import auth
 
@@ -78,8 +79,13 @@ def make_token_soledad_app(state):
             return True
         return False
 
+    # we test for action authorization in leap.soledad.tests.test_server
+    def verify_action(environ, uuid):
+        return True
+
     application = SoledadAuthMiddleware(app)
     application.verify_token = verify_token
+    application.verify_action = verify_action
     return application
 
 

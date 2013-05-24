@@ -71,6 +71,7 @@ Path to the certificate file used to certify the SSL connection between
 Soledad client and server.
 """
 
+SECRETS_DOC_ID_HASH_PREFIX = 'uuid-'
 
 #
 # Exceptions
@@ -522,7 +523,10 @@ class Soledad(object):
         @return: the hash
         @rtype: str
         """
-        return sha256('uuid-%s' % self._uuid).hexdigest()
+        return sha256(
+            '%s%s' % (
+                SECRETS_DOC_ID_HASH_PREFIX,
+                self._uuid)).hexdigest()
 
     def _shared_db(self):
         """
