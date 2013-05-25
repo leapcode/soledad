@@ -73,27 +73,6 @@ Soledad client and server.
 
 SECRETS_DOC_ID_HASH_PREFIX = 'uuid-'
 
-#
-# Exceptions
-#
-
-class KeyDoesNotExist(Exception):
-    """
-    Soledad attempted to find a key that does not exist locally.
-    """
-
-
-class KeyAlreadyExists(Exception):
-    """
-    Soledad attempted to create a key that already exists locally.
-    """
-
-
-class NotADirectory(Exception):
-    """
-    Expected a path for a directory but got some other thing.
-    """
-
 
 #
 # Soledad: local encrypted storage and remote encrypted sync.

@@ -44,7 +44,7 @@ from leap.soledad.backends.leap_backend import (
     WrongMac,
 )
 from leap.soledad.backends.couch import CouchDatabase
-from leap.soledad import KeyAlreadyExists, Soledad
+from leap.soledad import Soledad
 from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad.tests.test_couch import CouchDBTestCase
