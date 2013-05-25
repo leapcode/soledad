@@ -21,10 +21,7 @@ A U1DB backend for encrypting data before sending to server and decrypting
 after receiving.
 """
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 import hashlib
 import hmac
 import binascii

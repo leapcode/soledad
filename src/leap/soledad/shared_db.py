@@ -20,10 +20,7 @@
 A shared database for storing/retrieving encrypted key material.
 """
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 
 
 from u1db.remote import http_database

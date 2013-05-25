@@ -21,10 +21,7 @@
 # general imports
 import uuid
 import re
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 
 
 from base64 import b64encode, b64decode

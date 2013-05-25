@@ -24,11 +24,10 @@ Test sqlcipher backend internals.
 import os
 import time
 import unittest
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 import threading
+
+
 from pysqlcipher import dbapi2
 from StringIO import StringIO
 

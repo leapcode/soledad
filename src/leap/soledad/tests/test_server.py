@@ -23,10 +23,7 @@ Tests for server-related functionality.
 import os
 import shutil
 import tempfile
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 import hashlib
 
 

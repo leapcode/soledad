@@ -31,10 +31,7 @@ from leap.soledad.backends import couch
 from leap.soledad.tests import u1db_tests as tests
 from leap.soledad.tests.u1db_tests import test_backends
 from leap.soledad.tests.u1db_tests import test_sync
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
 )

@@ -25,10 +25,7 @@ This should be run with:
 
 import configparser
 import httplib
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 
 
 from hashlib import sha256

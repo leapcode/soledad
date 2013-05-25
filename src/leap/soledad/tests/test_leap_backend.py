@@ -23,11 +23,9 @@ Test Leap backend bits.
 import u1db
 import os
 import ssl
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 import cStringIO
+
 
 from u1db.sync import Synchronizer
 from u1db.remote import (
