@@ -439,6 +439,7 @@ def sync_via_synchronizer_and_leap(test, db_source, db_target,
         test.skipTest("full trace hook unsupported over http")
     path = test._http_at[db_target]
     target = LeapSyncTarget.connect(test.getURL(path), test._soledad._crypto)
+    target.set_token_credentials('user-uuid', 'auth-token')
     if trace_hook_shallow:
         target._set_trace_hook_shallow(trace_hook_shallow)
     return sync.Synchronizer(db_source, target).sync()
@@ -662,6 +663,7 @@ def _make_local_db_and_leap_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
     st = LeapSyncTarget.connect(test.getURL(path), test._soledad._crypto)
+    st.set_token_credentials('user-uuid', 'auth-token')
     return db, st
 
 
