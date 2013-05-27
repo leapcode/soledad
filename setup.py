@@ -31,9 +31,10 @@ install_requirements = [
     'python-gnupg',
     'simplejson',
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
+    'oauth',
     'u1db',
     'requests',
-    'six==1.1',
+    'six==1.1.0',
     'pysqlite',
     'scrypt',
 ]
@@ -57,7 +58,7 @@ setup(
     name='leap.soledad',
     # TODO: change version according to decisions regarding soledad versus
     # leap client versions.
-    version='0.1.0-dev',
+    version='0.1.0',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
