@@ -23,10 +23,7 @@ Tests for cryptographic related stuff.
 import os
 import shutil
 import tempfile
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 import hashlib
 
 
@@ -44,7 +41,7 @@ from leap.soledad.backends.leap_backend import (
     WrongMac,
 )
 from leap.soledad.backends.couch import CouchDatabase
-from leap.soledad import KeyAlreadyExists, Soledad
+from leap.soledad import Soledad
 from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.tests import BaseSoledadTest
 from leap.soledad.tests.test_couch import CouchDBTestCase

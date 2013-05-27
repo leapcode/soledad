@@ -71,27 +71,7 @@ Path to the certificate file used to certify the SSL connection between
 Soledad client and server.
 """
 
-
-#
-# Exceptions
-#
-
-class KeyDoesNotExist(Exception):
-    """
-    Soledad attempted to find a key that does not exist locally.
-    """
-
-
-class KeyAlreadyExists(Exception):
-    """
-    Soledad attempted to create a key that already exists locally.
-    """
-
-
-class NotADirectory(Exception):
-    """
-    Expected a path for a directory but got some other thing.
-    """
+SECRETS_DOC_ID_HASH_PREFIX = 'uuid-'
 
 
 #
@@ -522,7 +502,10 @@ class Soledad(object):
         @return: the hash
         @rtype: str
         """
-        return sha256('uuid-%s' % self._uuid).hexdigest()
+        return sha256(
+            '%s%s' % (
+                SECRETS_DOC_ID_HASH_PREFIX,
+                self._uuid)).hexdigest()
 
     def _shared_db(self):
         """

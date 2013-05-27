@@ -24,10 +24,7 @@ Tests for general Soledad functionality.
 import os
 import re
 import tempfile
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import simplejson as json
 
 
 from leap.common.testing.basetest import BaseLeapTest

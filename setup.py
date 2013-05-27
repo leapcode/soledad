@@ -36,6 +36,7 @@ install_requirements = [
     'six==1.1',
     'pysqlite',
     'scrypt',
+    'routes',
 ]
 
 
