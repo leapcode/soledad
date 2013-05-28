@@ -39,7 +39,6 @@ from leap.common.crypto import (
     encrypt_sym,
     decrypt_sym,
 )
-from leap.common.keymanager import KeyManager
 from leap.common.check import leap_assert
 from leap.soledad.auth import TokenBasedAuth
 
