@@ -30,7 +30,8 @@ install_requirements = [
     'pysqlcipher',
     'simplejson',
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
-    'oauth',
+    'oauth',  # this is not strictly needed by us, but we need it
+              # until u1db adds it to its release as a dep.
     'u1db',
     'requests',
     'six==1.1.0',
@@ -53,12 +54,23 @@ else:
     # XXX this should go only for linux/mac
     data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
+trove_classifiers = (
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: "
+    "GNU General Public License v3 or later (GPLv3+)",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 2.6",
+    "Programming Language :: Python :: 2.7",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+)
 
 setup(
     name='leap.soledad',
-    # TODO: change version according to decisions regarding soledad versus
-    # leap client versions.
-    version='0.1.0',
+    version='0.1.1',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -79,6 +91,7 @@ setup(
     install_requires=install_requirements,
     tests_require=tests_requirements,
     data_files=data_files,
+    classifiers=trove_classifiers,
     # the following files are only used for testing, and might be removed if
     # we manage or decide to not install tests in the future.
     package_data={
