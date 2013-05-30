@@ -50,7 +50,6 @@ from u1db.remote.ssl_match_hostname import (  # noqa
 from leap.common import events
 from leap.common.check import leap_assert
 from leap.common.files import mkdir_p
-from leap.common.keymanager.errors import DecryptionFailed
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
@@ -450,7 +449,7 @@ class Soledad(object):
         key = scrypt.hash(self._passphrase, salt, buflen=32)
         iv, ciphertext = self._crypto.encrypt_sym(secret, key)
         self._secrets[secret_id] = {
-            # leap.common.keymanager.openpgp uses AES256 for symmetric
+            # leap.soledad.crypto submodule uses AES256 for symmetric
             # encryption.
             self.KDF_KEY: 'scrypt',  # TODO: remove hard coded kdf
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),

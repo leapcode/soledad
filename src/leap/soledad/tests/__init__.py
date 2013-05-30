@@ -22,6 +22,9 @@ from leap.common.testing.basetest import BaseLeapTest
 # instance in each test.
 #-----------------------------------------------------------------------------
 
+ADDRESS = 'leap@leap.se'
+
+
 class BaseSoledadTest(BaseLeapTest):
     """
     Instantiates Soledad for usage in tests.
@@ -31,7 +34,7 @@ class BaseSoledadTest(BaseLeapTest):
         # config info
         self.db1_file = os.path.join(self.tempdir, "db1.u1db")
         self.db2_file = os.path.join(self.tempdir, "db2.u1db")
-        self.email = 'leap@leap.se'
+        self.email = ADDRESS
         # open test dbs
         self._db1 = u1db.open(self.db1_file, create=True,
                               document_factory=LeapDocument)
@@ -48,7 +51,7 @@ class BaseSoledadTest(BaseLeapTest):
                 os.unlink(f)
         self._soledad.close()
 
-    def _soledad_instance(self, user='leap@leap.se', passphrase='123',
+    def _soledad_instance(self, user=ADDRESS, passphrase='123',
                           prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
                           local_db_path='soledad.u1db', server_url='',

@@ -28,7 +28,6 @@ install_requirements = [
     'couchdb',
     'leap.common',
     'pysqlcipher',
-    'python-gnupg',
     'simplejson',
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
     'oauth',
