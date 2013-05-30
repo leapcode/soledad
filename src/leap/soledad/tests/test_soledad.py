@@ -265,7 +265,6 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             ADDRESS,
         )
 
-
     def test_sync_signals(self):
         """
         Test Soledad emits SOLEDAD_CREATING_KEYS signal.
@@ -291,7 +290,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         soledad.events.signal.reset_mock()
         sol = self._soledad_instance()
         # mock the sync target
-        LeapSyncTarget.get_sync_info = Mock(return_value=[0,0,0,0,2])
+        LeapSyncTarget.get_sync_info = Mock(return_value=[0, 0, 0, 0, 2])
         # mock our generation so soledad thinks there's new data to sync
         sol._db._get_generation = Mock(return_value=1)
         # check for new data to sync

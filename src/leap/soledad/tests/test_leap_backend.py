@@ -688,7 +688,7 @@ class LeapDatabaseSyncTargetTests(
         self.assertEqual(
             [(doc.doc_id, doc.rev, 1),
              (doc2.doc_id, doc2.rev, 2)],
-            [c[:-3]+c[-2:-1] for c in self.other_changes])
+            [c[:-3] + c[-2:-1] for c in self.other_changes])
         self.assertEqual(
             json.loads(tests.simple_doc),
             json.loads(self.other_changes[0][2]))

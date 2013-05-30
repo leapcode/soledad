@@ -233,7 +233,6 @@ class CryptoMethodsTestCase(BaseSoledadTest):
         self.assertTrue(
             secret_id_2 == hashlib.sha256(sol.storage_secret).hexdigest())
 
-
     def test__has_secret(self):
         sol = self._soledad_instance(user='user@leap.se')
         self.assertTrue(sol._has_secret(), "Should have a secret at "
@@ -246,7 +245,6 @@ class CryptoMethodsTestCase(BaseSoledadTest):
         # but not being able to decrypt correctly should
         sol._secrets[sol.secret_id][sol.SECRET_KEY] = None
         self.assertFalse(sol._has_secret())
-
 
 
 class MacAuthTestCase(BaseSoledadTest):

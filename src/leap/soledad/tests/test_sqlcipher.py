@@ -745,7 +745,7 @@ class SQLCipherSyncTargetTests(
         self.assertEqual(
             [(doc.doc_id, doc.rev, 1),
              (doc2.doc_id, doc2.rev, 2)],
-            [c[:2]+c[3:4] for c in self.other_changes])
+            [c[:2] + c[3:4] for c in self.other_changes])
         self.assertEqual(
             json.dumps(tests.simple_doc),
             json.dumps(self.other_changes[0][2]))
