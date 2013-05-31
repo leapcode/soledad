@@ -16,6 +16,8 @@ privkey_path=/etc/leap/soledad-server.pem
 
 test -r /etc/leap/ || exit 0
 
+. /lib/lsb/init-functions
+
 
 case "$1" in
     start)
@@ -49,8 +51,12 @@ case "$1" in
         $0 restart
     ;;
 
+    status)
+        status_of_proc -p $pidfile /usr/local/bin/twistd soledad && exit 0 || exit $?
+    ;;
+
     *)
-        echo "Usage: /etc/init.d/soledad {start|stop|restart|force-reload}" >&2
+        echo "Usage: /etc/init.d/soledad {start|stop|restart|force-reload|status}" >&2
         exit 1
     ;;
 esac
