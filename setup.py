@@ -82,21 +82,11 @@ setup(
         "LEAP client, an API for data storage and sync."
     ),
     namespace_packages=["leap"],
-    # For now, we do not exclude tests because of the circular dependency
-    # between leap.common and leap.soledad.
-    #packages=find_packages('src', exclude=['leap.soledad.tests']),
-    packages=find_packages('src'),
+    packages=find_packages('src', exclude=['leap.soledad.tests']),
     package_dir={'': 'src'},
     test_suite='leap.soledad.tests',
     install_requires=install_requirements,
     tests_require=tests_requirements,
     data_files=data_files,
     classifiers=trove_classifiers,
-    # the following files are only used for testing, and might be removed if
-    # we manage or decide to not install tests in the future.
-    package_data={
-        'leap.soledad.tests.u1db_tests.testing-certs': [
-            '*.pem', '*.cert', '*.key'
-        ]
-    }
 )

@@ -312,11 +312,13 @@ class CouchDatabase(ObjectStoreDatabase):
         # TODO: prevent user from overwriting a document with the same doc_id
         # as this one.
         doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
-        doc.content = {self.U1DB_TRANSACTION_LOG_KEY: [],
-                       self.U1DB_CONFLICTS_KEY: b64encode(json.dumps({})),
-                       self.U1DB_OTHER_GENERATIONS_KEY: {},
-                       self.U1DB_INDEXES_KEY: b64encode(json.dumps({})),
-                       self.U1DB_REPLICA_UID_KEY: self._replica_uid}
+        doc.content = {
+            self.U1DB_TRANSACTION_LOG_KEY: b64encode(json.dumps([])),
+            self.U1DB_CONFLICTS_KEY: b64encode(json.dumps({})),
+            self.U1DB_OTHER_GENERATIONS_KEY: b64encode(json.dumps({})),
+            self.U1DB_INDEXES_KEY: b64encode(json.dumps({})),
+            self.U1DB_REPLICA_UID_KEY: b64encode(self._replica_uid),
+        }
         self._put_doc(doc)
 
     def _fetch_u1db_data(self):
@@ -331,13 +333,15 @@ class CouchDatabase(ObjectStoreDatabase):
             cdoc, self.COUCH_U1DB_ATTACHMENT_KEY).read()
         content = json.loads(jsonstr)
         # set u1db database info
-        self._transaction_log = content[self.U1DB_TRANSACTION_LOG_KEY]
+        self._transaction_log = json.loads(
+            b64decode(content[self.U1DB_TRANSACTION_LOG_KEY]))
         self._conflicts = json.loads(
             b64decode(content[self.U1DB_CONFLICTS_KEY]))
-        self._other_generations = content[self.U1DB_OTHER_GENERATIONS_KEY]
+        self._other_generations = json.loads(
+            b64decode(content[self.U1DB_OTHER_GENERATIONS_KEY]))
         self._indexes = self._load_indexes_from_json(
             b64decode(content[self.U1DB_INDEXES_KEY]))
-        self._replica_uid = content[self.U1DB_REPLICA_UID_KEY]
+        self._replica_uid = b64decode(content[self.U1DB_REPLICA_UID_KEY])
         # save couch _rev
         self._couch_rev = cdoc[self.COUCH_REV_KEY]
 
@@ -349,14 +353,16 @@ class CouchDatabase(ObjectStoreDatabase):
         """
         doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
         doc.content = {
-            self.U1DB_TRANSACTION_LOG_KEY: self._transaction_log,
             # Here, the b64 encode ensures that document content
             # does not cause strange behaviour in couchdb because
             # of encoding.
+            self.U1DB_TRANSACTION_LOG_KEY:
+                b64encode(json.dumps(self._transaction_log)),
             self.U1DB_CONFLICTS_KEY: b64encode(json.dumps(self._conflicts)),
-            self.U1DB_OTHER_GENERATIONS_KEY: self._other_generations,
+            self.U1DB_OTHER_GENERATIONS_KEY:
+                b64encode(json.dumps(self._other_generations)),
             self.U1DB_INDEXES_KEY: b64encode(self._dump_indexes_as_json()),
-            self.U1DB_REPLICA_UID_KEY: self._replica_uid,
+            self.U1DB_REPLICA_UID_KEY: b64encode(self._replica_uid),
             self.COUCH_REV_KEY: self._couch_rev}
         self._put_doc(doc)
 
