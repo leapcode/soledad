@@ -26,9 +26,15 @@ import binascii
 import hmac
 import hashlib
 
+
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-from leap.common.check import leap_assert, leap_assert_type
+
+
+from leap.soledad import (
+    soledad_assert,
+    soledad_assert_type,
+)
 
 
 class EncryptionMethods(object):
@@ -85,13 +91,14 @@ class SoledadCrypto(object):
         @return: A tuple with the initial value and the encrypted data.
         @rtype: (long, str)
         """
-        leap_assert_type(key, str)
+        soledad_assert_type(key, str)
 
         # AES-256 in CTR mode
         if method == EncryptionMethods.AES_256_CTR:
-            leap_assert(
+            soledad_assert(
                 len(key) == 32,  # 32 x 8 = 256 bits.
-                'Wrong key size: %s bits (must be 256 bits long).' % (len(key)*8))
+                'Wrong key size: %s bits (must be 256 bits long).' %
+                (len(key) * 8))
             iv = os.urandom(8)
             ctr = Counter.new(64, prefix=iv)
             cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
@@ -119,15 +126,15 @@ class SoledadCrypto(object):
         @return: The decrypted data.
         @rtype: str
         """
-        leap_assert_type(key, str)
+        soledad_assert_type(key, str)
 
         # AES-256 in CTR mode
         if method == EncryptionMethods.AES_256_CTR:
             # assert params
-            leap_assert(
+            soledad_assert(
                 len(key) == 32,  # 32 x 8 = 256 bits.
                 'Wrong key size: %s (must be 256 bits long).' % len(key))
-            leap_assert(
+            soledad_assert(
                 'iv' in kwargs,
                 'AES-256-CTR needs an initial value given as.')
             ctr = Counter.new(64, prefix=binascii.a2b_base64(kwargs['iv']))

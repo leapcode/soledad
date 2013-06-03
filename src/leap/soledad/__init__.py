@@ -36,6 +36,7 @@ import scrypt
 import httplib
 import socket
 import ssl
+import errno
 
 
 from xdg import BaseDirectory
@@ -47,9 +48,92 @@ from u1db.remote.ssl_match_hostname import (  # noqa
 )
 
 
-from leap.common import events
-from leap.common.check import leap_assert
-from leap.common.files import mkdir_p
+#
+# Assert functions
+#
+
+def soledad_assert(condition, message):
+    """
+    Asserts the condition and displays the message if that's not
+    met.
+
+    @param condition: condition to check
+    @type condition: bool
+    @param message: message to display if the condition isn't met
+    @type message: str
+    """
+    assert condition, message
+
+
+# we want to use leap.common.check.leap_assert in case it is available,
+# because it also logs in a way other parts of leap can access log messages.
+try:
+    from leap.common.check import leap_assert
+    soledad_assert = leap_assert
+except ImportError:
+    pass
+
+
+def soledad_assert_type(var, expectedType):
+    """
+    Helper assert check for a variable's expected type
+
+    @param var: variable to check
+    @type var: any
+    @param expectedType: type to check agains
+    @type expectedType: type
+    """
+    soledad_assert(isinstance(var, expectedType),
+                   "Expected type %r instead of %r" %
+                   (expectedType, type(var)))
+
+try:
+    from leap.common.check import leap_assert_type
+    soledad_assert_type = leap_assert_type
+except ImportError:
+    pass
+
+
+#
+# Signaling function
+#
+
+# we define a fake signaling function and fake signal constants that will
+# allow for logging signaling attempts in case leap.common.events is not
+# available.
+
+def signal(signal, content=""):
+    logger.info("Would signal: %s - %s." % (str(signal), content))
+
+SOLEDAD_CREATING_KEYS = 'Creating keys...'
+SOLEDAD_DONE_CREATING_KEYS = 'Done creating keys.'
+SOLEDAD_DOWNLOADING_KEYS = 'Downloading keys...'
+SOLEDAD_DONE_DOWNLOADING_KEYS = 'Done downloading keys.'
+SOLEDAD_UPLOADING_KEYS = 'Uploading keys...'
+SOLEDAD_DONE_UPLOADING_KEYS = 'Done uploading keys.'
+SOLEDAD_NEW_DATA_TO_SYNC = 'New data available.'
+SOLEDAD_DONE_DATA_SYNC = 'Done data sync.'
+
+# we want to use leap.common.events to emits signals, if it is available.
+try:
+    from leap.common import events
+    # replace fake signaling function with real one
+    signal = events.signal
+    # replace fake string signals with real signals
+    SOLEDAD_CREATING_KEYS = events.events_pb2.SOLEDAD_CREATING_KEYS
+    SOLEDAD_DONE_CREATING_KEYS = events.events_pb2.SOLEDAD_DONE_CREATING_KEYS
+    SOLEDAD_DOWNLOADING_KEYS = events.events_pb2.SOLEDAD_DOWNLOADING_KEYS
+    SOLEDAD_DONE_DOWNLOADING_KEYS = \
+        events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS
+    SOLEDAD_UPLOADING_KEYS = events.events_pb2.SOLEDAD_UPLOADING_KEYS
+    SOLEDAD_DONE_UPLOADING_KEYS = \
+        events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS
+    SOLEDAD_NEW_DATA_TO_SYNC = events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC
+    SOLEDAD_DONE_DATA_SYNC = events.events_pb2.SOLEDAD_DONE_DATA_SYNC
+except ImportError:
+    pass
+
+
 from leap.soledad.backends import sqlcipher
 from leap.soledad.backends.leap_backend import (
     LeapDocument,
@@ -63,6 +147,10 @@ from leap.soledad.crypto import SoledadCrypto
 
 logger = logging.getLogger(name=__name__)
 
+
+#
+# Constants
+#
 
 SOLEDAD_CERT = None
 """
@@ -226,7 +314,7 @@ class Soledad(object):
                 self.DEFAULT_PREFIX, self.LOCAL_DATABASE_FILE_NAME)
         # initialize server_url
         self._server_url = server_url
-        leap_assert(
+        soledad_assert(
             self._server_url is not None,
             'Missing URL for Soledad server.')
 
@@ -295,7 +383,13 @@ class Soledad(object):
             [self._local_db_path, self._secrets_path])
         for path in paths:
             logger.info('Creating directory: %s.' % path)
-            mkdir_p(path)
+            try:
+                os.makedirs(path)
+            except OSError as exc:
+                if exc.errno == errno.EEXIST and os.path.isdir(path):
+                    pass
+                else:
+                    raise
 
     def _init_db(self):
         """
@@ -439,8 +533,8 @@ class Soledad(object):
 
         This method emits the following signals:
 
-            * leap.common.events.events_pb2.SOLEDAD_CREATING_KEYS
-            * leap.common.events.events_pb2.SOLEDAD_DONE_CREATING_KEYS
+            * SOLEDAD_CREATING_KEYS
+            * SOLEDAD_DONE_CREATING_KEYS
 
         A secret has the following structure:
 
@@ -458,7 +552,7 @@ class Soledad(object):
         @return: The id of the generated secret.
         @rtype: str
         """
-        events.signal(events.events_pb2.SOLEDAD_CREATING_KEYS, self._uuid)
+        signal(SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
         secret = os.urandom(self.GENERATED_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
@@ -479,8 +573,7 @@ class Soledad(object):
                 str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
         }
         self._store_secrets()
-        events.signal(
-            events.events_pb2.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
+        signal(SOLEDAD_DONE_CREATING_KEYS, self._uuid)
         return secret_id
 
     def _store_secrets(self):
@@ -543,15 +636,13 @@ class Soledad(object):
         @return: a document with encrypted key material in its contents
         @rtype: LeapDocument
         """
-        events.signal(
-            events.events_pb2.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
+        signal(SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db()
         if not db:
             logger.warning('No shared db found')
             return
         doc = db.get_doc(self._uuid_hash())
-        events.signal(
-            events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
+        signal(SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
 
     def _put_secrets_in_shared_db(self):
@@ -563,7 +654,7 @@ class Soledad(object):
         Otherwise, upload keys to shared recovery database.
 
         """
-        leap_assert(
+        soledad_assert(
             self._has_secret(),
             'Tried to send keys to server but they don\'t exist in local '
             'storage.')
@@ -574,15 +665,13 @@ class Soledad(object):
         # fill doc with encrypted secrets
         doc.content = self.export_recovery_document(include_uuid=False)
         # upload secrets to server
-        events.signal(
-            events.events_pb2.SOLEDAD_UPLOADING_KEYS, self._uuid)
+        signal(SOLEDAD_UPLOADING_KEYS, self._uuid)
         db = self._shared_db()
         if not db:
             logger.warning('No shared db found')
             return
         db.put_doc(doc)
-        events.signal(
-            events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
+        signal(SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
     #
     # Document storage, retrieval and sync.
@@ -835,7 +924,7 @@ class Soledad(object):
         local_gen = self._db.sync(
             urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
             creds=self._creds, autocreate=True)
-        events.signal(events.events_pb2.SOLEDAD_DONE_DATA_SYNC, self._uuid)
+        signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
         return local_gen
 
     def need_sync(self, url):
@@ -852,8 +941,7 @@ class Soledad(object):
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
-            events.signal(
-                events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC, self._uuid)
+            signal(SOLEDAD_NEW_DATA_TO_SYNC, self._uuid)
             return True
         return False
 
@@ -1005,3 +1093,6 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
 
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
 http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection
+
+
+__all__ = ['soledad_assert', 'Soledad']

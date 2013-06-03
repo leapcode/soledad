@@ -165,7 +165,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
     def setUp(self):
         BaseSoledadTest.setUp(self)
         # mock signaling
-        soledad.events.signal = Mock()
+        soledad.signal = Mock()
 
     def tearDown(self):
         pass
@@ -179,54 +179,54 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         """
         Test that a fresh soledad emits all bootstrap signals.
         """
-        soledad.events.signal.reset_mock()
+        soledad.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative.json',
             local_db_path='alternative.u1db')
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.events.signal.mock_calls.reverse()
-        soledad.events.signal.call_args = \
-            soledad.events.signal.call_args_list[0]
-        soledad.events.signal.call_args_list.reverse()
+        soledad.signal.mock_calls.reverse()
+        soledad.signal.call_args = \
+            soledad.signal.call_args_list[0]
+        soledad.signal.call_args_list.reverse()
         # assert signals
-        soledad.events.signal.assert_called_with(
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_CREATING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_CREATING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_UPLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_UPLOADING_KEYS,
             ADDRESS,
         )
@@ -235,32 +235,32 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         """
         Test that an existent soledad emits some of the bootstrap signals.
         """
-        soledad.events.signal.reset_mock()
+        soledad.signal.reset_mock()
         # get an existent instance so it emits only some of bootstrap signals
         sol = self._soledad_instance()
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.events.signal.mock_calls.reverse()
-        soledad.events.signal.call_args = \
-            soledad.events.signal.call_args_list[0]
-        soledad.events.signal.call_args_list.reverse()
+        soledad.signal.mock_calls.reverse()
+        soledad.signal.call_args = \
+            soledad.signal.call_args_list[0]
+        soledad.signal.call_args_list.reverse()
         # assert signals
-        soledad.events.signal.assert_called_with(
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_UPLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.events.signal)
-        soledad.events.signal.assert_called_with(
+        self._pop_mock_call(soledad.signal)
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_UPLOADING_KEYS,
             ADDRESS,
         )
@@ -269,7 +269,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         """
         Test Soledad emits SOLEDAD_CREATING_KEYS signal.
         """
-        soledad.events.signal.reset_mock()
+        soledad.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance()
         # mock the actual db sync so soledad does not try to connect to the
@@ -278,7 +278,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # do the sync
         sol.sync()
         # assert the signal has been emitted
-        soledad.events.signal.assert_called_with(
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_DONE_DATA_SYNC,
             ADDRESS,
         )
@@ -287,7 +287,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         """
         Test Soledad emits SOLEDAD_CREATING_KEYS signal.
         """
-        soledad.events.signal.reset_mock()
+        soledad.signal.reset_mock()
         sol = self._soledad_instance()
         # mock the sync target
         LeapSyncTarget.get_sync_info = Mock(return_value=[0, 0, 0, 0, 2])
@@ -296,7 +296,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # check for new data to sync
         sol.need_sync('http://provider/userdb')
         # assert the signal has been emitted
-        soledad.events.signal.assert_called_with(
+        soledad.signal.assert_called_with(
             proto.SOLEDAD_NEW_DATA_TO_SYNC,
             ADDRESS,
         )
