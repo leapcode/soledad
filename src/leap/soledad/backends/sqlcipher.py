@@ -25,9 +25,23 @@ with the exception of the following statements:
   * PRAGMA cipher_use_hmac
   * PRAGMA cipher_default_use_mac
 
-These statements were introduced for backwards compatibility with SLCipher 1.1
-databases, so we do not implement them as all our SQLCipher databases handled
-by Soledad are created with SQLCipher >= 2.0.
+SQLCipher 2.0 introduced a per-page HMAC to validate that the page data has
+not be tampered with. By default, when creating or opening a database using
+SQLCipher 2, SQLCipher will attempt to use an HMAC check. This change in
+database format means that SQLCipher 2 can't operate on version 1.1.x
+databases by default. Thus, in order to provide backward compatibility with
+SQLCipher 1.1.x, PRAGMA cipher_use_hmac can be used to disable the HMAC
+functionality on specific databases.
+
+In some very specific cases, it is not possible to call PRAGMA cipher_use_hmac
+as one of the first operations on a database. An example of this is when
+trying to ATTACH a 1.1.x database to the main database. In these cases PRAGMA
+cipher_default_use_hmac can be used to globally alter the default use of HMAC
+when opening a database.
+
+So, as the statements above were introduced for backwards compatibility with
+SLCipher 1.1 databases, we do not implement them as all SQLCipher databases
+handled by Soledad should be created by SQLCipher >= 2.0.
 """
 
 import os
@@ -441,7 +455,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
         The key itself can be a passphrase, which is converted to a key using
         PBKDF2 key derivation. The result is used as the encryption key for
-        the database.
+        the database. By using this method, there is no way to alter the KDF;
+        if you want to do so you should use a raw key instead and derive the
+        key using your own KDF.
 
         @param db_handle: A handle to the SQLCipher database.
         @type db_handle: pysqlcipher.Connection
@@ -477,6 +493,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         SQLCipher uses aes-256-cbc as the default cipher and mode of
         operation. It is possible to change this, though not generally
         recommended, using PRAGMA cipher.
+
+        SQLCipher makes direct use of libssl, so all cipher options available
+        to libssl are also available for use with SQLCipher. See `man enc` for
+        OpenSSL's supported ciphers.
 
         Implementation Notes:
 
