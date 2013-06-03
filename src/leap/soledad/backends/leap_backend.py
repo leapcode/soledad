@@ -33,11 +33,9 @@ from u1db.errors import BrokenSyncStream
 from u1db.remote.http_target import HTTPSyncTarget
 
 
-from leap.common.crypto import (
+from leap.soledad.crypto import (
     EncryptionMethods,
     UnknownEncryptionMethod,
-    encrypt_sym,
-    decrypt_sym,
 )
 from leap.common.check import leap_assert
 from leap.soledad.auth import TokenBasedAuth
@@ -169,7 +167,7 @@ def encrypt_doc(crypto, doc):
     """
     leap_assert(doc.is_tombstone() is False)
     # encrypt content using AES-256 CTR mode
-    iv, ciphertext = encrypt_sym(
+    iv, ciphertext = crypto.encrypt_sym(
         doc.get_json(),
         crypto.doc_passphrase(doc.doc_id),
         method=EncryptionMethods.AES_256_CTR)
@@ -242,7 +240,7 @@ def decrypt_doc(crypto, doc):
         enc_method = doc.content[ENC_METHOD_KEY]
         if enc_method == EncryptionMethods.AES_256_CTR:
             leap_assert(ENC_IV_KEY in doc.content)
-            plainjson = decrypt_sym(
+            plainjson = crypto.decrypt_sym(
                 ciphertext,
                 crypto.doc_passphrase(doc.doc_id),
                 method=enc_method,
