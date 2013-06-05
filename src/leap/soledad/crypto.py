@@ -21,11 +21,35 @@ Cryptographic utilities for Soledad.
 """
 
 
+import os
+import binascii
 import hmac
 import hashlib
 
 
-from leap.common import crypto
+from Crypto.Cipher import AES
+from Crypto.Util import Counter
+
+
+from leap.soledad import (
+    soledad_assert,
+    soledad_assert_type,
+)
+
+
+class EncryptionMethods(object):
+    """
+    Representation of encryption methods that can be used.
+    """
+
+    AES_256_CTR = 'aes-256-ctr'
+
+
+class UnknownEncryptionMethod(Exception):
+    """
+    Raised when trying to encrypt/decrypt with unknown method.
+    """
+    pass
 
 
 class NoSymmetricSecret(Exception):
@@ -51,7 +75,7 @@ class SoledadCrypto(object):
         self._soledad = soledad
 
     def encrypt_sym(self, data, key,
-                    method=crypto.EncryptionMethods.AES_256_CTR):
+                    method=EncryptionMethods.AES_256_CTR):
         """
         Encrypt C{data} using a {password}.
 
@@ -67,10 +91,24 @@ class SoledadCrypto(object):
         @return: A tuple with the initial value and the encrypted data.
         @rtype: (long, str)
         """
-        return crypto.encrypt_sym(data, key, method)
+        soledad_assert_type(key, str)
+
+        # AES-256 in CTR mode
+        if method == EncryptionMethods.AES_256_CTR:
+            soledad_assert(
+                len(key) == 32,  # 32 x 8 = 256 bits.
+                'Wrong key size: %s bits (must be 256 bits long).' %
+                (len(key) * 8))
+            iv = os.urandom(8)
+            ctr = Counter.new(64, prefix=iv)
+            cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
+            return binascii.b2a_base64(iv), cipher.encrypt(data)
+
+        # raise if method is unknown
+        raise UnknownEncryptionMethod('Unkwnown method: %s' % method)
 
     def decrypt_sym(self, data, key,
-                    method=crypto.EncryptionMethods.AES_256_CTR, **kwargs):
+                    method=EncryptionMethods.AES_256_CTR, **kwargs):
         """
         Decrypt data using symmetric secret.
 
@@ -88,7 +126,23 @@ class SoledadCrypto(object):
         @return: The decrypted data.
         @rtype: str
         """
-        return crypto.decrypt_sym(data, key, method, **kwargs)
+        soledad_assert_type(key, str)
+
+        # AES-256 in CTR mode
+        if method == EncryptionMethods.AES_256_CTR:
+            # assert params
+            soledad_assert(
+                len(key) == 32,  # 32 x 8 = 256 bits.
+                'Wrong key size: %s (must be 256 bits long).' % len(key))
+            soledad_assert(
+                'iv' in kwargs,
+                'AES-256-CTR needs an initial value given as.')
+            ctr = Counter.new(64, prefix=binascii.a2b_base64(kwargs['iv']))
+            cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
+            return cipher.decrypt(data)
+
+        # raise if method is unknown
+        raise UnknownEncryptionMethod('Unkwnown method: %s' % method)
 
     def doc_passphrase(self, doc_id):
         """

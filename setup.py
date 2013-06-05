@@ -26,7 +26,6 @@ from setuptools import (
 install_requirements = [
     'configparser',
     'couchdb',
-    'leap.common',
     'pysqlcipher',
     'simplejson',
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
@@ -35,9 +34,10 @@ install_requirements = [
     'u1db',
     'requests',
     'six==1.1.0',
-    'pysqlite',
     'scrypt',
     'routes',
+    'pyxdg',
+    'pycrypto',
 ]
 
 
@@ -45,6 +45,7 @@ tests_requirements = [
     'mock',
     'nose2',
     'testscenarios',
+    'leap.common',
 ]
 
 
@@ -89,4 +90,7 @@ setup(
     tests_require=tests_requirements,
     data_files=data_files,
     classifiers=trove_classifiers,
+    extras_require={
+        'signaling': ['leap.common'],
+    }
 )
