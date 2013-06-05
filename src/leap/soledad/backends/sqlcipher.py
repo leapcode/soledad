@@ -483,7 +483,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         if not all(c in string.hexdigits for c in key):
             raise NotAnHexString(key)
-        db_handle.cursor().execute('PRAGMA key = "x\'%s"' % passphrase)
+        db_handle.cursor().execute('PRAGMA key = "x\'%s"' % key)
 
     @classmethod
     def _pragma_cipher(cls, db_handle, cipher='aes-256-cbc'):

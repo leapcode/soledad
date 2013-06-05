@@ -301,17 +301,36 @@ class Soledad(object):
         """
         Initialize the U1DB SQLCipher database for local storage.
 
-        The local storage passphrase is hexlified version of the last
-        C{LOCAL_STORAGE_SECRET_LENGTH} bytes of the storage secret.
+        Currently, Soledad uses the default SQLCipher cipher, i.e.
+        'aes-256-cbc'. We use scrypt to derive a 256-bit encryption key and
+        uses the 'raw PRAGMA key' format to handle the key to SQLCipher.
+
+        The first C{self.REMOTE_STORAGE_SECRET_LENGTH} bytes of the storage
+        secret are used for remote storage encryption. We use the next
+        C{self.LOCAL_STORAGE_SECRET} bytes to derive a key for local storage.
+        From these bytes, the first C{self.SALT_LENGTH} are used as the salt
+        and the rest as the password for the scrypt hashing.
         """
+        # salt indexes
+        salt_start = self.REMOTE_STORAGE_SECRET_LENGTH
+        salt_end = salt_start + self.SALT_LENGTH
+        # password indexes
+        pwd_start = salt_end
+        pwd_end = salt_start + self.LOCAL_STORAGE_SECRET_LENGTH
+        # calculate the key for local encryption
+        secret = self._get_storage_secret()
+        key = scrypt.hash(
+            secret[pwd_start:pwd_end],  # the password
+            secret[salt_start:salt_end],  # the salt
+            buflen=32,  # we need a key with 256 bits (32 bytes)
+        )
         self._db = sqlcipher.open(
             self._local_db_path,
-            # storage secret is binary but sqlcipher passphrase must be string
-            binascii.b2a_hex(
-                self._get_storage_secret()[self.LOCAL_STORAGE_SECRET_LENGTH:]),
+            binascii.b2a_hex(key),  # sqlcipher only accepts the hex version
             create=True,
             document_factory=LeapDocument,
-            crypto=self._crypto)
+            crypto=self._crypto,
+            raw_key=True)
 
     def close(self):
         """
