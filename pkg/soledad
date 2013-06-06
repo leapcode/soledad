@@ -11,6 +11,7 @@ HTTPS_PORT=2424
 PLAIN_PORT=65534
 CERT_PATH=/etc/leap/soledad-server.pem
 PRIVKEY_PATH=/etc/leap/soledad-server.pem
+TWISTD_PATH=/usr/bin/twistd
 
 [ -r /etc/default/soledad ] && . /etc/default/soledad
 
@@ -23,7 +24,7 @@ case "$1" in
     start)
         echo -n "Starting soledad: twistd"
         HOME="/var/lib/soledad/" \
-          start-stop-daemon --start --quiet --exec /usr/local/bin/twistd -- \
+          start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
                           --pidfile=$PIDFILE \
                           --logfile=$LOGFILE \
                           web \
@@ -52,7 +53,7 @@ case "$1" in
     ;;
 
     status)
-        status_of_proc -p $PIDFILE /usr/local/bin/twistd soledad && exit 0 || exit $?
+        status_of_proc -p $PIDFILE $TWISTD_PATH soledad && exit 0 || exit $?
     ;;
 
     *)
