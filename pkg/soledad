@@ -1,8 +1,6 @@
 #!/bin/sh
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
-
-
 PIDFILE=/var/run/soledad.pid
 RUNDIR=/var/lib/soledad/
 OBJ=leap.soledad.server.application
