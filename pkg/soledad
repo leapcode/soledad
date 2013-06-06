@@ -3,13 +3,13 @@
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
 
-pidfile=/var/run/soledad.pid \
-rundir=/var/lib/soledad/ \
-obj=leap.soledad.server.application \
-logfile=/var/log/soledad.log \
-https_port=2424 \
-plain_port=65534 \
-cert_path=/etc/leap/soledad-server.pem \
+pidfile=/var/run/soledad.pid
+rundir=/var/lib/soledad/
+obj=leap.soledad.server.application
+logfile=/var/log/soledad.log
+https_port=2424
+plain_port=65534
+cert_path=/etc/leap/soledad-server.pem
 privkey_path=/etc/leap/soledad-server.pem
 
 [ -r /etc/default/soledad ] && . /etc/default/soledad
