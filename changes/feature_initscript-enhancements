@@ -1,0 +1,5 @@
+  o Add LSB (Linux Standards Base) 3.1 compliant header
+  o Remove unnecessary backslashes in variable definitions
+  o Replace environment variables with more standard upper-cased names
+  o Make a TWISTD_PATH environment variable to replace hard-coded /usr/local/bin/twistd
+  o Pull environment variables together into one block
