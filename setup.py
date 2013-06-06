@@ -52,7 +52,8 @@ if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
 else:
     # XXX this should go only for linux/mac
-    data_files = [("/etc/init.d/", ["pkg/soledad"])]
+    # debian package: disable this mechanism for installation as it doesn't use debian mechanism to register
+    data_files = None
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
