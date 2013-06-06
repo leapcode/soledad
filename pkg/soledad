@@ -10,6 +10,7 @@ PLAIN_PORT=65534
 CERT_PATH=/etc/leap/soledad-server.pem
 PRIVKEY_PATH=/etc/leap/soledad-server.pem
 TWISTD_PATH=/usr/bin/twistd
+HOME=/var/lib/soledad/
 
 [ -r /etc/default/soledad ] && . /etc/default/soledad
 
@@ -21,7 +22,6 @@ test -r /etc/leap/ || exit 0
 case "$1" in
     start)
         echo -n "Starting soledad: twistd"
-        HOME="/var/lib/soledad/" \
           start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
                           --pidfile=$PIDFILE \
                           --logfile=$LOGFILE \
