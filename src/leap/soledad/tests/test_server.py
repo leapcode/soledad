@@ -25,15 +25,40 @@ import shutil
 import tempfile
 import simplejson as json
 import hashlib
+import mock
 
 
-from leap.soledad.server import URLToAuth
+from leap.soledad import Soledad
+from leap.soledad.server import (
+    SoledadApp,
+    SoledadAuthMiddleware,
+    URLToAuth,
+)
+from leap.soledad.backends.couch import (
+    CouchServerState,
+    CouchDatabase,
+)
+from leap.soledad.backends import leap_backend
+
+
 from leap.common.testing.basetest import BaseLeapTest
+from leap.soledad.tests import ADDRESS
+from leap.soledad.tests.u1db_tests import (
+    TestCaseWithServer,
+    simple_doc,
+    nested_doc,
+)
+from leap.soledad.tests.test_couch import CouchDBTestCase
+from leap.soledad.tests.test_leap_backend import (
+    make_token_soledad_app,
+    make_leap_document_for_test,
+    token_leap_sync_target,
+)
 
 
-class SoledadServerTestCase(BaseLeapTest):
+class ServerAuthorizationTestCase(BaseLeapTest):
     """
-    Tests that guarantee that data will always be encrypted when syncing.
+    Tests related to Soledad server authorization.
     """
 
     def setUp(self):
@@ -237,3 +262,120 @@ class SoledadServerTestCase(BaseLeapTest):
         self.assertFalse(
             authmap.is_authorized(
                 self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
+
+
+class EncryptedSyncTestCase(
+        CouchDBTestCase, TestCaseWithServer):
+    """
+    Tests for encrypted sync using Soledad server backed by a couch database.
+    """
+
+    @staticmethod
+    def make_app_with_state(state):
+        return make_token_soledad_app(state)
+
+    make_document_for_test = make_leap_document_for_test
+
+    sync_target = token_leap_sync_target
+
+    def _soledad_instance(self, user='user-uuid', passphrase='123',
+                          prefix='',
+                          secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
+                          local_db_path='soledad.u1db', server_url='',
+                          cert_file=None, auth_token=None, secret_id=None):
+        """
+        Instantiate Soledad.
+        """
+
+        # this callback ensures we save a document which is sent to the shared
+        # db.
+        def _put_doc_side_effect(doc):
+            self._doc_put = doc
+
+        # we need a mocked shared db or else Soledad will try to access the
+        # network to find if there are uploaded secrets.
+        class MockSharedDB(object):
+
+            get_doc = mock.Mock(return_value=None)
+            put_doc = mock.Mock(side_effect=_put_doc_side_effect)
+
+            def __call__(self):
+                return self
+
+        Soledad._shared_db = MockSharedDB()
+        return Soledad(
+            user,
+            passphrase,
+            secrets_path=os.path.join(self.tempdir, prefix, secrets_path),
+            local_db_path=os.path.join(
+                self.tempdir, prefix, local_db_path),
+            server_url=server_url,
+            cert_file=cert_file,
+            auth_token=auth_token,
+            secret_id=secret_id)
+
+    def make_app(self):
+        self.request_state = CouchServerState(self._couch_url)
+        return self.make_app_with_state(self.request_state)
+
+    def setUp(self):
+        TestCaseWithServer.setUp(self)
+        CouchDBTestCase.setUp(self)
+        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
+        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+
+    def tearDown(self):
+        CouchDBTestCase.tearDown(self)
+        TestCaseWithServer.tearDown(self)
+
+    def test_encrypted_sym_sync(self):
+        """
+        Test the complete syncing chain between two soledad dbs using a
+        Soledad server backed by a couch database.
+        """
+        self.startServer()
+        # instantiate soledad and create a document
+        sol1 = self._soledad_instance(
+            # token is verified in test_leap_backend.make_token_soledad_app
+            auth_token='auth-token'
+        )
+        _, doclist = sol1.get_all_docs()
+        self.assertEqual([], doclist)
+        doc1 = sol1.create_doc(json.loads(simple_doc))
+        # sync with server
+        sol1._server_url = self.getURL()
+        sol1.sync()
+        # assert doc was sent to couch db
+        db = CouchDatabase(
+            self._couch_url,
+            # the name of the user database is "user-<uuid>".
+            'user-user-uuid',
+        )
+        _, doclist = db.get_all_docs()
+        self.assertEqual(1, len(doclist))
+        couchdoc = doclist[0]
+        # assert document structure in couch server
+        self.assertEqual(doc1.doc_id, couchdoc.doc_id)
+        self.assertEqual(doc1.rev, couchdoc.rev)
+        self.assertEqual(6, len(couchdoc.content))
+        self.assertTrue(leap_backend.ENC_JSON_KEY in couchdoc.content)
+        self.assertTrue(leap_backend.ENC_SCHEME_KEY in couchdoc.content)
+        self.assertTrue(leap_backend.ENC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(leap_backend.ENC_IV_KEY in couchdoc.content)
+        self.assertTrue(leap_backend.MAC_KEY in couchdoc.content)
+        self.assertTrue(leap_backend.MAC_METHOD_KEY in couchdoc.content)
+        # instantiate soledad with empty db, but with same secrets path
+        sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
+        _, doclist = sol2.get_all_docs()
+        self.assertEqual([], doclist)
+        sol2._secrets_path = sol1.secrets_path
+        sol2._load_secrets()
+        sol2._set_secret_id(sol1._secret_id)
+        # sync the new instance
+        sol2._server_url = self.getURL()
+        sol2.sync()
+        _, doclist = sol2.get_all_docs()
+        self.assertEqual(1, len(doclist))
+        doc2 = doclist[0]
+        # assert incoming doc is equal to the first sent doc
+        self.assertEqual(doc1, doc2)
