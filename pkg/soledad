@@ -1,16 +1,25 @@
 #!/bin/sh
+### BEGIN INIT INFO
+# Provides:          soledad
+# Required-Start:    $network $named $remote_fs $syslog $time
+# Required-Stop:     $network $named $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start soledad daemon at boot time
+# Description:       Synchronization of locally encrypted data among devices
+### END INIT INFO
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
-
-
-pidfile=/var/run/soledad.pid \
-rundir=/var/lib/soledad/ \
-obj=leap.soledad.server.application \
-logfile=/var/log/soledad.log \
-https_port=2424 \
-plain_port=65534 \
-cert_path=/etc/leap/soledad-server.pem \
-privkey_path=/etc/leap/soledad-server.pem
+PIDFILE=/var/run/soledad.pid
+RUNDIR=/var/lib/soledad/
+OBJ=leap.soledad.server.application
+LOGFILE=/var/log/soledad.log
+HTTPS_PORT=2424
+PLAIN_PORT=65534
+CERT_PATH=/etc/leap/soledad-server.pem
+PRIVKEY_PATH=/etc/leap/soledad-server.pem
+TWISTD_PATH=/usr/bin/twistd
+HOME=/var/lib/soledad/
 
 [ -r /etc/default/soledad ] && . /etc/default/soledad
 
@@ -22,23 +31,22 @@ test -r /etc/leap/ || exit 0
 case "$1" in
     start)
         echo -n "Starting soledad: twistd"
-        HOME="/var/lib/soledad/" \
-          start-stop-daemon --start --quiet --exec /usr/local/bin/twistd -- \
-                          --pidfile=$pidfile \
-                          --logfile=$logfile \
+          start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
+                          --pidfile=$PIDFILE \
+                          --logfile=$LOGFILE \
                           web \
-                          --wsgi=$obj \
-                          --https=$https_port \
-                          --certificate=$cert_path \
-                          --privkey=$privkey_path \
-                          --port=$plain_port
+                          --wsgi=$OBJ \
+                          --https=$HTTPS_PORT \
+                          --certificate=$CERT_PATH \
+                          --privkey=$PRIVKEY_PATH \
+                          --port=$PLAIN_PORT
         echo "."
     ;;
 
     stop)
         echo -n "Stopping soledad: twistd"
         start-stop-daemon --stop --quiet  \
-            --pidfile $pidfile
+            --pidfile $PIDFILE
         echo "."
     ;;
 
@@ -52,7 +60,7 @@ case "$1" in
     ;;
 
     status)
-        status_of_proc -p $pidfile /usr/local/bin/twistd soledad && exit 0 || exit $?
+        status_of_proc -p $PIDFILE $TWISTD_PATH soledad && exit 0 || exit $?
     ;;
 
     *)
