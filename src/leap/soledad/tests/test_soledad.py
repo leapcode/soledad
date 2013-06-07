@@ -29,13 +29,7 @@ from mock import Mock
 
 
 from leap.common.testing.basetest import BaseLeapTest
-from leap.common.events import (
-    server,
-    component,
-    events_pb2 as proto,
-    register,
-    signal,
-)
+from leap.common.events import events_pb2 as proto
 from leap.soledad.tests import (
     BaseSoledadTest,
     ADDRESS,
