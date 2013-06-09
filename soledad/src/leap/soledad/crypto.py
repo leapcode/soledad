@@ -27,8 +27,7 @@ import hmac
 import hashlib
 
 
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
+from pycryptopp.cipher.aes import AES
 
 
 from leap.soledad import (
@@ -99,10 +98,9 @@ class SoledadCrypto(object):
                 len(key) == 32,  # 32 x 8 = 256 bits.
                 'Wrong key size: %s bits (must be 256 bits long).' %
                 (len(key) * 8))
-            iv = os.urandom(8)
-            ctr = Counter.new(64, prefix=iv)
-            cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
-            return binascii.b2a_base64(iv), cipher.encrypt(data)
+            iv = os.urandom(16)
+            ciphertext = AES(key=key, iv=iv).process(data)
+            return binascii.b2a_base64(iv), ciphertext
 
         # raise if method is unknown
         raise UnknownEncryptionMethod('Unkwnown method: %s' % method)
@@ -137,9 +135,8 @@ class SoledadCrypto(object):
             soledad_assert(
                 'iv' in kwargs,
                 'AES-256-CTR needs an initial value.')
-            ctr = Counter.new(64, prefix=binascii.a2b_base64(kwargs['iv']))
-            cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
-            return cipher.decrypt(data)
+            return AES(
+                key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
 
         # raise if method is unknown
         raise UnknownEncryptionMethod('Unkwnown method: %s' % method)
