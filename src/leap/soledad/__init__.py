@@ -1073,6 +1073,9 @@ class Soledad(object):
 # Monkey patching u1db to be able to provide a custom SSL cert
 #-----------------------------------------------------------------------------
 
+# We need a more reasonable timeout (in seconds)
+SOLEDAD_TIMEOUT = 10
+
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     """HTTPSConnection verifying server side certificates."""
     # derived from httplib.py
@@ -1080,7 +1083,7 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     def connect(self):
         "Connect to a host on a given (SSL) port."
         sock = socket.create_connection((self.host, self.port),
-                                        self.timeout, self.source_address)
+                                        SOLEDAD_TIMEOUT, self.source_address)
         if self._tunnel_host:
             self.sock = sock
             self._tunnel()
