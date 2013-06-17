@@ -282,6 +282,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         soledad.signal.reset_mock()
         sol = self._soledad_instance()
         # mock the sync target
+        old_get_sync_info = SoledadSyncTarget.get_sync_info
         SoledadSyncTarget.get_sync_info = Mock(return_value=[0, 0, 0, 0, 2])
         # mock our generation so soledad thinks there's new data to sync
         sol._db._get_generation = Mock(return_value=1)
@@ -292,3 +293,4 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             proto.SOLEDAD_NEW_DATA_TO_SYNC,
             ADDRESS,
         )
+        SoledadSyncTarget.get_sync_info = old_get_sync_info
