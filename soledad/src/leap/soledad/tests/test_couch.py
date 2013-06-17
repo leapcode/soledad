@@ -316,7 +316,6 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         self.db2 = None
         self.db3 = None
         test_sync.DatabaseSyncTests.setUp(self)
-        CouchDBTestCase.setUp(self)
 
     def tearDown(self):
         self.db and self.db.delete_database()
