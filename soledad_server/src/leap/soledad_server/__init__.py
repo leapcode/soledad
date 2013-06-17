@@ -20,7 +20,7 @@
 A U1DB server that stores data using CouchDB as its persistence layer.
 
 This should be run with:
-    twistd -n web --wsgi=leap.soledad.server.application --port=2424
+    twistd -n web --wsgi=leap.soledad_server.application --port=2424
 """
 
 import configparser
@@ -53,7 +53,7 @@ if version.base() == "12.0.0":
 from couchdb.client import Server
 
 from leap.soledad import SECRETS_DOC_ID_HASH_PREFIX
-from leap.soledad.backends.couch import CouchServerState
+from leap.soledad_server.couch import CouchServerState
 
 
 #-----------------------------------------------------------------------------
@@ -126,7 +126,7 @@ class URLToAuth(object):
         @return: The database name corresponding to C{uuid}.
         @rtype: str
         """
-        return sha256('%s%s' % (SECRETS_DOC_ID_HASH_PREFIX, uuid)).hexdigest()
+        return '%s%s' % (SoledadApp.USER_DB_PREFIX, uuid)
 
     def _register_auth_info(self, dbname):
         """
@@ -327,6 +327,11 @@ class SoledadApp(http_app.HTTPApp):
     SHARED_DB_NAME = 'shared'
     """
     The name of the shared database that holds user's encrypted secrets.
+    """
+
+    USER_DB_PREFIX = 'uuid-'
+    """
+    The string prefix of users' databases.
     """
 
     def __call__(self, environ, start_response):

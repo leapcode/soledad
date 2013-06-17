@@ -8,9 +8,9 @@ from mock import Mock
 
 
 from leap.soledad import Soledad
+from leap.soledad.document import SoledadDocument
 from leap.soledad.crypto import SoledadCrypto
-from leap.soledad.backends.leap_backend import (
-    LeapDocument,
+from leap.soledad.target import (
     decrypt_doc,
     ENC_SCHEME_KEY,
 )
@@ -37,9 +37,9 @@ class BaseSoledadTest(BaseLeapTest):
         self.email = ADDRESS
         # open test dbs
         self._db1 = u1db.open(self.db1_file, create=True,
-                              document_factory=LeapDocument)
+                              document_factory=SoledadDocument)
         self._db2 = u1db.open(self.db2_file, create=True,
-                              document_factory=LeapDocument)
+                              document_factory=SoledadDocument)
         # initialize soledad by hand so we can control keys
         self._soledad = self._soledad_instance(user=self.email)
 
@@ -257,11 +257,3 @@ RZXoH+FTg9UAW87eqU610npOkT6cRaBxaMK/mDtGNdc=
 =JTFu
 -----END PGP PRIVATE KEY BLOCK-----
 """
-
-__all__ = [
-    'test_couch',
-    'test_encrypted',
-    'test_leap_backend',
-    'test_sqlcipher',
-    'u1db_tests',
-]

@@ -27,14 +27,12 @@ from base64 import b64decode
 
 from leap.common.files import mkdir_p
 
-from leap.soledad.backends import couch
+from leap.soledad_server import couch
 from leap.soledad.tests import u1db_tests as tests
 from leap.soledad.tests.u1db_tests import test_backends
 from leap.soledad.tests.u1db_tests import test_sync
 import simplejson as json
-from leap.soledad.backends.leap_backend import (
-    LeapDocument,
-)
+from leap.soledad.document import SoledadDocument
 
 
 #-----------------------------------------------------------------------------
@@ -185,7 +183,7 @@ def copy_couch_database_for_test(test, db):
 
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
-    return LeapDocument(doc_id, rev, content, has_conflicts=has_conflicts)
+    return SoledadDocument(doc_id, rev, content, has_conflicts=has_conflicts)
 
 
 COUCH_SCENARIOS = [

@@ -43,13 +43,13 @@ from u1db.backends.sqlite_backend import SQLitePartialExpandDatabase
 
 
 # soledad stuff.
-from leap.soledad.backends.sqlcipher import (
+from leap.soledad.document import SoledadDocument
+from leap.soledad.sqlcipher import (
     SQLCipherDatabase,
     DatabaseIsNotEncrypted,
+    open as u1db_open,
 )
-from leap.soledad.backends.sqlcipher import open as u1db_open
-from leap.soledad.backends.leap_backend import (
-    LeapDocument,
+from leap.soledad.target import (
     EncryptionSchemes,
     decrypt_doc,
     ENC_JSON_KEY,
@@ -63,7 +63,7 @@ from leap.soledad.tests.u1db_tests import test_sqlite_backend
 from leap.soledad.tests.u1db_tests import test_backends
 from leap.soledad.tests.u1db_tests import test_open
 from leap.soledad.tests.u1db_tests import test_sync
-from leap.soledad.backends.leap_backend import LeapSyncTarget
+from leap.soledad.target import SoledadSyncTarget
 from leap.common.testing.basetest import BaseLeapTest
 
 PASSWORD = '123456'
@@ -115,7 +115,7 @@ def copy_sqlcipher_database_for_test(test, db):
 
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
-    return LeapDocument(doc_id, rev, content, has_conflicts=has_conflicts)
+    return SoledadDocument(doc_id, rev, content, has_conflicts=has_conflicts)
 
 
 SQLCIPHER_SCENARIOS = [
@@ -205,7 +205,7 @@ class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
         self.assertTrue(db2._is_initialized(db1._get_sqlite_handle().cursor()))
 
 
-class TestAlternativeDocument(LeapDocument):
+class TestAlternativeDocument(SoledadDocument):
     """A (not very) alternative implementation of Document."""
 
 
@@ -272,7 +272,7 @@ class TestSQLCipherPartialExpandDatabase(
             path, PASSWORD,
             document_factory=TestAlternativeDocument)
         doc = db2.create_doc({})
-        self.assertTrue(isinstance(doc, LeapDocument))
+        self.assertTrue(isinstance(doc, SoledadDocument))
 
     def test__open_database_non_existent(self):
         temp_dir = self.createTempDir(prefix='u1db-test-')
@@ -341,7 +341,7 @@ class TestSQLCipherPartialExpandDatabase(
             path, PASSWORD, create=False,
             document_factory=TestAlternativeDocument)
         doc = db2.create_doc({})
-        self.assertTrue(isinstance(doc, LeapDocument))
+        self.assertTrue(isinstance(doc, SoledadDocument))
 
     def test_open_database_create(self):
         temp_dir = self.createTempDir(prefix='u1db-test-')
@@ -401,7 +401,7 @@ class SQLCipherOpen(test_open.TestU1DBOpen):
                        document_factory=TestAlternativeDocument)
         self.addCleanup(db.close)
         doc = db.create_doc({})
-        self.assertTrue(isinstance(doc, LeapDocument))
+        self.assertTrue(isinstance(doc, SoledadDocument))
 
     def test_open_existing(self):
         db = SQLCipherDatabase(self.db_path, PASSWORD)
@@ -438,7 +438,7 @@ def sync_via_synchronizer_and_leap(test, db_source, db_target,
     if trace_hook:
         test.skipTest("full trace hook unsupported over http")
     path = test._http_at[db_target]
-    target = LeapSyncTarget.connect(test.getURL(path), test._soledad._crypto)
+    target = SoledadSyncTarget.connect(test.getURL(path), test._soledad._crypto)
     target.set_token_credentials('user-uuid', 'auth-token')
     if trace_hook_shallow:
         target._set_trace_hook_shallow(trace_hook_shallow)
@@ -662,7 +662,7 @@ class SQLCipherDatabaseSyncTests(
 def _make_local_db_and_leap_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = LeapSyncTarget.connect(test.getURL(path), test._soledad._crypto)
+    st = SoledadSyncTarget.connect(test.getURL(path), test._soledad._crypto)
     st.set_token_credentials('user-uuid', 'auth-token')
     return db, st
 
@@ -791,7 +791,7 @@ class SQLCipherEncryptionTest(BaseLeapTest):
             # trying to open an encrypted database with the regular u1db
             # backend should raise a DatabaseError exception.
             SQLitePartialExpandDatabase(self.DB_FILE,
-                                        document_factory=LeapDocument)
+                                        document_factory=SoledadDocument)
             raise DatabaseIsNotEncrypted()
         except dbapi2.DatabaseError:
             # at this point we know that the regular U1DB sqlcipher backend
@@ -807,7 +807,7 @@ class SQLCipherEncryptionTest(BaseLeapTest):
         SQLCipher backend should not succeed to open unencrypted databases.
         """
         db = SQLitePartialExpandDatabase(self.DB_FILE,
-                                         document_factory=LeapDocument)
+                                         document_factory=SoledadDocument)
         db.create_doc_from_json(tests.simple_doc)
         db.close()
         try:

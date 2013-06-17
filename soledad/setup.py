@@ -16,7 +16,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from setuptools import (
     setup,
     find_packages
@@ -24,18 +23,13 @@ from setuptools import (
 
 
 install_requirements = [
-    'configparser',
-    'couchdb',
     'pysqlcipher',
     'simplejson',
-    'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
     'oauth',  # this is not strictly needed by us, but we need it
               # until u1db adds it to its release as a dep.
     'u1db',
-    'requests',
     'six==1.1.0',
     'scrypt',
-    'routes',
     'pyxdg',
     'pycrypto',
 ]
@@ -46,14 +40,9 @@ tests_requirements = [
     'nose2',
     'testscenarios',
     'leap.common',
+    'leap.soledad_server',
 ]
 
-
-if os.environ.get('VIRTUAL_ENV', None):
-    data_files = None
-else:
-    # XXX this should go only for linux/mac
-    data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -88,9 +77,6 @@ setup(
     test_suite='leap.soledad.tests',
     install_requires=install_requirements,
     tests_require=tests_requirements,
-    data_files=data_files,
     classifiers=trove_classifiers,
-    extras_require={
-        'signaling': ['leap.common'],
-    }
+    extras_require={'signaling': ['leap.common']},
 )

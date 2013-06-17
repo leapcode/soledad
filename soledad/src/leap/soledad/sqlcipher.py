@@ -54,7 +54,7 @@ from pysqlcipher import dbapi2
 from u1db import (
     errors,
 )
-from leap.soledad.backends.leap_backend import LeapDocument
+from leap.soledad.document import SoledadDocument
 
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
@@ -169,7 +169,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
         def factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
                     syncable=True):
-            return LeapDocument(doc_id=doc_id, rev=rev, json=json,
+            return SoledadDocument(doc_id=doc_id, rev=rev, json=json,
                                 has_conflicts=has_conflicts,
                                 syncable=syncable)
         self.set_document_factory(factory)
@@ -301,10 +301,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @rtype: int
         """
         from u1db.sync import Synchronizer
-        from leap.soledad.backends.leap_backend import LeapSyncTarget
+        from leap.soledad.target import SoledadSyncTarget
         return Synchronizer(
             self,
-            LeapSyncTarget(url,
+            SoledadSyncTarget(url,
                            creds=creds,
                            crypto=self._crypto)).sync(autocreate=autocreate)
 

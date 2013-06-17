@@ -36,12 +36,10 @@ from leap.soledad.tests import (
 )
 from leap import soledad
 from leap.soledad import Soledad
+from leap.soledad.document import SoledadDocument
 from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.shared_db import SoledadSharedDatabase
-from leap.soledad.backends.leap_backend import (
-    LeapDocument,
-    LeapSyncTarget,
-)
+from leap.soledad.target import SoledadSyncTarget
 
 
 class AuxMethodsTestCase(BaseSoledadTest):
@@ -63,7 +61,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
             sol._gen_secret()
         sol._load_secrets()
         sol._init_db()
-        from leap.soledad.backends.sqlcipher import SQLCipherDatabase
+        from leap.soledad.sqlcipher import SQLCipherDatabase
         self.assertIsInstance(sol._db, SQLCipherDatabase)
 
     def test__init_config_defaults(self):
@@ -117,7 +115,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
     def setUp(self):
         BaseSoledadTest.setUp(self)
         self._shared_db = SoledadSharedDatabase(
-            'https://provider/', LeapDocument, None)
+            'https://provider/', SoledadDocument, None)
 
     def test__get_secrets_from_shared_db(self):
         """
@@ -284,7 +282,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         soledad.signal.reset_mock()
         sol = self._soledad_instance()
         # mock the sync target
-        LeapSyncTarget.get_sync_info = Mock(return_value=[0, 0, 0, 0, 2])
+        SoledadSyncTarget.get_sync_info = Mock(return_value=[0, 0, 0, 0, 2])
         # mock our generation so soledad thinks there's new data to sync
         sol._db._get_generation = Mock(return_value=1)
         # check for new data to sync

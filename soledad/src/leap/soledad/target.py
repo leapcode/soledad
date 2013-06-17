@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# leap_backend.py
+# target.py
 # Copyright (C) 2013 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,13 +27,13 @@ import hmac
 import binascii
 
 
-from u1db import Document
 from u1db.remote import utils
 from u1db.errors import BrokenSyncStream
 from u1db.remote.http_target import HTTPSyncTarget
 
 
 from leap.soledad import soledad_assert
+from leap.soledad.document import SoledadDocument
 from leap.soledad.crypto import (
     EncryptionMethods,
     UnknownEncryptionMethod,
@@ -96,7 +96,7 @@ class MacMethods(object):
 
 
 #
-# Crypto utilities for a LeapDocument.
+# Crypto utilities for a SoledadDocument.
 #
 
 ENC_JSON_KEY = '_enc_json'
@@ -159,7 +159,7 @@ def encrypt_doc(crypto, doc):
     @param crypto: A SoledadCryto instance used to perform the encryption.
     @type crypto: leap.soledad.crypto.SoledadCrypto
     @param doc: The document with contents to be encrypted.
-    @type doc: LeapDocument
+    @type doc: SoledadDocument
 
     @return: The JSON serialization of the dict representing the encrypted
         content.
@@ -213,7 +213,7 @@ def decrypt_doc(crypto, doc):
     @param crypto: A SoledadCryto instance to perform the encryption.
     @type crypto: leap.soledad.crypto.SoledadCrypto
     @param doc: The document to be decrypted.
-    @type doc: LeapDocument
+    @type doc: SoledadDocument
 
     @return: The JSON serialization of the decrypted content.
     @rtype: str
@@ -252,92 +252,11 @@ def decrypt_doc(crypto, doc):
     return plainjson
 
 
-class LeapDocument(Document):
-    """
-    Encryptable and syncable document.
-
-    LEAP Documents can be flagged as syncable or not, so the replicas
-    might not sync every document.
-    """
-
-    def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False,
-                 syncable=True):
-        """
-        Container for handling an encryptable document.
-
-        @param doc_id: The unique document identifier.
-        @type doc_id: str
-        @param rev: The revision identifier of the document.
-        @type rev: str
-        @param json: The JSON string for this document.
-        @type json: str
-        @param has_conflicts: Boolean indicating if this document has conflicts
-        @type has_conflicts: bool
-        @param syncable: Should this document be synced with remote replicas?
-        @type syncable: bool
-        """
-        Document.__init__(self, doc_id, rev, json, has_conflicts)
-        self._syncable = syncable
-
-    def _get_syncable(self):
-        """
-        Return whether this document is syncable.
-
-        @return: Is this document syncable?
-        @rtype: bool
-        """
-        return self._syncable
-
-    def _set_syncable(self, syncable=True):
-        """
-        Determine if this document should be synced with remote replicas.
-
-        @param syncable: Should this document be synced with remote replicas?
-        @type syncable: bool
-        """
-        self._syncable = syncable
-
-    syncable = property(
-        _get_syncable,
-        _set_syncable,
-        doc="Determine if document should be synced with server."
-    )
-
-    def _get_rev(self):
-        """
-        Get the document revision.
-
-        Returning the revision as string solves the following exception in
-        Twisted web:
-            exceptions.TypeError: Can only pass-through bytes on Python 2
-
-        @return: The document revision.
-        @rtype: str
-        """
-        if self._rev is None:
-            return None
-        return str(self._rev)
-
-    def _set_rev(self, rev):
-        """
-        Set document revision.
-
-        @param rev: The new document revision.
-        @type rev: bytes
-        """
-        self._rev = rev
-
-    rev = property(
-        _get_rev,
-        _set_rev,
-        doc="Wrapper to ensure `doc.rev` is always returned as bytes.")
-
-
 #
-# LeapSyncTarget
+# SoledadSyncTarget
 #
 
-class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
+class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
     """
     A SyncTarget that encrypts data before sending and decrypts data after
     receiving.
@@ -380,11 +299,11 @@ class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
     @staticmethod
     def connect(url, crypto=None):
-        return LeapSyncTarget(url, crypto=crypto)
+        return SoledadSyncTarget(url, crypto=crypto)
 
     def __init__(self, url, creds=None, crypto=None):
         """
-        Initialize the LeapSyncTarget.
+        Initialize the SoledadSyncTarget.
 
         @param url: The url of the target replica to sync with.
         @type url: str
@@ -441,7 +360,7 @@ class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 #-------------------------------------------------------------
                 # if arriving content was symmetrically encrypted, we decrypt
                 # it.
-                doc = LeapDocument(entry['id'], entry['rev'], entry['content'])
+                doc = SoledadDocument(entry['id'], entry['rev'], entry['content'])
                 if doc.content and ENC_SCHEME_KEY in doc.content:
                     if doc.content[ENC_SCHEME_KEY] == \
                             EncryptionSchemes.SYMKEY:
@@ -517,7 +436,7 @@ class LeapSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         comma = ','
         for doc, gen, trans_id in docs_by_generations:
             # skip non-syncable docs
-            if isinstance(doc, LeapDocument) and not doc.syncable:
+            if isinstance(doc, SoledadDocument) and not doc.syncable:
                 continue
             #-------------------------------------------------------------
             # symmetric encryption of document's contents

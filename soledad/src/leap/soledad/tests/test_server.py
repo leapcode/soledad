@@ -29,16 +29,16 @@ import mock
 
 
 from leap.soledad import Soledad
-from leap.soledad.server import (
+from leap.soledad_server import (
     SoledadApp,
     SoledadAuthMiddleware,
     URLToAuth,
 )
-from leap.soledad.backends.couch import (
+from leap.soledad_server.couch import (
     CouchServerState,
     CouchDatabase,
 )
-from leap.soledad.backends import leap_backend
+from leap.soledad import target
 
 
 from leap.common.testing.basetest import BaseLeapTest
@@ -49,7 +49,7 @@ from leap.soledad.tests.u1db_tests import (
     nested_doc,
 )
 from leap.soledad.tests.test_couch import CouchDBTestCase
-from leap.soledad.tests.test_leap_backend import (
+from leap.soledad.tests.test_target import (
     make_token_soledad_app,
     make_leap_document_for_test,
     token_leap_sync_target,
@@ -336,7 +336,7 @@ class EncryptedSyncTestCase(
         self.startServer()
         # instantiate soledad and create a document
         sol1 = self._soledad_instance(
-            # token is verified in test_leap_backend.make_token_soledad_app
+            # token is verified in test_target.make_token_soledad_app
             auth_token='auth-token'
         )
         _, doclist = sol1.get_all_docs()
@@ -358,12 +358,12 @@ class EncryptedSyncTestCase(
         self.assertEqual(doc1.doc_id, couchdoc.doc_id)
         self.assertEqual(doc1.rev, couchdoc.rev)
         self.assertEqual(6, len(couchdoc.content))
-        self.assertTrue(leap_backend.ENC_JSON_KEY in couchdoc.content)
-        self.assertTrue(leap_backend.ENC_SCHEME_KEY in couchdoc.content)
-        self.assertTrue(leap_backend.ENC_METHOD_KEY in couchdoc.content)
-        self.assertTrue(leap_backend.ENC_IV_KEY in couchdoc.content)
-        self.assertTrue(leap_backend.MAC_KEY in couchdoc.content)
-        self.assertTrue(leap_backend.MAC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(target.ENC_JSON_KEY in couchdoc.content)
+        self.assertTrue(target.ENC_SCHEME_KEY in couchdoc.content)
+        self.assertTrue(target.ENC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(target.ENC_IV_KEY in couchdoc.content)
+        self.assertTrue(target.MAC_KEY in couchdoc.content)
+        self.assertTrue(target.MAC_METHOD_KEY in couchdoc.content)
         # instantiate soledad with empty db, but with same secrets path
         sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
         _, doclist = sol2.get_all_docs()
