@@ -24,6 +24,7 @@ from setuptools import (
 
 install_requirements = [
     'pysqlcipher',
+    'pysqlite',  # TODO: this should not be a dep, see #2945
     'simplejson',
     'oauth',  # this is not strictly needed by us, but we need it
               # until u1db adds it to its release as a dep.
@@ -32,6 +33,7 @@ install_requirements = [
     'scrypt',
     'pyxdg',
     'pycrypto',
+    'pyOpenSSL',
 ]
 
 
