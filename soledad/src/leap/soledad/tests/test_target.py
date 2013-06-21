@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# test_leap_backend.py
+# test_target.py
 # Copyright (C) 2013 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -33,15 +33,17 @@ from u1db.remote import (
     http_database,
     http_target,
 )
-from routes.mapper import Mapper
 
 from leap import soledad
-from leap.soledad.backends import leap_backend
-from leap.soledad.server import (
+from leap.soledad import (
+    target,
+    auth,
+)
+from leap.soledad.document import SoledadDocument
+from leap.soledad_server import (
     SoledadApp,
     SoledadAuthMiddleware,
 )
-from leap.soledad import auth
 
 
 from leap.soledad.tests import u1db_tests as tests
@@ -61,7 +63,7 @@ from leap.soledad.tests.u1db_tests import test_sync
 
 def make_leap_document_for_test(test, doc_id, rev, content,
                                 has_conflicts=False):
-    return leap_backend.LeapDocument(
+    return SoledadDocument(
         doc_id, rev, content, has_conflicts=has_conflicts)
 
 
@@ -126,7 +128,7 @@ def copy_token_http_database_for_test(test, db):
     return http_db
 
 
-class LeapTests(test_backends.AllDatabaseTests, BaseSoledadTest):
+class SoledadTests(test_backends.AllDatabaseTests, BaseSoledadTest):
 
     scenarios = LEAP_SCENARIOS + [
         ('token_http', {'make_database_for_test':
@@ -143,7 +145,7 @@ class LeapTests(test_backends.AllDatabaseTests, BaseSoledadTest):
 # The following tests come from `u1db.tests.test_http_client`.
 #-----------------------------------------------------------------------------
 
-class TestLeapClientBase(test_http_client.TestHTTPClientBase):
+class TestSoledadClientBase(test_http_client.TestHTTPClientBase):
     """
     This class should be used to test Token auth.
     """
@@ -230,13 +232,13 @@ class TestLeapClientBase(test_http_client.TestHTTPClientBase):
 # The following tests come from `u1db.tests.test_document`.
 #-----------------------------------------------------------------------------
 
-class TestLeapDocument(test_document.TestDocument, BaseSoledadTest):
+class TestSoledadDocument(test_document.TestDocument, BaseSoledadTest):
 
     scenarios = ([(
         'leap', {'make_document_for_test': make_leap_document_for_test})])
 
 
-class TestLeapPyDocument(test_document.TestPyDocument, BaseSoledadTest):
+class TestSoledadPyDocument(test_document.TestPyDocument, BaseSoledadTest):
 
     scenarios = ([(
         'leap', {'make_document_for_test': make_leap_document_for_test})])
@@ -246,7 +248,7 @@ class TestLeapPyDocument(test_document.TestPyDocument, BaseSoledadTest):
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 #-----------------------------------------------------------------------------
 
-class TestLeapSyncTargetBasics(
+class TestSoledadSyncTargetBasics(
         test_remote_sync_target.TestHTTPSyncTargetBasics):
     """
     Some tests had to be copied to this class so we can instantiate our own
@@ -254,14 +256,14 @@ class TestLeapSyncTargetBasics(
     """
 
     def test_parse_url(self):
-        remote_target = leap_backend.LeapSyncTarget('http://127.0.0.1:12345/')
+        remote_target = target.SoledadSyncTarget('http://127.0.0.1:12345/')
         self.assertEqual('http', remote_target._url.scheme)
         self.assertEqual('127.0.0.1', remote_target._url.hostname)
         self.assertEqual(12345, remote_target._url.port)
         self.assertEqual('/', remote_target._url.path)
 
 
-class TestLeapParsingSyncStream(
+class TestSoledadParsingSyncStream(
         test_remote_sync_target.TestParsingSyncStream,
         BaseSoledadTest):
     """
@@ -281,10 +283,10 @@ class TestLeapParsingSyncStream(
         """
         Test adapted to use encrypted content.
         """
-        doc = leap_backend.LeapDocument('i', rev='r')
+        doc = SoledadDocument('i', rev='r')
         doc.content = {}
-        enc_json = leap_backend.encrypt_doc(self._soledad._crypto, doc)
-        tgt = leap_backend.LeapSyncTarget(
+        enc_json = target.encrypt_doc(self._soledad._crypto, doc)
+        tgt = target.SoledadSyncTarget(
             "http://foo/foo", crypto=self._soledad._crypto)
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
@@ -297,7 +299,7 @@ class TestLeapParsingSyncStream(
                           lambda doc, gen, trans_id: None)
 
     def test_wrong_start(self):
-        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+        tgt = target.SoledadSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "{}\r\n]", None)
@@ -309,7 +311,7 @@ class TestLeapParsingSyncStream(
                           tgt._parse_sync_stream, "", None)
 
     def test_wrong_end(self):
-        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+        tgt = target.SoledadSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n{}", None)
@@ -318,7 +320,7 @@ class TestLeapParsingSyncStream(
                           tgt._parse_sync_stream, "[\r\n", None)
 
     def test_missing_comma(self):
-        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+        tgt = target.SoledadSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream,
@@ -326,13 +328,13 @@ class TestLeapParsingSyncStream(
                           '"content": "c", "gen": 3}\r\n]', None)
 
     def test_no_entries(self):
-        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+        tgt = target.SoledadSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n]", None)
 
     def test_error_in_stream(self):
-        tgt = leap_backend.LeapSyncTarget("http://foo/foo")
+        tgt = target.SoledadSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.Unavailable,
                           tgt._parse_sync_stream,
@@ -353,7 +355,7 @@ class TestLeapParsingSyncStream(
 #
 
 def leap_sync_target(test, path):
-    return leap_backend.LeapSyncTarget(
+    return target.SoledadSyncTarget(
         test.getURL(path), crypto=test._soledad._crypto)
 
 
@@ -363,7 +365,7 @@ def token_leap_sync_target(test, path):
     return st
 
 
-class TestLeapSyncTarget(
+class TestSoledadSyncTarget(
         test_remote_sync_target.TestRemoteSyncTargets, BaseSoledadTest):
 
     scenarios = [
@@ -497,14 +499,14 @@ class TestLeapSyncTarget(
 
 def token_leap_https_sync_target(test, host, path):
     _, port = test.server.server_address
-    st = leap_backend.LeapSyncTarget(
+    st = target.SoledadSyncTarget(
         'https://%s:%d/%s' % (host, port, path),
         crypto=test._soledad._crypto)
     st.set_token_credentials('user-uuid', 'auth-token')
     return st
 
 
-class TestLeapSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
+class TestSoledadSyncTargetHttpsSupport(test_https.TestHttpSyncTargetHttpsSupport,
                                      BaseSoledadTest):
 
     scenarios = [
@@ -598,7 +600,7 @@ class TestHTTPDatabaseWithCreds(
 def _make_local_db_and_leap_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = leap_backend.LeapSyncTarget.connect(
+    st = target.SoledadSyncTarget.connect(
         test.getURL(path), crypto=test._soledad._crypto)
     return db, st
 
@@ -616,7 +618,7 @@ target_scenarios = [
 ]
 
 
-class LeapDatabaseSyncTargetTests(
+class SoledadDatabaseSyncTargetTests(
         test_sync.DatabaseSyncTargetTests, BaseSoledadTest):
 
     scenarios = (
@@ -702,7 +704,7 @@ class LeapDatabaseSyncTargetTests(
                  [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
 
 
-class TestLeapDbSync(test_sync.TestDbSync, BaseSoledadTest):
+class TestSoledadDbSync(test_sync.TestDbSync, BaseSoledadTest):
     """Test db.sync remote sync shortcut"""
 
     scenarios = [
@@ -722,7 +724,7 @@ class TestLeapDbSync(test_sync.TestDbSync, BaseSoledadTest):
 
     def do_sync(self, target_name):
         """
-        Perform sync using LeapSyncTarget and Token auth.
+        Perform sync using SoledadSyncTarget and Token auth.
         """
         if self.token:
             extra = dict(creds={'token': {
@@ -732,7 +734,7 @@ class TestLeapDbSync(test_sync.TestDbSync, BaseSoledadTest):
             target_url = self.getURL(target_name)
             return Synchronizer(
                 self.db,
-                leap_backend.LeapSyncTarget(
+                target.SoledadSyncTarget(
                     target_url,
                     crypto=self._soledad._crypto,
                     **extra)).sync(autocreate=True)

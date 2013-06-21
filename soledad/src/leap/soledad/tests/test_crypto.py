@@ -33,10 +33,12 @@ from Crypto import Random
 
 
 from leap.common.testing.basetest import BaseLeapTest
-from leap.soledad import Soledad
-from leap.soledad import crypto
-from leap.soledad.backends import leap_backend
-from leap.soledad.backends.couch import CouchDatabase
+from leap.soledad import (
+    Soledad,
+    crypto,
+    target,
+)
+from leap.soledad.document import SoledadDocument
 from leap.soledad.tests import (
     BaseSoledadTest,
     KEY_FINGERPRINT,
@@ -49,12 +51,6 @@ from leap.soledad.tests.u1db_tests import (
 )
 
 
-# These will be used in the future for EncryptedCouchSyncTestCase
-#from leap.soledad.tests.test_couch import CouchDBTestCase
-#from leap.soledad.tests.test_leap_backend import make_leap_document_for_test
-#from leap.soledad.backends.couch import CouchServerState
-
-
 class EncryptedSyncTestCase(BaseSoledadTest):
     """
     Tests that guarantee that data will always be encrypted when syncing.
@@ -65,18 +61,18 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         Test encrypting and decrypting documents.
         """
         simpledoc = {'key': 'val'}
-        doc1 = leap_backend.LeapDocument(doc_id='id')
+        doc1 = SoledadDocument(doc_id='id')
         doc1.content = simpledoc
         # encrypt doc
-        doc1.set_json(leap_backend.encrypt_doc(self._soledad._crypto, doc1))
+        doc1.set_json(target.encrypt_doc(self._soledad._crypto, doc1))
         # assert content is different and includes keys
         self.assertNotEqual(
             simpledoc, doc1.content,
             'incorrect document encryption')
-        self.assertTrue(leap_backend.ENC_JSON_KEY in doc1.content)
-        self.assertTrue(leap_backend.ENC_SCHEME_KEY in doc1.content)
+        self.assertTrue(target.ENC_JSON_KEY in doc1.content)
+        self.assertTrue(target.ENC_SCHEME_KEY in doc1.content)
         # decrypt doc
-        doc1.set_json(leap_backend.decrypt_doc(self._soledad._crypto, doc1))
+        doc1.set_json(target.decrypt_doc(self._soledad._crypto, doc1))
         self.assertEqual(
             simpledoc, doc1.content, 'incorrect document encryption')
 
@@ -161,36 +157,36 @@ class MacAuthTestCase(BaseSoledadTest):
         Trying to decrypt a document with wrong MAC should raise.
         """
         simpledoc = {'key': 'val'}
-        doc = leap_backend.LeapDocument(doc_id='id')
+        doc = SoledadDocument(doc_id='id')
         doc.content = simpledoc
         # encrypt doc
-        doc.set_json(leap_backend.encrypt_doc(self._soledad._crypto, doc))
-        self.assertTrue(leap_backend.MAC_KEY in doc.content)
-        self.assertTrue(leap_backend.MAC_METHOD_KEY in doc.content)
+        doc.set_json(target.encrypt_doc(self._soledad._crypto, doc))
+        self.assertTrue(target.MAC_KEY in doc.content)
+        self.assertTrue(target.MAC_METHOD_KEY in doc.content)
         # mess with MAC
-        doc.content[leap_backend.MAC_KEY] = '1234567890ABCDEF'
+        doc.content[target.MAC_KEY] = '1234567890ABCDEF'
         # try to decrypt doc
         self.assertRaises(
-            leap_backend.WrongMac,
-            leap_backend.decrypt_doc, self._soledad._crypto, doc)
+            target.WrongMac,
+            target.decrypt_doc, self._soledad._crypto, doc)
 
     def test_decrypt_with_unknown_mac_method_raises(self):
         """
         Trying to decrypt a document with unknown MAC method should raise.
         """
         simpledoc = {'key': 'val'}
-        doc = leap_backend.LeapDocument(doc_id='id')
+        doc = SoledadDocument(doc_id='id')
         doc.content = simpledoc
         # encrypt doc
-        doc.set_json(leap_backend.encrypt_doc(self._soledad._crypto, doc))
-        self.assertTrue(leap_backend.MAC_KEY in doc.content)
-        self.assertTrue(leap_backend.MAC_METHOD_KEY in doc.content)
+        doc.set_json(target.encrypt_doc(self._soledad._crypto, doc))
+        self.assertTrue(target.MAC_KEY in doc.content)
+        self.assertTrue(target.MAC_METHOD_KEY in doc.content)
         # mess with MAC method
-        doc.content[leap_backend.MAC_METHOD_KEY] = 'mymac'
+        doc.content[target.MAC_METHOD_KEY] = 'mymac'
         # try to decrypt doc
         self.assertRaises(
-            leap_backend.UnknownMacMethod,
-            leap_backend.decrypt_doc, self._soledad._crypto, doc)
+            target.UnknownMacMethod,
+            target.decrypt_doc, self._soledad._crypto, doc)
 
 
 class SoledadCryptoTestCase(BaseSoledadTest):

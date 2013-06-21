@@ -1,0 +1,3 @@
+  o Database request have default timeout too high, a
+    soledad.SOLEDAD_TIMEOUT variable has been added in order to have
+    more control over this. Fixes #2713

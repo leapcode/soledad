@@ -26,26 +26,14 @@ from setuptools import (
 install_requirements = [
     'configparser',
     'couchdb',
-    'pysqlcipher',
     'simplejson',
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
     'oauth',  # this is not strictly needed by us, but we need it
               # until u1db adds it to its release as a dep.
     'u1db',
-    'requests',
     'six==1.1.0',
-    'scrypt',
     'routes',
-    'pyxdg',
-    'pycrypto',
-]
-
-
-tests_requirements = [
-    'mock',
-    'nose2',
-    'testscenarios',
-    'leap.common',
+    'PyOpenSSL',
 ]
 
 
@@ -70,7 +58,7 @@ trove_classifiers = (
 )
 
 setup(
-    name='leap.soledad',
+    name='leap.soledad_server',
     version='0.1.1',
     url='https://leap.se/',
     license='GPLv3+',
@@ -83,14 +71,9 @@ setup(
         "LEAP client, an API for data storage and sync."
     ),
     namespace_packages=["leap"],
-    packages=find_packages('src', exclude=['leap.soledad.tests']),
+    packages=find_packages('src'),
     package_dir={'': 'src'},
-    test_suite='leap.soledad.tests',
     install_requires=install_requirements,
-    tests_require=tests_requirements,
     data_files=data_files,
     classifiers=trove_classifiers,
-    extras_require={
-        'signaling': ['leap.common'],
-    }
 )

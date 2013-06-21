@@ -134,13 +134,12 @@ except ImportError:
     pass
 
 
-from leap.soledad.backends import sqlcipher
-from leap.soledad.backends.leap_backend import (
-    LeapDocument,
-    LeapSyncTarget,
+from leap.soledad.document import SoledadDocument
+from leap.soledad.sqlcipher import (
+    open as sqlcipher_open,
+    SQLCipherDatabase,
 )
-
-from leap.soledad import shared_db
+from leap.soledad.target import SoledadSyncTarget
 from leap.soledad.shared_db import SoledadSharedDatabase
 from leap.soledad.crypto import SoledadCrypto
 
@@ -418,11 +417,11 @@ class Soledad(object):
             secret[salt_start:salt_end],  # the salt
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
-        self._db = sqlcipher.open(
+        self._db = sqlcipher_open(
             self._local_db_path,
             binascii.b2a_hex(key),  # sqlcipher only accepts the hex version
             create=True,
-            document_factory=LeapDocument,
+            document_factory=SoledadDocument,
             crypto=self._crypto,
             raw_key=True)
 
@@ -432,7 +431,7 @@ class Soledad(object):
         """
         if hasattr(self, '_db') and isinstance(
                 self._db,
-                sqlcipher.SQLCipherDatabase):
+                SQLCipherDatabase):
             self._db.close()
 
     def __del__(self):
@@ -634,7 +633,7 @@ class Soledad(object):
         database.
 
         @return: a document with encrypted key material in its contents
-        @rtype: LeapDocument
+        @rtype: SoledadDocument
         """
         signal(SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db()
@@ -661,7 +660,7 @@ class Soledad(object):
         # try to get secrets doc from server, otherwise create it
         doc = self._get_secrets_from_shared_db()
         if doc is None:
-            doc = LeapDocument(doc_id=self._uuid_hash())
+            doc = SoledadDocument(doc_id=self._uuid_hash())
         # fill doc with encrypted secrets
         doc.content = self.export_recovery_document(include_uuid=False)
         # upload secrets to server
@@ -682,7 +681,7 @@ class Soledad(object):
         Update a document in the local encrypted database.
 
         @param doc: the document to update
-        @type doc: LeapDocument
+        @type doc: SoledadDocument
 
         @return: the new revision identifier for the document
         @rtype: str
@@ -694,7 +693,7 @@ class Soledad(object):
         Delete a document from the local encrypted database.
 
         @param doc: the document to delete
-        @type doc: LeapDocument
+        @type doc: SoledadDocument
 
         @return: the new revision identifier for the document
         @rtype: str
@@ -713,7 +712,7 @@ class Soledad(object):
         @type include_deleted: bool
 
         @return: the document object or None
-        @rtype: LeapDocument
+        @rtype: SoledadDocument
         """
         return self._db.get_doc(doc_id, include_deleted=include_deleted)
 
@@ -758,7 +757,7 @@ class Soledad(object):
         @type doc_id: str
 
         @return: the new document
-        @rtype: LeapDocument
+        @rtype: SoledadDocument
         """
         return self._db.create_doc(content, doc_id=doc_id)
 
@@ -777,7 +776,7 @@ class Soledad(object):
         @param doc_id: An optional identifier specifying the document id.
         @type doc_id:
         @return: The new cocument
-        @rtype: LeapDocument
+        @rtype: SoledadDocument
         """
         return self._db.create_doc_from_json(json, doc_id=doc_id)
 
@@ -903,7 +902,7 @@ class Soledad(object):
         Mark a document as no longer conflicted.
 
         @param doc: a document with the new content to be inserted.
-        @type doc: LeapDocument
+        @type doc: SoledadDocument
         @param conflicted_doc_revs: a list of revisions that the new content
             supersedes.
         @type conflicted_doc_revs: list
@@ -937,7 +936,7 @@ class Soledad(object):
         @return: Whether remote replica and local replica differ.
         @rtype: bool
         """
-        target = LeapSyncTarget(url, creds=self._creds, crypto=self._crypto)
+        target = SoledadSyncTarget(url, creds=self._creds, crypto=self._crypto)
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
@@ -1073,6 +1072,9 @@ class Soledad(object):
 # Monkey patching u1db to be able to provide a custom SSL cert
 #-----------------------------------------------------------------------------
 
+# We need a more reasonable timeout (in seconds)
+SOLEDAD_TIMEOUT = 10
+
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     """HTTPSConnection verifying server side certificates."""
     # derived from httplib.py
@@ -1080,7 +1082,7 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     def connect(self):
         "Connect to a host on a given (SSL) port."
         sock = socket.create_connection((self.host, self.port),
-                                        self.timeout, self.source_address)
+                                        SOLEDAD_TIMEOUT, self.source_address)
         if self._tunnel_host:
             self.sock = sock
             self._tunnel()

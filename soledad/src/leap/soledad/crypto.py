@@ -136,7 +136,7 @@ class SoledadCrypto(object):
                 'Wrong key size: %s (must be 256 bits long).' % len(key))
             soledad_assert(
                 'iv' in kwargs,
-                'AES-256-CTR needs an initial value given as.')
+                'AES-256-CTR needs an initial value.')
             ctr = Counter.new(64, prefix=binascii.a2b_base64(kwargs['iv']))
             cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
             return cipher.decrypt(data)
