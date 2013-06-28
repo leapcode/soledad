@@ -1,3 +1,0 @@
-  o Add SQLCipher API to SQLCipher backend (allow for use of raw keys, add
-    better encrypted db assertion, add cipher, kdf_iter, cipher_page_size and
-    rekey PRAGMAS).

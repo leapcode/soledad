@@ -1,0 +1,42 @@
+0.2.1 Jun 28:
+Client:
+  o Do not list the backends in the __init__'s __all__ to allow not
+    supporting couch on the client side until the code is diveded into
+    client and server.  o Fix bad dependencies in setup.py.
+  o Fix broken pip install
+  o Database request have default timeout too high, a
+    soledad.SOLEDAD_TIMEOUT variable has been added in order to have
+    more control over this. Fixes #2713
+  o Add validation and authorization of actions upon interaction with
+    server.
+  o Add MAC authentication to encrypted representation of documents.
+  o Add SQLCipher API to SQLCipher backend (allow for use of raw keys,
+    add better encrypted db assertion, add cipher, kdf_iter,
+    cipher_page_size and rekey PRAGMAS).
+  o Change symmetric encryption method to AES-256 CTR mode.
+  o Change the local storage of the storage secret:
+      * Use scrypt to derive a key for the encryption of the storage
+        secret.
+      * Store secret in a file called 'soledad.json' by default.
+      * Also store the salt and encryption details, as defined in the
+        spec.
+      * This change is not backwards compatible (i.e. all previously
+        stored secrets are incompatible with this new encryption and
+        storage scheme).
+  o Improve tests coverage.
+  o Split soledad client and server into two different packages.
+  o Use scrypt to derive the key for local encryption.
+
+Server:
+  o Add a `status` option to Soledad init script.
+  o Allow to initialize soledad with a blank server
+  o b64 encode all U1DB data in couch backend to avoid utf8 encoding
+    problems.
+    * init.d script improvements:
+    * Add LSB (Linux Standards Base) 3.1 compliant header
+    * Remove unnecessary backslashes in variable definitions
+    * Replace environment variables with more standard upper-cased names
+    * Make a TWISTD_PATH environment variable to replace hard-coded
+      /usr/local/bin/twistd
+    * Pull environment variables together into one block o Remove strict
+      dependency on leap.common.

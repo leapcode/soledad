@@ -1,3 +1,0 @@
-  o Do not list the backends in the __init__'s __all__ to allow not
-    supporting couch on the client side until the code is diveded into
-    client and server.
