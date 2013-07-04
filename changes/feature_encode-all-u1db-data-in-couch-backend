@@ -1,1 +1,0 @@
-  o b64 encode all U1DB data in couch backend to avoid utf8 encoding problems.

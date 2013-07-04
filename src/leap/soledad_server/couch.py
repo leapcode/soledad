@@ -34,11 +34,10 @@ from couchdb.client import Server, Document as CouchDocument
 from couchdb.http import ResourceNotFound
 
 
-from leap.soledad.backends.objectstore import (
+from leap.soledad_server.objectstore import (
     ObjectStoreDatabase,
     ObjectStoreSyncTarget,
 )
-from leap.soledad.backends.leap_backend import LeapDocument
 
 
 class InvalidURLError(Exception):
@@ -120,10 +119,7 @@ class CouchDatabase(ObjectStoreDatabase):
         except ResourceNotFound:
             self._server.create(self._dbname)
             self._database = self._server[self._dbname]
-        ObjectStoreDatabase.__init__(self, replica_uid=replica_uid,
-                                     # TODO: move the factory choice
-                                     # away
-                                     document_factory=LeapDocument)
+        ObjectStoreDatabase.__init__(self, replica_uid=replica_uid)
 
     #-------------------------------------------------------------------------
     # methods from Database

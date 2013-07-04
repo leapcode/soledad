@@ -26,25 +26,14 @@ from setuptools import (
 install_requirements = [
     'configparser',
     'couchdb',
-    'leap.common',
-    'pysqlcipher',
     'simplejson',
     'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
     'oauth',  # this is not strictly needed by us, but we need it
               # until u1db adds it to its release as a dep.
     'u1db',
-    'requests',
     'six==1.1.0',
-    'pysqlite',
-    'scrypt',
     'routes',
-]
-
-
-tests_requirements = [
-    'mock',
-    'nose2',
-    'testscenarios',
+    'PyOpenSSL',
 ]
 
 
@@ -52,8 +41,7 @@ if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
 else:
     # XXX this should go only for linux/mac
-    # debian package: disable this mechanism for installation as it doesn't use debian mechanism to register
-    data_files = None
+    data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -70,8 +58,8 @@ trove_classifiers = (
 )
 
 setup(
-    name='leap.soledad',
-    version='0.1.1',
+    name='leap.soledad_server',
+    version='0.2.1',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -83,11 +71,9 @@ setup(
         "LEAP client, an API for data storage and sync."
     ),
     namespace_packages=["leap"],
-    packages=find_packages('src', exclude=['leap.soledad.tests']),
+    packages=find_packages('src'),
     package_dir={'': 'src'},
-    test_suite='leap.soledad.tests',
     install_requires=install_requirements,
-    tests_require=tests_requirements,
     data_files=data_files,
     classifiers=trove_classifiers,
 )
