@@ -1,6 +1,15 @@
 #!/usr/bin/make -f
 
 %:
-	dh $@ --with python2 --buildsystem=python_distutils
+	dh $@ --with python2
+
+override_dh_auto_clean:
+	cd soledad && python setup.py clean -a 
+	cd soledad_server && python setup.py clean -a 
+
+override_dh_auto_install: 
+	cd soledad && python setup.py install --root=../debian/soledad-common
+	cd soledad_server && python setup.py install --root=../debian/soledad-server
+
 
 
