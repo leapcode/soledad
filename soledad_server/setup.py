@@ -34,6 +34,7 @@ install_requirements = [
     'six==1.1.0',
     'routes',
     'PyOpenSSL',
+    'leap.soledad>=0.2.1',
 ]
 
 
