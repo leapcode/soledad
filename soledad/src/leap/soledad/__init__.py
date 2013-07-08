@@ -164,6 +164,20 @@ SECRETS_DOC_ID_HASH_PREFIX = 'uuid-'
 # Soledad: local encrypted storage and remote encrypted sync.
 #
 
+class NoStorageSecret(Exception):
+    """
+    Raised when trying to use a storage secret but none is available.
+    """
+    pass
+
+
+class PassphraseTooShort(Exception):
+    """
+    Raised when trying to change the passphrase but the provided passphrase is
+    too short.
+    """
+
+
 class Soledad(object):
     """
     Soledad provides encrypted data storage and sync.
@@ -232,6 +246,12 @@ class Soledad(object):
     encryption.
     """
 
+    MINIMUM_PASSPHRASE_LENGTH = 6
+    """
+    The minimum length for a passphrase. The passphrase length is only checked
+    when the user changes her passphras, not when she instantiates Soledad.
+    """
+
     IV_SEPARATOR = ":"
     """
     A separator used for storing the encryption initial value prepended to the
@@ -246,6 +266,8 @@ class Soledad(object):
     KDF_KEY = 'kdf'
     KDF_SALT_KEY = 'kdf_salt'
     KDF_LENGTH_KEY = 'kdf_length'
+    KDF_SCRYPT = 'scrypt'
+    CIPHER_AES256 = 'aes256'
     """
     Keys used to access storage secrets in recovery documents.
     """
@@ -563,10 +585,10 @@ class Soledad(object):
         self._secrets[secret_id] = {
             # leap.soledad.crypto submodule uses AES256 for symmetric
             # encryption.
-            self.KDF_KEY: 'scrypt',  # TODO: remove hard coded kdf
+            self.KDF_KEY: self.KDF_SCRYPT,
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
-            self.CIPHER_KEY: 'aes256',  # TODO: remove hard coded cipher
+            self.CIPHER_KEY: self.CIPHER_AES256,
             self.LENGTH_KEY: len(secret),
             self.SECRET_KEY: '%s%s%s' % (
                 str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
@@ -599,6 +621,45 @@ class Soledad(object):
         }
         with open(self._secrets_path, 'w') as f:
             f.write(json.dumps(data))
+
+    def change_passphrase(self, new_passphrase):
+        """
+        Change the passphrase that encrypts the storage secret.
+
+        @param new_passphrase: The new passphrase.
+        @type new_passphrase: str
+
+        @raise NoStorageSecret: Raised if there's no storage secret available.
+        """
+        # maybe we want to add more checks to guarantee passphrase is
+        # reasonable?
+        soledad_assert_type(new_passphrase, str)
+        if len(new_passphrase) < self.MINIMUM_PASSPHRASE_LENGTH:
+            raise PassphraseTooShort(
+                'Passphrase must be at least %d characters long!' %
+                self.MINIMUM_PASSPHRASE_LENGTH)
+        # ensure there's a secret for which the passphrase will be changed.
+        if not self._has_secret():
+            raise NoStorageSecret()
+        secret = self._get_storage_secret()
+        # generate random salt
+        new_salt = os.urandom(self.SALT_LENGTH)
+        # get a 256-bit key
+        key = scrypt.hash(new_passphrase, new_salt, buflen=32)
+        iv, ciphertext = self._crypto.encrypt_sym(secret, key)
+        self._secrets[self._secret_id] = {
+            # leap.soledad.crypto submodule uses AES256 for symmetric
+            # encryption.
+            self.KDF_KEY: self.KDF_SCRYPT,  # TODO: remove hard coded kdf
+            self.KDF_SALT_KEY: binascii.b2a_base64(new_salt),
+            self.KDF_LENGTH_KEY: len(key),
+            self.CIPHER_KEY: self.CIPHER_AES256,
+            self.LENGTH_KEY: len(secret),
+            self.SECRET_KEY: '%s%s%s' % (
+                str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
+        }
+        self._store_secrets()
+        self._passphrase = new_passphrase
 
     #
     # General crypto utility methods.
