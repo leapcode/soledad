@@ -28,6 +28,7 @@ import simplejson as json
 from mock import Mock
 
 
+from pysqlcipher.dbapi2 import DatabaseError
 from leap.common.testing.basetest import BaseLeapTest
 from leap.common.events import events_pb2 as proto
 from leap.soledad.tests import (
@@ -105,6 +106,39 @@ class AuxMethodsTestCase(BaseSoledadTest):
             os.path.join(self.tempdir, 'value_2'),
             sol.local_db_path)
         self.assertEqual('value_1', sol.server_url)
+
+    def test_change_passphrase(self):
+        """
+        Test if passphrase can be changed.
+        """
+        sol = self._soledad_instance(
+            'leap@leap.se',
+            passphrase='123')
+        doc = sol.create_doc({'simple': 'doc'})
+        doc_id = doc.doc_id
+        # change the passphrase
+        sol.change_passphrase('654321')
+        # assert we can not use the old passphrase anymore
+        self.assertRaises(
+            DatabaseError,
+            self._soledad_instance, 'leap@leap.se', '123')
+        # use new passphrase and retrieve doc
+        sol2 = self._soledad_instance('leap@leap.se', '654321')
+        doc2 = sol2.get_doc(doc_id)
+        self.assertEqual(doc, doc2)
+
+    def test_change_passphrase_with_short_passphrase_raises(self):
+        """
+        Test if attempt to change passphrase passing a short passphrase
+        raises.
+        """
+        sol = self._soledad_instance(
+            'leap@leap.se',
+            passphrase='123')
+        # check that soledad complains about new passphrase length
+        self.assertRaises(
+            soledad.PassphraseTooShort,
+            sol.change_passphrase, '54321')
 
 
 class SoledadSharedDBTestCase(BaseSoledadTest):
