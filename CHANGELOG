@@ -1,3 +1,9 @@
+0.2.2 Jul 12:
+Client:
+  o Add method for password change.
+Server:
+  o Use the right name as the WSGI server
+
 0.2.1 Jun 28:
 Client:
   o Do not list the backends in the __init__'s __all__ to allow not
