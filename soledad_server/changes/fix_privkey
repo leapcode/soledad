@@ -1,0 +1,2 @@
+Fix double specified /etc/leap/soledad-server.pem in initscript by pointing
+the PRIVKEY_PATH to /etc/leap/soledad-server.key. Fixes #3174.

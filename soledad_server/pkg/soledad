@@ -17,7 +17,7 @@ LOGFILE=/var/log/soledad.log
 HTTPS_PORT=2424
 PLAIN_PORT=65534
 CERT_PATH=/etc/leap/soledad-server.pem
-PRIVKEY_PATH=/etc/leap/soledad-server.pem
+PRIVKEY_PATH=/etc/leap/soledad-server.key
 TWISTD_PATH=/usr/bin/twistd
 HOME=/var/lib/soledad/
 
