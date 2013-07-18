@@ -1,3 +1,9 @@
+soledad (0.2.2.1) unstable; urgency=low
+
+  * Fix installation of initscript
+
+ -- Micah Anderson <micah@debian.org>  Thu, 18 Jul 2013 15:54:51 -0400
+
 soledad (0.2.2) unstable; urgency=low
 
   * Initial debian package
