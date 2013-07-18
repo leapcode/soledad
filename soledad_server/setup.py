@@ -42,7 +42,7 @@ if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
 else:
     # XXX this should go only for linux/mac
-    data_files = [("/etc/init.d/", ["pkg/soledad"])]
+    # data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -75,6 +75,6 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=install_requirements,
-    data_files=data_files,
+    #data_files=data_files,
     classifiers=trove_classifiers,
 )
