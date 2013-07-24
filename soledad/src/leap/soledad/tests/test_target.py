@@ -40,10 +40,8 @@ from leap.soledad import (
     auth,
 )
 from leap.soledad.document import SoledadDocument
-from leap.soledad_server import (
-    SoledadApp,
-    SoledadAuthMiddleware,
-)
+from leap.soledad_server import SoledadApp
+from leap.soledad_server.auth import SoledadTokenAuthMiddleware
 
 
 from leap.soledad.tests import u1db_tests as tests
@@ -74,18 +72,18 @@ def make_soledad_app(state):
 def make_token_soledad_app(state):
     app = SoledadApp(state)
 
-    def verify_token(environ, uuid, token):
-        if uuid == 'user-uuid' and token == 'auth-token':
+    def _verify_authentication_data(uuid, auth_data):
+        if uuid == 'user-uuid' and auth_data == 'auth-token':
             return True
         return False
 
     # we test for action authorization in leap.soledad.tests.test_server
-    def verify_action(environ, uuid):
+    def _verify_authorization(uuid, environ):
         return True
 
-    application = SoledadAuthMiddleware(app)
-    application.verify_token = verify_token
-    application.verify_action = verify_action
+    application = SoledadTokenAuthMiddleware(app)
+    application._verify_authentication_data = _verify_authentication_data
+    application._verify_authorization = _verify_authorization
     return application
 
 
@@ -190,7 +188,7 @@ class TestSoledadClientBase(test_http_client.TestHTTPClientBase):
             return res
         # mime solead application here.
         if '/token' in environ['PATH_INFO']:
-            auth = environ.get(SoledadAuthMiddleware.HTTP_AUTH_KEY)
+            auth = environ.get(SoledadTokenAuthMiddleware.HTTP_AUTH_KEY)
             if not auth:
                 start_response("401 Unauthorized",
                                [('Content-Type', 'application/json')])
