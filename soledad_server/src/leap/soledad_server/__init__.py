@@ -28,7 +28,6 @@ import httplib
 import simplejson as json
 
 
-from hashlib import sha256
 from routes.mapper import Mapper
 from u1db import DBNAME_CONSTRAINTS
 from u1db.remote import http_app
@@ -52,7 +51,6 @@ if version.base() == "12.0.0":
 
 from couchdb.client import Server
 
-from leap.soledad import SECRETS_DOC_ID_HASH_PREFIX
 from leap.soledad_server.couch import CouchServerState
 
 
