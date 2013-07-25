@@ -231,7 +231,14 @@ def decrypt_doc(crypto, doc):
         crypto, doc.doc_id, doc.rev,
         ciphertext,
         doc.content[MAC_METHOD_KEY])
-    if binascii.a2b_hex(doc.content[MAC_KEY]) != mac:  # mac is stored as hex.
+    # we compare mac's hashes to avoid possible timing attacks that might
+    # exploit python's builtin comparison operator behaviour, which fails
+    # immediatelly when non-matching bytes are found.
+    doc_mac_hash = hashlib.sha256(
+        binascii.a2b_hex(  # the mac is stored as hex
+            doc.content[MAC_KEY])).digest()
+    calculated_mac_hash = hashlib.sha256(mac).digest()
+    if doc_mac_hash != calculated_mac_hash:
         raise WrongMac('Could not authenticate document\'s contents.')
     # decrypt doc's content
     enc_scheme = doc.content[ENC_SCHEME_KEY]
