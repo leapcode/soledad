@@ -21,19 +21,14 @@ Tests for server-related functionality.
 """
 
 import os
-import shutil
 import tempfile
 import simplejson as json
-import hashlib
 import mock
 
 
 from leap.soledad import Soledad
-from leap.soledad_server import (
-    SoledadApp,
-    SoledadAuthMiddleware,
-    URLToAuth,
-)
+from leap.soledad_server import SoledadApp
+from leap.soledad_server.auth import URLToAuthorization
 from leap.soledad_server.couch import (
     CouchServerState,
     CouchDatabase,
@@ -42,11 +37,9 @@ from leap.soledad import target
 
 
 from leap.common.testing.basetest import BaseLeapTest
-from leap.soledad.tests import ADDRESS
 from leap.soledad.tests.u1db_tests import (
     TestCaseWithServer,
     simple_doc,
-    nested_doc,
 )
 from leap.soledad.tests.test_couch import CouchDBTestCase
 from leap.soledad.tests.test_target import (
@@ -93,7 +86,8 @@ class ServerAuthorizationTestCase(BaseLeapTest):
             /user-db/sync-from/{source}   | GET, PUT, POST
         """
         uuid = 'myuuid'
-        authmap = URLToAuth(uuid)
+        authmap = URLToAuthorization(
+            uuid, SoledadApp.SHARED_DB_NAME, SoledadApp.USER_DB_PREFIX)
         dbname = authmap._uuid_dbname(uuid)
         # test global auth
         self.assertTrue(
@@ -208,7 +202,8 @@ class ServerAuthorizationTestCase(BaseLeapTest):
         Test if authorization fails for a wrong dbname.
         """
         uuid = 'myuuid'
-        authmap = URLToAuth(uuid)
+        authmap = URLToAuthorization(
+            uuid, SoledadApp.SHARED_DB_NAME, SoledadApp.USER_DB_PREFIX)
         dbname = 'somedb'
         # test wrong-db database resource auth
         self.assertFalse(

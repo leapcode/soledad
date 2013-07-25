@@ -24,7 +24,6 @@ they can do token-based auth requests to the Soledad server.
 """
 
 
-from u1db.remote.http_client import HTTPClientBase
 from u1db import errors
 
 
