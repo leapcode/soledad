@@ -1,2 +1,0 @@
-  o Avoid possible timing attack in document's mac comparison by comparing
-    hashes instead of plain macs. Closes #3243.

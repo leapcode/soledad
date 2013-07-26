@@ -1,2 +1,0 @@
-  o Refactor server side auth classes to make it possible for other kinds of
-    authentication to be easily implemented. Closes #2621.
