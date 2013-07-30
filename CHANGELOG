@@ -1,3 +1,14 @@
+0.2.3 Jul 26:
+Client:
+  o Avoid possible timing attack in document's mac comparison by
+    comparing hashes instead of plain macs. Closes #3243.
+Server:
+  o Refactor server side auth classes to make it possible for other
+    kinds of authentication to be easily implemented. Closes #2621.
+  o Fix double specified /etc/leap/soledad-server.pem in initscript by
+    pointing the PRIVKEY_PATH to /etc/leap/soledad-server.key. Fixes
+    #3174.
+
 0.2.2 Jul 12:
 Client:
   o Add method for password change.

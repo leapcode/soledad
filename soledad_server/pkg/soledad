@@ -15,8 +15,9 @@ RUNDIR=/var/lib/soledad/
 OBJ=leap.soledad_server.application
 LOGFILE=/var/log/soledad.log
 HTTPS_PORT=2424
+PLAIN_PORT=65534
 CERT_PATH=/etc/leap/soledad-server.pem
-PRIVKEY_PATH=/etc/leap/soledad-server.pem
+PRIVKEY_PATH=/etc/leap/soledad-server.key
 TWISTD_PATH=/usr/bin/twistd
 HOME=/var/lib/soledad/
 
@@ -31,11 +32,14 @@ case "$1" in
     start)
         echo -n "Starting soledad: twistd"
           start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
-            --pidfile=$PIDFILE \
-            --logfile=$LOGFILE \
-            web \
-            --wsgi=$OBJ \
-            --port=ssl:$HTTPS_PORT:privateKey=$PRIVKEY_PATH:certKey=$CERT_PATH
+                          --pidfile=$PIDFILE \
+                          --logfile=$LOGFILE \
+                          web \
+                          --wsgi=$OBJ \
+                          --https=$HTTPS_PORT \
+                          --certificate=$CERT_PATH \
+                          --privkey=$PRIVKEY_PATH \
+                          --port=$PLAIN_PORT
         echo "."
     ;;
 

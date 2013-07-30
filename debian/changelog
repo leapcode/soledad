@@ -1,3 +1,9 @@
+soledad (0.2.3) unstable; urgency=low
+
+  * Upgrade to new release
+
+ -- Micah Anderson <micah@debian.org>  Mon, 29 Jul 2013 20:47:19 -0400
+
 soledad (0.2.2.1) unstable; urgency=low
 
   * Fix installation of initscript

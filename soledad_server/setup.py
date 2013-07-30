@@ -34,12 +34,15 @@ install_requirements = [
     'six==1.1.0',
     'routes',
     'PyOpenSSL',
-    'leap.soledad>=0.2.1',
+    'leap.soledad>=0.2.3',
 ]
 
 
 if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
+else:
+    # XXX this should go only for linux/mac
+    data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -57,7 +60,7 @@ trove_classifiers = (
 
 setup(
     name='leap.soledad_server',
-    version='0.2.2',
+    version='0.2.3',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -72,5 +75,6 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=install_requirements,
+    data_files=data_files,
     classifiers=trove_classifiers,
 )
