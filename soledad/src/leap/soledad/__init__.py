@@ -27,7 +27,6 @@ remote storage in the server side.
 """
 
 import os
-import string
 import binascii
 import logging
 import urlparse
@@ -42,68 +41,55 @@ import errno
 from xdg import BaseDirectory
 from hashlib import sha256
 from u1db.remote import http_client
-from u1db.remote.ssl_match_hostname import (  # noqa
-    CertificateError,
-    match_hostname,
-)
+from u1db.remote.ssl_match_hostname import match_hostname
 
 
 #
 # Assert functions
 #
 
-def soledad_assert(condition, message):
-    """
-    Asserts the condition and displays the message if that's not
-    met.
-
-    @param condition: condition to check
-    @type condition: bool
-    @param message: message to display if the condition isn't met
-    @type message: str
-    """
-    assert condition, message
-
-
 # we want to use leap.common.check.leap_assert in case it is available,
 # because it also logs in a way other parts of leap can access log messages.
-try:
-    from leap.common.check import leap_assert
-    soledad_assert = leap_assert
-except ImportError:
-    pass
-
-
-def soledad_assert_type(var, expectedType):
-    """
-    Helper assert check for a variable's expected type
-
-    @param var: variable to check
-    @type var: any
-    @param expectedType: type to check agains
-    @type expectedType: type
-    """
-    soledad_assert(isinstance(var, expectedType),
-                   "Expected type %r instead of %r" %
-                   (expectedType, type(var)))
 
 try:
-    from leap.common.check import leap_assert_type
-    soledad_assert_type = leap_assert_type
+    from leap.common.check import leap_assert as soledad_assert
+
 except ImportError:
-    pass
+
+    def soledad_assert(condition, message):
+        """
+        Asserts the condition and displays the message if that's not
+        met.
+
+        @param condition: condition to check
+        @type condition: bool
+        @param message: message to display if the condition isn't met
+        @type message: str
+        """
+        assert condition, message
+
+try:
+    from leap.common.check import leap_assert_type as soledad_assert_type
+
+except ImportError:
+
+    def soledad_assert_type(var, expectedType):
+        """
+        Helper assert check for a variable's expected type
+
+        @param var: variable to check
+        @type var: any
+        @param expectedType: type to check agains
+        @type expectedType: type
+        """
+        soledad_assert(isinstance(var, expectedType),
+                       "Expected type %r instead of %r" %
+                       (expectedType, type(var)))
 
 
 #
 # Signaling function
 #
-
-# we define a fake signaling function and fake signal constants that will
-# allow for logging signaling attempts in case leap.common.events is not
-# available.
-
-def signal(signal, content=""):
-    logger.info("Would signal: %s - %s." % (str(signal), content))
 
 SOLEDAD_CREATING_KEYS = 'Creating keys...'
 SOLEDAD_DONE_CREATING_KEYS = 'Done creating keys.'
@@ -117,9 +103,7 @@ SOLEDAD_DONE_DATA_SYNC = 'Done data sync.'
 # we want to use leap.common.events to emits signals, if it is available.
 try:
     from leap.common import events
-    # replace fake signaling function with real one
-    signal = events.signal
-    # replace fake string signals with real signals
+    from leap.common.events import signal
     SOLEDAD_CREATING_KEYS = events.events_pb2.SOLEDAD_CREATING_KEYS
     SOLEDAD_DONE_CREATING_KEYS = events.events_pb2.SOLEDAD_DONE_CREATING_KEYS
     SOLEDAD_DOWNLOADING_KEYS = events.events_pb2.SOLEDAD_DOWNLOADING_KEYS
@@ -130,18 +114,23 @@ try:
         events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS
     SOLEDAD_NEW_DATA_TO_SYNC = events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC
     SOLEDAD_DONE_DATA_SYNC = events.events_pb2.SOLEDAD_DONE_DATA_SYNC
+
 except ImportError:
-    pass
+    # we define a fake signaling function and fake signal constants that will
+    # allow for logging signaling attempts in case leap.common.events is not
+    # available.
+
+    def signal(signal, content=""):
+        logger.info("Would signal: %s - %s." % (str(signal), content))
 
 
-from leap.soledad.document import SoledadDocument
-from leap.soledad.sqlcipher import (
-    open as sqlcipher_open,
-    SQLCipherDatabase,
-)
-from leap.soledad.target import SoledadSyncTarget
-from leap.soledad.shared_db import SoledadSharedDatabase
 from leap.soledad.crypto import SoledadCrypto
+from leap.soledad.dbwrapper import SQLCipherWrapper
+from leap.soledad.document import SoledadDocument
+from leap.soledad.shared_db import SoledadSharedDatabase
+from leap.soledad.sqlcipher import open as sqlcipher_open
+from leap.soledad.sqlcipher import SQLCipherDatabase
+from leap.soledad.target import SoledadSyncTarget
 
 
 logger = logging.getLogger(name=__name__)
