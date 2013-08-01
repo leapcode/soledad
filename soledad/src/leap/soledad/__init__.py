@@ -428,7 +428,9 @@ class Soledad(object):
             secret[salt_start:salt_end],  # the salt
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
-        self._db = sqlcipher_open(
+
+        # Instantiate a thread-safe wrapper
+        self._db = SQLCipherWrapper(
             self._local_db_path,
             binascii.b2a_hex(key),  # sqlcipher only accepts the hex version
             create=True,
@@ -442,13 +444,14 @@ class Soledad(object):
         """
         if hasattr(self, '_db') and isinstance(
                 self._db,
-                SQLCipherDatabase):
+                SQLCipherWrapper):
             self._db.close()
 
     def __del__(self):
         """
         Make sure local database is closed when object is destroyed.
         """
+        # Watch out! We have no guarantees  that this is properly called.
         self.close()
 
     #
