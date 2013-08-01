@@ -61,7 +61,7 @@ class SoledadApp(http_app.HTTPApp):
     The name of the shared database that holds user's encrypted secrets.
     """
 
-    USER_DB_PREFIX = 'uuid-'
+    USER_DB_PREFIX = 'user-'
     """
     The string prefix of users' databases.
     """
