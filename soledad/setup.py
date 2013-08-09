@@ -62,7 +62,7 @@ trove_classifiers = (
 
 setup(
     name='leap.soledad',
-    version='0.2.3',
+    version='0.3.0',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',

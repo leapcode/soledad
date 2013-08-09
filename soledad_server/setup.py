@@ -34,7 +34,7 @@ install_requirements = [
     'six==1.1.0',
     'routes',
     'PyOpenSSL',
-    'leap.soledad>=0.2.3',
+    'leap.soledad>=0.3.0',
 ]
 
 
@@ -60,7 +60,7 @@ trove_classifiers = (
 
 setup(
     name='leap.soledad_server',
-    version='0.2.3',
+    version='0.3.0',
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
