@@ -1,3 +1,12 @@
+0.3.0 Aug 9:
+Client:
+  o Thread safe wrapper for pysqlcipher.
+  o Fix a couple of typos that prevented certain functionality to
+    work. Fixes #3306
+Server:
+  o A plaintext port is not opened by soledad server initscript call
+    to twistd web anymore. Closes #3254.
+
 0.2.3 Jul 26:
 Client:
   o Avoid possible timing attack in document's mac comparison by

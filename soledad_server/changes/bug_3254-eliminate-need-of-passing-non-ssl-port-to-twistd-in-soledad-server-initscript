@@ -1,2 +1,0 @@
-  o A plaintext port is not opened by soledad server initscript call to twistd
-    web anymore. Closes #3254.
