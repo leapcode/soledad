@@ -343,8 +343,8 @@ class SoledadAuthMiddleware(object):
         @rtype: bool
         """
         return URLToAuthorization(
-            uuid, self.app.SHARED_DB_NAME,
-            self.app.USER_DB_PREFIX
+            uuid, self._app.SHARED_DB_NAME,
+            self._app.USER_DB_PREFIX
         ).is_authorized(environ)
 
     @abstractmethod
