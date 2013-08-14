@@ -238,7 +238,7 @@ class Soledad(object):
     MINIMUM_PASSPHRASE_LENGTH = 6
     """
     The minimum length for a passphrase. The passphrase length is only checked
-    when the user changes her passphras, not when she instantiates Soledad.
+    when the user changes her passphrase, not when she instantiates Soledad.
     """
 
     IV_SEPARATOR = ":"
@@ -1120,6 +1120,14 @@ class Soledad(object):
         _get_storage_secret,
         doc='The secret used for symmetric encryption.')
 
+    def _get_passphrase(self):
+        return self._passphrase
+
+    passphrase = property(
+        _get_passphrase,
+        doc='The passphrase for locking and unlocking encryption secrets for '
+            'local and remote storage.')
+
 
 #-----------------------------------------------------------------------------
 # Monkey patching u1db to be able to provide a custom SSL cert
@@ -1127,6 +1135,7 @@ class Soledad(object):
 
 # We need a more reasonable timeout (in seconds)
 SOLEDAD_TIMEOUT = 10
+
 
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     """HTTPSConnection verifying server side certificates."""

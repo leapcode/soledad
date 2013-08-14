@@ -140,6 +140,13 @@ class AuxMethodsTestCase(BaseSoledadTest):
             soledad.PassphraseTooShort,
             sol.change_passphrase, '54321')
 
+    def test_get_passphrase(self):
+        """
+        Assert passphrase getter works fine.
+        """
+        sol = self._soledad_instance()
+        self.assertEqual('123', sol.passphrase)
+
 
 class SoledadSharedDBTestCase(BaseSoledadTest):
     """
