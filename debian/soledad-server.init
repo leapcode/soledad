@@ -26,43 +26,54 @@ test -r /etc/leap/ || exit 0
 
 . /lib/lsb/init-functions
 
+is_true() {
+    if [ "x$1" = "xtrue" -o "x$1" = "xyes" -o "x$1" = "x0" ] ; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 case "$1" in
     start)
-        echo -n "Starting soledad: twistd"
-          start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
-            --pidfile=$PIDFILE \
-            --logfile=$LOGFILE \
-            web \
-            --wsgi=$OBJ \
-            --port=ssl:$HTTPS_PORT:privateKey=$PRIVKEY_PATH:certKey=$CERT_PATH
-        echo "."
-    ;;
-
+        if is_true "$START" ; then
+            echo -n "Starting soledad: twistd"
+            start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
+                --pidfile=$PIDFILE \
+                --logfile=$LOGFILE \
+                web \
+                --wsgi=$OBJ \
+                --port=ssl:$HTTPS_PORT:privateKey=$PRIVKEY_PATH:certKey=$CERT_PATH
+            echo "."
+        else
+            echo ""
+            echo "soledad-server is not configured to start, please edit /etc/default/soledad to enable"
+        fi
+        ;;
     stop)
         echo -n "Stopping soledad: twistd"
         start-stop-daemon --stop --quiet  \
             --pidfile $PIDFILE
         echo "."
-    ;;
+        ;;
 
     restart)
         $0 stop
         $0 start
-    ;;
+        ;;
 
     force-reload)
         $0 restart
-    ;;
+        ;;
 
     status)
         status_of_proc -p $PIDFILE $TWISTD_PATH soledad && exit 0 || exit $?
-    ;;
+        ;;
 
     *)
         echo "Usage: /etc/init.d/soledad {start|stop|restart|force-reload|status}" >&2
         exit 1
-    ;;
+        ;;
 esac
 
 exit 0
