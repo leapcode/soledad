@@ -1,3 +1,15 @@
+soledad (0.3.0.3) unstable; urgency=low
+
+  * Fixed missing epoch on python-twisted-conch
+
+ -- Micah Anderson <micah@debian.org>  Thu, 15 Aug 2013 13:16:54 -0400
+
+soledad (0.3.0.2) unstable; urgency=low
+
+  * Pin twisted version in Depends to get 13 or greater
+
+ -- Micah Anderson <micah@debian.org>  Thu, 15 Aug 2013 11:31:57 -0400
+
 soledad (0.3.0.1) unstable; urgency=low
 
   * Update initscript to require that START=yes is set
