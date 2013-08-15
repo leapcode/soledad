@@ -168,7 +168,7 @@ def encrypt_doc(crypto, doc):
     soledad_assert(doc.is_tombstone() is False)
     # encrypt content using AES-256 CTR mode
     iv, ciphertext = crypto.encrypt_sym(
-        doc.get_json(),
+        str(doc.get_json()),  # encryption/decryption routines expect str
         crypto.doc_passphrase(doc.doc_id),
         method=EncryptionMethods.AES_256_CTR)
     # Return a representation for the encrypted content. In the following, we

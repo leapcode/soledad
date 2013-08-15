@@ -27,8 +27,8 @@ import hmac
 import hashlib
 
 
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
+from pycryptopp.cipher.aes import AES
+from pycryptopp.cipher.xsalsa20 import XSalsa20
 
 
 from leap.soledad import (
@@ -43,6 +43,7 @@ class EncryptionMethods(object):
     """
 
     AES_256_CTR = 'aes-256-ctr'
+    XSALSA20 = 'xsalsa20'
 
 
 class UnknownEncryptionMethod(Exception):
@@ -93,19 +94,23 @@ class SoledadCrypto(object):
         """
         soledad_assert_type(key, str)
 
+        soledad_assert(
+            len(key) == 32,  # 32 x 8 = 256 bits.
+            'Wrong key size: %s bits (must be 256 bits long).' %
+            (len(key) * 8))
+        iv = None
         # AES-256 in CTR mode
         if method == EncryptionMethods.AES_256_CTR:
-            soledad_assert(
-                len(key) == 32,  # 32 x 8 = 256 bits.
-                'Wrong key size: %s bits (must be 256 bits long).' %
-                (len(key) * 8))
-            iv = os.urandom(8)
-            ctr = Counter.new(64, prefix=iv)
-            cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
-            return binascii.b2a_base64(iv), cipher.encrypt(data)
-
-        # raise if method is unknown
-        raise UnknownEncryptionMethod('Unkwnown method: %s' % method)
+            iv = os.urandom(16)
+            ciphertext = AES(key=key, iv=iv).process(data)
+        # XSalsa20
+        elif method == EncryptionMethods.XSALSA20:
+            iv = os.urandom(24)
+            ciphertext = XSalsa20(key=key, iv=iv).process(data)
+        else:
+            # raise if method is unknown
+            raise UnknownEncryptionMethod('Unkwnown method: %s' % method)
+        return binascii.b2a_base64(iv), ciphertext
 
     def decrypt_sym(self, data, key,
                     method=EncryptionMethods.AES_256_CTR, **kwargs):
@@ -127,19 +132,20 @@ class SoledadCrypto(object):
         @rtype: str
         """
         soledad_assert_type(key, str)
-
+        # assert params
+        soledad_assert(
+            len(key) == 32,  # 32 x 8 = 256 bits.
+            'Wrong key size: %s (must be 256 bits long).' % len(key))
+        soledad_assert(
+            'iv' in kwargs,
+            '%s needs an initial value.' % method)
         # AES-256 in CTR mode
         if method == EncryptionMethods.AES_256_CTR:
-            # assert params
-            soledad_assert(
-                len(key) == 32,  # 32 x 8 = 256 bits.
-                'Wrong key size: %s (must be 256 bits long).' % len(key))
-            soledad_assert(
-                'iv' in kwargs,
-                'AES-256-CTR needs an initial value.')
-            ctr = Counter.new(64, prefix=binascii.a2b_base64(kwargs['iv']))
-            cipher = AES.new(key=key, mode=AES.MODE_CTR, counter=ctr)
-            return cipher.decrypt(data)
+            return AES(
+                key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
+        elif method == EncryptionMethods.XSALSA20:
+            return XSalsa20(
+                key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
 
         # raise if method is unknown
         raise UnknownEncryptionMethod('Unkwnown method: %s' % method)

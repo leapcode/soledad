@@ -32,8 +32,7 @@ install_requirements = [
     'six==1.1.0',
     'scrypt',
     'pyxdg',
-    'pycrypto',
-    'pyOpenSSL',
+    'pycryptopp',
 ]
 
 
@@ -43,6 +42,7 @@ tests_requirements = [
     'testscenarios',
     'leap.common',
     'leap.soledad_server',
+    'pyOpenSSL',
 ]
 
 
