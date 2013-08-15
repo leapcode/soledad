@@ -22,14 +22,10 @@ Tests for general Soledad functionality.
 
 
 import os
-import re
-import tempfile
-import simplejson as json
 from mock import Mock
 
 
 from pysqlcipher.dbapi2 import DatabaseError
-from leap.common.testing.basetest import BaseLeapTest
 from leap.common.events import events_pb2 as proto
 from leap.soledad.tests import (
     BaseSoledadTest,
@@ -62,8 +58,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
             sol._gen_secret()
         sol._load_secrets()
         sol._init_db()
-        from leap.soledad.sqlcipher import SQLCipherDatabase
-        self.assertIsInstance(sol._db, SQLCipherDatabase)
+        from leap.soledad.dbwrapper import SQLCipherWrapper
+        self.assertIsInstance(sol._db, SQLCipherWrapper)
 
     def test__init_config_defaults(self):
         """
@@ -111,17 +107,30 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         Test if passphrase can be changed.
         """
+        self._soledad.close()
         sol = self._soledad_instance(
             'leap@leap.se',
-            passphrase='123')
+            passphrase='123',
+            prefix=self.rand_prefix,
+        )
         doc = sol.create_doc({'simple': 'doc'})
         doc_id = doc.doc_id
+
         # change the passphrase
         sol.change_passphrase('654321')
+        sol.close()
+
         # assert we can not use the old passphrase anymore
+        # XXX this is failing with the new dbwrapper, and
+        # I suspect it has to do with the DatabaseError being
+        # raised in the db thread on db init and not properly
+        # propagated.
         self.assertRaises(
             DatabaseError,
-            self._soledad_instance, 'leap@leap.se', '123')
+            self._soledad_instance, 'leap@leap.se',
+            passphrase='123',
+            prefix=self.rand_prefix)
+
         # use new passphrase and retrieve doc
         sol2 = self._soledad_instance('leap@leap.se', '654321')
         doc2 = sol2.get_doc(doc_id)

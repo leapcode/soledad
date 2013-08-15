@@ -3,17 +3,16 @@ Tests to make sure Soledad provides U1DB functionality and more.
 """
 
 import os
+import random
+import string
 import u1db
 from mock import Mock
 
 
 from leap.soledad import Soledad
 from leap.soledad.document import SoledadDocument
-from leap.soledad.crypto import SoledadCrypto
-from leap.soledad.target import (
-    decrypt_doc,
-    ENC_SCHEME_KEY,
-)
+from leap.soledad.target import decrypt_doc
+from leap.soledad.target import ENC_SCHEME_KEY
 from leap.common.testing.basetest import BaseLeapTest
 
 
@@ -40,16 +39,23 @@ class BaseSoledadTest(BaseLeapTest):
                               document_factory=SoledadDocument)
         self._db2 = u1db.open(self.db2_file, create=True,
                               document_factory=SoledadDocument)
+        # get a random prefix for each test, so we do not mess with
+        # concurrency during initialization and shutting down of
+        # each local db.
+        self.rand_prefix = ''.join(
+            map(lambda x: random.choice(string.ascii_letters), range(6)))
         # initialize soledad by hand so we can control keys
-        self._soledad = self._soledad_instance(user=self.email)
+        self._soledad = self._soledad_instance(
+            prefix=self.rand_prefix, user=self.email)
 
     def tearDown(self):
         self._db1.close()
         self._db2.close()
+        self._soledad.close()
+        # XXX should not access "private" attrs
         for f in [self._soledad._local_db_path, self._soledad._secrets_path]:
             if os.path.isfile(f):
                 os.unlink(f)
-        self._soledad.close()
 
     def _soledad_instance(self, user=ADDRESS, passphrase='123',
                           prefix='',
@@ -72,7 +78,8 @@ class BaseSoledadTest(BaseLeapTest):
         return Soledad(
             user,
             passphrase,
-            secrets_path=os.path.join(self.tempdir, prefix, secrets_path),
+            secrets_path=os.path.join(
+                self.tempdir, prefix, secrets_path),
             local_db_path=os.path.join(
                 self.tempdir, prefix, local_db_path),
             server_url=server_url,  # Soledad will fail if not given an url.

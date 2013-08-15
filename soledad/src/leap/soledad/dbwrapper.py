@@ -69,7 +69,12 @@ class SQLCipherWrapper(threading.Thread):
         """
         # instantiate u1db
         args, kwargs = self._wrargs
-        self._db = sqlcipher.open(*args, **kwargs)
+        try:
+            self._db = sqlcipher.open(*args, **kwargs)
+        except Exception as exc:
+            logger.debug("Error in init_db: %r" % (exc,))
+            self._stopped.set()
+            raise exc
 
     def run(self):
         """
@@ -79,13 +84,17 @@ class SQLCipherWrapper(threading.Thread):
         logger.debug("Initializing sqlcipher")
         end_mths = ("__end_thread", "_SQLCipherWrapper__end_thread")
 
-        self._init_db()
+        failed = False
+        try:
+            self._init_db()
+        except:
+            failed = True
         self._lock = threading.Lock()
 
         ct = 0
         started = False
 
-        while True:
+        while not failed:
             if self._db is None:
                 if started:
                     break

@@ -43,7 +43,7 @@ So, as the statements above were introduced for backwards compatibility with
 SLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
-
+import logging
 import os
 import time
 import string
@@ -51,10 +51,10 @@ import string
 
 from u1db.backends import sqlite_backend
 from pysqlcipher import dbapi2
-from u1db import (
-    errors,
-)
+from u1db import errors as u1db_errors
 from leap.soledad.document import SoledadDocument
+
+logger = logging.getLogger(__name__)
 
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
@@ -170,8 +170,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         def factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
                     syncable=True):
             return SoledadDocument(doc_id=doc_id, rev=rev, json=json,
-                                has_conflicts=has_conflicts,
-                                syncable=syncable)
+                                   has_conflicts=has_conflicts,
+                                   syncable=syncable)
         self.set_document_factory(factory)
 
     @classmethod
@@ -205,20 +205,30 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @rtype: SQLCipherDatabase
         """
         if not os.path.isfile(sqlcipher_file):
-            raise errors.DatabaseDoesNotExist()
-        tries = 2
+            raise u1db_errors.DatabaseDoesNotExist()
+
+        tries = 30
         while True:
             # Note: There seems to be a bug in sqlite 3.5.9 (with python2.6)
             #       where without re-opening the database on Windows, it
             #       doesn't see the transaction that was just committed
+
             db_handle = dbapi2.connect(sqlcipher_file)
-            # set cryptographic params
-            cls._set_crypto_pragmas(
-                db_handle, password, raw_key, cipher, kdf_iter,
-                cipher_page_size)
-            c = db_handle.cursor()
-            v, err = cls._which_index_storage(c)
-            db_handle.close()
+
+            try:
+                # set cryptographic params
+                cls._set_crypto_pragmas(
+                    db_handle, password, raw_key, cipher, kdf_iter,
+                    cipher_page_size)
+                c = db_handle.cursor()
+                # XXX if we use it here, it should be public
+                v, err = cls._which_index_storage(c)
+            except Exception as exc:
+                logger.warning("ERROR OPENING DATABASE!")
+                logger.debug("error was: %r" % exc)
+                v, err = None, exc
+            finally:
+                db_handle.close()
             if v is not None:
                 break
             # possibly another process is initializing it, wait for it to be
@@ -273,7 +283,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 sqlcipher_file, password, document_factory=document_factory,
                 crypto=crypto, raw_key=raw_key, cipher=cipher,
                 kdf_iter=kdf_iter, cipher_page_size=cipher_page_size)
-        except errors.DatabaseDoesNotExist:
+        except u1db_errors.DatabaseDoesNotExist:
             if not create:
                 raise
             # TODO: remove backend class from here.
@@ -305,8 +315,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         return Synchronizer(
             self,
             SoledadSyncTarget(url,
-                           creds=creds,
-                           crypto=self._crypto)).sync(autocreate=autocreate)
+                              creds=creds,
+                              crypto=self._crypto)).sync(autocreate=autocreate)
 
     def _extra_schema_init(self, c):
         """

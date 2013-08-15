@@ -74,7 +74,7 @@ setup(
         "LEAP client, an API for data storage and sync."
     ),
     namespace_packages=["leap"],
-    packages=find_packages('src', exclude=['leap.soledad.tests']),
+    packages=find_packages('src'),  # exclude=['leap.soledad.tests']),
     package_dir={'': 'src'},
     test_suite='leap.soledad.tests',
     install_requires=install_requirements,

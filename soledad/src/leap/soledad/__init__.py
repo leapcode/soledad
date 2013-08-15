@@ -128,8 +128,8 @@ from leap.soledad.crypto import SoledadCrypto
 from leap.soledad.dbwrapper import SQLCipherWrapper
 from leap.soledad.document import SoledadDocument
 from leap.soledad.shared_db import SoledadSharedDatabase
-from leap.soledad.sqlcipher import open as sqlcipher_open
-from leap.soledad.sqlcipher import SQLCipherDatabase
+#from leap.soledad.sqlcipher import open as sqlcipher_open
+#from leap.soledad.sqlcipher import SQLCipherDatabase
 from leap.soledad.target import SoledadSyncTarget
 
 
@@ -650,6 +650,7 @@ class Soledad(object):
             self.SECRET_KEY: '%s%s%s' % (
                 str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
         }
+
         self._store_secrets()
         self._passphrase = new_passphrase
 
