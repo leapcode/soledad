@@ -5,4 +5,10 @@ build/
 MANIFEST
 *.egg-info/
 *.egg
+*.swp
+*.swo
+*.pyc
+*.log
+*.*~
+
 
