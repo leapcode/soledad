@@ -855,7 +855,8 @@ class Soledad(object):
 
             "number(fieldname, width)", "lower(fieldname)"
         """
-        return self._db.create_index(index_name, *index_expressions)
+        if self._db:
+            return self._db.create_index(index_name, *index_expressions)
 
     def delete_index(self, index_name):
         """
@@ -864,7 +865,8 @@ class Soledad(object):
         @param index_name: The name of the index we are removing
         @type index_name: str
         """
-        return self._db.delete_index(index_name)
+        if self._db:
+            return self._db.delete_index(index_name)
 
     def list_indexes(self):
         """
@@ -873,7 +875,8 @@ class Soledad(object):
         @return: A list of [('index-name', ['field', 'field2'])] definitions.
         @rtype: list
         """
-        return self._db.list_indexes()
+        if self._db:
+            return self._db.list_indexes()
 
     def get_from_index(self, index_name, *key_values):
         """
@@ -895,7 +898,8 @@ class Soledad(object):
         @return: List of [Document]
         @rtype: list
         """
-        return self._db.get_from_index(index_name, *key_values)
+        if self._db:
+            return self._db.get_from_index(index_name, *key_values)
 
     def get_range_from_index(self, index_name, start_value, end_value):
         """
@@ -924,8 +928,9 @@ class Soledad(object):
         @return: List of [Document]
         @rtype: list
         """
-        return self._db.get_range_from_index(
-            index_name, start_value, end_value)
+        if self._db:
+            return self._db.get_range_from_index(
+                index_name, start_value, end_value)
 
     def get_index_keys(self, index_name):
         """
@@ -936,7 +941,8 @@ class Soledad(object):
         @return: [] A list of tuples of indexed keys.
         @rtype: list
         """
-        return self._db.get_index_keys(index_name)
+        if self._db:
+            return self._db.get_index_keys(index_name)
 
     def get_doc_conflicts(self, doc_id):
         """
@@ -948,7 +954,8 @@ class Soledad(object):
         @return: a list of the document entries that are conflicted
         @rtype: list
         """
-        return self._db.get_doc_conflicts(doc_id)
+        if self._db:
+            return self._db.get_doc_conflicts(doc_id)
 
     def resolve_doc(self, doc, conflicted_doc_revs):
         """
@@ -960,7 +967,8 @@ class Soledad(object):
             supersedes.
         @type conflicted_doc_revs: list
         """
-        return self._db.resolve_doc(doc, conflicted_doc_revs)
+        if self._db:
+            return self._db.resolve_doc(doc, conflicted_doc_revs)
 
     def sync(self):
         """
@@ -973,11 +981,12 @@ class Soledad(object):
             performed.
         @rtype: str
         """
-        local_gen = self._db.sync(
-            urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-            creds=self._creds, autocreate=True)
-        signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
-        return local_gen
+        if self._db:
+            local_gen = self._db.sync(
+                urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
+                creds=self._creds, autocreate=True)
+            signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
+            return local_gen
 
     def need_sync(self, url):
         """
