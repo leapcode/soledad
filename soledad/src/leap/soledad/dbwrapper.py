@@ -25,7 +25,6 @@ some time so postponing that refactor.
 import logging
 import threading
 import Queue
-import time
 
 import exceptions
 
@@ -37,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 class SQLCipherWrapper(threading.Thread):
+
+    k_lock = threading.Lock()
 
     def __init__(self, *args, **kwargs):
         """
@@ -53,6 +54,7 @@ class SQLCipherWrapper(threading.Thread):
         :type kwargs: dict
         """
         threading.Thread.__init__(self)
+        self._lock = threading.Lock()
         self._db = None
         self._wrargs = args, kwargs
 
@@ -69,53 +71,64 @@ class SQLCipherWrapper(threading.Thread):
         """
         # instantiate u1db
         args, kwargs = self._wrargs
-        try:
-            self._db = sqlcipher.open(*args, **kwargs)
-        except Exception as exc:
-            logger.debug("Error in init_db: %r" % (exc,))
-            self._stopped.set()
-            raise exc
+        with self.k_lock:
+            try:
+                self._db = sqlcipher.open(*args, **kwargs)
+                print "init ok"
+            except Exception as exc:
+                logger.debug("Error in init_db: %r" % (exc,))
+                self._stopped.set()
+                raise exc
 
     def run(self):
         """
         Main loop for the sqlcipher thread.
         """
+        END_METHODS = ("__end_thread", "_SQLCipherWrapper__end_thread")
         logger.debug("SQLCipherWrapper thread started.")
         logger.debug("Initializing sqlcipher")
-        end_mths = ("__end_thread", "_SQLCipherWrapper__end_thread")
 
-        failed = False
+        #ct = 0
+        #started = False
+
         try:
             self._init_db()
         except:
-            failed = True
-        self._lock = threading.Lock()
+            logger.error("Failed to init db.")
+            print "error on init"
+            # XXX should raise?
 
-        ct = 0
-        started = False
+        while True:
 
-        while not failed:
+            #if self._db is None:
+                #if started:
+                    #break
+                #if ct > 10:
+                    #break  # XXX DEBUG
+                #logger.debug('db not ready yet, waiting...')
+                #print "db not ready, wait..."
+                #time.sleep(1)
+                #ct += 1
+
             if self._db is None:
-                if started:
-                    break
-                if ct > 10:
-                    break  # XXX DEBUG
-                logger.debug('db not ready yet, waiting...')
-                time.sleep(1)
-                ct += 1
+                print "db not initialized!"
 
-            started = True
-
+            #started = True
             with self._lock:
-                try:
-                    mth, q, wrargs = self._queue.get()
-                except:
-                    logger.error("exception getting args from queue")
 
+                try:
+                    # XXX not getting args...
+                    mth, q, wrargs = self._queue.get()  # False?
+                except:
+                    print "Exception getting args"
+                    logger.error("exception getting args from queue")
+                    continue
+
+                print "mth: ", mth
                 res = None
                 attr = getattr(self._db, mth, None)
                 if not attr:
-                    if mth not in end_mths:
+                    if mth not in END_METHODS:
                         logger.error('method %s does not exist' % (mth,))
                         res = AttributeError(
                             "_db instance has no attribute %s" % mth)
@@ -134,14 +147,16 @@ class SQLCipherWrapper(threading.Thread):
                 else:
                     # non-callable attribute
                     res = attr
-                logger.debug('returning proxied db call...')
+                #logger.debug('returning proxied db call...')
+                print "putting res: ", res
                 q.put(res)
 
-            if mth in end_mths:
-                logger.debug('ending thread')
-                break
+                if mth in END_METHODS:
+                    logger.debug('ending thread')
+                    break
 
         logger.debug("SQLCipherWrapper thread terminated.")
+        print "SQLWRAPPER TERMINATED"
         self._stopped.set()
 
     def close(self):
@@ -158,18 +173,27 @@ class SQLCipherWrapper(threading.Thread):
         """
 
         def __proxied_mth(method, *args, **kwargs):
+            SQLWRAPPER_METHOD_TIMEOUT = 20  # in seconds
             if not self._stopped.isSet():
                 wrargs = {'args': args, 'kwargs': kwargs}
                 q = Queue.Queue()
-                self._queue.put((method, q, wrargs))
-                res = q.get()
-                q.task_done()
+                print "put meth"
+                with self.k_lock:
+                    self._queue.put((method, q, wrargs))
+                    try:
+                        # XXX this is blocking
+                        res = q.get(timeout=SQLWRAPPER_METHOD_TIMEOUT)
+                        q.task_done()
+                    except Queue.Empty:
+                        res = None
+                    print "got result"
 
                 if isinstance(res, exceptions.BaseException):
                     # XXX should get the original bt
                     raise res
                 return res
             else:
+                print "called but stopped!"
                 logger.warning("tried to call proxied meth "
                                "but stopped is set: %s" %
                                (method,))
@@ -185,6 +209,8 @@ class SQLCipherWrapper(threading.Thread):
 
     def __del__(self):
         """
+        Closes the thread upon object destruction.
+
         Do not trust this get called. No guarantees given. Because of a funny
         dance with the refs and the way the gc works, we should be calling the
         close method explicitely.

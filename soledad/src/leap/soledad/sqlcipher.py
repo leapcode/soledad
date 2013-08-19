@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 # sqlcipher.py
 # Copyright (C) 2013 LEAP
 #
@@ -47,6 +47,7 @@ import logging
 import os
 import time
 import string
+import threading
 
 
 from u1db.backends import sqlite_backend
@@ -125,6 +126,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     """A U1DB implementation that uses SQLCipher as its persistence layer."""
 
     _index_storage_value = 'expand referenced encrypted'
+    k_lock = threading.Lock()
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
@@ -158,14 +160,15 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 sqlcipher_file, password, raw_key, cipher, kdf_iter,
                 cipher_page_size)
         # connect to the database
-        self._db_handle = dbapi2.connect(sqlcipher_file)
-        # set SQLCipher cryptographic parameters
-        self._set_crypto_pragmas(
-            self._db_handle, password, raw_key, cipher, kdf_iter,
-            cipher_page_size)
-        self._real_replica_uid = None
-        self._ensure_schema()
-        self._crypto = crypto
+        with self.k_lock:
+            self._db_handle = dbapi2.connect(sqlcipher_file)
+            # set SQLCipher cryptographic parameters
+            self._set_crypto_pragmas(
+                self._db_handle, password, raw_key, cipher, kdf_iter,
+                cipher_page_size)
+            self._real_replica_uid = None
+            self._ensure_schema()
+            self._crypto = crypto
 
         def factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
                     syncable=True):
@@ -207,8 +210,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         if not os.path.isfile(sqlcipher_file):
             raise u1db_errors.DatabaseDoesNotExist()
 
-        tries = 30
+        tries = 2
         while True:
+            print "tries: ", tries
             # Note: There seems to be a bug in sqlite 3.5.9 (with python2.6)
             #       where without re-opening the database on Windows, it
             #       doesn't see the transaction that was just committed
@@ -225,7 +229,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 v, err = cls._which_index_storage(c)
             except Exception as exc:
                 logger.warning("ERROR OPENING DATABASE!")
+                print "ERROR OPENING DB ---------"
                 logger.debug("error was: %r" % exc)
+                print "error was: %r" % exc
+                print exc.__class__
                 v, err = None, exc
             finally:
                 db_handle.close()
@@ -234,8 +241,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             # possibly another process is initializing it, wait for it to be
             # done
             if tries == 0:
+                print "ERROR, raise"
                 raise err  # go for the richest error?
             tries -= 1
+            print "sleeping"
             time.sleep(cls.WAIT_FOR_PARALLEL_INIT_HALF_INTERVAL)
         return SQLCipherDatabase._sqlite_registry[v](
             sqlcipher_file, password, document_factory=document_factory,
@@ -325,6 +334,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         @param c: The cursor for querying the database.
         @type c: dbapi2.cursor
         """
+        # XXX used??? private method not used in module
         c.execute(
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
@@ -658,6 +668,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         if not all(c in string.hexdigits for c in key):
             raise NotAnHexString(key)
         db_handle.cursor().execute('PRAGMA rekey = "x\'%s"' % passphrase)
+
+    def __del__(self):
+        """
+        Closes db_handle upon object destruction.
+        """
+        if self._db_handle is not None:
+            self._db_handle.close()
 
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)
