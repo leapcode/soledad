@@ -7,6 +7,10 @@ Soledad
 
 This software is under development.
 
+Library dependencies
+--------------------
+* ``libsqlite3-dev``
+
 Tests
 -----
 
