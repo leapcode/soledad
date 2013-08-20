@@ -125,11 +125,10 @@ except ImportError:
 
 
 from leap.soledad.crypto import SoledadCrypto
-from leap.soledad.dbwrapper import SQLCipherWrapper
 from leap.soledad.document import SoledadDocument
 from leap.soledad.shared_db import SoledadSharedDatabase
-#from leap.soledad.sqlcipher import open as sqlcipher_open
-#from leap.soledad.sqlcipher import SQLCipherDatabase
+from leap.soledad.sqlcipher import open as sqlcipher_open
+from leap.soledad.sqlcipher import SQLCipherDatabase
 from leap.soledad.target import SoledadSyncTarget
 
 
@@ -429,8 +428,7 @@ class Soledad(object):
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
 
-        # Instantiate a thread-safe wrapper
-        self._db = SQLCipherWrapper(
+        self._db = sqlcipher_open(
             self._local_db_path,
             binascii.b2a_hex(key),  # sqlcipher only accepts the hex version
             create=True,
@@ -444,7 +442,7 @@ class Soledad(object):
         """
         if hasattr(self, '_db') and isinstance(
                 self._db,
-                SQLCipherWrapper):
+                SQLCipherDatabase):
             self._db.close()
 
     def __del__(self):

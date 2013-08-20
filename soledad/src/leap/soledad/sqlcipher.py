@@ -61,6 +61,15 @@ logger = logging.getLogger(__name__)
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
 sqlite_backend.dbapi2 = dbapi2
 
+# It seems that, as long as we are not using old sqlite versions, serialized
+# mode is enabled by default at compile time. So accessing db connections from
+# different threads should be safe, as long as no attempt is made to use them
+# from multiple threads with no locking.
+# See https://sqlite.org/threadsafe.html
+# and http://bugs.python.org/issue16509
+
+SQLITE_CHECK_SAME_THREAD = False
+
 
 def open(path, password, create=True, document_factory=None, crypto=None,
          raw_key=False, cipher='aes-256-cbc', kdf_iter=4000,
@@ -161,7 +170,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 cipher_page_size)
         # connect to the database
         with self.k_lock:
-            self._db_handle = dbapi2.connect(sqlcipher_file)
+            self._db_handle = dbapi2.connect(
+                sqlcipher_file,
+                check_same_thread=SQLITE_CHECK_SAME_THREAD)
             # set SQLCipher cryptographic parameters
             self._set_crypto_pragmas(
                 self._db_handle, password, raw_key, cipher, kdf_iter,
@@ -211,40 +222,37 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             raise u1db_errors.DatabaseDoesNotExist()
 
         tries = 2
+        # Note: There seems to be a bug in sqlite 3.5.9 (with python2.6)
+        #       where without re-opening the database on Windows, it
+        #       doesn't see the transaction that was just committed
         while True:
-            print "tries: ", tries
-            # Note: There seems to be a bug in sqlite 3.5.9 (with python2.6)
-            #       where without re-opening the database on Windows, it
-            #       doesn't see the transaction that was just committed
 
-            db_handle = dbapi2.connect(sqlcipher_file)
+            with cls.k_lock:
+                db_handle = dbapi2.connect(
+                    sqlcipher_file,
+                    check_same_thread=SQLITE_CHECK_SAME_THREAD)
 
-            try:
-                # set cryptographic params
-                cls._set_crypto_pragmas(
-                    db_handle, password, raw_key, cipher, kdf_iter,
-                    cipher_page_size)
-                c = db_handle.cursor()
-                # XXX if we use it here, it should be public
-                v, err = cls._which_index_storage(c)
-            except Exception as exc:
-                logger.warning("ERROR OPENING DATABASE!")
-                print "ERROR OPENING DB ---------"
-                logger.debug("error was: %r" % exc)
-                print "error was: %r" % exc
-                print exc.__class__
-                v, err = None, exc
-            finally:
-                db_handle.close()
-            if v is not None:
-                break
+                try:
+                    # set cryptographic params
+                    cls._set_crypto_pragmas(
+                        db_handle, password, raw_key, cipher, kdf_iter,
+                        cipher_page_size)
+                    c = db_handle.cursor()
+                    # XXX if we use it here, it should be public
+                    v, err = cls._which_index_storage(c)
+                except Exception as exc:
+                    logger.warning("ERROR OPENING DATABASE!")
+                    logger.debug("error was: %r" % exc)
+                    v, err = None, exc
+                finally:
+                    db_handle.close()
+                if v is not None:
+                    break
             # possibly another process is initializing it, wait for it to be
             # done
             if tries == 0:
-                print "ERROR, raise"
                 raise err  # go for the richest error?
             tries -= 1
-            print "sleeping"
             time.sleep(cls.WAIT_FOR_PARALLEL_INIT_HALF_INTERVAL)
         return SQLCipherDatabase._sqlite_registry[v](
             sqlcipher_file, password, document_factory=document_factory,
@@ -422,10 +430,15 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         except dbapi2.DatabaseError:
             # assert that we can access it using SQLCipher with the given
             # key
-            db_handle = dbapi2.connect(sqlcipher_file)
-            cls._set_crypto_pragmas(
-                db_handle, key, raw_key, cipher, kdf_iter, cipher_page_size)
-            db_handle.cursor().execute('SELECT count(*) FROM sqlite_master')
+            with cls.k_lock:
+                db_handle = dbapi2.connect(
+                    sqlcipher_file,
+                    check_same_thread=SQLITE_CHECK_SAME_THREAD)
+                cls._set_crypto_pragmas(
+                    db_handle, key, raw_key, cipher,
+                    kdf_iter, cipher_page_size)
+                db_handle.cursor().execute(
+                    'SELECT count(*) FROM sqlite_master')
 
     @classmethod
     def _set_crypto_pragmas(cls, db_handle, key, raw_key, cipher, kdf_iter,
