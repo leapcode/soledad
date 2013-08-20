@@ -189,8 +189,11 @@ class DatabaseBaseTests(TestCase):
 
     scenarios = LOCAL_DATABASES_SCENARIOS
 
-    def create_database(self, replica_uid):
-        return self.make_database_for_test(self, replica_uid)
+    def make_database_for_test(self, replica_uid):
+        return make_memory_database_for_test(self, replica_uid)
+
+    def create_database(self, *args):
+        return self.make_database_for_test(self, *args)
 
     def copy_database(self, db):
         # DO NOT COPY OR REUSE THIS CODE OUTSIDE TESTS: COPYING U1DB DATABASES

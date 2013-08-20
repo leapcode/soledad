@@ -85,7 +85,8 @@ class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
     whitebox = True
 
     def setUp(self):
-        super(DatabaseSyncTargetTests, self).setUp()
+        tests.DatabaseBaseTests.setUp(self)
+        tests.TestCaseWithServer.setUp(self)
         self.db, self.st = self.create_db_and_target(self)
         self.other_changes = []
 
@@ -95,6 +96,9 @@ class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
         self.db.close()
         del self.db
         super(DatabaseSyncTargetTests, self).tearDown()
+
+    def create_db_and_target(self, *args):
+        return _make_local_db_and_target(*args)
 
     def receive_doc(self, doc, gen, trans_id):
         self.other_changes.append(
