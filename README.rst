@@ -10,18 +10,16 @@ This software is under development.
 Tests
 -----
 
-Client and server tests are both included in leap.soledad. Because
-soledad_server depends on soledad and soledad tests depend on soledad_server,
-if you want to run tests in development mode you must first install soledad,
-then soledad_server, and then run the tests.
+Client and server tests are both included in leap.soledad.common. If you want
+to run tests in development mode you must do the following::
 
-Therefore, tests must be run with::
-
-  cd soledad
+  cd common
   python setup.py develop
-  cd ../soledad_server
+  cd ../client
   python setup.py develop
-  cd ../soledad
+  cd ../server
+  python setup.py develop
+  cd ../common
   python setup.py test
 
 Note that to run CouchDB tests, be sure you have ``CouchDB`` installed on your
