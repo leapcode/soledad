@@ -4,12 +4,14 @@
 	dh $@ --with python2
 
 override_dh_auto_clean:
-	cd soledad && python setup.py clean -a 
-	cd soledad_server && python setup.py clean -a 
+	cd client && python setup.py clean -a 
+	cd common && python setup.py clean -a 
+	cd server && python setup.py clean -a 
 
 override_dh_auto_install: 
-	cd soledad && python setup.py install --root=../debian/soledad-common
-	cd soledad_server && python setup.py install --root=../debian/soledad-server
+	cd common && python setup.py install --root=../debian/soledad-common
+	cd server && python setup.py install --root=../debian/soledad-server
+	cd client && python setup.py install --root=../debian/soledad-client
 
 
 
