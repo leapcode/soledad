@@ -84,7 +84,6 @@ except ImportError:
 from leap.soledad.common import soledad_assert, soledad_assert_type
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.crypto import SoledadCrypto
-from leap.soledad.client.dbwrapper import SQLCipherWrapper
 from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client.sqlcipher import open as sqlcipher_open
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
