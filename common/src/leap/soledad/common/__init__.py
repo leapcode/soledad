@@ -62,3 +62,7 @@ except ImportError:
         soledad_assert(isinstance(var, expectedType),
                        "Expected type %r instead of %r" %
                        (expectedType, type(var)))
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions

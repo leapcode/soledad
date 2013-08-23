@@ -14,28 +14,20 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
+"""
+setup file for leap.soledad.server
+"""
 import os
-from setuptools import (
-    setup,
-    find_packages
-)
+from setuptools import setup
+from setuptools import find_packages
 
+import versioneer
+versioneer.versionfile_source = 'src/leap/soledad/server/_version.py'
+versioneer.versionfile_build = 'leap/soledad/server/_version.py'
+versioneer.tag_prefix = ''  # tags are like 1.2.0
+versioneer.parentdir_prefix = 'leap.soledad.server-'
 
-install_requirements = [
-    'configparser',
-    'couchdb',
-    'simplejson',
-    'twisted>=12.0.0',  # TODO: maybe we just want twisted-web?
-    'oauth',  # this is not strictly needed by us, but we need it
-              # until u1db adds it to its release as a dep.
-    'u1db',
-    'routes',
-    'PyOpenSSL',
-    'leap.soledad.common>=0.3.0',
-]
-
+from pkg import utils
 
 if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
@@ -61,7 +53,8 @@ trove_classifiers = (
 
 setup(
     name='leap.soledad.server',
-    version='0.3.0',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -72,10 +65,10 @@ setup(
         "securely shared among devices. It provides, to other parts of the "
         "LEAP client, an API for data storage and sync."
     ),
+    classifiers=trove_classifiers,
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    install_requires=install_requirements,
+    install_requires=utils.parse_requirements(),
     data_files=data_files,
-    classifiers=trove_classifiers,
 )

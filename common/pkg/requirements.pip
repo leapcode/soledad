@@ -1,0 +1,8 @@
+simplejson
+u1db
+six==1.1.0  # some tests are incompatible with newer versions of six.
+
+#this is not strictly needed by us, but we need it
+#until u1db adds it to its release as a dep.
+oauth
+
