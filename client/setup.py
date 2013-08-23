@@ -14,26 +14,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+"""
+setup file for leap.soledad.client
+"""
+from setuptools import setup
+from setuptools import find_packages
 
+import versioneer
+versioneer.versionfile_source = 'src/leap/soledad/client/_version.py'
+versioneer.versionfile_build = 'leap/soledad/client/_version.py'
+versioneer.tag_prefix = ''  # tags are like 1.2.0
+versioneer.parentdir_prefix = 'leap.soledad.client-'
 
-from setuptools import (
-    setup,
-    find_packages
-)
-
-
-install_requirements = [
-    'pysqlcipher',
-    'pysqlite',  # TODO: this should not be a dep, see #2945
-    'simplejson',
-    'oauth',  # this is not strictly needed by us, but we need it
-              # until u1db adds it to its release as a dep.
-    'u1db',
-    'scrypt',
-    'pyxdg',
-    'pycryptopp',
-    'leap.soledad.common>=0.3.0',
-]
+from pkg import utils
 
 
 trove_classifiers = (
@@ -50,10 +43,12 @@ trove_classifiers = (
     "Topic :: Software Development :: Libraries :: Python Modules"
 )
 
+# XXX add ref to docs
 
 setup(
     name='leap.soledad.client',
-    version='0.3.0',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -64,10 +59,10 @@ setup(
         "securely shared among devices. It provides, to other parts of the "
         "LEAP client, an API for data storage and sync."
     ),
+    classifiers=trove_classifiers,
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    install_requires=install_requirements,
-    classifiers=trove_classifiers,
-    extras_require={'signaling': ['leap.common']},
+    install_requires=utils.parse_requirements(),
+    extras_require={'signaling': ['leap.common>=0.3.0']},
 )
