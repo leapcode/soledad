@@ -14,32 +14,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+"""
+setup file for leap.soledad.common
+"""
+from setuptools import setup
+from setuptools import find_packages
 
+import versioneer
+versioneer.versionfile_source = 'src/leap/soledad/common/_version.py'
+versioneer.versionfile_build = 'leap/soledad/common/_version.py'
+versioneer.tag_prefix = ''  # tags are like 1.2.0
+versioneer.parentdir_prefix = 'leap.soledad.common-'
 
-from setuptools import (
-    setup,
-    find_packages
-)
-
-
-install_requirements = [
-    'simplejson',
-    'oauth',  # this is not strictly needed by us, but we need it
-              # until u1db adds it to its release as a dep.
-    'u1db',
-    'six==1.1.0',  # some tests are incompatible with newer versions of six.
-]
-
-
-tests_requirements = [
-    'mock',
-    'nose2',
-    'testscenarios',
-    'leap.common',
-    'leap.soledad.server',
-    'leap.soledad.client',
-]
-
+from pkg import utils
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -55,10 +42,12 @@ trove_classifiers = (
     "Topic :: Software Development :: Libraries :: Python Modules"
 )
 
+# XXX add ref to docs
 
 setup(
     name='leap.soledad.common',
-    version='0.3.0',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     url='https://leap.se/',
     license='GPLv3+',
     description='Synchronization of locally encrypted data among devices.',
@@ -69,11 +58,12 @@ setup(
         "securely shared among devices. It provides, to other parts of the "
         "LEAP client, an API for data storage and sync."
     ),
+    classifiers=trove_classifiers,
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src', exclude=['leap.soledad.common.tests']),
     package_dir={'': 'src'},
     test_suite='leap.soledad.common.tests',
-    install_requires=install_requirements,
-    tests_require=tests_requirements,
-    classifiers=trove_classifiers,
+    install_requires=utils.parse_requirements(),
+    tests_require=utils.parse_requirements(
+        reqfiles=['pkg/requirements-testing.pip']),
 )

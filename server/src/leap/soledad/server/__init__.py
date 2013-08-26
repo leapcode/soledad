@@ -123,3 +123,7 @@ state = CouchServerState(conf['couch_url'])
 application = SoledadTokenAuthMiddleware(SoledadApp(state))
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), application)
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions

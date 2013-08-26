@@ -1,0 +1,1 @@
+src/leap/soledad/server/_version.py export-subst

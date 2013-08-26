@@ -1,0 +1,6 @@
+mock
+nose2
+testscenarios
+leap.common
+leap.soledad.server
+leap.soledad.client

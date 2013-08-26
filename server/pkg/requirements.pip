@@ -1,0 +1,22 @@
+configparser
+couchdb
+simplejson
+u1db
+routes
+PyOpenSSL
+
+# TODO: maybe we just want twisted-web?
+twisted>=12.0.0
+
+# leap deps -- bump me!
+leap.soledad.common>=0.3.0
+
+#
+# Things yet to fix:
+#
+
+# oauth is not strictly needed by us, but we need it
+# until u1db adds it to its release as a dep.
+
+oauth
+
