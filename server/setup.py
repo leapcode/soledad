@@ -57,13 +57,14 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     url='https://leap.se/',
     license='GPLv3+',
-    description='Synchronization of locally encrypted data among devices.',
+    description='Synchronization of locally encrypted data among devices '
+                '(server components)',
     author='The LEAP Encryption Access Project',
     author_email='info@leap.se',
     long_description=(
         "Soledad is the part of LEAP that allows application data to be "
         "securely shared among devices. It provides, to other parts of the "
-        "LEAP client, an API for data storage and sync."
+        "LEAP project, an API for data storage and sync."
     ),
     classifiers=trove_classifiers,
     namespace_packages=["leap", "leap.soledad"],
