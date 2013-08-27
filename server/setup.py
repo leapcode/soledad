@@ -29,7 +29,8 @@ versioneer.parentdir_prefix = 'leap.soledad.server-'
 
 from pkg import utils
 
-if os.environ.get('VIRTUAL_ENV', None):
+isset = lambda var: os.environ.get(var, None)
+if isset('VIRTUAL_ENV') or isset('LEAP_SKIP_INIT'):
     data_files = None
 else:
     # XXX this should go only for linux/mac
@@ -71,5 +72,5 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=utils.parse_requirements(),
-    data_files=data_files,
+    data_files=data_files
 )
