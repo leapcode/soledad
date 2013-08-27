@@ -33,7 +33,8 @@ if os.environ.get('VIRTUAL_ENV', None):
     data_files = None
 else:
     # XXX this should go only for linux/mac
-    data_files = [("/etc/init.d/", ["pkg/soledad"])]
+    # disabled on debian so the packaging can install it
+    #data_files = [("/etc/init.d/", ["pkg/soledad"])]
 
 
 trove_classifiers = (
@@ -70,5 +71,6 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=utils.parse_requirements(),
-    data_files=data_files,
+    # disabled on debian so the packaging can handle it
+    #data_files=data_files,
 )
