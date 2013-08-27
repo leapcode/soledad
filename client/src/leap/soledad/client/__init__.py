@@ -1126,3 +1126,7 @@ http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection
 
 
 __all__ = ['soledad_assert', 'Soledad']
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions

@@ -1,0 +1,10 @@
+mock
+nose2
+testscenarios
+leap.common
+leap.soledad.server
+leap.soledad.client
+
+# Under quarantine...
+# I've been able to run all tests with six==1.3 -- kali
+# six==1.1.0  # some tests are incompatible with newer versions of six.

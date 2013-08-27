@@ -1,0 +1,23 @@
+pysqlcipher
+simplejson
+u1db
+scrypt
+pyxdg
+pycryptopp
+
+#
+# leap deps
+#
+
+leap.soledad.common>=0.3.0
+
+#
+# XXX things to fix yet:
+#
+
+# this is not strictly needed by us, but we need it
+# until u1db adds it to its release as a dep.
+oauth
+
+# pysqlite should not be a dep, see #2945
+pysqlite

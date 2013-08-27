@@ -1,2 +1,4 @@
 pysqlcipher python-sqlcipher
-python-leap.soledad.common soledad-common
+leap.soledad.common soledad-common
+leap.soledad.server soledad-server
+leap.soledad.client soledad-client

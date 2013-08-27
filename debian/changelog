@@ -1,4 +1,11 @@
-soledad (0.3.1pre) unstable; urgency=low
+soledad (0.3.1) unstable; urgency=low
+
+  * Update to latest release.
+  * Fix pydist-overrides.
+
+ -- Ben Carrillo <ben@futeisha.org>  Mon, 26 Aug 2013 18:21:09 +0200
+
+soledad (0.3.1~pre) unstable; urgency=low
 
   * Upgrade to latest code in develop
   * Setup additional binary package
