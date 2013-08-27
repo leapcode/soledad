@@ -1,9 +1,13 @@
 soledad (0.3.1) unstable; urgency=low
 
+  [ Ben Carrillo ]
   * Update to latest release.
   * Fix pydist-overrides.
 
- -- Ben Carrillo <ben@futeisha.org>  Mon, 26 Aug 2013 18:21:09 +0200
+  [ Micah Anderson ]
+  * Stop setup.py from installing initscript so packaging can
+
+ -- Micah Anderson <micah@debian.org>  Mon, 26 Aug 2013 18:21:09 +0200
 
 soledad (0.3.1~pre) unstable; urgency=low
 
