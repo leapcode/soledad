@@ -9,9 +9,9 @@ override_dh_auto_clean:
 	cd server && python setup.py clean -a 
 
 override_dh_auto_install: 
-	cd common && python setup.py install --root=../debian/soledad-common
-	cd server && python setup.py install --root=../debian/soledad-server
 	cd client && python setup.py install --root=../debian/soledad-client
+	cd common && python setup.py install --root=../debian/soledad-common
+	cd server && LEAP_SKIP_INIT=1 python setup.py install --root=../debian/soledad-server
 
 
 
