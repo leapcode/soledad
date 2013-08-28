@@ -37,12 +37,11 @@ import socket
 import ssl
 import errno
 
-
-from xdg import BaseDirectory
 from hashlib import sha256
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
 
+from leap.common.config import get_path_prefix
 
 #
 # Signaling function
@@ -218,9 +217,7 @@ class Soledad(object):
     Keys used to access storage secrets in recovery documents.
     """
 
-    DEFAULT_PREFIX = os.path.join(
-        BaseDirectory.xdg_config_home,
-        'leap', 'soledad')
+    DEFAULT_PREFIX = os.path.join(get_path_prefix(), 'leap', 'soledad')
     """
     Prefix for default values for path.
     """
