@@ -4,7 +4,10 @@ soledad (0.3.1.1) unstable; urgency=low
   * Fix installation of __init__ file on namespace module.
   * Add LICENSE.
 
- -- Micah Anderson <micah@debian.org>  Mon, 26 Aug 2013 18:21:09 +0200
+  [ Micah Anderson ]
+  * Add fix to initscript so it uses the new namespace
+	
+ -- Micah Anderson <micah@debian.org>  Thu, 29 Aug 2013 14:46:23 -0400
 
 soledad (0.3.1) unstable; urgency=low
 
