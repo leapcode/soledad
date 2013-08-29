@@ -11,4 +11,18 @@ MANIFEST
 *.log
 *.*~
 
+debian/files
+debian/soledad-client.postinst.debhelper
+debian/soledad-client.prerm.debhelper
+debian/soledad-client.substvars
+debian/soledad-client/
+debian/soledad-common.postinst.debhelper
+debian/soledad-common.prerm.debhelper
+debian/soledad-common.substvars
+debian/soledad-common/
+debian/soledad-server.postinst.debhelper
+debian/soledad-server.postrm.debhelper
+debian/soledad-server.prerm.debhelper
+debian/soledad-server.substvars
+debian/soledad-server/
 
