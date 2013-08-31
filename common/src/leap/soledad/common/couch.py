@@ -18,14 +18,12 @@
 
 """A U1DB backend that uses CouchDB as its persistence layer."""
 
-import uuid
 import re
 import simplejson as json
 import socket
 import logging
 
 
-from base64 import b64encode, b64decode
 from u1db import errors
 from u1db.sync import Synchronizer
 from u1db.backends.inmemory import InMemoryIndex
@@ -50,21 +48,145 @@ class InvalidURLError(Exception):
     """
 
 
+def persistent_class(cls):
+    """
+    Decorator that modifies a class to ensure u1db metadata persists on
+    underlying storage.
+
+    @param cls: The class that will be modified.
+    @type cls: type
+    """
+
+    def _create_persistent_method(old_method_name, key, load_method_name,
+                                  dump_method_name, store):
+        """
+        Create a persistent method to replace C{old_method_name}.
+        
+        The new method will load C{key} using C{load_method_name} and stores
+        it using C{dump_method_name} depending on the value of C{store}.
+        """
+        # get methods
+        old_method = getattr(cls, old_method_name)
+        load_method = getattr(cls, load_method_name) \
+            if load_method_name is not None \
+            else lambda self, data: setattr(self, key, data)
+        dump_method = getattr(cls, dump_method_name) \
+            if dump_method_name is not None \
+            else lambda self: getattr(self, key)
+
+        def _new_method(self, *args, **kwargs):
+            # get u1db data from couch db
+            doc = self._get_doc('%s%s' %
+                                (self.U1DB_DATA_DOC_ID_PREFIX, key))
+            load_method(self, doc.content['content'])
+            # run old method
+            retval = old_method(self, *args, **kwargs)
+            # store u1db data on couch
+            if store:
+                doc.content = {'content': dump_method(self)}
+                self._put_doc(doc)
+            return retval
+
+        return _new_method
+
+    # ensure the class has a persistency map
+    if not hasattr(cls, 'PERSISTENCY_MAP'):
+        logger.error('Class %s has no PERSISTENCY_MAP attribute, skipping '
+                     'persistent methods substitution.' % cls)
+        return cls
+    # replace old methods with new persistent ones
+    for key, ((load_method_name, dump_method_name),
+              persistent_methods) in cls.PERSISTENCY_MAP.iteritems():
+        for (method_name, store) in persistent_methods:
+            setattr(cls, method_name,
+                    _create_persistent_method(
+                        method_name,
+                        key,
+                        load_method_name,
+                        dump_method_name,
+                        store))
+    return cls
+
+
+@persistent_class
 class CouchDatabase(ObjectStoreDatabase):
     """
     A U1DB backend that uses Couch as its persistence layer.
     """
 
-    U1DB_TRANSACTION_LOG_KEY = 'transaction_log'
-    U1DB_CONFLICTS_KEY = 'conflicts'
-    U1DB_OTHER_GENERATIONS_KEY = 'other_generations'
-    U1DB_INDEXES_KEY = 'indexes'
-    U1DB_REPLICA_UID_KEY = 'replica_uid'
+    U1DB_TRANSACTION_LOG_KEY = '_transaction_log'
+    U1DB_CONFLICTS_KEY = '_conflicts'
+    U1DB_OTHER_GENERATIONS_KEY = '_other_generations'
+    U1DB_INDEXES_KEY = '_indexes'
+    U1DB_REPLICA_UID_KEY = '_replica_uid'
+
+    U1DB_DATA_KEYS = [
+        U1DB_TRANSACTION_LOG_KEY,
+        U1DB_CONFLICTS_KEY,
+        U1DB_OTHER_GENERATIONS_KEY,
+        U1DB_INDEXES_KEY,
+        U1DB_REPLICA_UID_KEY,
+    ]
 
     COUCH_ID_KEY = '_id'
     COUCH_REV_KEY = '_rev'
     COUCH_U1DB_ATTACHMENT_KEY = 'u1db_json'
     COUCH_U1DB_REV_KEY = 'u1db_rev'
+
+    # the following map describes information about methods usage of
+    # properties that have to persist on the underlying database. The format
+    # of the map is assumed to be:
+    #
+    #     {
+    #         'property_name': [
+    #             ('property_load_method_name', 'property_dump_method_name'),
+    #             [('method_1_name', bool),
+    #              ...
+    #              ('method_N_name', bool)]],
+    #         ...
+    #     }
+    #
+    # where the booleans indicate if the property should be stored after
+    # each method execution (i.e. if the method alters the property). Property
+    # load/dump methods will be run after/before properties are read/written
+    # to the underlying db.
+    PERSISTENCY_MAP = {
+        U1DB_TRANSACTION_LOG_KEY: [
+            ('_load_transaction_log_from_json', None),
+            [('_get_transaction_log', False),
+             ('_get_generation', False),
+             ('_get_generation_info', False),
+             ('_get_trans_id_for_gen', False),
+             ('whats_changed', False),
+             ('_put_and_update_indexes', True)]],
+        U1DB_CONFLICTS_KEY: [
+            (None, None),
+            [('_has_conflicts', False),
+             ('get_doc_conflicts', False),
+             ('_prune_conflicts', False),
+             ('resolve_doc', False),
+             ('_replace_conflicts', True),
+             ('_force_doc_sync_conflict', True)]],
+        U1DB_OTHER_GENERATIONS_KEY: [
+            ('_load_other_generations_from_json', None),
+            [('_get_replica_gen_and_trans_id', False),
+             ('_do_set_replica_gen_and_trans_id', True)]],
+        U1DB_INDEXES_KEY: [
+            ('_load_indexes_from_json', '_dump_indexes_as_json'),
+            [('list_indexes', False),
+             ('get_from_index', False),
+             ('get_range_from_index', False),
+             ('get_index_keys', False),
+             ('_put_and_update_indexes', True),
+             ('create_index', True),
+             ('delete_index', True)]],
+        U1DB_REPLICA_UID_KEY: [
+            (None, None),
+            [('_allocate_doc_rev', False),
+             ('_put_doc_if_newer', False),
+             ('_ensure_maximal_rev', False),
+             ('_prune_conflicts', False),
+             ('_set_replica_uid', True)]]}
 
     @classmethod
     def open_database(cls, url, create):
@@ -109,9 +231,11 @@ class CouchDatabase(ObjectStoreDatabase):
         @param session: an http.Session instance or None for a default session
         @type session: http.Session
         """
+        # save params
         self._url = url
         self._full_commit = full_commit
         self._session = session
+        # configure couch
         self._server = Server(url=self._url,
                               full_commit=self._full_commit,
                               session=self._session)
@@ -179,7 +303,7 @@ class CouchDatabase(ObjectStoreDatabase):
         generation = self._get_generation()
         results = []
         for doc_id in self._database:
-            if doc_id == self.U1DB_DATA_DOC_ID:
+            if doc_id.startswith(self.U1DB_DATA_DOC_ID_PREFIX):
                 continue
             doc = self._get_doc(doc_id, check_for_conflicts=True)
             if doc.content is None and not include_deleted:
@@ -246,14 +370,12 @@ class CouchDatabase(ObjectStoreDatabase):
             raise errors.IndexNameTakenError
         index = InMemoryIndex(index_name, list(index_expressions))
         for doc_id in self._database:
-            if doc_id == self.U1DB_DATA_DOC_ID:  # skip special file
-                continue
+            if doc_id.startswith(self.U1DB_DATA_DOC_ID_PREFIX):
+                continue  # skip special files
             doc = self._get_doc(doc_id)
             if doc.content is not None:
                 index.add_json(doc_id, doc.get_json())
         self._indexes[index_name] = index
-        # save data in object store
-        self._store_u1db_data()
 
     def close(self):
         """
@@ -295,76 +417,25 @@ class CouchDatabase(ObjectStoreDatabase):
 
     def _init_u1db_data(self):
         """
-        Initialize U1DB info data structure in the couch db.
+        Initialize u1db configuration data on backend storage.
 
         A U1DB database needs to keep track of all database transactions,
         document conflicts, the generation of other replicas it has seen,
         indexes created by users and so on.
 
-        In this implementation, all this information is stored in a special
-        document stored in the couch db with id equals to
-        CouchDatabse.U1DB_DATA_DOC_ID.
-
-        This method initializes the document that will hold such information.
+        In this implementation, all this information is stored in special
+        documents stored in the underlying with doc_id prefix equal to
+        U1DB_DATA_DOC_ID_PREFIX. Those documents ids are reserved: put_doc(),
+        get_doc() and delete_doc() will not allow documents with a doc_id with
+        that prefix to be accessed or modified.
         """
-        if self._replica_uid is None:
-            self._replica_uid = uuid.uuid4().hex
-        # TODO: prevent user from overwriting a document with the same doc_id
-        # as this one.
-        doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
-        doc.content = {
-            self.U1DB_TRANSACTION_LOG_KEY: b64encode(json.dumps([])),
-            self.U1DB_CONFLICTS_KEY: b64encode(json.dumps({})),
-            self.U1DB_OTHER_GENERATIONS_KEY: b64encode(json.dumps({})),
-            self.U1DB_INDEXES_KEY: b64encode(json.dumps({})),
-            self.U1DB_REPLICA_UID_KEY: b64encode(self._replica_uid),
-        }
-        self._put_doc(doc)
-
-    def _fetch_u1db_data(self):
-        """
-        Fetch U1DB info from the couch db.
-
-        See C{_init_u1db_data} documentation.
-        """
-        # retrieve u1db data from couch db
-        cdoc = self._database.get(self.U1DB_DATA_DOC_ID)
-        jsonstr = self._database.get_attachment(
-            cdoc, self.COUCH_U1DB_ATTACHMENT_KEY).read()
-        content = json.loads(jsonstr)
-        # set u1db database info
-        self._transaction_log = json.loads(
-            b64decode(content[self.U1DB_TRANSACTION_LOG_KEY]))
-        self._conflicts = json.loads(
-            b64decode(content[self.U1DB_CONFLICTS_KEY]))
-        self._other_generations = json.loads(
-            b64decode(content[self.U1DB_OTHER_GENERATIONS_KEY]))
-        self._indexes = self._load_indexes_from_json(
-            b64decode(content[self.U1DB_INDEXES_KEY]))
-        self._replica_uid = b64decode(content[self.U1DB_REPLICA_UID_KEY])
-        # save couch _rev
-        self._couch_rev = cdoc[self.COUCH_REV_KEY]
-
-    def _store_u1db_data(self):
-        """
-        Store U1DB info in the couch db.
-
-        See C{_init_u1db_data} documentation.
-        """
-        doc = self._factory(doc_id=self.U1DB_DATA_DOC_ID)
-        doc.content = {
-            # Here, the b64 encode ensures that document content
-            # does not cause strange behaviour in couchdb because
-            # of encoding.
-            self.U1DB_TRANSACTION_LOG_KEY:
-                b64encode(json.dumps(self._transaction_log)),
-            self.U1DB_CONFLICTS_KEY: b64encode(json.dumps(self._conflicts)),
-            self.U1DB_OTHER_GENERATIONS_KEY:
-                b64encode(json.dumps(self._other_generations)),
-            self.U1DB_INDEXES_KEY: b64encode(self._dump_indexes_as_json()),
-            self.U1DB_REPLICA_UID_KEY: b64encode(self._replica_uid),
-            self.COUCH_REV_KEY: self._couch_rev}
-        self._put_doc(doc)
+        for key in self.U1DB_DATA_KEYS:
+            doc_id = '%s%s' % (self.U1DB_DATA_DOC_ID_PREFIX, key)
+            doc = self._get_doc(doc_id)
+            if doc is None:
+                doc = self._factory(doc_id)
+                doc.content = {'content': getattr(self, key)}
+                self._put_doc(doc)
 
     #-------------------------------------------------------------------------
     # Couch specific methods
@@ -382,7 +453,7 @@ class CouchDatabase(ObjectStoreDatabase):
 
     def _dump_indexes_as_json(self):
         """
-        Dump index definitions as JSON string.
+        Dump index definitions as JSON.
         """
         indexes = {}
         for name, idx in self._indexes.iteritems():
@@ -390,25 +461,45 @@ class CouchDatabase(ObjectStoreDatabase):
             for attr in [self.INDEX_NAME_KEY, self.INDEX_DEFINITION_KEY,
                          self.INDEX_VALUES_KEY]:
                 indexes[name][attr] = getattr(idx, '_' + attr)
-        return json.dumps(indexes)
+        return indexes
 
     def _load_indexes_from_json(self, indexes):
         """
-        Load index definitions from JSON string.
+        Load index definitions from stored JSON.
 
-        @param indexes: A JSON serialization of a list of [('index-name',
-            ['field', 'field2'])].
+        @param indexes: A JSON representation of indexes as
+            [('index-name', ['field', 'field2', ...]), ...].
         @type indexes: str
-
-        @return: A dictionary with the index definitions.
-        @rtype: dict
         """
-        dict = {}
-        for name, idx_dict in json.loads(indexes).iteritems():
+        self._indexes = {}
+        for name, idx_dict in indexes.iteritems():
             idx = InMemoryIndex(name, idx_dict[self.INDEX_DEFINITION_KEY])
             idx._values = idx_dict[self.INDEX_VALUES_KEY]
-            dict[name] = idx
-        return dict
+            self._indexes[name] = idx
+
+    def _load_transaction_log_from_json(self, transaction_log):
+        """
+        Load transaction log from stored JSON.
+
+        @param transaction_log: A JSON representation of transaction_log as
+            [('generation', 'transaction_id'), ...].
+        @type transaction_log: list
+        """
+        self._transaction_log = []
+        for gen, trans_id in transaction_log:
+            self._transaction_log.append((gen, trans_id))
+
+    def _load_other_generations_from_json(self, other_generations):
+        """
+        Load other generations from stored JSON.
+
+        @param other_generations: A JSON representation of other_generations
+            as {'replica_uid': ('generation', 'transaction_id'), ...}.
+        @type other_generations: dict
+        """
+        self._other_generations = {}
+        for replica_uid, [gen, trans_id] in other_generations.iteritems():
+            self._other_generations[replica_uid] = (gen, trans_id)
 
 
 class CouchSyncTarget(ObjectStoreSyncTarget):
