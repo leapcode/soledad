@@ -1,0 +1,2 @@
+  o Fix the init script for soledad server so that it uses the new
+    package namespace.
