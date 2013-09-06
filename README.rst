@@ -12,20 +12,24 @@ There are currently three python packages maintained under this
 repository:
 
 **leap.soledad.common** common pieces.
+
 .. image:: https://pypip.in/v/leap.soledad.common/badge.png
         :target: https://crate.io/packages/leap.soledad.common
 
 **leap.soledad.client** where the soledad client lives.
+
 .. image:: https://pypip.in/v/leap.soledad.client/badge.png
         :target: https://crate.io/packages/leap.soledad.client
 
 **leap.soledad.server** oh surprise! bits needed for the soledad server.
+
 .. image:: https://pypip.in/v/leap.soledad.server/badge.png
         :target: https://crate.io/packages/leap.soledad.server
 
 
 Library dependencies
 --------------------
+
 * ``libsqlite3-dev``
 
 Tests
