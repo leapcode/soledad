@@ -29,7 +29,8 @@ versioneer.parentdir_prefix = 'leap.soledad.server-'
 
 from pkg import utils
 
-if os.environ.get('VIRTUAL_ENV', None):
+isset = lambda var: os.environ.get(var, None)
+if isset('VIRTUAL_ENV') or isset('LEAP_SKIP_INIT'):
     data_files = None
 else:
     # XXX this should go only for linux/mac
@@ -57,18 +58,19 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     url='https://leap.se/',
     license='GPLv3+',
-    description='Synchronization of locally encrypted data among devices.',
+    description='Synchronization of locally encrypted data among devices '
+                '(server components)',
     author='The LEAP Encryption Access Project',
     author_email='info@leap.se',
     long_description=(
         "Soledad is the part of LEAP that allows application data to be "
         "securely shared among devices. It provides, to other parts of the "
-        "LEAP client, an API for data storage and sync."
+        "LEAP project, an API for data storage and sync."
     ),
     classifiers=trove_classifiers,
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=utils.parse_requirements(),
-    data_files=data_files,
+    data_files=data_files
 )

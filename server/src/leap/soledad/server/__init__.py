@@ -20,7 +20,7 @@
 A U1DB server that stores data using CouchDB as its persistence layer.
 
 This should be run with:
-    twistd -n web --wsgi=leap.soledad_server.application --port=2424
+    twistd -n web --wsgi=leap.soledad.server.application --port=2424
 """
 
 import configparser
