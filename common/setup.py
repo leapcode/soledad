@@ -67,4 +67,7 @@ setup(
     install_requires=utils.parse_requirements(),
     tests_require=utils.parse_requirements(
         reqfiles=['pkg/requirements-testing.pip']),
+    extras_require={
+        'couchdb': ['couchdb'],
+    },
 )
