@@ -271,6 +271,14 @@ class CouchDatabaseSyncTargetTests(test_sync.DatabaseSyncTargetTests,
 
     scenarios = (tests.multiply_scenarios(COUCH_SCENARIOS, target_scenarios))
 
+    def setUp(self):
+        # we implement parents' setUp methods here to prevent from launching
+        # more couch instances then needed.
+        tests.TestCase.setUp(self)
+        self.server = self.server_thread = None
+        self.db, self.st = self.create_db_and_target(self)
+        self.other_changes = []
+
     def tearDown(self):
         self.db.delete_database()
         test_sync.DatabaseSyncTargetTests.tearDown(self)
