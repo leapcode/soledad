@@ -4,9 +4,6 @@ Client:
 Server:
   o Fix the init script for soledad server so that it uses the new
     package namespace.
-Common:
-  o Split soledad package into common, client and server. Closes #3487.
-  o Add versioneer, parse_requirements
 
 0.3.1 Aug 23:
 Client:
