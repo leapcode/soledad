@@ -2,10 +2,27 @@ Soledad
 ==================================================================
 *Synchronization Of Locally Encrypted Data Among Devices*
 
-.. image:: https://pypip.in/v/leap.soledad/badge.png
-        :target: https://crate.io/packages/leap.soledad
+Soledad is the part of LEAP that allows application data to be
+securely shared among devices. It provides, to other parts of the 
+LEAP project, an API for data storage and sync.
 
 This software is under development.
+
+There are currently three python packages maintained under this
+repository:
+
+**leap.soledad.common** common pieces.
+.. image:: https://pypip.in/v/leap.soledad.common/badge.png
+        :target: https://crate.io/packages/leap.soledad.common
+
+**leap.soledad.client** where the soledad client lives.
+.. image:: https://pypip.in/v/leap.soledad.client/badge.png
+        :target: https://crate.io/packages/leap.soledad.client
+
+**leap.soledad.server** oh surprise! bits needed for the soledad server.
+.. image:: https://pypip.in/v/leap.soledad.server/badge.png
+        :target: https://crate.io/packages/leap.soledad.server
+
 
 Library dependencies
 --------------------
