@@ -14,8 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Soledad - Synchronization Of Locally Encrypted Data Among Devices.
 
@@ -25,21 +23,22 @@ implements (1) a SQLCipher backend for local storage in the client, (2) a
 SyncTarget that encrypts data before syncing, and (3) a CouchDB backend for
 remote storage in the server side.
 """
-
-import os
 import binascii
-import logging
-import urlparse
-import simplejson as json
-import scrypt
+import errno
 import httplib
+import logging
+import os
 import socket
 import ssl
-import errno
+import urlparse
 
 from hashlib import sha256
+
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
+
+import scrypt
+import simplejson as json
 
 from leap.common.config import get_path_prefix
 
