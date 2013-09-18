@@ -345,8 +345,9 @@ class Soledad(object):
             lambda x: os.path.dirname(x),
             [self._local_db_path, self._secrets_path])
         for path in paths:
-            logger.info('Creating directory: %s.' % path)
             try:
+                if not os.path.isdir(path):
+                    logger.info('Creating directory: %s.' % path)
                 os.makedirs(path)
             except OSError as exc:
                 if exc.errno == errno.EEXIST and os.path.isdir(path):
