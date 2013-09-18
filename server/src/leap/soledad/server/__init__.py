@@ -19,11 +19,18 @@
 """
 A U1DB server that stores data using CouchDB as its persistence layer.
 
-This should be run with:
-    twistd -n web --wsgi=leap.soledad.server.application --port=2424
+This is written as a Twisted application and intended to be run using the
+twistd command. To start the soledad server, run:
+
+    twistd -n web --wsgi=leap.soledad.server.application --port=X
+
+An initscript is included and will be installed system wide to make it
+feasible to start and stop the Soledad server service using a standard
+interface.
 """
 
 import configparser
+
 
 from u1db.remote import http_app
 
@@ -116,13 +123,18 @@ def load_configuration(file_path):
 # Run as Twisted WSGI Resource
 #-----------------------------------------------------------------------------
 
-conf = load_configuration('/etc/leap/soledad-server.conf')
-state = CouchServerState(conf['couch_url'])
+def application(environ, start_response):
+    conf = load_configuration('/etc/leap/soledad-server.conf')
+    state = CouchServerState(
+        conf['couch_url'],
+        SoledadApp.SHARED_DB_NAME,
+        SoledadTokenAuthMiddleware.TOKENS_DB,
+        SoledadApp.USER_DB_PREFIX)
+    # WSGI application that may be used by `twistd -web`
+    application = SoledadTokenAuthMiddleware(SoledadApp(state))
+    resource = WSGIResource(reactor, reactor.getThreadPool(), application)
+    return application(environ, start_response)
 
-# WSGI application that may be used by `twistd -web`
-application = SoledadTokenAuthMiddleware(SoledadApp(state))
-
-resource = WSGIResource(reactor, reactor.getThreadPool(), application)
 
 from ._version import get_versions
 __version__ = get_versions()['version']
