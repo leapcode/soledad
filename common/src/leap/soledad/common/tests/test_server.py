@@ -310,7 +310,8 @@ class EncryptedSyncTestCase(
             secret_id=secret_id)
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url)
+        self.request_state = CouchServerState(
+            self._couch_url, 'shared', 'tokens', 'user-')
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):

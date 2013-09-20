@@ -178,7 +178,12 @@ def copy_couch_database_for_test(test, db):
     new_db._conflicts = copy.deepcopy(db._conflicts)
     new_db._other_generations = copy.deepcopy(db._other_generations)
     new_db._indexes = copy.deepcopy(db._indexes)
-    new_db._store_u1db_data()
+    # save u1db data on couch
+    for key in new_db.U1DB_DATA_KEYS:
+        doc_id = '%s%s' % (new_db.U1DB_DATA_DOC_ID_PREFIX, key)
+        doc = new_db._get_doc(doc_id)
+        doc.content = {'content': getattr(new_db, key)}
+        new_db._put_doc(doc)
     return new_db
 
 
@@ -271,6 +276,14 @@ class CouchDatabaseSyncTargetTests(test_sync.DatabaseSyncTargetTests,
 
     scenarios = (tests.multiply_scenarios(COUCH_SCENARIOS, target_scenarios))
 
+    def setUp(self):
+        # we implement parents' setUp methods here to prevent from launching
+        # more couch instances then needed.
+        tests.TestCase.setUp(self)
+        self.server = self.server_thread = None
+        self.db, self.st = self.create_db_and_target(self)
+        self.other_changes = []
+
     def tearDown(self):
         self.db.delete_database()
         test_sync.DatabaseSyncTargetTests.tearDown(self)
@@ -345,20 +358,18 @@ class CouchDatabaseStorageTests(CouchDBTestCase):
             return [self._listify(i) for i in l]
         return l
 
-    def _fetch_u1db_data(self, db):
-        cdoc = db._database.get(db.U1DB_DATA_DOC_ID)
-        jsonstr = db._database.get_attachment(cdoc, 'u1db_json').getvalue()
-        return json.loads(jsonstr)
+    def _fetch_u1db_data(self, db, key):
+        doc = db._get_doc("%s%s" % (db.U1DB_DATA_DOC_ID_PREFIX, key))
+        return doc.content['content']
 
     def test_transaction_log_storage_after_put(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
                                  'u1db_tests')
         db.create_doc({'simple': 'doc'})
-        content = self._fetch_u1db_data(db)
+        content = self._fetch_u1db_data(db, db.U1DB_TRANSACTION_LOG_KEY)
         self.assertEqual(
             self._listify(db._transaction_log),
-            self._listify(
-                json.loads(b64decode(content[db.U1DB_TRANSACTION_LOG_KEY]))))
+            self._listify(content))
 
     def test_conflict_log_storage_after_put_if_newer(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
@@ -367,29 +378,27 @@ class CouchDatabaseStorageTests(CouchDBTestCase):
         doc.set_json(nested_doc)
         doc.rev = db._replica_uid + ':2'
         db._force_doc_sync_conflict(doc)
-        content = self._fetch_u1db_data(db)
+        content = self._fetch_u1db_data(db, db.U1DB_CONFLICTS_KEY)
         self.assertEqual(
             self._listify(db._conflicts),
-            self._listify(
-                json.loads(b64decode(content[db.U1DB_CONFLICTS_KEY]))))
+            self._listify(content))
 
     def test_other_gens_storage_after_set(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
                                  'u1db_tests')
         doc = db.create_doc({'simple': 'doc'})
         db._set_replica_gen_and_trans_id('a', 'b', 'c')
-        content = self._fetch_u1db_data(db)
+        content = self._fetch_u1db_data(db, db.U1DB_OTHER_GENERATIONS_KEY)
         self.assertEqual(
             self._listify(db._other_generations),
-            self._listify(
-                json.loads(b64decode(content[db.U1DB_OTHER_GENERATIONS_KEY]))))
+            self._listify(content))
 
     def test_index_storage_after_create(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
                                  'u1db_tests')
         doc = db.create_doc({'name': 'john'})
         db.create_index('myindex', 'name')
-        content = self._fetch_u1db_data(db)
+        content = self._fetch_u1db_data(db, db.U1DB_INDEXES_KEY)
         myind = db._indexes['myindex']
         index = {
             'myindex': {
@@ -400,8 +409,7 @@ class CouchDatabaseStorageTests(CouchDBTestCase):
         }
         self.assertEqual(
             self._listify(index),
-            self._listify(
-                json.loads(b64decode(content[db.U1DB_INDEXES_KEY]))))
+            self._listify(content))
 
     def test_index_storage_after_delete(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
@@ -410,7 +418,7 @@ class CouchDatabaseStorageTests(CouchDBTestCase):
         db.create_index('myindex', 'name')
         db.create_index('myindex2', 'name')
         db.delete_index('myindex')
-        content = self._fetch_u1db_data(db)
+        content = self._fetch_u1db_data(db, db.U1DB_INDEXES_KEY)
         myind = db._indexes['myindex2']
         index = {
             'myindex2': {
@@ -421,16 +429,13 @@ class CouchDatabaseStorageTests(CouchDBTestCase):
         }
         self.assertEqual(
             self._listify(index),
-            self._listify(
-                json.loads(b64decode(content[db.U1DB_INDEXES_KEY]))))
+            self._listify(content))
 
     def test_replica_uid_storage_after_db_creation(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
                                  'u1db_tests')
-        content = self._fetch_u1db_data(db)
-        self.assertEqual(
-            db._replica_uid,
-            b64decode(content[db.U1DB_REPLICA_UID_KEY]))
+        content = self._fetch_u1db_data(db, db.U1DB_REPLICA_UID_KEY)
+        self.assertEqual(db._replica_uid, content)
 
 
 load_tests = tests.load_with_scenarios

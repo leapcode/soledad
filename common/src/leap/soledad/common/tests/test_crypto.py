@@ -29,9 +29,6 @@ import binascii
 
 
 from leap.common.testing.basetest import BaseLeapTest
-from Crypto import Random
-
-
 from leap.soledad.client import (
     Soledad,
     crypto,
@@ -193,7 +190,7 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
 
     def test_encrypt_decrypt_sym(self):
         # generate 256-bit key
-        key = Random.new().read(32)
+        key = os.urandom(32)
         iv, cyphertext = self._soledad._crypto.encrypt_sym(
             'data', key,
             method=crypto.EncryptionMethods.AES_256_CTR)
@@ -206,7 +203,7 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         self.assertEqual('data', plaintext)
 
     def test_decrypt_with_wrong_iv_fails(self):
-        key = Random.new().read(32)
+        key = os.urandom(32)
         iv, cyphertext = self._soledad._crypto.encrypt_sym(
             'data', key,
             method=crypto.EncryptionMethods.AES_256_CTR)
@@ -224,17 +221,17 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         self.assertNotEqual('data', plaintext)
 
     def test_decrypt_with_wrong_key_fails(self):
-        key = Random.new().read(32)
+        key = os.urandom(32)
         iv, cyphertext = self._soledad._crypto.encrypt_sym(
             'data', key,
             method=crypto.EncryptionMethods.AES_256_CTR)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
-        wrongkey = Random.new().read(32)  # 256-bits key
+        wrongkey = os.urandom(32)  # 256-bits key
         # ensure keys are different in case we are extremely lucky
         while wrongkey == key:
-            wrongkey = Random.new().read(32)
+            wrongkey = os.urandom(32)
         plaintext = self._soledad._crypto.decrypt_sym(
             cyphertext, wrongkey, iv=iv,
             method=crypto.EncryptionMethods.AES_256_CTR)
@@ -245,7 +242,7 @@ class SoledadCryptoXSalsa20TestCase(BaseSoledadTest):
 
     def test_encrypt_decrypt_sym(self):
         # generate 256-bit key
-        key = Random.new().read(32)
+        key = os.urandom(32)
         iv, cyphertext = self._soledad._crypto.encrypt_sym(
             'data', key,
             method=crypto.EncryptionMethods.XSALSA20)
@@ -258,7 +255,7 @@ class SoledadCryptoXSalsa20TestCase(BaseSoledadTest):
         self.assertEqual('data', plaintext)
 
     def test_decrypt_with_wrong_iv_fails(self):
-        key = Random.new().read(32)
+        key = os.urandom(32)
         iv, cyphertext = self._soledad._crypto.encrypt_sym(
             'data', key,
             method=crypto.EncryptionMethods.XSALSA20)
@@ -276,17 +273,17 @@ class SoledadCryptoXSalsa20TestCase(BaseSoledadTest):
         self.assertNotEqual('data', plaintext)
 
     def test_decrypt_with_wrong_key_fails(self):
-        key = Random.new().read(32)
+        key = os.urandom(32)
         iv, cyphertext = self._soledad._crypto.encrypt_sym(
             'data', key,
             method=crypto.EncryptionMethods.XSALSA20)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
-        wrongkey = Random.new().read(32)  # 256-bits key
+        wrongkey = os.urandom(32)  # 256-bits key
         # ensure keys are different in case we are extremely lucky
         while wrongkey == key:
-            wrongkey = Random.new().read(32)
+            wrongkey = os.urandom(32)
         plaintext = self._soledad._crypto.decrypt_sym(
             cyphertext, wrongkey, iv=iv,
             method=crypto.EncryptionMethods.XSALSA20)

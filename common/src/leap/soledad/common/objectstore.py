@@ -20,11 +20,22 @@
 Abstract U1DB backend to handle storage using object stores (like CouchDB, for
 example).
 
+This backend uses special documents to store all U1DB data (replica uid,
+indexes, transaction logs and info about other dbs). The id of these documents
+are reserved and have prefix equal to ObjectStore.U1DB_DATA_DOC_ID_PREFIX.
+
 Right now, this is only used by CouchDatabase backend, but can also be
 extended to implement OpenStack or Amazon S3 storage, for example.
 
 See U1DB documentation for more information on how to use databases.
 """
+
+
+from base64 import b64encode, b64decode
+
+
+import uuid
+import simplejson as json
 
 
 from u1db import errors
@@ -38,6 +49,8 @@ class ObjectStoreDatabase(InMemoryDatabase):
     """
     A backend for storing u1db data in an object store.
     """
+
+    U1DB_DATA_DOC_ID_PREFIX = 'u1db/'
 
     @classmethod
     def open_database(cls, url, create, document_factory=None):
@@ -71,24 +84,52 @@ class ObjectStoreDatabase(InMemoryDatabase):
             self,
             replica_uid,
             document_factory=document_factory)
-        # sync data in memory with data in object store
-        if not self._get_doc(self.U1DB_DATA_DOC_ID):
-            self._init_u1db_data()
-        self._fetch_u1db_data()
+        if self._replica_uid is None:
+            self._replica_uid = uuid.uuid4().hex
+        self._init_u1db_data()
+
+    def _init_u1db_data(self):
+        """
+        Initialize u1db configuration data on backend storage.
+
+        A U1DB database needs to keep track of all database transactions,
+        document conflicts, the generation of other replicas it has seen,
+        indexes created by users and so on.
+
+        In this implementation, all this information is stored in special
+        documents stored in the couch db with id prefix equal to
+        U1DB_DATA_DOC_ID_PREFIX.  Those documents ids are reserved:
+        put_doc(), get_doc() and delete_doc() will not allow documents with
+        a doc_id with that prefix to be accessed or modified.
+        """
+        raise NotImplementedError(self._init_u1db_data)
 
     #-------------------------------------------------------------------------
     # methods from Database
     #-------------------------------------------------------------------------
 
-    def _set_replica_uid(self, replica_uid):
+    def put_doc(self, doc):
         """
-        Force the replica_uid to be set.
+        Update a document.
 
-        @param replica_uid: The uid of the replica.
-        @type replica_uid: str
+        If the document currently has conflicts, put will fail.
+        If the database specifies a maximum document size and the document
+        exceeds it, put will fail and raise a DocumentTooBig exception.
+
+        This method prevents from updating the document with doc_id equals to
+        self.U1DB_DATA_DOC_ID, which contains U1DB data.
+
+        @param doc: A Document with new content.
+        @type doc: Document
+
+        @return: new_doc_rev - The new revision identifier for the document.
+            The Document object will also be updated.
+        @rtype: str
         """
-        InMemoryDatabase._set_replica_uid(self, replica_uid)
-        self._store_u1db_data()
+        if doc.doc_id is not None and \
+                doc.doc_id.startswith(self.U1DB_DATA_DOC_ID_PREFIX):
+            raise errors.InvalidDocId()
+        return InMemoryDatabase.put_doc(self, doc)
 
     def _put_doc(self, doc):
         """
@@ -105,6 +146,27 @@ class ObjectStoreDatabase(InMemoryDatabase):
         @rtype: str
         """
         raise NotImplementedError(self._put_doc)
+
+    def get_doc(self, doc_id, include_deleted=False):
+        """
+        Get the JSON string for the given document.
+
+        This method prevents from getting the document with doc_id equals to
+        self.U1DB_DATA_DOC_ID, which contains U1DB data.
+
+        @param doc_id: The unique document identifier
+        @type doc_id: str
+        @param include_deleted: If set to True, deleted documents will be
+            returned with empty content. Otherwise asking for a deleted
+            document will return None.
+        @type include_deleted: bool
+
+        @return: a Document object.
+        @rtype: Document
+        """
+        if doc_id.startswith(self.U1DB_DATA_DOC_ID_PREFIX):
+            raise errors.InvalidDocId()
+        return InMemoryDatabase.get_doc(self, doc_id, include_deleted)
 
     def _get_doc(self, doc_id):
         """
@@ -136,11 +198,23 @@ class ObjectStoreDatabase(InMemoryDatabase):
             the documents in the database.
         @rtype: tuple
         """
-        raise NotImplementedError(self.get_all_docs)
+        generation = self._get_generation()
+        results = []
+        for doc_id in self._database:
+            if doc_id.startswith(self.U1DB_DATA_DOC_ID_PREFIX):
+                continue
+            doc = self._get_doc(doc_id, check_for_conflicts=True)
+            if doc.content is None and not include_deleted:
+                continue
+            results.append(doc)
+        return (generation, results)
 
     def delete_doc(self, doc):
         """
         Mark a document as deleted.
+
+        This method prevents from deleting the document with doc_id equals to
+        self.U1DB_DATA_DOC_ID, which contains U1DB data.
 
         @param doc: The document to mark as deleted.
         @type doc: u1db.Document
@@ -148,6 +222,8 @@ class ObjectStoreDatabase(InMemoryDatabase):
         @return: The new revision id of the document.
         @type: str
         """
+        if doc.doc_id.startswith(self.U1DB_DATA_DOC_ID_PREFIX):
+            raise errors.InvalidDocId()
         old_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if old_doc is None:
             raise errors.DocumentDoesNotExist
@@ -177,58 +253,6 @@ class ObjectStoreDatabase(InMemoryDatabase):
         """
         raise NotImplementedError(self.create_index)
 
-    def delete_index(self, index_name):
-        """
-        Remove a named index.
-
-        Here we just guarantee that the new info will be stored in the backend
-        db after update.
-
-        @param index_name: The name of the index we are removing.
-        @type index_name: str
-        """
-        InMemoryDatabase.delete_index(self, index_name)
-        self._store_u1db_data()
-
-    def _replace_conflicts(self, doc, conflicts):
-        """
-        Set new conflicts for a document.
-
-        Here we just guarantee that the new info will be stored in the backend
-        db after update.
-
-        @param doc: The document with a new set of conflicts.
-        @param conflicts: The new set of conflicts.
-        @type conflicts: list
-        """
-        InMemoryDatabase._replace_conflicts(self, doc, conflicts)
-        self._store_u1db_data()
-
-    def _do_set_replica_gen_and_trans_id(self, other_replica_uid,
-                                         other_generation,
-                                         other_transaction_id):
-        """
-        Set the last-known generation and transaction id for the other
-        database replica.
-
-        Here we just guarantee that the new info will be stored in the backend
-        db after update.
-
-        @param other_replica_uid: The U1DB identifier for the other replica.
-        @type other_replica_uid: str
-        @param other_generation: The generation number for the other replica.
-        @type other_generation: int
-        @param other_transaction_id: The transaction id associated with the
-            generation.
-        @type other_transaction_id: str
-        """
-        InMemoryDatabase._do_set_replica_gen_and_trans_id(
-            self,
-            other_replica_uid,
-            other_generation,
-            other_transaction_id)
-        self._store_u1db_data()
-
     #-------------------------------------------------------------------------
     # implemented methods from CommonBackend
     #-------------------------------------------------------------------------
@@ -250,45 +274,6 @@ class ObjectStoreDatabase(InMemoryDatabase):
         trans_id = self._allocate_transaction_id()
         self._put_doc(doc)
         self._transaction_log.append((doc.doc_id, trans_id))
-        self._store_u1db_data()
-
-    #-------------------------------------------------------------------------
-    # methods specific for object stores
-    #-------------------------------------------------------------------------
-
-    U1DB_DATA_DOC_ID = 'u1db_data'
-
-    def _fetch_u1db_data(self):
-        """
-        Fetch u1db configuration data from backend storage.
-
-        See C{_init_u1db_data} documentation.
-        """
-        NotImplementedError(self._fetch_u1db_data)
-
-    def _store_u1db_data(self):
-        """
-        Store u1db configuration data on backend storage.
-
-        See C{_init_u1db_data} documentation.
-        """
-        NotImplementedError(self._store_u1db_data)
-
-    def _init_u1db_data(self):
-        """
-        Initialize u1db configuration data on backend storage.
-
-        A U1DB database needs to keep track of all database transactions,
-        document conflicts, the generation of other replicas it has seen,
-        indexes created by users and so on.
-
-        In this implementation, all this information is stored in a special
-        document stored in the couch db with id equals to
-        CouchDatabse.U1DB_DATA_DOC_ID.
-
-        This method initializes the document that will hold such information.
-        """
-        NotImplementedError(self._init_u1db_data)
 
 
 class ObjectStoreSyncTarget(InMemorySyncTarget):
