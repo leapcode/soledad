@@ -1,3 +1,13 @@
+0.4.0 Sep 20:
+Client:
+  o Remove redundant logging when creating data dirs.
+Server:
+  o Verify for couch permissions when starting server. Closes #3501.
+Common:
+  o Improve u1db data storage in couch. Closes #3647.
+  o Turn couchdb dependency for common into optional. Closes #2167.
+  o Add verification for couch permissions. Closes #3501.
+
 0.3.2 Sep 6:
 Client:
   o Use dirspec instead of plain xdg. Closes #3574.
