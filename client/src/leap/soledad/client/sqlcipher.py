@@ -79,29 +79,29 @@ def open(path, password, create=True, document_factory=None, crypto=None,
     Will raise u1db.errors.DatabaseDoesNotExist if create=False and the
     database does not already exist.
 
-    @param path: The filesystem path for the database to open.
-    @param type: str
-    @param create: True/False, should the database be created if it doesn't
+    :param path: The filesystem path for the database to open.
+    :param type: str
+    :param create: True/False, should the database be created if it doesn't
         already exist?
-    @param type: bool
-    @param document_factory: A function that will be called with the same
+    :param type: bool
+    :param document_factory: A function that will be called with the same
         parameters as Document.__init__.
-    @type document_factory: callable
-    @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
+    :type document_factory: callable
+    :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
         document contents when syncing.
-    @type crypto: soledad.crypto.SoledadCrypto
-    @param raw_key: Whether C{password} is a raw 64-char hex string or a
+    :type crypto: soledad.crypto.SoledadCrypto
+    :param raw_key: Whether C{password} is a raw 64-char hex string or a
         passphrase that should be hashed to obtain the encyrption key.
-    @type raw_key: bool
-    @param cipher: The cipher and mode to use.
-    @type cipher: str
-    @param kdf_iter: The number of iterations to use.
-    @type kdf_iter: int
-    @param cipher_page_size: The page size.
-    @type cipher_page_size: int
+    :type raw_key: bool
+    :param cipher: The cipher and mode to use.
+    :type cipher: str
+    :param kdf_iter: The number of iterations to use.
+    :type kdf_iter: int
+    :param cipher_page_size: The page size.
+    :type cipher_page_size: int
 
-    @return: An instance of Database.
-    @rtype SQLCipherDatabase
+    :return: An instance of Database.
+    :rtype SQLCipherDatabase
     """
     return SQLCipherDatabase.open_database(
         path, password, create=create, document_factory=document_factory,
@@ -143,25 +143,25 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Create a new sqlcipher file.
 
-        @param sqlcipher_file: The path for the SQLCipher file.
-        @type sqlcipher_file: str
-        @param password: The password that protects the SQLCipher db.
-        @type password: str
-        @param document_factory: A function that will be called with the same
+        :param sqlcipher_file: The path for the SQLCipher file.
+        :type sqlcipher_file: str
+        :param password: The password that protects the SQLCipher db.
+        :type password: str
+        :param document_factory: A function that will be called with the same
             parameters as Document.__init__.
-        @type document_factory: callable
-        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
+        :type document_factory: callable
+        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type crypto: soledad.crypto.SoledadCrypto
-        @param raw_key: Whether C{password} is a raw 64-char hex string or a
+        :type crypto: soledad.crypto.SoledadCrypto
+        :param raw_key: Whether C{password} is a raw 64-char hex string or a
             passphrase that should be hashed to obtain the encyrption key.
-        @type raw_key: bool
-        @param cipher: The cipher and mode to use.
-        @type cipher: str
-        @param kdf_iter: The number of iterations to use.
-        @type kdf_iter: int
-        @param cipher_page_size: The page size.
-        @type cipher_page_size: int
+        :type raw_key: bool
+        :param cipher: The cipher and mode to use.
+        :type cipher: str
+        :param kdf_iter: The number of iterations to use.
+        :type kdf_iter: int
+        :param cipher_page_size: The page size.
+        :type cipher_page_size: int
         """
         # ensure the db is encrypted if the file already exists
         if os.path.exists(sqlcipher_file):
@@ -195,28 +195,28 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Open a SQLCipher database.
 
-        @param sqlcipher_file: The path for the SQLCipher file.
-        @type sqlcipher_file: str
-        @param password: The password that protects the SQLCipher db.
-        @type password: str
-        @param document_factory: A function that will be called with the same
+        :param sqlcipher_file: The path for the SQLCipher file.
+        :type sqlcipher_file: str
+        :param password: The password that protects the SQLCipher db.
+        :type password: str
+        :param document_factory: A function that will be called with the same
             parameters as Document.__init__.
-        @type document_factory: callable
-        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
+        :type document_factory: callable
+        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type crypto: soledad.crypto.SoledadCrypto
-        @param raw_key: Whether C{password} is a raw 64-char hex string or a
+        :type crypto: soledad.crypto.SoledadCrypto
+        :param raw_key: Whether C{password} is a raw 64-char hex string or a
             passphrase that should be hashed to obtain the encyrption key.
-        @type raw_key: bool
-        @param cipher: The cipher and mode to use.
-        @type cipher: str
-        @param kdf_iter: The number of iterations to use.
-        @type kdf_iter: int
-        @param cipher_page_size: The page size.
-        @type cipher_page_size: int
+        :type raw_key: bool
+        :param cipher: The cipher and mode to use.
+        :type cipher: str
+        :param kdf_iter: The number of iterations to use.
+        :type kdf_iter: int
+        :param cipher_page_size: The page size.
+        :type cipher_page_size: int
 
-        @return: The database object.
-        @rtype: SQLCipherDatabase
+        :return: The database object.
+        :rtype: SQLCipherDatabase
         """
         if not os.path.isfile(sqlcipher_file):
             raise u1db_errors.DatabaseDoesNotExist()
@@ -267,33 +267,33 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Open a SQLCipher database.
 
-        @param sqlcipher_file: The path for the SQLCipher file.
-        @type sqlcipher_file: str
-        @param password: The password that protects the SQLCipher db.
-        @type password: str
-        @param create: Should the datbase be created if it does not already
+        :param sqlcipher_file: The path for the SQLCipher file.
+        :type sqlcipher_file: str
+        :param password: The password that protects the SQLCipher db.
+        :type password: str
+        :param create: Should the datbase be created if it does not already
             exist?
-        @type: bool
-        @param backend_cls: A class to use as backend.
-        @type backend_cls: type
-        @param document_factory: A function that will be called with the same
+        :type: bool
+        :param backend_cls: A class to use as backend.
+        :type backend_cls: type
+        :param document_factory: A function that will be called with the same
             parameters as Document.__init__.
-        @type document_factory: callable
-        @param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
+        :type document_factory: callable
+        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
             document contents when syncing.
-        @type crypto: soledad.crypto.SoledadCrypto
-        @param raw_key: Whether C{password} is a raw 64-char hex string or a
+        :type crypto: soledad.crypto.SoledadCrypto
+        :param raw_key: Whether C{password} is a raw 64-char hex string or a
             passphrase that should be hashed to obtain the encyrption key.
-        @type raw_key: bool
-        @param cipher: The cipher and mode to use.
-        @type cipher: str
-        @param kdf_iter: The number of iterations to use.
-        @type kdf_iter: int
-        @param cipher_page_size: The page size.
-        @type cipher_page_size: int
+        :type raw_key: bool
+        :param cipher: The cipher and mode to use.
+        :type cipher: str
+        :param kdf_iter: The number of iterations to use.
+        :type kdf_iter: int
+        :param cipher_page_size: The page size.
+        :type cipher_page_size: int
 
-        @return: The database object.
-        @rtype: SQLCipherDatabase
+        :return: The database object.
+        :rtype: SQLCipherDatabase
         """
         try:
             return cls._open_database(
@@ -316,16 +316,16 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Synchronize documents with remote replica exposed at url.
 
-        @param url: The url of the target replica to sync with.
-        @type url: str
-        @param creds: optional dictionary giving credentials.
+        :param url: The url of the target replica to sync with.
+        :type url: str
+        :param creds: optional dictionary giving credentials.
             to authorize the operation with the server.
-        @type creds: dict
-        @param autocreate: Ask the target to create the db if non-existent.
-        @type autocreate: bool
+        :type creds: dict
+        :param autocreate: Ask the target to create the db if non-existent.
+        :type autocreate: bool
 
-        @return: The local generation before the synchronisation was performed.
-        @rtype: int
+        :return: The local generation before the synchronisation was performed.
+        :rtype: int
         """
         from u1db.sync import Synchronizer
         from leap.soledad.client.target import SoledadSyncTarget
@@ -343,8 +343,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         method, which is executed when the database schema is created. Here,
         we use it to include the "syncable" property for LeapDocuments.
 
-        @param c: The cursor for querying the database.
-        @type c: dbapi2.cursor
+        :param c: The cursor for querying the database.
+        :type c: dbapi2.cursor
         """
         c.execute(
             'ALTER TABLE document '
@@ -354,10 +354,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Update a document and all indexes related to it.
 
-        @param old_doc: The old version of the document.
-        @type old_doc: u1db.Document
-        @param doc: The new version of the document.
-        @type doc: u1db.Document
+        :param old_doc: The old version of the document.
+        :type old_doc: u1db.Document
+        :param doc: The new version of the document.
+        :type doc: u1db.Document
         """
         sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
             self, old_doc, doc)
@@ -370,15 +370,15 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Get just the document content, without fancy handling.
 
-        @param doc_id: The unique document identifier
-        @type doc_id: str
-        @param include_deleted: If set to True, deleted documents will be
+        :param doc_id: The unique document identifier
+        :type doc_id: str
+        :param include_deleted: If set to True, deleted documents will be
             returned with empty content. Otherwise asking for a deleted
             document will return None.
-        @type include_deleted: bool
+        :type include_deleted: bool
 
-        @return: a Document object.
-        @type: u1db.Document
+        :return: a Document object.
+        :type: u1db.Document
         """
         doc = sqlite_backend.SQLitePartialExpandDatabase._get_doc(
             self, doc_id, check_for_conflicts)
@@ -411,19 +411,19 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         which will attempt to read the first page of the database and will
         parse the schema.
 
-        @param sqlcipher_file: The path for the SQLCipher file.
-        @type sqlcipher_file: str
-        @param key: The key that protects the SQLCipher db.
-        @type key: str
-        @param raw_key: Whether C{key} is a raw 64-char hex string or a
+        :param sqlcipher_file: The path for the SQLCipher file.
+        :type sqlcipher_file: str
+        :param key: The key that protects the SQLCipher db.
+        :type key: str
+        :param raw_key: Whether C{key} is a raw 64-char hex string or a
             passphrase that should be hashed to obtain the encyrption key.
-        @type raw_key: bool
-        @param cipher: The cipher and mode to use.
-        @type cipher: str
-        @param kdf_iter: The number of iterations to use.
-        @type kdf_iter: int
-        @param cipher_page_size: The page size.
-        @type cipher_page_size: int
+        :type raw_key: bool
+        :param cipher: The cipher and mode to use.
+        :type cipher: str
+        :param kdf_iter: The number of iterations to use.
+        :type kdf_iter: int
+        :param cipher_page_size: The page size.
+        :type cipher_page_size: int
         """
         try:
             # try to open an encrypted database with the regular u1db
@@ -473,11 +473,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         * PRAGMA key should generally be called as the first operation on a
           database.
 
-        @param key: The key for use with the database.
-        @type key: str
-        @param raw_key: Whether C{key} is a raw 64-char hex string or a
+        :param key: The key for use with the database.
+        :type key: str
+        :param raw_key: Whether C{key} is a raw 64-char hex string or a
             passphrase that should be hashed to obtain the encyrption key.
-        @type raw_key: bool
+        :type raw_key: bool
         """
         if raw_key:
             cls._pragma_key_raw(db_handle, key)
@@ -495,10 +495,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         if you want to do so you should use a raw key instead and derive the
         key using your own KDF.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param passphrase: The passphrase used to derive the encryption key.
-        @type passphrase: str
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param passphrase: The passphrase used to derive the encryption key.
+        :type passphrase: str
         """
         db_handle.cursor().execute("PRAGMA key = '%s'" % passphrase)
 
@@ -512,10 +512,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         ensure that the data provided is a 64 character hex string, which will
         be converted directly to 32 bytes (256 bits) of key data.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param key: A 64 character hex string.
-        @type key: str
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param key: A 64 character hex string.
+        :type key: str
         """
         if not all(c in string.hexdigits for c in key):
             raise NotAnHexString(key)
@@ -546,10 +546,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
           widely available and peer-reviewed OpenSSL libcrypto for all
           cryptographic functions.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param cipher: The cipher and mode to use.
-        @type cipher: str
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param cipher: The cipher and mode to use.
+        :type cipher: str
         """
         db_handle.cursor().execute("PRAGMA cipher = '%s'" % cipher)
 
@@ -575,10 +575,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         * It is not recommended to reduce the number of iterations if a
           passphrase is in use.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param kdf_iter: The number of iterations to use.
-        @type kdf_iter: int
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param kdf_iter: The number of iterations to use.
+        :type kdf_iter: int
         """
         db_handle.cursor().execute("PRAGMA kdf_iter = '%d'" % kdf_iter)
 
@@ -608,10 +608,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         * If a non-default value is used PRAGMA cipher_page_size to create a
           database, it must also be called every time that database is opened.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param cipher_page_size: The page size.
-        @type cipher_page_size: int
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param cipher_page_size: The page size.
+        :type cipher_page_size: int
         """
         db_handle.cursor().execute(
             "PRAGMA cipher_page_size = '%d'" % cipher_page_size)
@@ -637,13 +637,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
           code>PRAGMA rekey_kdf_iter. These are deprecated and should not be
           used. Instead, use sqlcipher_export().
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param new_key: The new key.
-        @type new_key: str
-        @param raw_key: Whether C{password} is a raw 64-char hex string or a
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param new_key: The new key.
+        :type new_key: str
+        :param raw_key: Whether C{password} is a raw 64-char hex string or a
             passphrase that should be hashed to obtain the encyrption key.
-        @type raw_key: bool
+        :type raw_key: bool
         """
         if raw_key:
             cls._pragma_rekey_raw(db_handle, key)
@@ -659,10 +659,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         PBKDF2 key derivation. The result is used as the encryption key for
         the database.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param passphrase: The passphrase used to derive the encryption key.
-        @type passphrase: str
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param passphrase: The passphrase used to derive the encryption key.
+        :type passphrase: str
         """
         db_handle.cursor().execute("PRAGMA rekey = '%s'" % passphrase)
 
@@ -676,10 +676,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         ensure that the data provided is a 64 character hex string, which will
         be converted directly to 32 bytes (256 bits) of key data.
 
-        @param db_handle: A handle to the SQLCipher database.
-        @type db_handle: pysqlcipher.Connection
-        @param key: A 64 character hex string.
-        @type key: str
+        :param db_handle: A handle to the SQLCipher database.
+        :type db_handle: pysqlcipher.Connection
+        :param key: A 64 character hex string.
+        :type key: str
         """
         if not all(c in string.hexdigits for c in key):
             raise NotAnHexString(key)

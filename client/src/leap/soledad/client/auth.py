@@ -37,10 +37,10 @@ class TokenBasedAuth(object):
         """
         Store given credentials so we can sign the request later.
 
-        @param uuid: The user's uuid.
-        @type uuid: str
-        @param token: The authentication token.
-        @type token: str
+        :param uuid: The user's uuid.
+        :type uuid: str
+        :param token: The authentication token.
+        :type token: str
         """
         self._creds = {'token': (uuid, token)}
 
@@ -51,15 +51,15 @@ class TokenBasedAuth(object):
 
             [('Authorization', 'Token <base64 encoded creds')]
 
-        @param method: The HTTP method.
-        @type method: str
-        @param url_query: The URL query string.
-        @type url_query: str
-        @param params: A list with encoded query parameters.
-        @type param: list
+        :param method: The HTTP method.
+        :type method: str
+        :param url_query: The URL query string.
+        :type url_query: str
+        :param params: A list with encoded query parameters.
+        :type param: list
 
-        @return: The Authorization header.
-        @rtype: list of tuple
+        :return: The Authorization header.
+        :rtype: list of tuple
         """
         if 'token' in self._creds:
             uuid, token = self._creds['token']

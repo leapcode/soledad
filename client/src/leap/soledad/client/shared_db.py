@@ -61,10 +61,10 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         Store given credentials so we can sign the request later.
 
-        @param uuid: The user's uuid.
-        @type uuid: str
-        @param token: The authentication token.
-        @type token: str
+        :param uuid: The user's uuid.
+        :type uuid: str
+        :param token: The authentication token.
+        :type token: str
         """
         TokenBasedAuth.set_token_credentials(self, uuid, token)
 
@@ -72,15 +72,15 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         Return an authorization header to be included in the HTTP request.
 
-        @param method: The HTTP method.
-        @type method: str
-        @param url_query: The URL query string.
-        @type url_query: str
-        @param params: A list with encoded query parameters.
-        @type param: list
+        :param method: The HTTP method.
+        :type method: str
+        :param url_query: The URL query string.
+        :type url_query: str
+        :param params: A list with encoded query parameters.
+        :type param: list
 
-        @return: The Authorization header.
-        @rtype: list of tuple
+        :return: The Authorization header.
+        :rtype: list of tuple
         """
         return TokenBasedAuth._sign_request(self, method, url_query, params)
 
@@ -95,16 +95,16 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         Open a Soledad shared database.
 
-        @param url: URL of the remote database.
-        @type url: str
-        @param create: Should the database be created if it does not already
+        :param url: URL of the remote database.
+        :type url: str
+        :param create: Should the database be created if it does not already
             exist?
-        @type create: bool
-        @param token: An authentication token for accessing the shared db.
-        @type token: str
+        :type create: bool
+        :param token: An authentication token for accessing the shared db.
+        :type token: str
 
-        @return: The shared database in the given url.
-        @rtype: SoledadSharedDatabase
+        :return: The shared database in the given url.
+        :rtype: SoledadSharedDatabase
         """
         db = SoledadSharedDatabase(url, creds=creds)
         db.open(create)
@@ -115,10 +115,10 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         Dummy method that prevents from deleting shared database.
 
-        @raise: This will always raise an Unauthorized exception.
+        :raise: This will always raise an Unauthorized exception.
 
-        @param url: The database URL.
-        @type url: str
+        :param url: The database URL.
+        :type url: str
         """
         raise Unauthorized("Can't delete shared database.")
 
@@ -126,13 +126,13 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         Initialize database with auth token and encryption powers.
 
-        @param url: URL of the remote database.
-        @type url: str
-        @param document_factory: A factory for U1BD documents.
-        @type document_factory: u1db.Document
-        @param creds: A tuple containing the authentication method and
+        :param url: URL of the remote database.
+        :type url: str
+        :param document_factory: A factory for U1BD documents.
+        :type document_factory: u1db.Document
+        :param creds: A tuple containing the authentication method and
             credentials.
-        @type creds: tuple
+        :type creds: tuple
         """
         http_database.HTTPDatabase.__init__(self, url, document_factory,
                                             creds)
