@@ -32,6 +32,8 @@ import socket
 import ssl
 import urlparse
 
+import cchardet
+
 from hashlib import sha256
 
 from u1db.remote import http_client
@@ -755,6 +757,37 @@ class Soledad(object):
         """
         return self._db.get_all_docs(include_deleted)
 
+    def _convert_to_utf8(self, content):
+        """
+        Converts content to utf8 (or all the strings in content)
+
+        NOTE: Even though this method supports any type, it will
+        currently ignore contents of lists, tuple or any other
+        iterable than dict. We don't need support for these at the
+        moment
+
+        :param content: content to convert
+        :type content: object
+
+        :rtype: object
+        """
+
+        if isinstance(content, unicode):
+            return content
+        elif isinstance(content, str):
+            try:
+                result = cchardet.detect(content)
+                content = content.decode(result["encoding"]).encode("utf-8")\
+                                                            .decode("utf-8")
+            except UnicodeError:
+                pass
+            return content
+        else:
+            if isinstance(content, dict):
+                for key in content.keys():
+                    content[key] = self._convert_to_utf8(content[key])
+        return content
+
     def create_doc(self, content, doc_id=None):
         """
         Create a new document in the local encrypted database.
@@ -767,7 +800,7 @@ class Soledad(object):
         :return: the new document
         :rtype: SoledadDocument
         """
-        return self._db.create_doc(content, doc_id=doc_id)
+        return self._db.create_doc(self._convert_to_utf8(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
