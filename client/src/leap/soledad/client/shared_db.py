@@ -26,6 +26,7 @@ import simplejson as json
 from u1db.remote import http_database
 
 
+from leap.soledad.common import SHARED_DB_LOCK_DOC_ID_PREFIX
 from leap.soledad.client.auth import TokenBasedAuth
 
 
@@ -89,7 +90,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     #
 
     @staticmethod
-    def open_database(url, create, creds=None):
+    def open_database(url, uuid, create, creds=None):
         # TODO: users should not be able to create the shared database, so we
         # have to remove this from here in the future.
         """
@@ -97,8 +98,10 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
 
         :param url: URL of the remote database.
         :type url: str
+        :param uuid: The user's unique id.
+        :type uuid: str
         :param create: Should the database be created if it does not already
-            exist?
+                       exist?
         :type create: bool
         :param token: An authentication token for accessing the shared db.
         :type token: str
@@ -106,7 +109,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
-        db = SoledadSharedDatabase(url, creds=creds)
+        db = SoledadSharedDatabase(url, uuid, creds=creds)
         db.open(create)
         return db
 
@@ -122,12 +125,14 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         raise Unauthorized("Can't delete shared database.")
 
-    def __init__(self, url, document_factory=None, creds=None):
+    def __init__(self, url, uuid, document_factory=None, creds=None):
         """
         Initialize database with auth token and encryption powers.
 
         :param url: URL of the remote database.
         :type url: str
+        :param uuid: The user's unique id.
+        :type uuid: str
         :param document_factory: A factory for U1BD documents.
         :type document_factory: u1db.Document
         :param creds: A tuple containing the authentication method and
@@ -136,3 +141,30 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         http_database.HTTPDatabase.__init__(self, url, document_factory,
                                             creds)
+        self._uuid = uuid
+
+    def lock(self):
+        """
+        Obtain a lock on document with id C{doc_id}.
+
+        :return: A tuple containing the token to unlock and the timeout until
+                 lock expiration.
+        :rtype: (str, float)
+
+        :raise HTTPError: Raised if any HTTP error occurs.
+        """
+        res, headers = self._request_json('PUT', ['lock', self._uuid],
+                                          body={})
+        return res['token'], res['timeout']
+
+    def unlock(self, token):
+        """
+        Release the lock on shared database.
+
+        :param token: The token returned by a previous call to lock().
+        :type token: str
+
+        :raise HTTPError:
+        """
+        res, headers = self._request_json('DELETE', ['lock', self._uuid],
+                                          params={'token': token})

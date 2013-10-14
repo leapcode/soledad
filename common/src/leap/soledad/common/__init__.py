@@ -21,8 +21,21 @@ Soledad routines common to client and server.
 """
 
 
+from hashlib import sha256
+
+
 #
-# Assert functions
+# Global constants
+#
+
+
+SHARED_DB_NAME = 'shared'
+SHARED_DB_LOCK_DOC_ID_PREFIX = 'lock-'
+USER_DB_PREFIX = 'user-'
+
+
+#
+# Global functions
 #
 
 # we want to use leap.common.check.leap_assert in case it is available,
@@ -62,6 +75,7 @@ except ImportError:
         soledad_assert(isinstance(var, expectedType),
                        "Expected type %r instead of %r" %
                        (expectedType, type(var)))
+
 
 from ._version import get_versions
 __version__ = get_versions()['version']
