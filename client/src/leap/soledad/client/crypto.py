@@ -70,8 +70,8 @@ class SoledadCrypto(object):
         """
         Initialize the crypto object.
 
-        @param soledad: A Soledad instance for key lookup.
-        @type soledad: leap.soledad.Soledad
+        :param soledad: A Soledad instance for key lookup.
+        :type soledad: leap.soledad.Soledad
         """
         self._soledad = soledad
 
@@ -82,15 +82,15 @@ class SoledadCrypto(object):
 
         Currently, the only  encryption method supported is AES-256 CTR mode.
 
-        @param data: The data to be encrypted.
-        @type data: str
-        @param key: The key used to encrypt C{data} (must be 256 bits long).
-        @type key: str
-        @param method: The encryption method to use.
-        @type method: str
+        :param data: The data to be encrypted.
+        :type data: str
+        :param key: The key used to encrypt C{data} (must be 256 bits long).
+        :type key: str
+        :param method: The encryption method to use.
+        :type method: str
 
-        @return: A tuple with the initial value and the encrypted data.
-        @rtype: (long, str)
+        :return: A tuple with the initial value and the encrypted data.
+        :rtype: (long, str)
         """
         soledad_assert_type(key, str)
 
@@ -119,17 +119,17 @@ class SoledadCrypto(object):
 
         Currently, the only encryption method supported is AES-256 CTR mode.
 
-        @param data: The data to be decrypted.
-        @type data: str
-        @param key: The key used to decrypt C{data} (must be 256 bits long).
-        @type key: str
-        @param method: The encryption method to use.
-        @type method: str
-        @param kwargs: Other parameters specific to each encryption method.
-        @type kwargs: dict
+        :param data: The data to be decrypted.
+        :type data: str
+        :param key: The key used to decrypt C{data} (must be 256 bits long).
+        :type key: str
+        :param method: The encryption method to use.
+        :type method: str
+        :param kwargs: Other parameters specific to each encryption method.
+        :type kwargs: dict
 
-        @return: The decrypted data.
-        @rtype: str
+        :return: The decrypted data.
+        :rtype: str
         """
         soledad_assert_type(key, str)
         # assert params
@@ -160,14 +160,14 @@ class SoledadCrypto(object):
         secret stripped from the first MAC_KEY_LENGTH characters. The HMAC
         message is C{doc_id}.
 
-        @param doc_id: The id of the document that will be encrypted using
+        :param doc_id: The id of the document that will be encrypted using
             this passphrase.
-        @type doc_id: str
+        :type doc_id: str
 
-        @return: The passphrase.
-        @rtype: str
+        :return: The passphrase.
+        :rtype: str
 
-        @raise NoSymmetricSecret: if no symmetric secret was supplied.
+        :raise NoSymmetricSecret: if no symmetric secret was supplied.
         """
         if self.secret is None:
             raise NoSymmetricSecret()
@@ -187,13 +187,13 @@ class SoledadCrypto(object):
         function. The key used for HMAC is the first MAC_KEY_LENGTH characters
         of Soledad's storage secret. The HMAC message is C{doc_id}.
 
-        @param doc_id: The id of the document.
-        @type doc_id: str
+        :param doc_id: The id of the document.
+        :type doc_id: str
 
-        @return: The key.
-        @rtype: str
+        :return: The key.
+        :rtype: str
 
-        @raise NoSymmetricSecret: if no symmetric secret was supplied.
+        :raise NoSymmetricSecret: if no symmetric secret was supplied.
         """
         if self.secret is None:
             raise NoSymmetricSecret()

@@ -20,3 +20,5 @@ oauth
 
 # pysqlite should not be a dep, see #2945
 pysqlite
+
+cchardet

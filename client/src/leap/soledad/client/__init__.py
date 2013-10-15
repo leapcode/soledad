@@ -32,6 +32,8 @@ import socket
 import ssl
 import urlparse
 
+import cchardet
+
 from hashlib import sha256
 
 from u1db.remote import http_client
@@ -226,25 +228,26 @@ class Soledad(object):
         """
         Initialize configuration, cryptographic keys and dbs.
 
-        @param uuid: User's uuid.
-        @type uuid: str
-        @param passphrase: The passphrase for locking and unlocking encryption
-            secrets for local and remote storage.
-        @type passphrase: str
-        @param secrets_path: Path for storing encrypted key used for
-            symmetric encryption.
-        @type secrets_path: str
-        @param local_db_path: Path for local encrypted storage db.
-        @type local_db_path: str
-        @param server_url: URL for Soledad server. This is used either to sync
+        :param uuid: User's uuid.
+        :type uuid: str
+        :param passphrase: The passphrase for locking and unlocking encryption
+                           secrets for local and remote storage.
+        :type passphrase: str
+        :param secrets_path: Path for storing encrypted key used for
+                             symmetric encryption.
+        :type secrets_path: str
+        :param local_db_path: Path for local encrypted storage db.
+        :type local_db_path: str
+        :param server_url: URL for Soledad server. This is used either to sync
             with the user's remote db and to interact with the shared recovery
             database.
-        @type server_url: str
-        @param cert_file: Path to the SSL certificate to use in the
-            connection to the server_url.
-        @type cert_file: str
-        @param auth_token: Authorization token for accessing remote databases.
-        @type auth_token: str
+        :type server_url: str
+        :param cert_file: Path to the certificate of the ca used
+                          to validate the SSL certificate used by the remote
+                          soledad server.
+        :type cert_file: str
+        :param auth_token: Authorization token for accessing remote databases.
+        :type auth_token: str
         """
         # get config params
         self._uuid = uuid
@@ -339,7 +342,7 @@ class Soledad(object):
         """
         Create work directories.
 
-        @raise OSError: in case file exists and is not a dir.
+        :raise OSError: in case file exists and is not a dir.
         """
         paths = map(
             lambda x: os.path.dirname(x),
@@ -418,8 +421,8 @@ class Soledad(object):
         Storage secret is encrypted before being stored. This method decrypts
         and returns the stored secret.
 
-        @return: The storage secret.
-        @rtype: str
+        :return: The storage secret.
+        :rtype: str
         """
         # calculate the encryption key
         key = scrypt.hash(
@@ -478,8 +481,8 @@ class Soledad(object):
         """
         Return whether there is a storage secret available for use or not.
 
-        @return: Whether there's a storage secret for symmetric encryption.
-        @rtype: bool
+        :return: Whether there's a storage secret for symmetric encryption.
+        :rtype: bool
         """
         if self._secret_id is None or self._secret_id not in self._secrets:
             try:
@@ -515,8 +518,8 @@ class Soledad(object):
                 }
             }
 
-        @return: The id of the generated secret.
-        @rtype: str
+        :return: The id of the generated secret.
+        :rtype: str
         """
         signal(SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
@@ -571,10 +574,10 @@ class Soledad(object):
         """
         Change the passphrase that encrypts the storage secret.
 
-        @param new_passphrase: The new passphrase.
-        @type new_passphrase: str
+        :param new_passphrase: The new passphrase.
+        :type new_passphrase: str
 
-        @raise NoStorageSecret: Raised if there's no storage secret available.
+        :raise NoStorageSecret: Raised if there's no storage secret available.
         """
         # maybe we want to add more checks to guarantee passphrase is
         # reasonable?
@@ -616,8 +619,8 @@ class Soledad(object):
         Calculate a hash for storing/retrieving key material on shared
         database, based on user's uuid.
 
-        @return: the hash
-        @rtype: str
+        :return: the hash
+        :rtype: str
         """
         return sha256(
             '%s%s' % (
@@ -639,8 +642,8 @@ class Soledad(object):
         Retrieve the document with encrypted key material from the shared
         database.
 
-        @return: a document with encrypted key material in its contents
-        @rtype: SoledadDocument
+        :return: a document with encrypted key material in its contents
+        :rtype: SoledadDocument
         """
         signal(SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db()
@@ -687,11 +690,11 @@ class Soledad(object):
         """
         Update a document in the local encrypted database.
 
-        @param doc: the document to update
-        @type doc: SoledadDocument
+        :param doc: the document to update
+        :type doc: SoledadDocument
 
-        @return: the new revision identifier for the document
-        @rtype: str
+        :return: the new revision identifier for the document
+        :rtype: str
         """
         return self._db.put_doc(doc)
 
@@ -699,11 +702,11 @@ class Soledad(object):
         """
         Delete a document from the local encrypted database.
 
-        @param doc: the document to delete
-        @type doc: SoledadDocument
+        :param doc: the document to delete
+        :type doc: SoledadDocument
 
-        @return: the new revision identifier for the document
-        @rtype: str
+        :return: the new revision identifier for the document
+        :rtype: str
         """
         return self._db.delete_doc(doc)
 
@@ -711,15 +714,15 @@ class Soledad(object):
         """
         Retrieve a document from the local encrypted database.
 
-        @param doc_id: the unique document identifier
-        @type doc_id: str
-        @param include_deleted: if True, deleted documents will be
-            returned with empty content; otherwise asking for a deleted
-            document will return None
-        @type include_deleted: bool
+        :param doc_id: the unique document identifier
+        :type doc_id: str
+        :param include_deleted: if True, deleted documents will be
+                                returned with empty content; otherwise asking
+                                for a deleted document will return None
+        :type include_deleted: bool
 
-        @return: the document object or None
-        @rtype: SoledadDocument
+        :return: the document object or None
+        :rtype: SoledadDocument
         """
         return self._db.get_doc(doc_id, include_deleted=include_deleted)
 
@@ -728,15 +731,15 @@ class Soledad(object):
         """
         Get the content for many documents.
 
-        @param doc_ids: a list of document identifiers
-        @type doc_ids: list
-        @param check_for_conflicts: if set False, then the conflict check will
+        :param doc_ids: a list of document identifiers
+        :type doc_ids: list
+        :param check_for_conflicts: if set False, then the conflict check will
             be skipped, and 'None' will be returned instead of True/False
-        @type check_for_conflicts: bool
+        :type check_for_conflicts: bool
 
-        @return: iterable giving the Document object for each document id
+        :return: iterable giving the Document object for each document id
             in matching doc_ids order.
-        @rtype: generator
+        :rtype: generator
         """
         return self._db.get_docs(doc_ids,
                                  check_for_conflicts=check_for_conflicts,
@@ -745,28 +748,59 @@ class Soledad(object):
     def get_all_docs(self, include_deleted=False):
         """Get the JSON content for all documents in the database.
 
-        @param include_deleted: If set to True, deleted documents will be
-            returned with empty content. Otherwise deleted documents will not
-            be included in the results.
-        @return: (generation, [Document])
-            The current generation of the database, followed by a list of all
-            the documents in the database.
+        :param include_deleted: If set to True, deleted documents will be
+                                returned with empty content. Otherwise deleted
+                                documents will not be included in the results.
+        :return: (generation, [Document])
+                 The current generation of the database, followed by a list of
+                 all the documents in the database.
         """
         return self._db.get_all_docs(include_deleted)
+
+    def _convert_to_utf8(self, content):
+        """
+        Converts content to utf8 (or all the strings in content)
+
+        NOTE: Even though this method supports any type, it will
+        currently ignore contents of lists, tuple or any other
+        iterable than dict. We don't need support for these at the
+        moment
+
+        :param content: content to convert
+        :type content: object
+
+        :rtype: object
+        """
+
+        if isinstance(content, unicode):
+            return content
+        elif isinstance(content, str):
+            try:
+                result = cchardet.detect(content)
+                content = content.decode(result["encoding"]).encode("utf-8")\
+                                                            .decode("utf-8")
+            except UnicodeError:
+                pass
+            return content
+        else:
+            if isinstance(content, dict):
+                for key in content.keys():
+                    content[key] = self._convert_to_utf8(content[key])
+        return content
 
     def create_doc(self, content, doc_id=None):
         """
         Create a new document in the local encrypted database.
 
-        @param content: the contents of the new document
-        @type content: dict
-        @param doc_id: an optional identifier specifying the document id
-        @type doc_id: str
+        :param content: the contents of the new document
+        :type content: dict
+        :param doc_id: an optional identifier specifying the document id
+        :type doc_id: str
 
-        @return: the new document
-        @rtype: SoledadDocument
+        :return: the new document
+        :rtype: SoledadDocument
         """
-        return self._db.create_doc(content, doc_id=doc_id)
+        return self._db.create_doc(self._convert_to_utf8(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -778,12 +812,12 @@ class Soledad(object):
         If the database specifies a maximum document size and the document
         exceeds it, create will fail and raise a DocumentTooBig exception.
 
-        @param json: The JSON document string
-        @type json: str
-        @param doc_id: An optional identifier specifying the document id.
-        @type doc_id:
-        @return: The new cocument
-        @rtype: SoledadDocument
+        :param json: The JSON document string
+        :type json: str
+        :param doc_id: An optional identifier specifying the document id.
+        :type doc_id:
+        :return: The new cocument
+        :rtype: SoledadDocument
         """
         return self._db.create_doc_from_json(json, doc_id=doc_id)
 
@@ -796,11 +830,11 @@ class Soledad(object):
         Creating an index will block until the expressions have been evaluated
         and the index generated.
 
-        @param index_name: A unique name which can be used as a key prefix
-        @type index_name: str
-        @param index_expressions: index expressions defining the index
-            information.
-        @type index_expressions: dict
+        :param index_name: A unique name which can be used as a key prefix
+        :type index_name: str
+        :param index_expressions: index expressions defining the index
+                                  information.
+        :type index_expressions: dict
 
             Examples:
 
@@ -816,8 +850,8 @@ class Soledad(object):
         """
         Remove a named index.
 
-        @param index_name: The name of the index we are removing
-        @type index_name: str
+        :param index_name: The name of the index we are removing
+        :type index_name: str
         """
         if self._db:
             return self._db.delete_index(index_name)
@@ -826,8 +860,8 @@ class Soledad(object):
         """
         List the definitions of all known indexes.
 
-        @return: A list of [('index-name', ['field', 'field2'])] definitions.
-        @rtype: list
+        :return: A list of [('index-name', ['field', 'field2'])] definitions.
+        :rtype: list
         """
         if self._db:
             return self._db.list_indexes()
@@ -843,14 +877,14 @@ class Soledad(object):
         It is also possible to append a '*' to the last supplied value (eg
         'val*', '*', '*' or 'val', 'val*', '*', but not 'val*', 'val', '*')
 
-        @param index_name: The index to query
-        @type index_name: str
-        @param key_values: values to match. eg, if you have
-            an index with 3 fields then you would have:
-            get_from_index(index_name, val1, val2, val3)
-        @type key_values: tuple
-        @return: List of [Document]
-        @rtype: list
+        :param index_name: The index to query
+        :type index_name: str
+        :param key_values: values to match. eg, if you have
+                           an index with 3 fields then you would have:
+                           get_from_index(index_name, val1, val2, val3)
+        :type key_values: tuple
+        :return: List of [Document]
+        :rtype: list
         """
         if self._db:
             return self._db.get_from_index(index_name, *key_values)
@@ -869,18 +903,18 @@ class Soledad(object):
         possible to append a '*' to the last supplied value (eg 'val*', '*',
         '*' or 'val', 'val*', '*', but not 'val*', 'val', '*')
 
-        @param index_name: The index to query
-        @type index_name: str
-        @param start_values: tuples of values that define the lower bound of
+        :param index_name: The index to query
+        :type index_name: str
+        :param start_values: tuples of values that define the lower bound of
             the range. eg, if you have an index with 3 fields then you would
             have: (val1, val2, val3)
-        @type start_values: tuple
-        @param end_values: tuples of values that define the upper bound of the
+        :type start_values: tuple
+        :param end_values: tuples of values that define the upper bound of the
             range. eg, if you have an index with 3 fields then you would have:
             (val1, val2, val3)
-        @type end_values: tuple
-        @return: List of [Document]
-        @rtype: list
+        :type end_values: tuple
+        :return: List of [Document]
+        :rtype: list
         """
         if self._db:
             return self._db.get_range_from_index(
@@ -890,10 +924,10 @@ class Soledad(object):
         """
         Return all keys under which documents are indexed in this index.
 
-        @param index_name: The index to query
-        @type index_name: str
-        @return: [] A list of tuples of indexed keys.
-        @rtype: list
+        :param index_name: The index to query
+        :type index_name: str
+        :return: [] A list of tuples of indexed keys.
+        :rtype: list
         """
         if self._db:
             return self._db.get_index_keys(index_name)
@@ -902,11 +936,11 @@ class Soledad(object):
         """
         Get the list of conflicts for the given document.
 
-        @param doc_id: the document id
-        @type doc_id: str
+        :param doc_id: the document id
+        :type doc_id: str
 
-        @return: a list of the document entries that are conflicted
-        @rtype: list
+        :return: a list of the document entries that are conflicted
+        :rtype: list
         """
         if self._db:
             return self._db.get_doc_conflicts(doc_id)
@@ -915,11 +949,11 @@ class Soledad(object):
         """
         Mark a document as no longer conflicted.
 
-        @param doc: a document with the new content to be inserted.
-        @type doc: SoledadDocument
-        @param conflicted_doc_revs: a list of revisions that the new content
-            supersedes.
-        @type conflicted_doc_revs: list
+        :param doc: a document with the new content to be inserted.
+        :type doc: SoledadDocument
+        :param conflicted_doc_revs: a list of revisions that the new content
+                                    supersedes.
+        :type conflicted_doc_revs: list
         """
         if self._db:
             return self._db.resolve_doc(doc, conflicted_doc_revs)
@@ -928,12 +962,12 @@ class Soledad(object):
         """
         Synchronize the local encrypted replica with a remote replica.
 
-        @param url: the url of the target replica to sync with
-        @type url: str
+        :param url: the url of the target replica to sync with
+        :type url: str
 
-        @return: the local generation before the synchronisation was
+        :return: the local generation before the synchronisation was
             performed.
-        @rtype: str
+        :rtype: str
         """
         if self._db:
             local_gen = self._db.sync(
@@ -946,11 +980,11 @@ class Soledad(object):
         """
         Return if local db replica differs from remote url's replica.
 
-        @param url: The remote replica to compare with local replica.
-        @type url: str
+        :param url: The remote replica to compare with local replica.
+        :type url: str
 
-        @return: Whether remote replica and local replica differ.
-        @rtype: bool
+        :return: Whether remote replica and local replica differ.
+        :rtype: bool
         """
         target = SoledadSyncTarget(url, creds=self._creds, crypto=self._crypto)
         info = target.get_sync_info(self._db._get_replica_uid())
@@ -972,8 +1006,8 @@ class Soledad(object):
                     'token': '<token>'
             }
 
-        @param token: The authentication token.
-        @type token: str
+        :param token: The authentication token.
+        :type token: str
         """
         self._creds = {
             'token': {
@@ -1004,11 +1038,11 @@ class Soledad(object):
                 self.UUID_KEY: '<uuid>',  # (optional)
             }
 
-        @param include_uuid: Should the uuid be included?
-        @type include_uuid: bool
+        :param include_uuid: Should the uuid be included?
+        :type include_uuid: bool
 
-        @return: The recovery document.
-        @rtype: dict
+        :return: The recovery document.
+        :rtype: dict
         """
         data = {self.STORAGE_SECRETS_KEY: self._secrets}
         if include_uuid:
@@ -1027,8 +1061,8 @@ class Soledad(object):
                 self.UUID_KEY: '<uuid>',  # (optional)
             }
 
-        @param data: The recovery document.
-        @type data: dict
+        :param data: The recovery document.
+        :type data: dict
         """
         # include new secrets in our secret pool.
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
@@ -1101,7 +1135,9 @@ SOLEDAD_TIMEOUT = 10
 
 
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):
-    """HTTPSConnection verifying server side certificates."""
+    """
+    HTTPSConnection verifying server side certificates.
+    """
     # derived from httplib.py
 
     def connect(self):

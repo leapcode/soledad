@@ -98,19 +98,19 @@ def mac_doc(crypto, doc_id, doc_rev, ciphertext, mac_method):
         * msg: doc_id + doc_rev + ciphertext
         * digestmod: sha256
 
-    @param crypto: A SoledadCryto instance used to perform the encryption.
-    @type crypto: leap.soledad.crypto.SoledadCrypto
-    @param doc_id: The id of the document.
-    @type doc_id: str
-    @param doc_rev: The revision of the document.
-    @type doc_rev: str
-    @param ciphertext: The content of the document.
-    @type ciphertext: str
-    @param mac_method: The MAC method to use.
-    @type mac_method: str
+    :param crypto: A SoledadCryto instance used to perform the encryption.
+    :type crypto: leap.soledad.crypto.SoledadCrypto
+    :param doc_id: The id of the document.
+    :type doc_id: str
+    :param doc_rev: The revision of the document.
+    :type doc_rev: str
+    :param ciphertext: The content of the document.
+    :type ciphertext: str
+    :param mac_method: The MAC method to use.
+    :type mac_method: str
 
-    @return: The calculated MAC.
-    @rtype: str
+    :return: The calculated MAC.
+    :rtype: str
     """
     if mac_method == MacMethods.HMAC:
         return hmac.new(
@@ -137,14 +137,14 @@ def encrypt_doc(crypto, doc):
             MAC_METHOD_KEY: 'hmac'
         }
 
-    @param crypto: A SoledadCryto instance used to perform the encryption.
-    @type crypto: leap.soledad.crypto.SoledadCrypto
-    @param doc: The document with contents to be encrypted.
-    @type doc: SoledadDocument
+    :param crypto: A SoledadCryto instance used to perform the encryption.
+    :type crypto: leap.soledad.crypto.SoledadCrypto
+    :param doc: The document with contents to be encrypted.
+    :type doc: SoledadDocument
 
-    @return: The JSON serialization of the dict representing the encrypted
+    :return: The JSON serialization of the dict representing the encrypted
         content.
-    @rtype: str
+    :rtype: str
     """
     soledad_assert(doc.is_tombstone() is False)
     # encrypt content using AES-256 CTR mode
@@ -191,13 +191,13 @@ def decrypt_doc(crypto, doc):
     EncryptionSchemes.SYMKEY and C{enc_method} is
     EncryptionMethods.AES_256_CTR.
 
-    @param crypto: A SoledadCryto instance to perform the encryption.
-    @type crypto: leap.soledad.crypto.SoledadCrypto
-    @param doc: The document to be decrypted.
-    @type doc: SoledadDocument
+    :param crypto: A SoledadCryto instance to perform the encryption.
+    :type crypto: leap.soledad.crypto.SoledadCrypto
+    :param doc: The document to be decrypted.
+    :type doc: SoledadDocument
 
-    @return: The JSON serialization of the decrypted content.
-    @rtype: str
+    :return: The JSON serialization of the decrypted content.
+    :rtype: str
     """
     soledad_assert(doc.is_tombstone() is False)
     soledad_assert(ENC_JSON_KEY in doc.content)
@@ -258,10 +258,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         Store given credentials so we can sign the request later.
 
-        @param uuid: The user's uuid.
-        @type uuid: str
-        @param token: The authentication token.
-        @type token: str
+        :param uuid: The user's uuid.
+        :type uuid: str
+        :param token: The authentication token.
+        :type token: str
         """
         TokenBasedAuth.set_token_credentials(self, uuid, token)
 
@@ -269,15 +269,15 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         Return an authorization header to be included in the HTTP request.
 
-        @param method: The HTTP method.
-        @type method: str
-        @param url_query: The URL query string.
-        @type url_query: str
-        @param params: A list with encoded query parameters.
-        @type param: list
+        :param method: The HTTP method.
+        :type method: str
+        :param url_query: The URL query string.
+        :type url_query: str
+        :param params: A list with encoded query parameters.
+        :type param: list
 
-        @return: The Authorization header.
-        @rtype: list of tuple
+        :return: The Authorization header.
+        :rtype: list of tuple
         """
         return TokenBasedAuth._sign_request(self, method, url_query, params)
 
@@ -293,14 +293,14 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         Initialize the SoledadSyncTarget.
 
-        @param url: The url of the target replica to sync with.
-        @type url: str
-        @param creds: optional dictionary giving credentials.
+        :param url: The url of the target replica to sync with.
+        :type url: str
+        :param creds: optional dictionary giving credentials.
             to authorize the operation with the server.
-        @type creds: dict
-        @param soledad: An instance of Soledad so we can encrypt/decrypt
+        :type creds: dict
+        :param soledad: An instance of Soledad so we can encrypt/decrypt
             document contents when syncing.
-        @type soledad: soledad.Soledad
+        :type soledad: soledad.Soledad
         """
         HTTPSyncTarget.__init__(self, url, creds)
         self._crypto = crypto
@@ -314,19 +314,19 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         EncryptionSchemes.SYMKEY, then this method will decrypt it with
         Soledad's symmetric key.
 
-        @param data: The body of the HTTP response.
-        @type data: str
-        @param return_doc_cb: A callback to insert docs from target.
-        @type return_doc_cb: function
-        @param ensure_callback: A callback to ensure we have the correct
+        :param data: The body of the HTTP response.
+        :type data: str
+        :param return_doc_cb: A callback to insert docs from target.
+        :type return_doc_cb: function
+        :param ensure_callback: A callback to ensure we have the correct
             target_replica_uid, if it was just created.
-        @type ensure_callback: function
+        :type ensure_callback: function
 
-        @raise BrokenSyncStream: If C{data} is malformed.
+        :raise BrokenSyncStream: If C{data} is malformed.
 
-        @return: A dictionary representing the first line of the response got
+        :return: A dictionary representing the first line of the response got
             from remote replica.
-        @rtype: list of str
+        :rtype: list of str
         """
         parts = data.splitlines()  # one at a time
         if not parts or parts[0] != '[':
@@ -381,25 +381,25 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         This does the same as the parent's method but encrypts content before
         syncing.
 
-        @param docs_by_generations: A list of (doc_id, generation, trans_id)
+        :param docs_by_generations: A list of (doc_id, generation, trans_id)
             of local documents that were changed since the last local
             generation the remote replica knows about.
-        @type docs_by_generations: list of tuples
-        @param source_replica_uid: The uid of the source replica.
-        @type source_replica_uid: str
-        @param last_known_generation: Target's last known generation.
-        @type last_known_generation: int
-        @param last_known_trans_id: Target's last known transaction id.
-        @type last_known_trans_id: str
-        @param return_doc_cb: A callback for inserting received documents from
+        :type docs_by_generations: list of tuples
+        :param source_replica_uid: The uid of the source replica.
+        :type source_replica_uid: str
+        :param last_known_generation: Target's last known generation.
+        :type last_known_generation: int
+        :param last_known_trans_id: Target's last known transaction id.
+        :type last_known_trans_id: str
+        :param return_doc_cb: A callback for inserting received documents from
             target.
-        @type return_doc_cb: function
-        @param ensure_callback: A callback that ensures we know the target
+        :type return_doc_cb: function
+        :param ensure_callback: A callback that ensures we know the target
             replica uid if the target replica was just created.
-        @type ensure_callback: function
+        :type ensure_callback: function
 
-        @return: The new generation and transaction id of the target replica.
-        @rtype: tuple
+        :return: The new generation and transaction id of the target replica.
+        :rtype: tuple
         """
         self._ensure_connection()
         if self._trace_hook:  # for tests
