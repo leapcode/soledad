@@ -32,9 +32,12 @@ import socket
 import ssl
 import urlparse
 
-import cchardet
-
 from hashlib import sha256
+
+try:
+    import cchardet as chardet
+except ImportError:
+    import chardet
 
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
@@ -771,12 +774,11 @@ class Soledad(object):
 
         :rtype: object
         """
-
         if isinstance(content, unicode):
             return content
         elif isinstance(content, str):
             try:
-                result = cchardet.detect(content)
+                result = chardet.detect(content)
                 content = content.decode(result["encoding"]).encode("utf-8")\
                                                             .decode("utf-8")
             except UnicodeError:
@@ -800,7 +802,8 @@ class Soledad(object):
         :return: the new document
         :rtype: SoledadDocument
         """
-        return self._db.create_doc(self._convert_to_utf8(content), doc_id=doc_id)
+        return self._db.create_doc(
+            self._convert_to_utf8(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
