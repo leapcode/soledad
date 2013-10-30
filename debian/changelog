@@ -1,6 +1,8 @@
 soledad (0.4.1) unstable; urgency=low
 
   * Update to 0.4.1.
+  * Freeze version to 0.4.1 using freeze_debianver command.
+  * Use python-chardet as a fallback.
 
  -- Micah Anderson <micah@debian.org>  Tue, 15 Oct 2013 15:27:19 -0300
 
