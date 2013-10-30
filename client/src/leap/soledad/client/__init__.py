@@ -1190,7 +1190,7 @@ class Soledad(object):
         doc='The secret used for symmetric encryption.')
 
     def _get_passphrase(self):
-        return self._passphrase.decode("UTF-8")
+        return self._passphrase
 
     passphrase = property(
         _get_passphrase,
