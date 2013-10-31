@@ -61,9 +61,9 @@ class AlreadyLockedError(errors.U1DBError):
 # maps.
 for e in [InvalidTokenError, NotLockedError, AlreadyLockedError]:
     http_errors.wire_description_to_status.update({
-        (e.wire_description, e.status)})
+        e.wire_description: e.status})
     errors.wire_description_to_exc.update({
-        (e.wire_description, e)})
+        e.wire_description: e})
 
 # u1db error statuses also have to be updated
 http_errors.ERROR_STATUSES = set(
