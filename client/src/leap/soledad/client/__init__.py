@@ -555,7 +555,7 @@ class Soledad(object):
             try:
                 self._load_secrets()  # try to load from disk
             except IOError, e:
-                logger.error('IOError: %s' % str(e))
+                logger.warning('IOError: %s' % str(e))
         try:
             self._get_storage_secret()
             return True
