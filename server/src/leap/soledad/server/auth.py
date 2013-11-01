@@ -32,6 +32,13 @@ from couchdb.client import Server
 from twisted.python import log
 
 
+from leap.soledad.common import (
+    SHARED_DB_NAME,
+    SHARED_DB_LOCK_DOC_ID_PREFIX,
+    USER_DB_PREFIX,
+)
+
+
 #-----------------------------------------------------------------------------
 # Authentication
 #-----------------------------------------------------------------------------
@@ -52,7 +59,7 @@ class URLToAuthorization(object):
     HTTP_METHOD_DELETE = 'DELETE'
     HTTP_METHOD_POST = 'POST'
 
-    def __init__(self, uuid, shared_db_name, user_db_prefix):
+    def __init__(self, uuid):
         """
         Initialize the mapper.
 
@@ -61,16 +68,13 @@ class URLToAuthorization(object):
 
         @param uuid: The user uuid.
         @type uuid: str
-        @param shared_db_name: The name of the shared database that holds
-            user's encrypted secrets.
-        @type shared_db_name: str
         @param user_db_prefix: The string prefix of users' databases.
         @type user_db_prefix: str
         """
         self._map = Mapper(controller_scan=None)
-        self._user_db_prefix = user_db_prefix
-        self._shared_db_name = shared_db_name
-        self._register_auth_info(self._uuid_dbname(uuid))
+        self._user_db_name = "%s%s" % (USER_DB_PREFIX, uuid)
+        self._uuid = uuid
+        self._register_auth_info()
 
     def is_authorized(self, environ):
         """
@@ -99,22 +103,10 @@ class URLToAuthorization(object):
             conditions=dict(method=http_methods),
             requirements={'dbname': DBNAME_CONSTRAINTS})
 
-    def _uuid_dbname(self, uuid):
+    def _register_auth_info(self):
         """
-        Return the database name corresponding to C{uuid}.
-
-        @param uuid: The user uid.
-        @type uuid: str
-
-        @return: The database name corresponding to C{uuid}.
-        @rtype: str
-        """
-        return '%s%s' % (self._user_db_prefix, uuid)
-
-    def _register_auth_info(self, dbname):
-        """
-        Register the authorization info in the mapper using C{dbname} as the
-        user's database name.
+        Register the authorization info in the mapper using C{SHARED_DB_NAME}
+        as the user's database name.
 
         This method sets up the following authorization rules:
 
@@ -123,35 +115,37 @@ class URLToAuthorization(object):
             /                             | GET
             /shared-db                    | GET
             /shared-db/docs               | -
-            /shared-db/doc/{id}           | GET, PUT, DELETE
+            /shared-db/doc/{any_id}       | GET, PUT, DELETE
             /shared-db/sync-from/{source} | -
+            /shared-db/lock/{uuid}        | PUT, DELETE
             /user-db                      | GET, PUT, DELETE
             /user-db/docs                 | -
             /user-db/doc/{id}             | -
             /user-db/sync-from/{source}   | GET, PUT, POST
-
-        @param dbname: The name of the user's database.
-        @type dbname: str
         """
         # auth info for global resource
         self._register('/', [self.HTTP_METHOD_GET])
         # auth info for shared-db database resource
         self._register(
-            '/%s' % self._shared_db_name,
+            '/%s' % SHARED_DB_NAME,
             [self.HTTP_METHOD_GET])
         # auth info for shared-db doc resource
         self._register(
-            '/%s/doc/{id:.*}' % self._shared_db_name,
+            '/%s/doc/{id:.*}' % SHARED_DB_NAME,
             [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
              self.HTTP_METHOD_DELETE])
+        # auth info for shared-db lock resource
+        self._register(
+            '/%s/lock/%s' % (SHARED_DB_NAME, self._uuid),
+            [self.HTTP_METHOD_PUT, self.HTTP_METHOD_DELETE])
         # auth info for user-db database resource
         self._register(
-            '/%s' % dbname,
+            '/%s' % self._user_db_name,
             [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
              self.HTTP_METHOD_DELETE])
         # auth info for user-db sync resource
         self._register(
-            '/%s/sync-from/{source_replica_uid}' % dbname,
+            '/%s/sync-from/{source_replica_uid}' % self._user_db_name,
             [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
              self.HTTP_METHOD_POST])
         # generate the regular expressions
@@ -165,7 +159,7 @@ class SoledadAuthMiddleware(object):
     This class must be extended to implement specific authentication methods
     (see SoledadTokenAuthMiddleware below).
 
-    It expects an HTTP_AUTHORIZATION header containing the the concatenation of
+    It expects an HTTP_AUTHORIZATION header containing the concatenation of
     the following strings:
 
         1. The authentication scheme. It will be verified by the
@@ -342,10 +336,7 @@ class SoledadAuthMiddleware(object):
             over the requested db.
         @rtype: bool
         """
-        return URLToAuthorization(
-            uuid, self._app.SHARED_DB_NAME,
-            self._app.USER_DB_PREFIX
-        ).is_authorized(environ)
+        return URLToAuthorization(uuid).is_authorized(environ)
 
     @abstractmethod
     def _get_auth_error_string(self):

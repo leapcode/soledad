@@ -32,9 +32,12 @@ import socket
 import ssl
 import urlparse
 
-import cchardet
-
 from hashlib import sha256
+
+try:
+    import cchardet as chardet
+except ImportError:
+    import chardet
 
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
@@ -43,6 +46,12 @@ import scrypt
 import simplejson as json
 
 from leap.common.config import get_path_prefix
+from leap.soledad.common import SHARED_DB_NAME
+from leap.soledad.common.errors import (
+    InvalidTokenError,
+    NotLockedError,
+    AlreadyLockedError,
+)
 
 #
 # Signaling function
@@ -103,8 +112,6 @@ Path to the certificate file used to certify the SSL connection between
 Soledad client and server.
 """
 
-SECRETS_DOC_ID_HASH_PREFIX = 'uuid-'
-
 
 #
 # Soledad: local encrypted storage and remote encrypted sync.
@@ -121,6 +128,13 @@ class PassphraseTooShort(Exception):
     """
     Raised when trying to change the passphrase but the provided passphrase is
     too short.
+    """
+
+
+class BootstrapSequenceError(Exception):
+    """
+    Raised when an attempt to generate a secret and store it in a recovery
+    documents on server failed.
     """
 
 
@@ -232,7 +246,7 @@ class Soledad(object):
         :type uuid: str
         :param passphrase: The passphrase for locking and unlocking encryption
                            secrets for local and remote storage.
-        :type passphrase: str
+        :type passphrase: unicode
         :param secrets_path: Path for storing encrypted key used for
                              symmetric encryption.
         :type secrets_path: str
@@ -248,9 +262,13 @@ class Soledad(object):
         :type cert_file: str
         :param auth_token: Authorization token for accessing remote databases.
         :type auth_token: str
+
+        :raise BootstrapSequenceError: Raised when the secret generation and
+            storage on server sequence has failed for some reason.
         """
         # get config params
         self._uuid = uuid
+        soledad_assert_type(passphrase, unicode)
         self._passphrase = passphrase
         # init crypto variables
         self._secrets = {}
@@ -258,11 +276,12 @@ class Soledad(object):
         # init config (possibly with default values)
         self._init_config(secrets_path, local_db_path, server_url)
         self._set_token(auth_token)
+        self._shared_db_instance = None
         # configure SSL certificate
         global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
         # initiate bootstrap sequence
-        self._bootstrap()
+        self._bootstrap()  # might raise BootstrapSequenceError()
 
     def _init_config(self, secrets_path, local_db_path, server_url):
         """
@@ -297,45 +316,93 @@ class Soledad(object):
         * stage 0 - local environment setup.
             - directory initialization.
             - crypto submodule initialization
-        * stage 1 - secret generation/loading:
+        * stage 1 - local secret loading:
             - if secrets exist locally, load them.
+        * stage 2 - remote secret loading:
             - else, if secrets exist in server, download them.
-            - else, generate a new secret.
-        * stage 2 - store secrets in server.
-        * stage 3 - database initialization.
+        * stage 3 - secret generation:
+            - else, generate a new secret and store in server.
+        * stage 4 - database initialization.
 
         This method decides which bootstrap stages have already been performed
         and performs the missing ones in order.
+
+        :raise BootstrapSequenceError: Raised when the secret generation and
+            storage on server sequence has failed for some reason.
         """
-        # TODO: make sure key storage always happens (even if this method is
-        #       interrupted).
-        # TODO: write tests for bootstrap stages.
-        # TODO: log each bootstrap step.
-        # stage 0  - socal environment setup
+        # STAGE 0  - local environment setup
         self._init_dirs()
         self._crypto = SoledadCrypto(self)
-        # stage 1 - secret generation/loading
+
+        # STAGE 1 - verify if secrets exist locally
         if not self._has_secret():  # try to load from local storage.
+
+            # STAGE 2 - there are no secrets in local storage, so try to fetch
+            # encrypted secrets from server.
             logger.info(
                 'Trying to fetch cryptographic secrets from shared recovery '
                 'database...')
-            # there are no secrets in local storage, so try to fetch encrypted
-            # secrets from server.
+
+            # --- start of atomic operation in shared db ---
+
+            # obtain lock on shared db
+            token = timeout = None
+            try:
+                token, timeout = self._shared_db.lock()
+            except AlreadyLockedError:
+                raise BootstrapSequenceError('Database is already locked.')
+
             doc = self._get_secrets_from_shared_db()
             if doc:
-                # found secrets in server, so import them.
                 logger.info(
                     'Found cryptographic secrets in shared recovery '
                     'database.')
                 self.import_recovery_document(doc.content)
             else:
-                # there are no secrets in server also, so generate a secret.
+                # STAGE 3 - there are no secrets in server also, so
+                # generate a secret and store it in remote db.
                 logger.info(
-                    'No cryptographic secrets found, creating new secrets...')
+                    'No cryptographic secrets found, creating new '
+                    ' secrets...')
                 self._set_secret_id(self._gen_secret())
-        # Stage 2 - storage of encrypted secrets in the server.
-        self._put_secrets_in_shared_db()
-        # Stage 3 - Local database initialization
+                try:
+                    self._put_secrets_in_shared_db()
+                except Exception:
+                    # storing generated secret in shared db failed for
+                    # some reason, so we erase the generated secret and
+                    # raise.
+                    try:
+                        os.unlink(self._secrets_path)
+                    except OSError as e:
+                        if errno == 2:  # no such file or directory
+                            pass
+                    raise BootstrapSequenceError(
+                        'Could not store generated secret in the shared '
+                        'database, bailing out...')
+
+            # release the lock on shared db
+            try:
+                self._shared_db.unlock(token)
+            except NotLockedError:
+                # for some reason the lock expired. Despite that, secret
+                # loading or generation/storage must have been executed
+                # successfully, so we pass.
+                pass
+            except InvalidTokenError:
+                # here, our lock has not only expired but also some other
+                # client application has obtained a new lock and is currently
+                # doing its thing in the shared database. Using the same
+                # reasoning as above, we assume everything went smooth and
+                # pass.
+                pass
+            except Exception as e:
+                logger.error("Unhandled exception when unlocking shared "
+                             "database.")
+                logger.exception(e)
+
+            # --- end of atomic operation in shared db ---
+
+        # STAGE 4 - local database initialization
         self._init_db()
 
     def _init_dirs(self):
@@ -426,7 +493,7 @@ class Soledad(object):
         """
         # calculate the encryption key
         key = scrypt.hash(
-            self._passphrase,
+            self._passphrase_as_string(),
             # the salt is stored base64 encoded
             binascii.a2b_base64(
                 self._secrets[self._secret_id][self.KDF_SALT_KEY]),
@@ -488,11 +555,11 @@ class Soledad(object):
             try:
                 self._load_secrets()  # try to load from disk
             except IOError, e:
-                logger.error('IOError: %s' % str(e))
+                logger.warning('IOError: %s' % str(e))
         try:
             self._get_storage_secret()
             return True
-        except:
+        except Exception:
             return False
 
     def _gen_secret(self):
@@ -528,7 +595,7 @@ class Soledad(object):
         # generate random salt
         salt = os.urandom(self.SALT_LENGTH)
         # get a 256-bit key
-        key = scrypt.hash(self._passphrase, salt, buflen=32)
+        key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
         iv, ciphertext = self._crypto.encrypt_sym(secret, key)
         self._secrets[secret_id] = {
             # leap.soledad.crypto submodule uses AES256 for symmetric
@@ -575,13 +642,13 @@ class Soledad(object):
         Change the passphrase that encrypts the storage secret.
 
         :param new_passphrase: The new passphrase.
-        :type new_passphrase: str
+        :type new_passphrase: unicode
 
         :raise NoStorageSecret: Raised if there's no storage secret available.
         """
         # maybe we want to add more checks to guarantee passphrase is
         # reasonable?
-        soledad_assert_type(new_passphrase, str)
+        soledad_assert_type(new_passphrase, unicode)
         if len(new_passphrase) < self.MINIMUM_PASSPHRASE_LENGTH:
             raise PassphraseTooShort(
                 'Passphrase must be at least %d characters long!' %
@@ -593,7 +660,7 @@ class Soledad(object):
         # generate random salt
         new_salt = os.urandom(self.SALT_LENGTH)
         # get a 256-bit key
-        key = scrypt.hash(new_passphrase, new_salt, buflen=32)
+        key = scrypt.hash(new_passphrase.encode('utf-8'), new_salt, buflen=32)
         iv, ciphertext = self._crypto.encrypt_sym(secret, key)
         self._secrets[self._secret_id] = {
             # leap.soledad.crypto submodule uses AES256 for symmetric
@@ -614,28 +681,32 @@ class Soledad(object):
     # General crypto utility methods.
     #
 
-    def _uuid_hash(self):
+    @property
+    def _shared_db(self):
         """
-        Calculate a hash for storing/retrieving key material on shared
-        database, based on user's uuid.
+        Return an instance of the shared recovery database object.
+
+        :return: The shared database.
+        :rtype: SoledadSharedDatabase
+        """
+        if self._shared_db_instance is None:
+            self._shared_db_instance = SoledadSharedDatabase.open_database(
+                urlparse.urljoin(self.server_url, SHARED_DB_NAME),
+                self._uuid,
+                False,  # db should exist at this point.
+                creds=self._creds)
+        return self._shared_db_instance
+
+    def _shared_db_doc_id(self):
+        """
+        Calculate the doc_id of the document in the shared db that stores key
+        material.
 
         :return: the hash
         :rtype: str
         """
-        return sha256(
-            '%s%s' % (
-                SECRETS_DOC_ID_HASH_PREFIX,
-                self._uuid)).hexdigest()
-
-    def _shared_db(self):
-        """
-        Return an instance of the shared recovery database object.
-        """
-        if self.server_url:
-            return SoledadSharedDatabase.open_database(
-                urlparse.urljoin(self.server_url, 'shared'),
-                False,  # TODO: eliminate need to create db here.
-                creds=self._creds)
+        return sha256('%s%s' %
+                     (self._passphrase_as_string(), self.uuid)).hexdigest()
 
     def _get_secrets_from_shared_db(self):
         """
@@ -646,11 +717,11 @@ class Soledad(object):
         :rtype: SoledadDocument
         """
         signal(SOLEDAD_DOWNLOADING_KEYS, self._uuid)
-        db = self._shared_db()
+        db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
-        doc = db.get_doc(self._uuid_hash())
+        doc = db.get_doc(self._shared_db_doc_id())
         signal(SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
 
@@ -661,7 +732,6 @@ class Soledad(object):
         Try to fetch keys from shared recovery database. If they already exist
         in the remote db, assert that that data is the same as local data.
         Otherwise, upload keys to shared recovery database.
-
         """
         soledad_assert(
             self._has_secret(),
@@ -670,12 +740,13 @@ class Soledad(object):
         # try to get secrets doc from server, otherwise create it
         doc = self._get_secrets_from_shared_db()
         if doc is None:
-            doc = SoledadDocument(doc_id=self._uuid_hash())
+            doc = SoledadDocument(
+                doc_id=self._shared_db_doc_id())
         # fill doc with encrypted secrets
         doc.content = self.export_recovery_document(include_uuid=False)
         # upload secrets to server
         signal(SOLEDAD_UPLOADING_KEYS, self._uuid)
-        db = self._shared_db()
+        db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
@@ -757,7 +828,7 @@ class Soledad(object):
         """
         return self._db.get_all_docs(include_deleted)
 
-    def _convert_to_utf8(self, content):
+    def _convert_to_unicode(self, content):
         """
         Converts content to utf8 (or all the strings in content)
 
@@ -771,12 +842,11 @@ class Soledad(object):
 
         :rtype: object
         """
-
         if isinstance(content, unicode):
             return content
         elif isinstance(content, str):
             try:
-                result = cchardet.detect(content)
+                result = chardet.detect(content)
                 content = content.decode(result["encoding"]).encode("utf-8")\
                                                             .decode("utf-8")
             except UnicodeError:
@@ -785,7 +855,7 @@ class Soledad(object):
         else:
             if isinstance(content, dict):
                 for key in content.keys():
-                    content[key] = self._convert_to_utf8(content[key])
+                    content[key] = self._convert_to_unicode(content[key])
         return content
 
     def create_doc(self, content, doc_id=None):
@@ -800,7 +870,8 @@ class Soledad(object):
         :return: the new document
         :rtype: SoledadDocument
         """
-        return self._db.create_doc(self._convert_to_utf8(content), doc_id=doc_id)
+        return self._db.create_doc(
+            self._convert_to_unicode(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -1027,6 +1098,7 @@ class Soledad(object):
     #
     # Recovery document export and import methods
     #
+
     def export_recovery_document(self, include_uuid=True):
         """
         Export the storage secrets and (optionally) the uuid.
@@ -1124,6 +1196,9 @@ class Soledad(object):
         _get_passphrase,
         doc='The passphrase for locking and unlocking encryption secrets for '
             'local and remote storage.')
+
+    def _passphrase_as_string(self):
+        return self._passphrase.encode('utf-8')
 
 
 #-----------------------------------------------------------------------------
