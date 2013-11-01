@@ -1,3 +1,17 @@
+0.4.2 Nov 1:
+Client:
+  o Support non-ascii passwords. Closes #4001.
+  o Change error severity for missing secrets path.
+  o Use chardet as fallback if cchardet not found.
+  o Improve bootstrap sequence and allow for locking the shared
+    database while creating/uploading the encryption secret. Closes
+    #4097.
+Common:
+  o Move some common functions and global variables to
+    leap.soledad.common.
+Server:
+  o Allow for locking the shared database. Closes #4097.
+
 0.4.1 Oct 4:
 Client:
   o Save only UTF8 strings. Related to #3660.
