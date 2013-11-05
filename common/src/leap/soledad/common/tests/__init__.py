@@ -60,11 +60,12 @@ class BaseSoledadTest(BaseLeapTest):
             if os.path.isfile(f):
                 os.unlink(f)
 
-    def _soledad_instance(self, user=ADDRESS, passphrase='123',
+    def _soledad_instance(self, user=ADDRESS, passphrase=u'123',
                           prefix='',
                           secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
                           local_db_path='soledad.u1db', server_url='',
-                          cert_file=None, secret_id=None):
+                          cert_file=None, secret_id=None,
+                          shared_db_class=None):
 
         def _put_doc_side_effect(doc):
             self._doc_put = doc
@@ -73,9 +74,14 @@ class BaseSoledadTest(BaseLeapTest):
 
             get_doc = Mock(return_value=None)
             put_doc = Mock(side_effect=_put_doc_side_effect)
+            lock = Mock(return_value=('atoken', 300))
+            unlock = Mock(return_value=True)
 
             def __call__(self):
                 return self
+
+        if shared_db_class is not None:
+            MockSharedDB = shared_db_class
 
         Soledad._shared_db = MockSharedDB()
         return Soledad(

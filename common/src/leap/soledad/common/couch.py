@@ -33,6 +33,7 @@ from couchdb.client import Server, Document as CouchDocument
 from couchdb.http import ResourceNotFound, Unauthorized
 
 
+from leap.soledad.common import USER_DB_PREFIX
 from leap.soledad.common.objectstore import (
     ObjectStoreDatabase,
     ObjectStoreSyncTarget,
@@ -61,7 +62,7 @@ def persistent_class(cls):
                                   dump_method_name, store):
         """
         Create a persistent method to replace C{old_method_name}.
-        
+
         The new method will load C{key} using C{load_method_name} and stores
         it using C{dump_method_name} depending on the value of C{store}.
         """
@@ -522,8 +523,7 @@ class CouchServerState(ServerState):
     Inteface of the WSGI server with the CouchDB backend.
     """
 
-    def __init__(self, couch_url, shared_db_name, tokens_db_name,
-                 user_db_prefix):
+    def __init__(self, couch_url, shared_db_name, tokens_db_name):
         """
         Initialize the couch server state.
 
@@ -533,13 +533,10 @@ class CouchServerState(ServerState):
         @type shared_db_name: str
         @param tokens_db_name: The name of the tokens database.
         @type tokens_db_name: str
-        @param user_db_prefix: The prefix for user database names.
-        @type user_db_prefix: str
         """
         self._couch_url = couch_url
         self._shared_db_name = shared_db_name
         self._tokens_db_name = tokens_db_name
-        self._user_db_prefix = user_db_prefix
         try:
             self._check_couch_permissions()
         except NotEnoughCouchPermissions:
@@ -553,8 +550,8 @@ class CouchServerState(ServerState):
 
     def _check_couch_permissions(self):
         """
-        Assert that Soledad Server has enough permissions on the underlying couch
-        database.
+        Assert that Soledad Server has enough permissions on the underlying
+        couch database.
 
         Soledad Server has to be able to do the following in the couch server:
 
@@ -563,8 +560,8 @@ class CouchServerState(ServerState):
             * Read from 'tokens' db.
 
         This function tries to perform the actions above using the "low level"
-        couch library to ensure that Soledad Server can do everything it needs on
-        the underlying couch database.
+        couch library to ensure that Soledad Server can do everything it needs
+        on the underlying couch database.
 
         @param couch_url: The URL of the couch database.
         @type couch_url: str
@@ -593,7 +590,7 @@ class CouchServerState(ServerState):
                 _open_couch_db(self._shared_db_name))
             # test read/write auth for user-<something> db
             _create_delete_test_doc(
-                _open_couch_db('%stest-db' % self._user_db_prefix))
+                _open_couch_db('%stest-db' % USER_DB_PREFIX))
             # test read auth for tokens db
             tokensdb = _open_couch_db(self._tokens_db_name)
             tokensdb.info()
