@@ -1,3 +1,9 @@
+soledad (0.4.2.1) unstable; urgency=low
+
+  * Change cchardet dependency for chardet explicitly.
+
+ -- Ben Carrillo <ben@futeisha.org>  Wed, 06 Nov 2013 17:46:03 -0200
+
 soledad (0.4.2) unstable; urgency=low
 
   * Update to 0.4.2

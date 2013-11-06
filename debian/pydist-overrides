@@ -3,4 +3,3 @@ PyOpenSSL python-openssl
 leap.soledad.common soledad-common
 leap.soledad.server soledad-server
 leap.soledad.client soledad-client
-cchardet python-chardet
