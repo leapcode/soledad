@@ -1,3 +1,13 @@
+soledad (0.4.2.2) unstable; urgency=low
+
+  * soledad-client: Cherry-pick change for autocommit mode, which fixes
+    a "cannot start a transaction within a transaction" that was
+    rendering the client unusable.
+  * soledad-client: Cherry-pick for default encoding, which fixes a bug
+    that was rendering the client unusable.
+
+ -- Ben Carrillo <ben@futeisha.org>  Thu, 07 Nov 2013 20:09:29 -0200
+
 soledad (0.4.2.1) unstable; urgency=low
 
   * Change cchardet dependency for chardet explicitly.
