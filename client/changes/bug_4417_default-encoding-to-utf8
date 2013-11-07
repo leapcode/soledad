@@ -1,0 +1,1 @@
+  o Defaults detected encoding to utf-8 to avoid bug if detected encoding is None. Closes: #4417
