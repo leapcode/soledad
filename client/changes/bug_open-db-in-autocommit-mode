@@ -1,0 +1,2 @@
+  o Open db in autocommit mode, to avoid nested transactions problems.
+    Closes: #4400
