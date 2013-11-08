@@ -847,8 +847,9 @@ class Soledad(object):
         elif isinstance(content, str):
             try:
                 result = chardet.detect(content)
-                content = content.decode(result["encoding"]).encode("utf-8")\
-                                                            .decode("utf-8")
+                default = "utf-8"
+                encoding = result["encoding"] or default
+                content = content.decode(encoding)
             except UnicodeError:
                 pass
             return content
