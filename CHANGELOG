@@ -1,4 +1,5 @@
 0.4.3 Nov 15:
+Client:
   o Defaults detected encoding to utf-8 to avoid bug if detected
     encoding is None. Closes: #4417
   o Open db in autocommit mode, to avoid nested transactions problems.
