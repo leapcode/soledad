@@ -70,6 +70,14 @@ sqlite_backend.dbapi2 = dbapi2
 
 SQLITE_CHECK_SAME_THREAD = False
 
+# We set isolation_level to None to setup autocommit mode.
+# See: http://docs.python.org/2/library/sqlite3.html#controlling-transactions
+# This avoids problems with sequential operations using the same soledad object
+# trying to open new transactions
+# (The error was:
+# OperationalError:cannot start a transaction within a transaction.)
+SQLITE_ISOLATION_LEVEL = None
+
 
 def open(path, password, create=True, document_factory=None, crypto=None,
          raw_key=False, cipher='aes-256-cbc', kdf_iter=4000,
@@ -172,6 +180,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         with self.k_lock:
             self._db_handle = dbapi2.connect(
                 sqlcipher_file,
+                isolation_level=SQLITE_ISOLATION_LEVEL,
                 check_same_thread=SQLITE_CHECK_SAME_THREAD)
             # set SQLCipher cryptographic parameters
             self._set_crypto_pragmas(
@@ -436,6 +445,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             with cls.k_lock:
                 db_handle = dbapi2.connect(
                     sqlcipher_file,
+                    isolation_level=SQLITE_ISOLATION_LEVEL,
                     check_same_thread=SQLITE_CHECK_SAME_THREAD)
                 cls._set_crypto_pragmas(
                     db_handle, key, raw_key, cipher,
@@ -645,6 +655,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             passphrase that should be hashed to obtain the encyrption key.
         :type raw_key: bool
         """
+        # XXX change key param!
         if raw_key:
             cls._pragma_rekey_raw(db_handle, key)
         else:
@@ -683,6 +694,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         if not all(c in string.hexdigits for c in key):
             raise NotAnHexString(key)
+        # XXX change passphrase param!
         db_handle.cursor().execute('PRAGMA rekey = "x\'%s"' % passphrase)
 
     def __del__(self):
