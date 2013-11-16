@@ -1,3 +1,9 @@
+0.4.3 Nov 15:
+  o Defaults detected encoding to utf-8 to avoid bug if detected
+    encoding is None. Closes: #4417
+  o Open db in autocommit mode, to avoid nested transactions problems.
+    Closes: #4400
+
 0.4.2 Nov 1:
 Client:
   o Support non-ascii passwords. Closes #4001.
