@@ -1,3 +1,9 @@
+soledad (0.4.3) unstable; urgency=low
+
+  * Update to 0.4.3 release
+
+ -- Ben Carrillo <ben@futeisha.org>  Fri, 15 Nov 2013 23:37:55 -0200
+
 soledad (0.4.2.2) unstable; urgency=low
 
   * soledad-client: Cherry-pick change for autocommit mode, which fixes
