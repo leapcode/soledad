@@ -33,6 +33,7 @@ from leap.soledad.common.tests import (
 )
 from leap import soledad
 from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.crypto import WrongMac
 from leap.soledad.client import Soledad, PassphraseTooShort
 from leap.soledad.client.crypto import SoledadCrypto
 from leap.soledad.client.shared_db import SoledadSharedDatabase
@@ -119,7 +120,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol.change_passphrase(u'654321')
 
         self.assertRaises(
-            DatabaseError,
+            WrongMac,
             self._soledad_instance, 'leap@leap.se',
             passphrase=u'123',
             prefix=self.rand_prefix)
@@ -292,7 +293,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         sol = self._soledad_instance()
         # create a document with secrets
         doc = SoledadDocument(doc_id=sol._shared_db_doc_id())
-        doc.content = sol.export_recovery_document(include_uuid=False)
+        doc.content = sol.export_recovery_document()
 
         class Stage2MockSharedDB(object):
 
