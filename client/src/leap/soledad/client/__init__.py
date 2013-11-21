@@ -747,6 +747,13 @@ class Soledad(object):
         """
         Update a document in the local encrypted database.
 
+        ============================== WARNING ==============================
+        This method converts the document's contents to unicode in-place. This
+        meanse that after calling C{put_doc(doc)}, the contents of the
+        document, i.e. C{doc.content}, might be different from before the
+        call.
+        ============================== WARNING ==============================
+
         :param doc: the document to update
         :type doc: SoledadDocument
 
