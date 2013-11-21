@@ -753,6 +753,7 @@ class Soledad(object):
         :return: the new revision identifier for the document
         :rtype: str
         """
+        doc.content = self._convert_to_unicode(doc.content)
         return self._db.put_doc(doc)
 
     def delete_doc(self, doc):
