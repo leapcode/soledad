@@ -149,8 +149,6 @@ class SoledadApp(http_app.HTTPApp):
         @return: HTTP application results.
         @rtype: list
         """
-        # ensure the shared database exists
-        self.state.ensure_database(self.SHARED_DB_NAME)
         return http_app.HTTPApp.__call__(self, environ, start_response)
 
 
