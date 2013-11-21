@@ -747,12 +747,20 @@ class Soledad(object):
         """
         Update a document in the local encrypted database.
 
+        ============================== WARNING ==============================
+        This method converts the document's contents to unicode in-place. This
+        meanse that after calling C{put_doc(doc)}, the contents of the
+        document, i.e. C{doc.content}, might be different from before the
+        call.
+        ============================== WARNING ==============================
+
         :param doc: the document to update
         :type doc: SoledadDocument
 
         :return: the new revision identifier for the document
         :rtype: str
         """
+        doc.content = self._convert_to_unicode(doc.content)
         return self._db.put_doc(doc)
 
     def delete_doc(self, doc):

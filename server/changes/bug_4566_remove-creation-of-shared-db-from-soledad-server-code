@@ -1,0 +1,1 @@
+  o Remove creation of shared db from soledad server code. Closes #4566.
