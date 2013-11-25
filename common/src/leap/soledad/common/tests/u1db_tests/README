@@ -12,7 +12,6 @@ Dependencies
 
 u1db tests depend on the following python packages:
 
-  nose2
   unittest2
   mercurial
   hgtools
@@ -25,10 +24,3 @@ u1db tests depend on the following python packages:
   routes
   simplejson
   cython
-
-Running tests
--------------
-
-Use nose2 to run tests:
-
-  nose2 leap.soledad.tests.u1db_tests
