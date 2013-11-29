@@ -1038,7 +1038,7 @@ class Soledad(object):
         if self._db:
             local_gen = self._db.sync(
                 urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                creds=self._creds, autocreate=True)
+                creds=self._creds, autocreate=False)
             signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
             return local_gen
 

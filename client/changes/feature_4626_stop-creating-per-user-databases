@@ -1,0 +1,2 @@
+  o Stop creating per-user databases, as now there's another service that does
+    this automatically (tapicero). Closes #4626.
