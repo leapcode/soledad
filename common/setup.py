@@ -103,6 +103,92 @@ def get_versions(default={}, verbose=False):
             f.write(subst_template)
 
 
+from os import listdir
+from os.path import realpath, dirname, isdir, join, isfile, basename
+import json
+import logging
+import binascii
+
+
+old_cmd_sdist = cmdclass["sdist"]
+
+
+class cmd_sdist(old_cmd_sdist):
+    """
+    Generate 'src/leap/soledad/common/ddocs.py' which contains coush design
+    documents scripts.
+    """
+
+    def run(self):
+        old_cmd_sdist.run(self)
+        self.build_ddocs_py()
+
+    def build_ddocs_py(self):
+        """
+        Build couch design documents based on content from subdirectories in
+        'src/leap/soledad/common/ddocs'.
+        """
+        prefix = join(
+            dirname(realpath(__file__)),
+            'src', 'leap', 'soledad', 'common')
+        ddocs_prefix = join(prefix, 'ddocs')
+        ddocs = {}
+
+        # design docs are represented by subdirectories of `ddocs_prefix`
+        for ddoc in [f for f in listdir(ddocs_prefix)
+                if isdir(join(ddocs_prefix, f))]:
+
+            ddocs[ddoc] = {'_id': '_design/%s' % ddoc}
+
+            for t in ['views', 'lists', 'updates']:
+                tdir = join(ddocs_prefix, ddoc, t)
+                if isdir(tdir):
+
+                    ddocs[ddoc][t] = {}
+
+                    if t == 'views':  # handle views (with map/reduce functions)
+                        for view in [f for f in listdir(tdir) \
+                                if isdir(join(tdir, f))]:
+                            # look for map.js and reduce.js
+                            mapfile = join(tdir, view, 'map.js')
+                            reducefile = join(tdir, view, 'reduce.js')
+                            mapfun = None
+                            reducefun = None
+                            try:
+                                with open(mapfile) as f:
+                                    mapfun = f.read()
+                            except IOError:
+                                pass
+                            try:
+                                with open(reducefile) as f:
+                                    reducefun = f.read()
+                            except IOError:
+                                pass
+                            ddocs[ddoc]['views'][view] = {}
+
+                            if mapfun is not None:
+                                ddocs[ddoc]['views'][view]['map'] = mapfun
+                            if reducefun is not None:
+                                ddocs[ddoc]['views'][view]['reduce'] = reducefun
+
+                    else:  # handle lists, updates, etc
+                        for fun in [f for f in listdir(tdir) \
+                                if isfile(join(tdir, f))]:
+                            funfile = join(tdir, fun)
+                            funname = basename(funfile).replace('.js', '')
+                            try:
+                                with open(funfile) as f:
+                                    ddocs[ddoc][t][funname] = f.read()
+                            except IOError:
+                                pass
+        # write file containing design docs strings
+        with open(join(prefix, 'ddocs.py'), 'w') as f:
+            for ddoc in ddocs:
+                f.write(
+                    "%s = '%s'\n" %
+                    (ddoc, binascii.b2a_base64(json.dumps(ddocs[ddoc]))[:-1]))
+
+
 cmdclass["freeze_debianver"] = freeze_debianver
 
 # XXX add ref to docs

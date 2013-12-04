@@ -27,7 +27,6 @@ from base64 import b64decode
 
 from leap.common.files import mkdir_p
 
-from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_sync
@@ -188,7 +187,7 @@ def copy_couch_database_for_test(test, db):
 
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
-    return SoledadDocument(doc_id, rev, content, has_conflicts=has_conflicts)
+    return couch.CouchDocument(doc_id, rev, content, has_conflicts=has_conflicts)
 
 
 COUCH_SCENARIOS = [
