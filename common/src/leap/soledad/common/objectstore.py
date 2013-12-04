@@ -50,7 +50,7 @@ class ObjectStoreDatabase(InMemoryDatabase):
     A backend for storing u1db data in an object store.
     """
 
-    U1DB_DATA_DOC_ID_PREFIX = 'u1db/'
+    U1DB_DATA_DOC_ID_PREFIX = 'u1db%2F'
 
     @classmethod
     def open_database(cls, url, create, document_factory=None):
