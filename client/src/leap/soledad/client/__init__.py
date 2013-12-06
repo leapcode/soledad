@@ -31,6 +31,7 @@ import os
 import socket
 import ssl
 import urlparse
+import hmac
 
 from hashlib import sha256
 
@@ -51,6 +52,13 @@ from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
     AlreadyLockedError,
+)
+from leap.soledad.common.crypto import (
+    MacMethods,
+    UnknownMacMethod,
+    WrongMac,
+    MAC_KEY,
+    MAC_METHOD_KEY,
 )
 
 #
@@ -357,7 +365,12 @@ class Soledad(object):
                 logger.info(
                     'Found cryptographic secrets in shared recovery '
                     'database.')
-                self.import_recovery_document(doc.content)
+                _, mac = self.import_recovery_document(doc.content)
+                if mac is False:
+                    self.put_secrets_in_shared_db()
+                self._store_secrets()  # save new secrets in local file
+                if self._secret_id is None:
+                    self._set_secret_id(self._secrets.items()[0][0])
             else:
                 # STAGE 3 - there are no secrets in server also, so
                 # generate a secret and store it in remote db.
@@ -516,21 +529,6 @@ class Soledad(object):
     def _load_secrets(self):
         """
         Load storage secrets from local file.
-
-        The content of the file has the following format:
-
-            {
-                "storage_secrets": {
-                    "<secret_id>": {
-                        'kdf': 'scrypt',
-                        'kdf_salt': '<b64 repr of salt>'
-                        'kdf_length': <key length>
-                        "cipher": "aes256",
-                        "length": <secret length>,
-                        "secret": "<encrypted storage_secret 1>",
-                    }
-                }
-            }
         """
         # does the file exist in disk?
         if not os.path.isfile(self._secrets_path):
@@ -539,7 +537,10 @@ class Soledad(object):
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        self._secrets = content[self.STORAGE_SECRETS_KEY]
+        _, mac = self.import_recovery_document(content)
+        if mac is False:
+            self._store_secrets()
+            self._put_secrets_in_shared_db()
         # choose first secret if no secret_id was given
         if self._secret_id is None:
             self._set_secret_id(self._secrets.items()[0][0])
@@ -614,28 +615,12 @@ class Soledad(object):
 
     def _store_secrets(self):
         """
-        Store a secret in C{Soledad.STORAGE_SECRETS_FILE_PATH}.
-
-        The contents of the stored file have the following format:
-
-            {
-                'storage_secrets': {
-                    '<secret_id>': {
-                        'kdf': 'scrypt',
-                        'kdf_salt': '<salt>'
-                        'kdf_length': <len>
-                        'cipher': 'aes256',
-                        'length': 1024,
-                        'secret': '<encrypted storage_secret 1>',
-                    }
-                }
-            }
+        Store secrets in C{Soledad.STORAGE_SECRETS_FILE_PATH}.
         """
-        data = {
-            self.STORAGE_SECRETS_KEY: self._secrets,
-        }
         with open(self._secrets_path, 'w') as f:
-            f.write(json.dumps(data))
+            f.write(
+                json.dumps(
+                    self.export_recovery_document()))
 
     def change_passphrase(self, new_passphrase):
         """
@@ -662,6 +647,7 @@ class Soledad(object):
         # get a 256-bit key
         key = scrypt.hash(new_passphrase.encode('utf-8'), new_salt, buflen=32)
         iv, ciphertext = self._crypto.encrypt_sym(secret, key)
+        # XXX update all secrets in the dict
         self._secrets[self._secret_id] = {
             # leap.soledad.crypto submodule uses AES256 for symmetric
             # encryption.
@@ -673,9 +659,9 @@ class Soledad(object):
             self.SECRET_KEY: '%s%s%s' % (
                 str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
         }
-
-        self._store_secrets()
         self._passphrase = new_passphrase
+        self._store_secrets()
+        self._put_secrets_in_shared_db()
 
     #
     # General crypto utility methods.
@@ -743,7 +729,7 @@ class Soledad(object):
             doc = SoledadDocument(
                 doc_id=self._shared_db_doc_id())
         # fill doc with encrypted secrets
-        doc.content = self.export_recovery_document(include_uuid=False)
+        doc.content = self.export_recovery_document()
         # upload secrets to server
         signal(SOLEDAD_UPLOADING_KEYS, self._uuid)
         db = self._shared_db
@@ -761,12 +747,20 @@ class Soledad(object):
         """
         Update a document in the local encrypted database.
 
+        ============================== WARNING ==============================
+        This method converts the document's contents to unicode in-place. This
+        meanse that after calling C{put_doc(doc)}, the contents of the
+        document, i.e. C{doc.content}, might be different from before the
+        call.
+        ============================== WARNING ==============================
+
         :param doc: the document to update
         :type doc: SoledadDocument
 
         :return: the new revision identifier for the document
         :rtype: str
         """
+        doc.content = self._convert_to_unicode(doc.content)
         return self._db.put_doc(doc)
 
     def delete_doc(self, doc):
@@ -1100,26 +1094,51 @@ class Soledad(object):
     # Recovery document export and import methods
     #
 
-    def export_recovery_document(self, include_uuid=True):
+    def export_recovery_document(self):
         """
-        Export the storage secrets and (optionally) the uuid.
+        Export the storage secrets.
 
         A recovery document has the following structure:
 
             {
-                self.STORAGE_SECRET_KEY: <secrets dict>,
-                self.UUID_KEY: '<uuid>',  # (optional)
+                'storage_secrets': {
+                    '<storage_secret id>': {
+                        'kdf': 'scrypt',
+                        'kdf_salt': '<b64 repr of salt>'
+                        'kdf_length': <key length>
+                        'cipher': 'aes256',
+                        'length': <secret length>,
+                        'secret': '<encrypted storage_secret>',
+                    },
+                },
+                'kdf': 'scrypt',
+                'kdf_salt': '<b64 repr of salt>',
+                'kdf_length: <key length>,
+                '_mac_method': 'hmac',
+                '_mac': '<mac>'
             }
 
-        :param include_uuid: Should the uuid be included?
-        :type include_uuid: bool
+        Note that multiple storage secrets might be stored in one recovery
+        document. This method will also calculate a MAC of a string
+        representation of the secrets dictionary.
 
         :return: The recovery document.
         :rtype: dict
         """
-        data = {self.STORAGE_SECRETS_KEY: self._secrets}
-        if include_uuid:
-            data[self.UUID_KEY] = self._uuid
+        # create salt and key for calculating MAC
+        salt = os.urandom(self.SALT_LENGTH)
+        key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
+        data = {
+            self.STORAGE_SECRETS_KEY: self._secrets,
+            self.KDF_KEY: self.KDF_SCRYPT,
+            self.KDF_SALT_KEY: binascii.b2a_base64(salt),
+            self.KDF_LENGTH_KEY: len(key),
+            MAC_METHOD_KEY: MacMethods.HMAC,
+            MAC_KEY: hmac.new(
+                key,
+                json.dumps(self._secrets),
+                sha256).hexdigest(),
+        }
         return data
 
     def import_recovery_document(self, data):
@@ -1127,27 +1146,49 @@ class Soledad(object):
         Import storage secrets for symmetric encryption and uuid (if present)
         from a recovery document.
 
-        A recovery document has the following structure:
-
-            {
-                self.STORAGE_SECRET_KEY: <secrets dict>,
-                self.UUID_KEY: '<uuid>',  # (optional)
-            }
+        Note that this method does not store the imported data on disk. For
+        that, use C{self._store_secrets()}.
 
         :param data: The recovery document.
         :type data: dict
+
+        :return: A tuple containing the number of imported secrets and whether
+                 there was MAC informationa available for authenticating.
+        :rtype: (int, bool)
         """
-        # include new secrets in our secret pool.
+        soledad_assert(self.STORAGE_SECRETS_KEY in data)
+        # check mac of the recovery document
+        mac_auth = False
+        mac = None
+        if MAC_KEY in data:
+            soledad_assert(data[MAC_KEY] is not None)
+            soledad_assert(MAC_METHOD_KEY in data)
+            soledad_assert(self.KDF_KEY in data)
+            soledad_assert(self.KDF_SALT_KEY in data)
+            soledad_assert(self.KDF_LENGTH_KEY in data)
+            if data[MAC_METHOD_KEY] == MacMethods.HMAC:
+                key = scrypt.hash(
+                    self._passphrase_as_string(),
+                    binascii.a2b_base64(data[self.KDF_SALT_KEY]),
+                    buflen=32)
+                mac = hmac.new(
+                    key,
+                    json.dumps(data[self.STORAGE_SECRETS_KEY]),
+                    sha256).hexdigest()
+            else:
+                raise UnknownMacMethod('Unknown MAC method: %s.' %
+                                       data[MAC_METHOD_KEY])
+            if mac != data[MAC_KEY]:
+                raise WrongMac('Could not authenticate recovery document\'s '
+                               'contents.')
+            mac_auth = True
+        # include secrets in the secret pool.
+        secrets = 0
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
             if secret_id not in self._secrets:
+                secrets += 1
                 self._secrets[secret_id] = secret_data
-        self._store_secrets()  # save new secrets in local file
-        # set uuid if present
-        if self.UUID_KEY in data:
-            self._uuid = data[self.UUID_KEY]
-        # choose first secret to use is none is assigned
-        if self._secret_id is None:
-            self._set_secret_id(data[self.STORAGE_SECRETS_KEY].items()[0][0])
+        return secrets, mac
 
     #
     # Setters/getters
