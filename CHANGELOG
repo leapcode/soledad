@@ -1,3 +1,11 @@
+0.4.4 Dec 6:
+Client:
+  o Add MAC verirication to the recovery document and
+    soledad.json. Closes #4348.
+Common:
+  o Add unicode conversion to put_doc(). Closes #4095.
+  o Remove tests dependency on nose2. Closes #4258.
+
 0.4.3 Nov 15:
 Client:
   o Defaults detected encoding to utf-8 to avoid bug if detected
