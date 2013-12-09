@@ -760,7 +760,7 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
                                        {'docs': [], 'last_known_gen': 0},
                                     'return':
                                        {'docs': [(doc.doc_id, doc.rev)],
-                                    'last_gen': 1}})
+                                        'last_gen': 1}})
         self.assertEqual([doc], self.db1.get_from_index('test-idx', 'value'))
 
     def test_sync_pulling_doesnt_update_other_if_changed(self):
@@ -785,7 +785,7 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
                                        {'docs': [], 'last_known_gen': 0},
                                     'return':
                                        {'docs': [(doc.doc_id, doc.rev)],
-                                    'last_gen': 1}})
+                                        'last_gen': 1}})
         self.assertEqual(1, self.db1._get_replica_gen_and_trans_id('test2')[0])
         # c2 should not have gotten a '_record_sync_info' call, because the
         # local database had been updated more than just by the messages
@@ -819,8 +819,8 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         self.assertLastExchangeLog(self.db2,
                                    {'receive':
                                        {'docs': [(doc.doc_id, doc.rev)],
-                                    'source_uid': 'test1',
-                                    'source_gen': 1, 'last_known_gen': 0},
+                                        'source_uid': 'test1',
+                                        'source_gen': 1, 'last_known_gen': 0},
                                     'return': {'docs': [], 'last_gen': 1}})
 
     def test_sync_ignores_superseded(self):
@@ -839,11 +839,11 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         self.assertLastExchangeLog(self.db1,
                                    {'receive':
                                        {'docs': [(doc.doc_id, doc_rev1)],
-                                    'source_uid': 'test2',
-                                    'source_gen': 1, 'last_known_gen': 0},
+                                        'source_uid': 'test2',
+                                        'source_gen': 1, 'last_known_gen': 0},
                                     'return':
                                        {'docs': [(doc.doc_id, doc_rev2)],
-                                    'last_gen': 2}})
+                                        'last_gen': 2}})
         self.assertGetDoc(self.db1, doc.doc_id, doc_rev2, new_content, False)
 
     def test_sync_sees_remote_conflicted(self):
@@ -861,11 +861,11 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         self.assertLastExchangeLog(self.db2,
                                    {'receive':
                                        {'docs': [(doc_id, doc1_rev)],
-                                    'source_uid': 'test1',
-                                    'source_gen': 1, 'last_known_gen': 0},
+                                        'source_uid': 'test1',
+                                        'source_gen': 1, 'last_known_gen': 0},
                                     'return':
                                        {'docs': [(doc_id, doc2_rev)],
-                                    'last_gen': 1}})
+                                        'last_gen': 1}})
         self.assertTransactionLog([doc_id, doc_id], self.db1)
         self.assertGetDoc(self.db1, doc_id, doc2_rev, new_doc, True)
         self.assertGetDoc(self.db2, doc_id, doc2_rev, new_doc, False)
@@ -892,10 +892,10 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         self.assertLastExchangeLog(self.db2,
                                    {'receive':
                                        {'docs': [(doc_id, doc1.rev)],
-                                    'source_uid': 'test1',
-                                    'source_gen': 2, 'last_known_gen': 1},
+                                        'source_uid': 'test1',
+                                        'source_gen': 2, 'last_known_gen': 1},
                                     'return': {'docs': [(doc_id, doc2.rev)],
-                                    'last_gen': 2}})
+                                               'last_gen': 2}})
         self.assertTransactionLog([doc_id, doc_id, doc_id], self.db1)
         self.assertGetDocIncludeDeleted(self.db1, doc_id, doc2.rev, None, True)
         self.assertGetDocIncludeDeleted(
@@ -950,8 +950,8 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         self.assertLastExchangeLog(self.db2,
                                    {'receive':
                                        {'docs': [(doc_id, deleted_rev)],
-                                    'source_uid': 'test1',
-                                    'source_gen': 2, 'last_known_gen': 1},
+                                        'source_uid': 'test1',
+                                        'source_gen': 2, 'last_known_gen': 1},
                                     'return': {'docs': [], 'last_gen': 2}})
         self.assertGetDocIncludeDeleted(
             self.db1, doc_id, deleted_rev, None, False)
@@ -1121,6 +1121,7 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
 
 
 class TestDbSync(tests.TestCaseWithServer):
+
     """Test db.sync remote sync shortcut"""
 
     scenarios = [
@@ -1189,6 +1190,7 @@ class TestDbSync(tests.TestCaseWithServer):
 
 
 class TestRemoteSyncIntegration(tests.TestCaseWithServer):
+
     """Integration tests for the most common sync scenario local -> remote"""
 
     make_app_with_state = staticmethod(make_http_app)
@@ -1204,7 +1206,7 @@ class TestRemoteSyncIntegration(tests.TestCaseWithServer):
         doc12 = self.db1.create_doc_from_json('{"a": 2}')
         doc21 = self.db2.create_doc_from_json('{"b": 1}')
         doc22 = self.db2.create_doc_from_json('{"b": 2}')
-        #sanity
+        # sanity
         self.assertEqual(2, len(self.db1._get_transaction_log()))
         self.assertEqual(2, len(self.db2._get_transaction_log()))
         progress1 = []
