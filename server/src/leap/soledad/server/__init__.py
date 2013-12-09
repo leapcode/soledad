@@ -183,7 +183,6 @@ class LockResource(object):
     FILESYSTEM_LOCK_TRIES = 5
     FILESYSTEM_LOCK_SLEEP_SECONDS = 1
 
-
     def __init__(self, uuid, state, responder):
         """
         Initialize the lock resource. Parameters to this constructor are
