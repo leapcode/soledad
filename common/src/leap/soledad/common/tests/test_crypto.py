@@ -40,6 +40,7 @@ from leap.soledad.common.tests import (
     KEY_FINGERPRINT,
     PRIVATE_KEY,
 )
+from leap.soledad.common.crypto import WrongMac, UnknownMacMethod
 from leap.soledad.common.tests.u1db_tests import (
     simple_doc,
     nested_doc,
@@ -88,11 +89,9 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
 
     def test_import_recovery_document(self):
         rd = self._soledad.export_recovery_document()
-        s = self._soledad_instance(user='anotheruser@leap.se')
+        s = self._soledad_instance()
         s.import_recovery_document(rd)
         s._set_secret_id(self._soledad._secret_id)
-        self.assertEqual(self._soledad._uuid,
-                         s._uuid, 'Failed setting user uuid.')
         self.assertEqual(self._soledad._get_storage_secret(),
                          s._get_storage_secret(),
                          'Failed settinng secret for symmetric encryption.')
@@ -164,7 +163,7 @@ class MacAuthTestCase(BaseSoledadTest):
         doc.content[target.MAC_KEY] = '1234567890ABCDEF'
         # try to decrypt doc
         self.assertRaises(
-            target.WrongMac,
+            WrongMac,
             target.decrypt_doc, self._soledad._crypto, doc)
 
     def test_decrypt_with_unknown_mac_method_raises(self):
@@ -182,7 +181,7 @@ class MacAuthTestCase(BaseSoledadTest):
         doc.content[target.MAC_METHOD_KEY] = 'mymac'
         # try to decrypt doc
         self.assertRaises(
-            target.UnknownMacMethod,
+            UnknownMacMethod,
             target.decrypt_doc, self._soledad._crypto, doc)
 
 

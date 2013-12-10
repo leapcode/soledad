@@ -35,12 +35,33 @@ class EncryptionSchemes(object):
     PUBKEY = 'pubkey'
 
 
+class UnknownEncryptionScheme(Exception):
+    """
+    Raised when trying to decrypt from unknown encryption schemes.
+    """
+    pass
+
+
 class MacMethods(object):
     """
     Representation of MAC methods used to authenticate document's contents.
     """
 
     HMAC = 'hmac'
+
+
+class UnknownMacMethod(Exception):
+    """
+    Raised when trying to authenticate document's content with unknown MAC
+    mehtod.
+    """
+    pass
+
+
+class WrongMac(Exception):
+    """
+    Raised when failing to authenticate document's contents based on MAC.
+    """
 
 
 #
