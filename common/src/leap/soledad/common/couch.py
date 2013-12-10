@@ -18,35 +18,25 @@
 
 """A U1DB backend that uses CouchDB as its persistence layer."""
 
-import os
 import simplejson as json
-import sys
-import time
+import re
 import uuid
 import logging
 import binascii
 import socket
 
 
+from couchdb.client import Server
+from couchdb.http import ResourceNotFound, Unauthorized
+from u1db import errors, query_parser, vectorclock
 from u1db.backends import CommonBackend, CommonSyncTarget
 from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
-from u1db import (
-    errors,
-    query_parser,
-    vectorclock,
-)
-from couchdb.client import (
-    Server,
-    Document as CouchDocument,
-    _doc_resource,
-)
-from couchdb.http import ResourceNotFound, Unauthorized
 
 
 from leap.soledad.common import USER_DB_PREFIX
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.ddocs import ensure_ddocs_on_remote_db
+from leap.soledad.common.ddocs import ensure_ddocs_on_db
 
 
 logger = logging.getLogger(__name__)
@@ -193,11 +183,11 @@ class CouchDatabase(CommonBackend):
             server[dbname]
         except ResourceNotFound:
             if not create:
-                raise DatabaseDoesNotExist()
+                raise errors.DatabaseDoesNotExist()
         return cls(url, dbname)
 
     def __init__(self, url, dbname, replica_uid=None, full_commit=True,
-                 session=None):
+                 session=None, ensure_ddocs=False):
         """
         Create a new Couch data container.
 
@@ -230,7 +220,9 @@ class CouchDatabase(CommonBackend):
         except ResourceNotFound:
             self._server.create(self._dbname)
             self._database = self._server[self._dbname]
-        self._initialize(replica_uid or uuid.uuid4().hex)
+        self._set_replica_uid(replica_uid or uuid.uuid4().hex)
+        if ensure_ddocs:
+            ensure_ddocs_on_db(self._database)
 
     def get_sync_target(self):
         """
@@ -270,25 +262,12 @@ class CouchDatabase(CommonBackend):
         """
         try:
             doc = self._database['u1db_config']
+            doc['replica_uid'] = replica_uid
         except ResourceNotFound:
             doc = {
                 '_id': 'u1db_config',
                 'replica_uid': replica_uid,
             }
-            self._database.save(doc)
-
-    def _ensure_design_docs(self):
-        """
-        Ensure that the design docs have been created.
-        """
-        if self._is_initialized():
-            return
-        self._initialize()
-
-    def _set_replica_uid(self, replica_uid):
-        """Force the replica_uid to be set."""
-        doc = self._database['u1db_config']
-        doc['replica_uid'] = replica_uid
         self._database.save(doc)
         self._real_replica_uid = replica_uid
 

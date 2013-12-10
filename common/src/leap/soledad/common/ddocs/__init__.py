@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 prefix = dirname(realpath(__file__))
 
 
-def ensure_ddocs_on_remote_db(db, prefix=prefix):
+def ensure_ddocs_on_db(db, prefix=prefix):
     """
     Ensure that the design documents in C{db} contain.
 
@@ -118,7 +118,7 @@ def build_ddocs(prefix=prefix):
                         except IOError:
                             pass
                         ddocs[ddoc]['views'][view] = {}
-                        
+
                         if mapfun is not None:
                             ddocs[ddoc]['views'][view]['map'] = mapfun
                         if reducefun is not None:
