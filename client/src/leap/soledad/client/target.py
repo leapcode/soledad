@@ -35,7 +35,10 @@ from u1db.remote.http_target import HTTPSyncTarget
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.crypto import (
     EncryptionSchemes,
+    UnknownEncryptionScheme,
     MacMethods,
+    UnknownMacMethod,
+    WrongMac,
     ENC_JSON_KEY,
     ENC_SCHEME_KEY,
     ENC_METHOD_KEY,
@@ -60,27 +63,6 @@ class DocumentNotEncrypted(Exception):
     Raised for failures in document encryption.
     """
     pass
-
-
-class UnknownEncryptionScheme(Exception):
-    """
-    Raised when trying to decrypt from unknown encryption schemes.
-    """
-    pass
-
-
-class UnknownMacMethod(Exception):
-    """
-    Raised when trying to authenticate document's content with unknown MAC
-    mehtod.
-    """
-    pass
-
-
-class WrongMac(Exception):
-    """
-    Raised when failing to authenticate document's contents based on MAC.
-    """
 
 
 #
