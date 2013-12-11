@@ -103,93 +103,163 @@ def get_versions(default={}, verbose=False):
             f.write(subst_template)
 
 
+#
+# Couch backend design docs file generation.
+#
+
 from os import listdir
 from os.path import realpath, dirname, isdir, join, isfile, basename
 import json
-import logging
 import binascii
 
 
 old_cmd_sdist = cmdclass["sdist"]
 
 
+def build_ddocs_py(basedir=None, with_src=True):
+    """
+    Build `ddocs.py` file.
+
+    For ease of development, couch backend design documents are stored as
+    `.js` files in  subdirectories of `src/leap/soledad/common/ddocs`. This
+    function scans that directory for javascript files, builds the design
+    documents structure, and encode those structures in the `ddocs.py` file.
+
+    This function is used when installing in develop mode, building or
+    generating source distributions (see the next classes and the `cmdclass`
+    setuptools parameter.
+
+    This funciton uses the following conventions to generate design documents:
+
+      - Design documents are represented by directories in the form
+        `<prefix>/<ddoc>`, there prefix is the `src/leap/soledad/common/ddocs`
+        directory.
+      - Design document directories might contain `views`, `lists` and
+        `updates` subdirectories.
+      - Views subdirectories must contain a `map.js` file and may contain a
+        `reduce.js` file.
+      - List and updates subdirectories may contain any number of javascript
+        files (i.e. ending in `.js`) whose names will be mapped to the
+        corresponding list or update function name.
+    """
+    cur_pwd = dirname(realpath(__file__))
+    common_path = ('src', 'leap', 'soledad', 'common')
+    dest_common_path = common_path
+    if not with_src:
+        dest_common_path = common_path[1:]
+    prefix = join(cur_pwd, *common_path)
+
+    dest_prefix = prefix
+    if basedir is not None:
+        # we're bulding a sdist
+        dest_prefix = join(basedir, *dest_common_path)
+
+    ddocs_prefix = join(prefix, 'ddocs')
+    ddocs = {}
+
+    # design docs are represented by subdirectories of `ddocs_prefix`
+    for ddoc in [f for f in listdir(ddocs_prefix)
+                 if isdir(join(ddocs_prefix, f))]:
+
+        ddocs[ddoc] = {'_id': '_design/%s' % ddoc}
+
+        for t in ['views', 'lists', 'updates']:
+            tdir = join(ddocs_prefix, ddoc, t)
+            if isdir(tdir):
+
+                ddocs[ddoc][t] = {}
+
+                if t == 'views':  # handle views (with map/reduce functions)
+                    for view in [f for f in listdir(tdir)
+                                 if isdir(join(tdir, f))]:
+                        # look for map.js and reduce.js
+                        mapfile = join(tdir, view, 'map.js')
+                        reducefile = join(tdir, view, 'reduce.js')
+                        mapfun = None
+                        reducefun = None
+                        try:
+                            with open(mapfile) as f:
+                                mapfun = f.read()
+                        except IOError:
+                            pass
+                        try:
+                            with open(reducefile) as f:
+                                reducefun = f.read()
+                        except IOError:
+                            pass
+                        ddocs[ddoc]['views'][view] = {}
+
+                        if mapfun is not None:
+                            ddocs[ddoc]['views'][view]['map'] = mapfun
+                        if reducefun is not None:
+                            ddocs[ddoc]['views'][view]['reduce'] = reducefun
+
+                else:  # handle lists, updates, etc
+                    for fun in [f for f in listdir(tdir)
+                                if isfile(join(tdir, f))]:
+                        funfile = join(tdir, fun)
+                        funname = basename(funfile).replace('.js', '')
+                        try:
+                            with open(funfile) as f:
+                                ddocs[ddoc][t][funname] = f.read()
+                        except IOError:
+                            pass
+    # write file containing design docs strings
+    ddoc_filename = "ddocs.py"
+    with open(join(dest_prefix, ddoc_filename), 'w') as f:
+        for ddoc in ddocs:
+            f.write(
+                "%s = '%s'\n" %
+                (ddoc, binascii.b2a_base64(json.dumps(ddocs[ddoc]))[:-1]))
+    print "Wrote design docs in %s" % (dest_prefix + '/' + ddoc_filename,)
+
+
+from setuptools.command.develop import develop as _cmd_develop
+
+
+class cmd_develop(_cmd_develop):
+    def run(self):
+        # versioneer:
+        versions = versioneer.get_versions(verbose=True)
+        self._versioneer_generated_versions = versions
+        # unless we update this, the command will keep using the old version
+        self.distribution.metadata.version = versions["version"]
+        _cmd_develop.run(self)
+        build_ddocs_py()
+
+
+# versioneer powered
+old_cmd_sdist = cmdclass["sdist"]
+
+
 class cmd_sdist(old_cmd_sdist):
     """
-    Generate 'src/leap/soledad/common/ddocs.py' which contains coush design
+    Generate 'src/leap/soledad/common/ddocs.py' which contains couch design
     documents scripts.
     """
-
     def run(self):
         old_cmd_sdist.run(self)
-        self.build_ddocs_py()
 
-    def build_ddocs_py(self):
-        """
-        Build couch design documents based on content from subdirectories in
-        'src/leap/soledad/common/ddocs'.
-        """
-        prefix = join(
-            dirname(realpath(__file__)),
-            'src', 'leap', 'soledad', 'common')
-        ddocs_prefix = join(prefix, 'ddocs')
-        ddocs = {}
+    def make_release_tree(self, base_dir, files):
+        old_cmd_sdist.make_release_tree(self, base_dir, files)
+        build_ddocs_py(basedir=base_dir)
 
-        # design docs are represented by subdirectories of `ddocs_prefix`
-        for ddoc in [f for f in listdir(ddocs_prefix)
-                if isdir(join(ddocs_prefix, f))]:
 
-            ddocs[ddoc] = {'_id': '_design/%s' % ddoc}
+# versioneer powered
+old_cmd_build = cmdclass["build"]
 
-            for t in ['views', 'lists', 'updates']:
-                tdir = join(ddocs_prefix, ddoc, t)
-                if isdir(tdir):
 
-                    ddocs[ddoc][t] = {}
-
-                    if t == 'views':  # handle views (with map/reduce functions)
-                        for view in [f for f in listdir(tdir) \
-                                if isdir(join(tdir, f))]:
-                            # look for map.js and reduce.js
-                            mapfile = join(tdir, view, 'map.js')
-                            reducefile = join(tdir, view, 'reduce.js')
-                            mapfun = None
-                            reducefun = None
-                            try:
-                                with open(mapfile) as f:
-                                    mapfun = f.read()
-                            except IOError:
-                                pass
-                            try:
-                                with open(reducefile) as f:
-                                    reducefun = f.read()
-                            except IOError:
-                                pass
-                            ddocs[ddoc]['views'][view] = {}
-
-                            if mapfun is not None:
-                                ddocs[ddoc]['views'][view]['map'] = mapfun
-                            if reducefun is not None:
-                                ddocs[ddoc]['views'][view]['reduce'] = reducefun
-
-                    else:  # handle lists, updates, etc
-                        for fun in [f for f in listdir(tdir) \
-                                if isfile(join(tdir, f))]:
-                            funfile = join(tdir, fun)
-                            funname = basename(funfile).replace('.js', '')
-                            try:
-                                with open(funfile) as f:
-                                    ddocs[ddoc][t][funname] = f.read()
-                            except IOError:
-                                pass
-        # write file containing design docs strings
-        with open(join(prefix, 'ddocs.py'), 'w') as f:
-            for ddoc in ddocs:
-                f.write(
-                    "%s = '%s'\n" %
-                    (ddoc, binascii.b2a_base64(json.dumps(ddocs[ddoc]))[:-1]))
+class cmd_build(old_cmd_build):
+    def run(self):
+        old_cmd_build.run(self)
+        build_ddocs_py(basedir=self.build_lib, with_src=False)
 
 
 cmdclass["freeze_debianver"] = freeze_debianver
+cmdclass["build"] = cmd_build
+cmdclass["sdist"] = cmd_sdist
+cmdclass["develop"] = cmd_develop
+
 
 # XXX add ref to docs
 

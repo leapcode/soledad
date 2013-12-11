@@ -1,3 +1,8 @@
+This directory holds a folder structure containing javascript files that
+represent the design documents needed by the CouchDB U1DB backend. These files
+are compiled into the `../ddocs.py` file by setuptools when creating the
+source distribution.
+
 The following table depicts the U1DB CouchDB backend method and the URI that
 is queried to obtain/update data from/to the server.
 

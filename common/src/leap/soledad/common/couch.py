@@ -34,9 +34,8 @@ from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
 
 
-from leap.soledad.common import USER_DB_PREFIX
+from leap.soledad.common import USER_DB_PREFIX, ddocs
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.ddocs import ensure_ddocs_on_db
 
 
 logger = logging.getLogger(__name__)
@@ -187,7 +186,7 @@ class CouchDatabase(CommonBackend):
         return cls(url, dbname)
 
     def __init__(self, url, dbname, replica_uid=None, full_commit=True,
-                 session=None, ensure_ddocs=False):
+                 session=None, ensure_ddocs=True):
         """
         Create a new Couch data container.
 
@@ -220,9 +219,27 @@ class CouchDatabase(CommonBackend):
         except ResourceNotFound:
             self._server.create(self._dbname)
             self._database = self._server[self._dbname]
-        self._set_replica_uid(replica_uid or uuid.uuid4().hex)
+        if replica_uid is not None:
+            self._set_replica_uid(replica_uid)
         if ensure_ddocs:
-            ensure_ddocs_on_db(self._database)
+            self.ensure_ddocs_on_db()
+
+    def ensure_ddocs_on_db(self):
+        """
+        Ensure that the design documents used by the backend exist on the
+        couch database.
+        """
+        # we check for existence of one of the files, and put all of them if
+        # that one does not exist
+        try:
+            self._database['_design/docs']
+            return
+        except ResourceNotFound:
+            for ddoc_name in ['docs', 'syncs', 'transactions']:
+                ddoc = json.loads(
+                    binascii.a2b_base64(
+                        getattr(ddocs, ddoc_name)))
+                self._database.save(ddoc)
 
     def get_sync_target(self):
         """
@@ -261,9 +278,11 @@ class CouchDatabase(CommonBackend):
         :type replica_uid: str
         """
         try:
+            # set on existent config document
             doc = self._database['u1db_config']
             doc['replica_uid'] = replica_uid
         except ResourceNotFound:
+            # or create the config document
             doc = {
                 '_id': 'u1db_config',
                 'replica_uid': replica_uid,
@@ -280,9 +299,16 @@ class CouchDatabase(CommonBackend):
         """
         if self._real_replica_uid is not None:
             return self._real_replica_uid
-        doc = self._database['u1db_config']
-        self._real_replica_uid = doc['replica_uid']
-        return self._real_replica_uid
+        try:
+            # grab replica_uid from server
+            doc = self._database['u1db_config']
+            self._real_replica_uid = doc['replica_uid']
+            return self._real_replica_uid
+        except ResourceNotFound:
+            # create a unique replica_uid
+            self._real_replica_uid = uuid.uuid4().hex
+            self._set_replica_uid(self._real_replica_uid)
+            return self._real_replica_uid
 
     _replica_uid = property(_get_replica_uid, _set_replica_uid)
 
