@@ -39,7 +39,7 @@ Package: soledad-client
 Architecture: all
 Depends: ${misc:Depends}, ${python:Depends}, python-sqlcipher (>= 2.6.3.1), python-pysqlite1.1, 
  python-simplejson, python-oauth, python-u1db, python-scrypt, 
- python-dirspec, python-pycryptopp, soledad-common,
+ python-dirspec, python-pycryptopp (>= 0.6.0.20120313-1), soledad-common,
  python-chardet
 Description: Synchronization of locally encrypted data among devices.
  Soledad is the part of LEAP that allows application data to be securely 
