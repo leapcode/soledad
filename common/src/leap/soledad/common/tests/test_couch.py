@@ -267,16 +267,16 @@ class CouchWithConflictsTests(
         test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
 
 
-# Notice: the CouchDB backend does not have indexing capabilities, but we
-# added in memory indexing for tests only.
+# Notice: the CouchDB backend does not have indexing capabilities, so we do
+# not test indexing now.
 
-class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
-
-    scenarios = COUCH_SCENARIOS
-
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.DatabaseIndexTests.tearDown(self)
+#class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
+#
+#    scenarios = COUCH_SCENARIOS
+#
+#    def tearDown(self):
+#        self.db.delete_database()
+#        test_backends.DatabaseIndexTests.tearDown(self)
 
 
 #-----------------------------------------------------------------------------
