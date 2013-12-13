@@ -973,6 +973,23 @@ class Soledad(object):
         if self._db:
             return self._db.get_from_index(index_name, *key_values)
 
+    def get_count_from_index(self, index_name, *key_values):
+        """
+        Return the count of the documents that match the keys and
+        values supplied.
+
+        :param index_name: The index to query
+        :type index_name: str
+        :param key_values: values to match. eg, if you have
+                           an index with 3 fields then you would have:
+                           get_from_index(index_name, val1, val2, val3)
+        :type key_values: tuple
+        :return: count.
+        :rtype: int
+        """
+        if self._db:
+            return self._db.get_count_from_index(index_name, *key_values)
+
     def get_range_from_index(self, index_name, start_value, end_value):
         """
         Return documents that fall within the specified range.

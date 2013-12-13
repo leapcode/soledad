@@ -49,8 +49,8 @@ import time
 import string
 import threading
 
-
 from u1db.backends import sqlite_backend
+from u1db import errors
 from pysqlcipher import dbapi2
 from u1db import errors as u1db_errors
 from leap.soledad.common.document import SoledadDocument
@@ -696,6 +696,57 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             raise NotAnHexString(key)
         # XXX change passphrase param!
         db_handle.cursor().execute('PRAGMA rekey = "x\'%s"' % passphrase)
+
+    # Extra query methods: extensions to the base sqlite implmentation.
+
+    def get_count_from_index(self, index_name, *key_values):
+        """
+        Returns the count for a given combination of index_name
+        and key values.
+
+        Extension method made from similar methods in u1db version 13.09
+
+        :param index_name: The index to query
+        :type index_name: str
+        :param key_values: values to match. eg, if you have
+                           an index with 3 fields then you would have:
+                           get_from_index(index_name, val1, val2, val3)
+        :type key_values: tuple
+        :return: count.
+        :rtype: int
+        """
+        c = self._db_handle.cursor()
+        definition = self._get_index_definition(index_name)
+
+        if len(key_values) != len(definition):
+            raise errors.InvalidValueForIndex()
+        tables = ["document_fields d%d" % i for i in range(len(definition))]
+        novalue_where = ["d.doc_id = d%d.doc_id"
+                         " AND d%d.field_name = ?"
+                         % (i, i) for i in range(len(definition))]
+        exact_where = [novalue_where[i]
+                       + (" AND d%d.value = ?" % (i,))
+                       for i in range(len(definition))]
+        args = []
+        where = []
+        for idx, (field, value) in enumerate(zip(definition, key_values)):
+            args.append(field)
+            where.append(exact_where[idx])
+            args.append(value)
+
+        tables = ["document_fields d%d" % i for i in range(len(definition))]
+        statement = (
+            "SELECT COUNT(*) FROM document d, %s WHERE %s " % (
+                ', '.join(tables),
+                ' AND '.join(where),
+            ))
+        try:
+            c.execute(statement, tuple(args))
+        except dbapi2.OperationalError, e:
+            raise dbapi2.OperationalError(
+                str(e) + '\nstatement: %s\nargs: %s\n' % (statement, args))
+        res = c.fetchall()
+        return res[0][0]
 
     def __del__(self):
         """
