@@ -223,8 +223,22 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
+    def setUp(self):
+        test_backends.AllDatabaseTests.setUp(self)
+        # save db info because of test_close
+        self._server = self.db._server
+        self._dbname = self.db._dbname
+
     def tearDown(self):
-        self.db.delete_database()
+        # if current test is `test_close` we have to use saved objects to
+        # delete the database because the close() method will have removed the
+        # references needed to do it using the CouchDatabase.
+        if self.id() == \
+                'leap.soledad.common.tests.test_couch.CouchTests.' \
+                'test_close(couch)':
+            del(self._server[self._dbname])
+        else:
+            self.db.delete_database()
         test_backends.AllDatabaseTests.tearDown(self)
 
 
