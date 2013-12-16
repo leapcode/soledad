@@ -29,6 +29,7 @@ import socket
 
 
 from u1db.backends import CommonBackend, CommonSyncTarget
+from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
 from u1db import (
     errors,
@@ -157,6 +158,10 @@ class CouchDocument(SoledadDocument):
         self._couch_rev = rev
 
     couch_rev = property(_get_couch_rev, _set_couch_rev)
+
+
+# monkey-patch the u1db http app to use CouchDocument
+http_app.Document = CouchDocument
 
 
 class CouchDatabase(CommonBackend):
