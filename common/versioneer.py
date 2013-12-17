@@ -115,7 +115,7 @@ import sys
 
 def run_command(args, cwd=None, verbose=False):
     try:
-        # remember shell=False, so use git.cmd on windows, not just git
+        # remember shell=False, so use git.exe on windows, not just git
         p = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=cwd)
     except EnvironmentError:
         e = sys.exc_info()[1]
@@ -230,7 +230,7 @@ def versions_from_vcs(tag_prefix, versionfile_source, verbose=False):
 
     GIT = "git"
     if sys.platform == "win32":
-        GIT = "git.cmd"
+        GIT = "git.exe"
     stdout = run_command([GIT, "describe", "--tags", "--dirty", "--always"],
                          cwd=root)
     if stdout is None:
@@ -305,7 +305,7 @@ import sys
 
 def run_command(args, cwd=None, verbose=False):
     try:
-        # remember shell=False, so use git.cmd on windows, not just git
+        # remember shell=False, so use git.exe on windows, not just git
         p = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=cwd)
     except EnvironmentError:
         e = sys.exc_info()[1]
@@ -430,7 +430,7 @@ def versions_from_vcs(tag_prefix, versionfile_source, verbose=False):
 
     GIT = "git"
     if sys.platform == "win32":
-        GIT = "git.cmd"
+        GIT = "git.exe"
     stdout = run_command([GIT, "describe", "--tags", "--dirty", "--always"],
                          cwd=root)
     if stdout is None:
@@ -486,7 +486,7 @@ import sys
 def do_vcs_install(versionfile_source, ipy):
     GIT = "git"
     if sys.platform == "win32":
-        GIT = "git.cmd"
+        GIT = "git.exe"
     run_command([GIT, "add", "versioneer.py"])
     run_command([GIT, "add", versionfile_source])
     run_command([GIT, "add", ipy])
