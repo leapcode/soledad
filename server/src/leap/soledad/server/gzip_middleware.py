@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# gzip.py
+# gzip_middleware.py
 # Copyright (C) 2013 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 """
 Gzip middleware for WSGI apps.
 """
-import gzip
 import StringIO
+from gzip import GzipFile
 
 
 class GzipMiddleware(object):
@@ -30,13 +30,12 @@ class GzipMiddleware(object):
         self.compresslevel = compresslevel
 
     def __call__(self, environ, start_response):
+        print "environ: ", environ
         if 'gzip' not in environ.get('HTTP_ACCEPT_ENCODING', ''):
             return self.app(environ, start_response)
-        if (environ['PATH_INFO'][-3:] != '.js' and environ[
-                'PATH_INFO'][-4:] != '.css'):
-            return self.app(environ, start_response)
+
         buffer = StringIO.StringIO()
-        output = gzip.GzipFile(
+        output = GzipFile(
             mode='wb',
             compresslevel=self.compresslevel,
             fileobj=buffer
