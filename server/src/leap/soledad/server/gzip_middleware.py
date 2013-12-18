@@ -30,7 +30,6 @@ class GzipMiddleware(object):
         self.compresslevel = compresslevel
 
     def __call__(self, environ, start_response):
-        print "environ: ", environ
         if 'gzip' not in environ.get('HTTP_ACCEPT_ENCODING', ''):
             return self.app(environ, start_response)
 
