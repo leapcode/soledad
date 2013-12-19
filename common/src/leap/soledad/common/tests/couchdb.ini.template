@@ -74,6 +74,8 @@ use_users_db = false
 
 [query_servers]
 ; javascript = %(tempdir)s/server/main.js
+javascript = /usr/bin/couchjs /usr/share/couchdb/server/main.js
+coffeescript = /usr/bin/couchjs /usr/share/couchdb/server/main-coffee.js
 
 
 ; Changing reduce_limit to false will disable reduce_limit.
