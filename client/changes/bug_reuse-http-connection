@@ -1,0 +1,2 @@
+  o Fix a bug in soledad.client.sqlcipher by which we were creating
+    a new connection for each sync.

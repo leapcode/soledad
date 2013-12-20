@@ -1283,7 +1283,7 @@ class Soledad(object):
 #-----------------------------------------------------------------------------
 
 # We need a more reasonable timeout (in seconds)
-SOLEDAD_TIMEOUT = 10
+SOLEDAD_TIMEOUT = 120
 
 
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):

@@ -63,6 +63,7 @@ logger = logging.getLogger(__name__)
 # Exceptions
 #
 
+
 class DocumentNotEncrypted(Exception):
     """
     Raised for failures in document encryption.
