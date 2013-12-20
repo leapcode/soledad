@@ -43,11 +43,12 @@ So, as the statements above were introduced for backwards compatibility with
 SLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
+import httplib
 import logging
 import os
-import time
 import string
 import threading
+import time
 
 from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
@@ -341,7 +342,20 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         if not self.syncer:
             self._create_syncer(url, creds=creds)
-        return self.syncer.sync(autocreate=autocreate)
+
+        try:
+            res = self.syncer.sync(autocreate=autocreate)
+        except httplib.CannotSendRequest:
+            # raised when you reuse httplib.HTTP object for new request
+            # while you havn't called its getresponse()
+            # this catch works for the current connclass used
+            # by our HTTPClientBase, since it uses httplib.
+            # we will have to replace it if it changes.
+            logger.info("Replacing connection and trying again...")
+            self._syncer = None
+            self._create_syncer(url, creds=creds)
+            res = self.syncer.sync(autocreate=autocreate)
+        return res
 
     @property
     def syncer(self):
