@@ -49,10 +49,12 @@ import time
 import string
 import threading
 
-from u1db.backends import sqlite_backend
-from u1db import errors
 from pysqlcipher import dbapi2
+from u1db.backends import sqlite_backend
+from u1db.sync import Synchronizer
 from u1db import errors as u1db_errors
+
+from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.common.document import SoledadDocument
 
 logger = logging.getLogger(__name__)
@@ -144,6 +146,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     _index_storage_value = 'expand referenced encrypted'
     k_lock = threading.Lock()
+    _syncer = None
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
@@ -336,13 +339,33 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :return: The local generation before the synchronisation was performed.
         :rtype: int
         """
-        from u1db.sync import Synchronizer
-        from leap.soledad.client.target import SoledadSyncTarget
-        return Synchronizer(
-            self,
-            SoledadSyncTarget(url,
-                              creds=creds,
-                              crypto=self._crypto)).sync(autocreate=autocreate)
+        if not self.syncer:
+            self._create_syncer(url, creds=creds)
+        return self.syncer.sync(autocreate=autocreate)
+
+    @property
+    def syncer(self):
+        """
+        Accesor for synchronizer.
+        """
+        return self._syncer
+
+    def _create_syncer(self, url, creds=None):
+        """
+        Creates a synchronizer
+
+        :param url: The url of the target replica to sync with.
+        :type url: str
+        :param creds: optional dictionary giving credentials.
+            to authorize the operation with the server.
+        :type creds: dict
+        """
+        if self._syncer is None:
+            self._syncer = Synchronizer(
+                self,
+                SoledadSyncTarget(url,
+                                  creds=creds,
+                                  crypto=self._crypto))
 
     def _extra_schema_init(self, c):
         """
@@ -719,7 +742,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         definition = self._get_index_definition(index_name)
 
         if len(key_values) != len(definition):
-            raise errors.InvalidValueForIndex()
+            raise u1db_errors.InvalidValueForIndex()
         tables = ["document_fields d%d" % i for i in range(len(definition))]
         novalue_where = ["d.doc_id = d%d.doc_id"
                          " AND d%d.field_name = ?"
