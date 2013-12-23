@@ -14,22 +14,26 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 A U1DB backend for encrypting data before sending to server and decrypting
 after receiving.
 """
-
-import simplejson as json
+import binascii
+import cStringIO
+import gzip
 import hashlib
 import hmac
-import binascii
+import logging
+import urllib
 
+import simplejson as json
+from time import sleep
 
-from u1db.remote import utils
+from u1db.remote import utils, http_errors
 from u1db.errors import BrokenSyncStream
+from u1db import errors
 from u1db.remote.http_target import HTTPSyncTarget
+from u1db.remote.http_client import _encode_query_parameter
 
 
 from leap.soledad.common import soledad_assert
@@ -53,10 +57,12 @@ from leap.soledad.client.crypto import (
     UnknownEncryptionMethod,
 )
 
+logger = logging.getLogger(__name__)
 
 #
 # Exceptions
 #
+
 
 class DocumentNotEncrypted(Exception):
     """
@@ -222,6 +228,24 @@ def decrypt_doc(crypto, doc):
     return plainjson
 
 
+def _gunzip(data):
+    """
+    Uncompress data that is gzipped.
+
+    :param data: gzipped data
+    :type data: basestring
+    """
+    buffer = cStringIO.StringIO()
+    buffer.write(data)
+    buffer.seek(0)
+    try:
+        data = gzip.GzipFile(mode='r', fileobj=buffer).read()
+    except Exception:
+        logger.warning("Error while decrypting gzipped data")
+    buffer.close()
+    return data
+
+
 #
 # SoledadSyncTarget
 #
@@ -353,6 +377,82 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             raise BrokenSyncStream
         return res
 
+    def _request(self, method, url_parts, params=None, body=None,
+                 content_type=None):
+        """
+        Overloaded method. See u1db docs.
+        Patched for adding gzip encoding.
+        """
+
+        self._ensure_connection()
+        unquoted_url = url_query = self._url.path
+        if url_parts:
+            if not url_query.endswith('/'):
+                url_query += '/'
+                unquoted_url = url_query
+            url_query += '/'.join(urllib.quote(part, safe='')
+                                  for part in url_parts)
+            # oauth performs its own quoting
+            unquoted_url += '/'.join(url_parts)
+        encoded_params = {}
+        if params:
+            for key, value in params.items():
+                key = unicode(key).encode('utf-8')
+                encoded_params[key] = _encode_query_parameter(value)
+            url_query += ('?' + urllib.urlencode(encoded_params))
+        if body is not None and not isinstance(body, basestring):
+            body = json.dumps(body)
+            content_type = 'application/json'
+        headers = {}
+        if content_type:
+            headers['content-type'] = content_type
+
+        # Patched: We would like to receive gzip pretty please
+        # ----------------------------------------------------
+        headers['accept-encoding'] = "gzip"
+        # ----------------------------------------------------
+
+        headers.update(
+            self._sign_request(method, unquoted_url, encoded_params))
+
+        for delay in self._delays:
+            try:
+                self._conn.request(method, url_query, body, headers)
+                return self._response()
+            except errors.Unavailable, e:
+                sleep(delay)
+        raise e
+
+    def _response(self):
+        """
+        Overloaded method, see u1db docs.
+        We patched it for decrypting gzip content.
+        """
+        resp = self._conn.getresponse()
+        body = resp.read()
+        headers = dict(resp.getheaders())
+
+        # Patched: We would like to decode gzip
+        # ----------------------------------------------------
+        encoding = headers.get('content-encoding', '')
+        if "gzip" in encoding:
+            body = _gunzip(body)
+        # ----------------------------------------------------
+
+        if resp.status in (200, 201):
+            return body, headers
+        elif resp.status in http_errors.ERROR_STATUSES:
+            try:
+                respdic = json.loads(body)
+            except ValueError:
+                pass
+            else:
+                self._error(respdic)
+        # special case
+        if resp.status == 503:
+            raise errors.Unavailable(body, headers)
+        raise errors.HTTPError(resp.status, body, headers)
+
     def sync_exchange(self, docs_by_generations, source_replica_uid,
                       last_known_generation, last_known_trans_id,
                       return_doc_cb, ensure_callback=None):
@@ -364,8 +464,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         syncing.
 
         :param docs_by_generations: A list of (doc_id, generation, trans_id)
-            of local documents that were changed since the last local
-            generation the remote replica knows about.
+                                    of local documents that were changed since
+                                    the last local generation the remote
+                                    replica knows about.
         :type docs_by_generations: list of tuples
         :param source_replica_uid: The uid of the source replica.
         :type source_replica_uid: str
@@ -391,6 +492,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         self._conn.putheader('content-type', 'application/x-u1db-sync-stream')
         for header_name, header_value in self._sign_request('POST', url, {}):
             self._conn.putheader(header_name, header_value)
+        self._conn.putheader('accept-encoding', 'gzip')
         entries = ['[']
         size = 1
 
@@ -428,7 +530,8 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         for entry in entries:
             self._conn.send(entry)
         entries = None
-        data, _ = self._response()
+        data, headers = self._response()
+
         res = self._parse_sync_stream(data, return_doc_cb, ensure_callback)
         data = None
         return res['new_generation'], res['new_transaction_id']

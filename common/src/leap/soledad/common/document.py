@@ -29,6 +29,7 @@ from u1db import Document
 #
 
 class SoledadDocument(Document):
+
     """
     Encryptable and syncable document.
 
@@ -107,5 +108,3 @@ class SoledadDocument(Document):
         _get_rev,
         _set_rev,
         doc="Wrapper to ensure `doc.rev` is always returned as bytes.")
-
-

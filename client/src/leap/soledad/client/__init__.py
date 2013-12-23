@@ -315,6 +315,47 @@ class Soledad(object):
     # initialization/destruction methods
     #
 
+    def _get_or_gen_crypto_secrets(self):
+        """
+        Retrieves or generates the crypto secrets.
+
+        Might raise BootstrapSequenceError
+        """
+        doc = self._get_secrets_from_shared_db()
+
+        if doc:
+            logger.info(
+                'Found cryptographic secrets in shared recovery '
+                'database.')
+            _, mac = self.import_recovery_document(doc.content)
+            if mac is False:
+                self.put_secrets_in_shared_db()
+            self._store_secrets()  # save new secrets in local file
+            if self._secret_id is None:
+                self._set_secret_id(self._secrets.items()[0][0])
+        else:
+            # STAGE 3 - there are no secrets in server also, so
+            # generate a secret and store it in remote db.
+            logger.info(
+                'No cryptographic secrets found, creating new '
+                ' secrets...')
+            self._set_secret_id(self._gen_secret())
+            try:
+                self._put_secrets_in_shared_db()
+            except Exception as ex:
+                # storing generated secret in shared db failed for
+                # some reason, so we erase the generated secret and
+                # raise.
+                try:
+                    os.unlink(self._secrets_path)
+                except OSError as e:
+                    if e.errno != errno.ENOENT:  # no such file or directory
+                        logger.exception(e)
+                logger.exception(ex)
+                raise BootstrapSequenceError(
+                    'Could not store generated secret in the shared '
+                    'database, bailing out...')
+
     def _bootstrap(self):
         """
         Bootstrap local Soledad instance.
@@ -342,6 +383,8 @@ class Soledad(object):
         self._init_dirs()
         self._crypto = SoledadCrypto(self)
 
+        secrets_problem = None
+
         # STAGE 1 - verify if secrets exist locally
         if not self._has_secret():  # try to load from local storage.
 
@@ -360,38 +403,10 @@ class Soledad(object):
             except AlreadyLockedError:
                 raise BootstrapSequenceError('Database is already locked.')
 
-            doc = self._get_secrets_from_shared_db()
-            if doc:
-                logger.info(
-                    'Found cryptographic secrets in shared recovery '
-                    'database.')
-                _, mac = self.import_recovery_document(doc.content)
-                if mac is False:
-                    self.put_secrets_in_shared_db()
-                self._store_secrets()  # save new secrets in local file
-                if self._secret_id is None:
-                    self._set_secret_id(self._secrets.items()[0][0])
-            else:
-                # STAGE 3 - there are no secrets in server also, so
-                # generate a secret and store it in remote db.
-                logger.info(
-                    'No cryptographic secrets found, creating new '
-                    ' secrets...')
-                self._set_secret_id(self._gen_secret())
-                try:
-                    self._put_secrets_in_shared_db()
-                except Exception:
-                    # storing generated secret in shared db failed for
-                    # some reason, so we erase the generated secret and
-                    # raise.
-                    try:
-                        os.unlink(self._secrets_path)
-                    except OSError as e:
-                        if errno == 2:  # no such file or directory
-                            pass
-                    raise BootstrapSequenceError(
-                        'Could not store generated secret in the shared '
-                        'database, bailing out...')
+            try:
+                self._get_or_gen_crypto_secrets()
+            except Exception as e:
+                secrets_problem = e
 
             # release the lock on shared db
             try:
@@ -416,7 +431,10 @@ class Soledad(object):
             # --- end of atomic operation in shared db ---
 
         # STAGE 4 - local database initialization
-        self._init_db()
+        if secrets_problem is None:
+            self._init_db()
+        else:
+            raise secrets_problem
 
     def _init_dirs(self):
         """
@@ -955,6 +973,23 @@ class Soledad(object):
         if self._db:
             return self._db.get_from_index(index_name, *key_values)
 
+    def get_count_from_index(self, index_name, *key_values):
+        """
+        Return the count of the documents that match the keys and
+        values supplied.
+
+        :param index_name: The index to query
+        :type index_name: str
+        :param key_values: values to match. eg, if you have
+                           an index with 3 fields then you would have:
+                           get_from_index(index_name, val1, val2, val3)
+        :type key_values: tuple
+        :return: count.
+        :rtype: int
+        """
+        if self._db:
+            return self._db.get_count_from_index(index_name, *key_values)
+
     def get_range_from_index(self, index_name, start_value, end_value):
         """
         Return documents that fall within the specified range.
@@ -1248,7 +1283,7 @@ class Soledad(object):
 #-----------------------------------------------------------------------------
 
 # We need a more reasonable timeout (in seconds)
-SOLEDAD_TIMEOUT = 10
+SOLEDAD_TIMEOUT = 120
 
 
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):

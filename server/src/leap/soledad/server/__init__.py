@@ -110,6 +110,8 @@ if version.base() == "12.0.0":
     sys.modules['OpenSSL.tsafe'] = old_tsafe
 
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
+from leap.soledad.server.gzip_middleware import GzipMiddleware
+
 from leap.soledad.common import (
     SHARED_DB_NAME,
     SHARED_DB_LOCK_DOC_ID_PREFIX,
@@ -182,7 +184,6 @@ class LockResource(object):
 
     FILESYSTEM_LOCK_TRIES = 5
     FILESYSTEM_LOCK_SLEEP_SECONDS = 1
-
 
     def __init__(self, uuid, state, responder):
         """
@@ -379,8 +380,9 @@ def application(environ, start_response):
         SoledadApp.SHARED_DB_NAME,
         SoledadTokenAuthMiddleware.TOKENS_DB)
     # WSGI application that may be used by `twistd -web`
-    application = SoledadTokenAuthMiddleware(SoledadApp(state))
-    resource = WSGIResource(reactor, reactor.getThreadPool(), application)
+    application = GzipMiddleware(
+        SoledadTokenAuthMiddleware(SoledadApp(state)))
+
     return application(environ, start_response)
 
 

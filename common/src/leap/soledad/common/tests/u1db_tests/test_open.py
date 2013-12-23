@@ -24,7 +24,8 @@ from u1db import (
 )
 from leap.soledad.common.tests import u1db_tests as tests
 from u1db.backends import sqlite_backend
-from leap.soledad.common.tests.u1db_tests.test_backends import TestAlternativeDocument
+from leap.soledad.common.tests.u1db_tests.test_backends \
+    import TestAlternativeDocument
 
 
 class TestU1DBOpen(tests.TestCase):

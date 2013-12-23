@@ -133,12 +133,11 @@ class TestHTTPDatabaseSimpleOperations(tests.TestCase):
              None), self.got)
 
     def test_get_doc_deleted_include_deleted(self):
-        self.response_val = errors.HTTPError(404,
-                                             json.dumps(
-                                             {"error": errors.DOCUMENT_DELETED}
-                                             ),
-                                             {'x-u1db-rev': 'doc-rev-gone',
-                                              'x-u1db-has-conflicts': 'false'})
+        self.response_val = errors.HTTPError(
+            404,
+            json.dumps({"error": errors.DOCUMENT_DELETED}),
+            {'x-u1db-rev': 'doc-rev-gone',
+             'x-u1db-has-conflicts': 'false'})
         doc = self.db.get_doc('deleted', include_deleted=True)
         self.assertEqual('deleted', doc.doc_id)
         self.assertEqual('doc-rev-gone', doc.rev)

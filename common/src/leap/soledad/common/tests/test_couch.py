@@ -25,9 +25,11 @@ import copy
 import shutil
 from base64 import b64decode
 
+from couchdb.client import Server
+from u1db import errors
+
 from leap.common.files import mkdir_p
 
-from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_sync
@@ -148,7 +150,7 @@ class TestCouchBackendImpl(CouchDBTestCase):
 
     def test__allocate_doc_id(self):
         db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
+                                 'u1db_tests', ensure_ddocs=True)
         doc_id1 = db._allocate_doc_id()
         self.assertTrue(doc_id1.startswith('D-'))
         self.assertEqual(34, len(doc_id1))
@@ -163,32 +165,51 @@ class TestCouchBackendImpl(CouchDBTestCase):
 def make_couch_database_for_test(test, replica_uid):
     port = str(test.wrapper.port)
     return couch.CouchDatabase('http://localhost:' + port, replica_uid,
-                               replica_uid=replica_uid or 'test')
+                               replica_uid=replica_uid or 'test',
+                               ensure_ddocs=True)
 
 
 def copy_couch_database_for_test(test, db):
     port = str(test.wrapper.port)
-    new_db = couch.CouchDatabase('http://localhost:' + port,
-                                 db._replica_uid + '_copy',
+    couch_url = 'http://localhost:' + port
+    new_dbname = db._replica_uid + '_copy'
+    new_db = couch.CouchDatabase(couch_url,
+                                 new_dbname,
                                  replica_uid=db._replica_uid or 'test')
-    gen, docs = db.get_all_docs(include_deleted=True)
-    for doc in docs:
-        new_db._put_doc(doc)
-    new_db._transaction_log = copy.deepcopy(db._transaction_log)
-    new_db._conflicts = copy.deepcopy(db._conflicts)
-    new_db._other_generations = copy.deepcopy(db._other_generations)
-    new_db._indexes = copy.deepcopy(db._indexes)
-    # save u1db data on couch
-    for key in new_db.U1DB_DATA_KEYS:
-        doc_id = '%s%s' % (new_db.U1DB_DATA_DOC_ID_PREFIX, key)
-        doc = new_db._get_doc(doc_id)
-        doc.content = {'content': getattr(new_db, key)}
-        new_db._put_doc(doc)
+    # copy all docs
+    old_couch_db = Server(couch_url)[db._replica_uid]
+    new_couch_db = Server(couch_url)[new_dbname]
+    for doc_id in old_couch_db:
+        doc = old_couch_db.get(doc_id)
+        # copy design docs
+        if ('u1db_rev' not in doc):
+            new_couch_db.save(doc)
+        # copy u1db docs
+        else:
+            new_doc = {
+                '_id': doc['_id'],
+                'u1db_transactions': doc['u1db_transactions'],
+                'u1db_rev': doc['u1db_rev']
+            }
+            attachments = []
+            if ('u1db_conflicts' in doc):
+                new_doc['u1db_conflicts'] = doc['u1db_conflicts']
+                for c_rev in doc['u1db_conflicts']:
+                    attachments.append('u1db_conflict_%s' % c_rev)
+            new_couch_db.save(new_doc)
+            # save conflict data
+            attachments.append('u1db_content')
+            for att_name in attachments:
+                att = old_couch_db.get_attachment(doc_id, att_name)
+                if (att is not None):
+                    new_couch_db.put_attachment(new_doc, att,
+                                                filename=att_name)
     return new_db
 
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
-    return SoledadDocument(doc_id, rev, content, has_conflicts=has_conflicts)
+    return couch.CouchDocument(
+        doc_id, rev, content, has_conflicts=has_conflicts)
 
 
 COUCH_SCENARIOS = [
@@ -202,8 +223,22 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
+    def setUp(self):
+        test_backends.AllDatabaseTests.setUp(self)
+        # save db info because of test_close
+        self._server = self.db._server
+        self._dbname = self.db._dbname
+
     def tearDown(self):
-        self.db.delete_database()
+        # if current test is `test_close` we have to use saved objects to
+        # delete the database because the close() method will have removed the
+        # references needed to do it using the CouchDatabase.
+        if self.id() == \
+                'leap.soledad.common.tests.test_couch.CouchTests.' \
+                'test_close(couch)':
+            del(self._server[self._dbname])
+        else:
+            self.db.delete_database()
         test_backends.AllDatabaseTests.tearDown(self)
 
 
@@ -246,17 +281,16 @@ class CouchWithConflictsTests(
         test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
 
 
-# Notice: the CouchDB backend is currently used for storing encrypted data in
-# the server, so indexing makes no sense. Thus, we ignore index testing for
-# now.
+# Notice: the CouchDB backend does not have indexing capabilities, so we do
+# not test indexing now.
 
-class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
-
-    scenarios = COUCH_SCENARIOS
-
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.DatabaseIndexTests.tearDown(self)
+#class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
+#
+#    scenarios = COUCH_SCENARIOS
+#
+#    def tearDown(self):
+#        self.db.delete_database()
+#        test_backends.DatabaseIndexTests.tearDown(self)
 
 
 #-----------------------------------------------------------------------------
@@ -311,6 +345,89 @@ class CouchDatabaseSyncTargetTests(test_sync.DatabaseSyncTargetTests,
                  [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
 
 
+# The following tests need that the database have an index, so we fake one.
+old_class = couch.CouchDatabase
+
+from u1db.backends.inmemory import InMemoryIndex
+
+
+class IndexedCouchDatabase(couch.CouchDatabase):
+
+    def __init__(self, url, dbname, replica_uid=None, full_commit=True,
+                     session=None, ensure_ddocs=True):
+        old_class.__init__(self, url, dbname, replica_uid, full_commit,
+                           session, ensure_ddocs=True)
+        self._indexes = {}
+
+    def _put_doc(self, old_doc, doc):
+        for index in self._indexes.itervalues():
+            if old_doc is not None and not old_doc.is_tombstone():
+                index.remove_json(old_doc.doc_id, old_doc.get_json())
+            if not doc.is_tombstone():
+                index.add_json(doc.doc_id, doc.get_json())
+        old_class._put_doc(self, old_doc, doc)
+
+    def create_index(self, index_name, *index_expressions):
+        if index_name in self._indexes:
+            if self._indexes[index_name]._definition == list(
+                    index_expressions):
+                return
+            raise errors.IndexNameTakenError
+        index = InMemoryIndex(index_name, list(index_expressions))
+        _, all_docs = self.get_all_docs()
+        for doc in all_docs:
+            index.add_json(doc.doc_id, doc.get_json())
+        self._indexes[index_name] = index
+
+    def delete_index(self, index_name):
+        del self._indexes[index_name]
+
+    def list_indexes(self):
+        definitions = []
+        for idx in self._indexes.itervalues():
+            definitions.append((idx._name, idx._definition))
+        return definitions
+
+    def get_from_index(self, index_name, *key_values):
+        try:
+            index = self._indexes[index_name]
+        except KeyError:
+            raise errors.IndexDoesNotExist
+        doc_ids = index.lookup(key_values)
+        result = []
+        for doc_id in doc_ids:
+            result.append(self._get_doc(doc_id, check_for_conflicts=True))
+        return result
+
+    def get_range_from_index(self, index_name, start_value=None,
+                             end_value=None):
+        """Return all documents with key values in the specified range."""
+        try:
+            index = self._indexes[index_name]
+        except KeyError:
+            raise errors.IndexDoesNotExist
+        if isinstance(start_value, basestring):
+            start_value = (start_value,)
+        if isinstance(end_value, basestring):
+            end_value = (end_value,)
+        doc_ids = index.lookup_range(start_value, end_value)
+        result = []
+        for doc_id in doc_ids:
+            result.append(self._get_doc(doc_id, check_for_conflicts=True))
+        return result
+
+    def get_index_keys(self, index_name):
+        try:
+            index = self._indexes[index_name]
+        except KeyError:
+            raise errors.IndexDoesNotExist
+        keys = index.keys()
+        # XXX inefficiency warning
+        return list(set([tuple(key.split('\x01')) for key in keys]))
+
+
+couch.CouchDatabase = IndexedCouchDatabase
+
 sync_scenarios = []
 for name, scenario in COUCH_SCENARIOS:
     scenario = dict(scenario)
@@ -342,100 +459,6 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         db = self.create_database('test3', 'target')
         db.delete_database()
         test_sync.DatabaseSyncTests.tearDown(self)
-
-
-#-----------------------------------------------------------------------------
-# The following tests test extra functionality introduced by our backends
-#-----------------------------------------------------------------------------
-
-class CouchDatabaseStorageTests(CouchDBTestCase):
-
-    def _listify(self, l):
-        if type(l) is dict:
-            return {
-                self._listify(a): self._listify(b) for a, b in l.iteritems()}
-        if hasattr(l, '__iter__'):
-            return [self._listify(i) for i in l]
-        return l
-
-    def _fetch_u1db_data(self, db, key):
-        doc = db._get_doc("%s%s" % (db.U1DB_DATA_DOC_ID_PREFIX, key))
-        return doc.content['content']
-
-    def test_transaction_log_storage_after_put(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
-        db.create_doc({'simple': 'doc'})
-        content = self._fetch_u1db_data(db, db.U1DB_TRANSACTION_LOG_KEY)
-        self.assertEqual(
-            self._listify(db._transaction_log),
-            self._listify(content))
-
-    def test_conflict_log_storage_after_put_if_newer(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
-        doc = db.create_doc({'simple': 'doc'})
-        doc.set_json(nested_doc)
-        doc.rev = db._replica_uid + ':2'
-        db._force_doc_sync_conflict(doc)
-        content = self._fetch_u1db_data(db, db.U1DB_CONFLICTS_KEY)
-        self.assertEqual(
-            self._listify(db._conflicts),
-            self._listify(content))
-
-    def test_other_gens_storage_after_set(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
-        doc = db.create_doc({'simple': 'doc'})
-        db._set_replica_gen_and_trans_id('a', 'b', 'c')
-        content = self._fetch_u1db_data(db, db.U1DB_OTHER_GENERATIONS_KEY)
-        self.assertEqual(
-            self._listify(db._other_generations),
-            self._listify(content))
-
-    def test_index_storage_after_create(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
-        doc = db.create_doc({'name': 'john'})
-        db.create_index('myindex', 'name')
-        content = self._fetch_u1db_data(db, db.U1DB_INDEXES_KEY)
-        myind = db._indexes['myindex']
-        index = {
-            'myindex': {
-                'definition': myind._definition,
-                'name': myind._name,
-                'values': myind._values,
-            }
-        }
-        self.assertEqual(
-            self._listify(index),
-            self._listify(content))
-
-    def test_index_storage_after_delete(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
-        doc = db.create_doc({'name': 'john'})
-        db.create_index('myindex', 'name')
-        db.create_index('myindex2', 'name')
-        db.delete_index('myindex')
-        content = self._fetch_u1db_data(db, db.U1DB_INDEXES_KEY)
-        myind = db._indexes['myindex2']
-        index = {
-            'myindex2': {
-                'definition': myind._definition,
-                'name': myind._name,
-                'values': myind._values,
-            }
-        }
-        self.assertEqual(
-            self._listify(index),
-            self._listify(content))
-
-    def test_replica_uid_storage_after_db_creation(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests')
-        content = self._fetch_u1db_data(db, db.U1DB_REPLICA_UID_KEY)
-        self.assertEqual(db._replica_uid, content)
 
 
 load_tests = tests.load_with_scenarios

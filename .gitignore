@@ -25,4 +25,3 @@ debian/soledad-server.postrm.debhelper
 debian/soledad-server.prerm.debhelper
 debian/soledad-server.substvars
 debian/soledad-server/
-
