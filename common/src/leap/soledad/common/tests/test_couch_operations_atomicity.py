@@ -337,3 +337,46 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             self.assertEqual(
                 1,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
+
+    def test_concurrent_syncs_do_not_fail(self):
+        """
+        Assert that concurrent attempts to sync end up being executed
+        sequentially and do not fail.
+        """
+        threads = []
+        docs = []
+        pool = threading.BoundedSemaphore(value=1)
+        self.startServer()
+        sol = self._soledad_instance(
+            auth_token='auth-token',
+            server_url=self.getURL())
+
+        def _run_method(self):
+            # create a lot of documents
+            doc = self._params['sol'].create_doc({})
+            # do the sync!
+            sol.sync()
+            pool.acquire()
+            docs.append(doc.doc_id)
+            pool.release()
+
+        # launch threads to create documents in parallel
+        for i in range(0, REPEAT_TIMES):
+            thread = self._WorkerThread(
+                {'sol': sol, 'syncs': i},
+                _run_method)
+            thread.start()
+            threads.append(thread)
+
+        # wait for threads to finish
+        for thread in threads:
+            thread.join()
+
+        transaction_log = self.db._get_transaction_log()
+        self.assertEqual(REPEAT_TIMES, len(transaction_log))
+        # assert all documents are in the remote log
+        self.assertEqual(REPEAT_TIMES, len(docs))
+        for doc_id in docs:
+            self.assertEqual(
+                1,
+                len(filter(lambda t: t[0] == doc_id, transaction_log)))

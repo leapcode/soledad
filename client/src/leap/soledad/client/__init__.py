@@ -34,6 +34,8 @@ import urlparse
 import hmac
 
 from hashlib import sha256
+from threading import Lock
+from collections import defaultdict
 
 try:
     import cchardet as chardet
@@ -243,6 +245,12 @@ class Soledad(object):
     DEFAULT_PREFIX = os.path.join(get_path_prefix(), 'leap', 'soledad')
     """
     Prefix for default values for path.
+    """
+
+    syncing_lock = defaultdict(Lock)
+    """
+    A dictionary that hold locks which avoid multiple sync attempts from the
+    same database replica.
     """
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
@@ -1063,6 +1071,9 @@ class Soledad(object):
         """
         Synchronize the local encrypted replica with a remote replica.
 
+        This method blocks until a syncing lock is acquired, so there are no
+        attempts of concurrent syncs from the same client replica.
+
         :param url: the url of the target replica to sync with
         :type url: str
 
@@ -1071,11 +1082,13 @@ class Soledad(object):
         :rtype: str
         """
         if self._db:
-            local_gen = self._db.sync(
-                urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                creds=self._creds, autocreate=True)
-            signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
-            return local_gen
+            # acquire lock before attempt to sync
+            with Soledad.syncing_lock[self._db._get_replica_uid()]:
+                local_gen = self._db.sync(
+                    urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
+                    creds=self._creds, autocreate=True)
+                signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
+                return local_gen
 
     def need_sync(self, url):
         """
