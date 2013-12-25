@@ -114,6 +114,10 @@ from leap.soledad.common.couch import CouchServerState
 # Soledad WSGI application
 #-----------------------------------------------------------------------------
 
+MAX_REQUEST_SIZE = 200  # in Mb
+MAX_ENTRY_SIZE = 200  # in Mb
+
+
 class SoledadApp(http_app.HTTPApp):
     """
     Soledad WSGI application
@@ -123,6 +127,9 @@ class SoledadApp(http_app.HTTPApp):
     """
     The name of the shared database that holds user's encrypted secrets.
     """
+
+    max_request_size = MAX_REQUEST_SIZE * 1024 * 1024
+    max_entry_size = MAX_ENTRY_SIZE * 1024 * 1024
 
     def __call__(self, environ, start_response):
         """
@@ -143,6 +150,8 @@ class SoledadApp(http_app.HTTPApp):
 
 
 http_app.url_to_resource.register(LockResource)
+http_app.SyncResource.max_request_size = MAX_REQUEST_SIZE * 1024 * 1024
+http_app.SyncResource.max_entry_size = MAX_ENTRY_SIZE * 1024 * 1024
 
 
 #-----------------------------------------------------------------------------

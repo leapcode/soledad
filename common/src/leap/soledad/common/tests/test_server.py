@@ -25,6 +25,7 @@ import tempfile
 import simplejson as json
 import mock
 import time
+import binascii
 
 
 from leap.common.testing.basetest import BaseLeapTest
@@ -421,6 +422,42 @@ class EncryptedSyncTestCase(
             auth_token='auth-token',
             passphrase=u'ãáàäéàëíìïóòöõúùüñç',
         )
+        _, doclist = sol2.get_all_docs()
+        self.assertEqual([], doclist)
+        sol2._secrets_path = sol1.secrets_path
+        sol2._load_secrets()
+        sol2._set_secret_id(sol1._secret_id)
+        # sync the new instance
+        sol2._server_url = self.getURL()
+        sol2.sync()
+        _, doclist = sol2.get_all_docs()
+        self.assertEqual(1, len(doclist))
+        doc2 = doclist[0]
+        # assert incoming doc is equal to the first sent doc
+        self.assertEqual(doc1, doc2)
+
+
+    def test_sync_very_large_files(self):
+        """
+        Test if Soledad can sync very large files.
+        """
+        # define the size of the "very large file"
+        length = 100*(10**6)  # 100 MB
+        self.startServer()
+        # instantiate soledad and create a document
+        sol1 = self._soledad_instance(
+            # token is verified in test_target.make_token_soledad_app
+            auth_token='auth-token'
+        )
+        _, doclist = sol1.get_all_docs()
+        self.assertEqual([], doclist)
+        content = binascii.hexlify(os.urandom(length/2))  # len() == length
+        doc1 = sol1.create_doc({'data': content})
+        # sync with server
+        sol1._server_url = self.getURL()
+        sol1.sync()
+        # instantiate soledad with empty db, but with same secrets path
+        sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
         _, doclist = sol2.get_all_docs()
         self.assertEqual([], doclist)
         sol2._secrets_path = sol1.secrets_path

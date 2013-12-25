@@ -27,7 +27,7 @@ import socket
 
 
 from couchdb.client import Server
-from couchdb.http import ResourceNotFound, Unauthorized, ServerError
+from couchdb.http import ResourceNotFound, Unauthorized, ServerError, Session
 from u1db import query_parser, vectorclock
 from u1db.errors import (
     DatabaseDoesNotExist,
@@ -48,6 +48,9 @@ from leap.soledad.common.document import SoledadDocument
 
 
 logger = logging.getLogger(__name__)
+
+
+COUCH_TIMEOUT = 120  # timeout for transfers between Soledad server and Couch
 
 
 class InvalidURLError(Exception):
@@ -275,6 +278,8 @@ class CouchDatabase(CommonBackend):
         # save params
         self._url = url
         self._full_commit = full_commit
+        if session is None:
+            session = Session(timeout=COUCH_TIMEOUT)
         self._session = session
         self._factory = CouchDocument
         self._real_replica_uid = None
