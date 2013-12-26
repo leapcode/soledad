@@ -377,6 +377,7 @@ class EncryptedSyncTestCase(
         doc2 = doclist[0]
         # assert incoming doc is equal to the first sent doc
         self.assertEqual(doc1, doc2)
+        db.delete_database()
 
     def test_encrypted_sym_sync_with_unicode_passphrase(self):
         """
@@ -435,7 +436,7 @@ class EncryptedSyncTestCase(
         doc2 = doclist[0]
         # assert incoming doc is equal to the first sent doc
         self.assertEqual(doc1, doc2)
-
+        db.delete_database()
 
     def test_sync_very_large_files(self):
         """
@@ -471,6 +472,13 @@ class EncryptedSyncTestCase(
         doc2 = doclist[0]
         # assert incoming doc is equal to the first sent doc
         self.assertEqual(doc1, doc2)
+        # delete remote database
+        db = CouchDatabase(
+            self._couch_url,
+            # the name of the user database is "user-<uuid>".
+            'user-user-uuid',
+        )
+        db.delete_database()
 
 
     def test_sync_many_small_files(self):
@@ -507,6 +515,13 @@ class EncryptedSyncTestCase(
         # assert incoming docs are equal to sent docs
         for doc in doclist:
             self.assertEqual(sol1.get_doc(doc.doc_id), doc)
+        # delete remote database
+        db = CouchDatabase(
+            self._couch_url,
+            # the name of the user database is "user-<uuid>".
+            'user-user-uuid',
+        )
+        db.delete_database()
 
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):
@@ -533,6 +548,12 @@ class LockResourceTestCase(
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
+        # delete remote database
+        db = CouchDatabase(
+            self._couch_url,
+            'shared',
+        )
+        db.delete_database()
 
     def test__try_obtain_filesystem_lock(self):
         responder = mock.Mock()
