@@ -473,6 +473,41 @@ class EncryptedSyncTestCase(
         self.assertEqual(doc1, doc2)
 
 
+    def test_sync_many_small_files(self):
+        """
+        Test if Soledad can sync many smallfiles.
+        """
+        number_of_docs = 100
+        self.startServer()
+        # instantiate soledad and create a document
+        sol1 = self._soledad_instance(
+            # token is verified in test_target.make_token_soledad_app
+            auth_token='auth-token'
+        )
+        _, doclist = sol1.get_all_docs()
+        self.assertEqual([], doclist)
+        # create many small files
+        for i in range(0, number_of_docs):
+            sol1.create_doc(json.loads(simple_doc))
+        # sync with server
+        sol1._server_url = self.getURL()
+        sol1.sync()
+        # instantiate soledad with empty db, but with same secrets path
+        sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
+        _, doclist = sol2.get_all_docs()
+        self.assertEqual([], doclist)
+        sol2._secrets_path = sol1.secrets_path
+        sol2._load_secrets()
+        sol2._set_secret_id(sol1._secret_id)
+        # sync the new instance
+        sol2._server_url = self.getURL()
+        sol2.sync()
+        _, doclist = sol2.get_all_docs()
+        self.assertEqual(number_of_docs, len(doclist))
+        # assert incoming docs are equal to sent docs
+        for doc in doclist:
+            self.assertEqual(sol1.get_doc(doc.doc_id), doc)
+
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):
     """

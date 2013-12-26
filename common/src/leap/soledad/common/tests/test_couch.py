@@ -81,9 +81,10 @@ class CouchDBWrapper(object):
         mkdir_p(os.path.join(self.tempdir, 'lib'))
         mkdir_p(os.path.join(self.tempdir, 'log'))
         args = ['couchdb', '-n', '-a', confPath]
-        #null = open('/dev/null', 'w')
+        null = open('/dev/null', 'w')
+
         self.process = subprocess.Popen(
-            args, env=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            args, env=None, stdout=null.fileno(), stderr=null.fileno(),
             close_fds=True)
         # find port
         logPath = os.path.join(self.tempdir, 'log', 'couch.log')
