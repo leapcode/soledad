@@ -121,6 +121,7 @@ from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
     AlreadyLockedError,
+    LockTimedOutError,
 )
 
 
@@ -225,7 +226,9 @@ class LockResource(object):
         """
         # obtain filesystem lock
         if not self._try_obtain_filesystem_lock():
-            self._responder.send_response_json(408)  # error: request timeout
+            self._responder.send_response_json(
+                LockTimedOutError.status,  # error: request timeout
+                error=LockTimedOutError.wire_description)
             return
 
         created_lock = False

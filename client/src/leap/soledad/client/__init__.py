@@ -54,6 +54,7 @@ from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
     AlreadyLockedError,
+    LockTimedOutError,
 )
 from leap.soledad.common.crypto import (
     MacMethods,
@@ -410,6 +411,8 @@ class Soledad(object):
                 token, timeout = self._shared_db.lock()
             except AlreadyLockedError:
                 raise BootstrapSequenceError('Database is already locked.')
+            except LockTimedOutError:
+                raise BootstrapSequenceError('Lock operation timed out.')
 
             try:
                 self._get_or_gen_crypto_secrets()

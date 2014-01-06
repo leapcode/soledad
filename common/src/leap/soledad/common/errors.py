@@ -57,13 +57,25 @@ class AlreadyLockedError(errors.U1DBError):
     wire_description = "lock is locked"
     status = 403
 
+
+class LockTimedOutError(errors.U1DBError):
+    """
+    Exception raised when timing out while trying to lock the shared database.
+    """
+
+    wire_description = "lock timed out"
+    status = 408
+
+
 # update u1db "wire description to status" and "wire description to exception"
 # maps.
-for e in [InvalidTokenError, NotLockedError, AlreadyLockedError]:
+for e in [InvalidTokenError, NotLockedError, AlreadyLockedError,
+        LockTimedOutError]:
     http_errors.wire_description_to_status.update({
         e.wire_description: e.status})
     errors.wire_description_to_exc.update({
         e.wire_description: e})
+
 
 # u1db error statuses also have to be updated
 http_errors.ERROR_STATUSES = set(
