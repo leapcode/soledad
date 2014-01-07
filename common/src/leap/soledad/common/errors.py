@@ -67,10 +67,19 @@ class LockTimedOutError(errors.U1DBError):
     status = 408
 
 
+class CouldNotObtainLockError(errors.U1DBError):
+    """
+    Exception raised when timing out while trying to lock the shared database.
+    """
+
+    wire_description = "error obtaining lock"
+    status = 500
+
+
 # update u1db "wire description to status" and "wire description to exception"
 # maps.
 for e in [InvalidTokenError, NotLockedError, AlreadyLockedError,
-        LockTimedOutError]:
+        LockTimedOutError, CouldNotObtainLockError]:
     http_errors.wire_description_to_status.update({
         e.wire_description: e.status})
     errors.wire_description_to_exc.update({
