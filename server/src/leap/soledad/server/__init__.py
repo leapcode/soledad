@@ -90,6 +90,7 @@ import configparser
 import time
 import hashlib
 import os
+import tempfile
 
 from u1db.remote import http_app
 
@@ -122,6 +123,7 @@ from leap.soledad.common.errors import (
     NotLockedError,
     AlreadyLockedError,
     LockTimedOutError,
+    CouldNotObtainLockError,
 )
 
 
@@ -201,7 +203,9 @@ class LockResource(object):
         self._shared_db = state.open_database(SoledadApp.SHARED_DB_NAME)
         self._lock_doc_id = '%s%s' % (SHARED_DB_LOCK_DOC_ID_PREFIX, uuid)
         self._lock = FilesystemLock(
-            hashlib.sha512(self._lock_doc_id).hexdigest())
+            os.path.join(
+                tempfile.gettmpdir(),
+                hashlib.sha512(self._lock_doc_id).hexdigest()))
         self._state = state
         self._responder = responder
 
@@ -328,8 +332,10 @@ class LockResource(object):
         while tries > 0:
             try:
                 return self._lock.lock()
-            except Exception as e:
+            except OSError as e:
                 tries -= 1
+                if tries == 0:
+                    raise CouldNotObtainLockError(e.message)
                 time.sleep(self.FILESYSTEM_LOCK_SLEEP_SECONDS)
         return False
 
