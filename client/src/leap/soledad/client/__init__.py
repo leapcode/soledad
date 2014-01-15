@@ -249,6 +249,7 @@ class Soledad(object):
     """
 
     syncing_lock = defaultdict(Lock)
+    rw_lock = Lock()
     """
     A dictionary that hold locks which avoid multiple sync attempts from the
     same database replica.
@@ -790,7 +791,8 @@ class Soledad(object):
         :rtype: str
         """
         doc.content = self._convert_to_unicode(doc.content)
-        return self._db.put_doc(doc)
+        with self.rw_lock:
+            return self._db.put_doc(doc)
 
     def delete_doc(self, doc):
         """
@@ -802,7 +804,8 @@ class Soledad(object):
         :return: the new revision identifier for the document
         :rtype: str
         """
-        return self._db.delete_doc(doc)
+        with self.rw_lock:
+            return self._db.delete_doc(doc)
 
     def get_doc(self, doc_id, include_deleted=False):
         """
@@ -818,7 +821,8 @@ class Soledad(object):
         :return: the document object or None
         :rtype: SoledadDocument
         """
-        return self._db.get_doc(doc_id, include_deleted=include_deleted)
+        with self.rw_lock:
+            return self._db.get_doc(doc_id, include_deleted=include_deleted)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
                  include_deleted=False):
@@ -835,9 +839,10 @@ class Soledad(object):
             in matching doc_ids order.
         :rtype: generator
         """
-        return self._db.get_docs(doc_ids,
-                                 check_for_conflicts=check_for_conflicts,
-                                 include_deleted=include_deleted)
+        with self.rw_lock:
+            return self._db.get_docs(
+                doc_ids, check_for_conflicts=check_for_conflicts,
+                include_deleted=include_deleted)
 
     def get_all_docs(self, include_deleted=False):
         """Get the JSON content for all documents in the database.
@@ -849,7 +854,8 @@ class Soledad(object):
                  The current generation of the database, followed by a list of
                  all the documents in the database.
         """
-        return self._db.get_all_docs(include_deleted)
+        with self.rw_lock:
+            return self._db.get_all_docs(include_deleted)
 
     def _convert_to_unicode(self, content):
         """
@@ -894,8 +900,9 @@ class Soledad(object):
         :return: the new document
         :rtype: SoledadDocument
         """
-        return self._db.create_doc(
-            self._convert_to_unicode(content), doc_id=doc_id)
+        with self.rw_lock:
+            return self._db.create_doc(
+                self._convert_to_unicode(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -914,7 +921,8 @@ class Soledad(object):
         :return: The new cocument
         :rtype: SoledadDocument
         """
-        return self._db.create_doc_from_json(json, doc_id=doc_id)
+        with self.rw_lock:
+            return self._db.create_doc_from_json(json, doc_id=doc_id)
 
     def create_index(self, index_name, *index_expressions):
         """
@@ -938,8 +946,10 @@ class Soledad(object):
 
             "number(fieldname, width)", "lower(fieldname)"
         """
-        if self._db:
-            return self._db.create_index(index_name, *index_expressions)
+        with self.rw_lock:
+            if self._db:
+                return self._db.create_index(
+                    index_name, *index_expressions)
 
     def delete_index(self, index_name):
         """
@@ -948,8 +958,9 @@ class Soledad(object):
         :param index_name: The name of the index we are removing
         :type index_name: str
         """
-        if self._db:
-            return self._db.delete_index(index_name)
+        with self.rw_lock:
+            if self._db:
+                return self._db.delete_index(index_name)
 
     def list_indexes(self):
         """
@@ -958,8 +969,9 @@ class Soledad(object):
         :return: A list of [('index-name', ['field', 'field2'])] definitions.
         :rtype: list
         """
-        if self._db:
-            return self._db.list_indexes()
+        with self.rw_lock:
+            if self._db:
+                return self._db.list_indexes()
 
     def get_from_index(self, index_name, *key_values):
         """
@@ -981,8 +993,9 @@ class Soledad(object):
         :return: List of [Document]
         :rtype: list
         """
-        if self._db:
-            return self._db.get_from_index(index_name, *key_values)
+        with self.rw_lock:
+            if self._db:
+                return self._db.get_from_index(index_name, *key_values)
 
     def get_count_from_index(self, index_name, *key_values):
         """
@@ -998,8 +1011,9 @@ class Soledad(object):
         :return: count.
         :rtype: int
         """
-        if self._db:
-            return self._db.get_count_from_index(index_name, *key_values)
+        with self.rw_lock:
+            if self._db:
+                return self._db.get_count_from_index(index_name, *key_values)
 
     def get_range_from_index(self, index_name, start_value, end_value):
         """
@@ -1028,9 +1042,10 @@ class Soledad(object):
         :return: List of [Document]
         :rtype: list
         """
-        if self._db:
-            return self._db.get_range_from_index(
-                index_name, start_value, end_value)
+        with self.rw_lock:
+            if self._db:
+                return self._db.get_range_from_index(
+                    index_name, start_value, end_value)
 
     def get_index_keys(self, index_name):
         """
@@ -1041,8 +1056,9 @@ class Soledad(object):
         :return: [] A list of tuples of indexed keys.
         :rtype: list
         """
-        if self._db:
-            return self._db.get_index_keys(index_name)
+        with self.rw_lock:
+            if self._db:
+                return self._db.get_index_keys(index_name)
 
     def get_doc_conflicts(self, doc_id):
         """
@@ -1054,8 +1070,9 @@ class Soledad(object):
         :return: a list of the document entries that are conflicted
         :rtype: list
         """
-        if self._db:
-            return self._db.get_doc_conflicts(doc_id)
+        with self.rw_lock:
+            if self._db:
+                return self._db.get_doc_conflicts(doc_id)
 
     def resolve_doc(self, doc, conflicted_doc_revs):
         """
@@ -1067,8 +1084,9 @@ class Soledad(object):
                                     supersedes.
         :type conflicted_doc_revs: list
         """
-        if self._db:
-            return self._db.resolve_doc(doc, conflicted_doc_revs)
+        with self.rw_lock:
+            if self._db:
+                return self._db.resolve_doc(doc, conflicted_doc_revs)
 
     def sync(self):
         """
@@ -1209,7 +1227,7 @@ class Soledad(object):
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # check mac of the recovery document
-        mac_auth = False
+        #mac_auth = False  # XXX ?
         mac = None
         if MAC_KEY in data:
             soledad_assert(data[MAC_KEY] is not None)
@@ -1232,7 +1250,7 @@ class Soledad(object):
             if mac != data[MAC_KEY]:
                 raise WrongMac('Could not authenticate recovery document\'s '
                                'contents.')
-            mac_auth = True
+            #mac_auth = True  # XXX ?
         # include secrets in the secret pool.
         secrets = 0
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
