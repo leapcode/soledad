@@ -204,7 +204,7 @@ class LockResource(object):
         self._lock_doc_id = '%s%s' % (SHARED_DB_LOCK_DOC_ID_PREFIX, uuid)
         self._lock = FilesystemLock(
             os.path.join(
-                tempfile.gettmpdir(),
+                tempfile.gettempdir(),
                 hashlib.sha512(self._lock_doc_id).hexdigest()))
         self._state = state
         self._responder = responder
