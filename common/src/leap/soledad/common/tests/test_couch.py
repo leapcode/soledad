@@ -24,16 +24,17 @@ import re
 import copy
 import shutil
 from base64 import b64decode
+from mock import Mock
 
 from couchdb.client import Server
-from u1db import errors
+from u1db import errors as u1db_errors
 
 from leap.common.files import mkdir_p
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.common import couch
+from leap.soledad.common import couch, errors
 import simplejson as json
 
 
@@ -356,7 +357,7 @@ class IndexedCouchDatabase(couch.CouchDatabase):
     def __init__(self, url, dbname, replica_uid=None, full_commit=True,
                      session=None, ensure_ddocs=True):
         old_class.__init__(self, url, dbname, replica_uid, full_commit,
-                           session, ensure_ddocs=True)
+                           session, ensure_ddocs=ensure_ddocs)
         self._indexes = {}
 
     def _put_doc(self, old_doc, doc):
@@ -372,7 +373,7 @@ class IndexedCouchDatabase(couch.CouchDatabase):
             if self._indexes[index_name]._definition == list(
                     index_expressions):
                 return
-            raise errors.IndexNameTakenError
+            raise u1db_errors.IndexNameTakenError
         index = InMemoryIndex(index_name, list(index_expressions))
         _, all_docs = self.get_all_docs()
         for doc in all_docs:
@@ -392,7 +393,7 @@ class IndexedCouchDatabase(couch.CouchDatabase):
         try:
             index = self._indexes[index_name]
         except KeyError:
-            raise errors.IndexDoesNotExist
+            raise u1db_errors.IndexDoesNotExist
         doc_ids = index.lookup(key_values)
         result = []
         for doc_id in doc_ids:
@@ -405,7 +406,7 @@ class IndexedCouchDatabase(couch.CouchDatabase):
         try:
             index = self._indexes[index_name]
         except KeyError:
-            raise errors.IndexDoesNotExist
+            raise u1db_errors.IndexDoesNotExist
         if isinstance(start_value, basestring):
             start_value = (start_value,)
         if isinstance(end_value, basestring):
@@ -420,7 +421,7 @@ class IndexedCouchDatabase(couch.CouchDatabase):
         try:
             index = self._indexes[index_name]
         except KeyError:
-            raise errors.IndexDoesNotExist
+            raise u1db_errors.IndexDoesNotExist
         keys = index.keys()
         # XXX inefficiency warning
         return list(set([tuple(key.split('\x01')) for key in keys]))
@@ -459,6 +460,210 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         db = self.create_database('test3', 'target')
         db.delete_database()
         test_sync.DatabaseSyncTests.tearDown(self)
+
+
+class CouchDatabaseExceptionsTests(CouchDBTestCase):
+
+    def setUp(self):
+        CouchDBTestCase.setUp(self)
+        self.db = couch.CouchDatabase(
+            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+            ensure_ddocs=False)  # note that we don't enforce ddocs here
+
+    def tearDown(self):
+        self.db.delete_database()
+
+    def test_missing_design_doc_raises(self):
+        """
+        Test that all methods that access design documents will raise if the
+        design docs are not present.
+        """
+        # _get_generation()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db._get_generation)
+        # _get_generation_info()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db._get_generation_info)
+        # _get_trans_id_for_gen()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db._get_trans_id_for_gen, 1)
+        # _get_transaction_log()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db._get_transaction_log)
+        # create_doc()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db.create_doc, {})
+        # whats_changed()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db.whats_changed)
+        # _do_set_replica_gen_and_trans_id()
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
+        # fake a conflict so we can test resolve_doc()
+        first_rev = self.db._allocate_doc_rev(None)
+        doc = couch.CouchDocument(
+            doc_id='mydoc', rev=self.db._allocate_doc_rev(first_rev))
+        self.db._get_doc = Mock(return_value=doc)
+        self.assertRaises(
+            errors.MissingDesignDocError,
+            self.db.resolve_doc, doc, [first_rev])
+
+    def test_missing_design_doc_functions_raises(self):
+        """
+        Test that all methods that access design documents list functions
+        will raise if the functions are not present.
+        """
+        self.db = couch.CouchDatabase(
+            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+            ensure_ddocs=True)
+        # erase views from _design/transactions
+        transactions = self.db._database['_design/transactions']
+        transactions['lists'] = {}
+        self.db._database.save(transactions)
+        # _get_generation()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db._get_generation)
+        # _get_generation_info()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db._get_generation_info)
+        # _get_trans_id_for_gen()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db._get_trans_id_for_gen, 1)
+        # whats_changed()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db.whats_changed)
+
+    def test_absent_design_doc_functions_raises(self):
+        """
+        Test that all methods that access design documents list functions
+        will raise if the functions are not present.
+        """
+        self.db = couch.CouchDatabase(
+            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+            ensure_ddocs=True)
+        # erase views from _design/transactions
+        transactions = self.db._database['_design/transactions']
+        del transactions['lists']
+        self.db._database.save(transactions)
+        # _get_generation()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db._get_generation)
+        # _get_generation_info()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db._get_generation_info)
+        # _get_trans_id_for_gen()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db._get_trans_id_for_gen, 1)
+        # whats_changed()
+        self.assertRaises(
+            errors.MissingDesignDocListFunctionError,
+            self.db.whats_changed)
+
+    def test_missing_design_doc_named_views_raises(self):
+        """
+        Test that all methods that access design documents' named views  will
+        raise if the views are not present.
+        """
+        self.db = couch.CouchDatabase(
+            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+            ensure_ddocs=True)
+        # erase views from _design/docs
+        docs = self.db._database['_design/docs']
+        del docs['views']
+        self.db._database.save(docs)
+        # erase views from _design/syncs
+        syncs = self.db._database['_design/syncs']
+        del syncs['views']
+        self.db._database.save(syncs)
+        # erase views from _design/transactions
+        transactions = self.db._database['_design/transactions']
+        del transactions['views']
+        self.db._database.save(transactions)
+        # _get_generation()
+        self.assertRaises(
+            errors.MissingDesignDocNamedViewError,
+            self.db._get_generation)
+        # _get_generation_info()
+        self.assertRaises(
+            errors.MissingDesignDocNamedViewError,
+            self.db._get_generation_info)
+        # _get_trans_id_for_gen()
+        self.assertRaises(
+            errors.MissingDesignDocNamedViewError,
+            self.db._get_trans_id_for_gen, 1)
+        # _get_transaction_log()
+        self.assertRaises(
+            errors.MissingDesignDocNamedViewError,
+            self.db._get_transaction_log)
+        # whats_changed()
+        self.assertRaises(
+            errors.MissingDesignDocNamedViewError,
+            self.db.whats_changed)
+
+    def test_deleted_design_doc_raises(self):
+        """
+        Test that all methods that access design documents will raise if the
+        design docs are not present.
+        """
+        self.db = couch.CouchDatabase(
+            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+            ensure_ddocs=True)
+        # delete _design/docs
+        del self.db._database['_design/docs']
+        # delete _design/syncs
+        del self.db._database['_design/syncs']
+        # delete _design/transactions
+        del self.db._database['_design/transactions']
+        # _get_generation()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._get_generation)
+        # _get_generation_info()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._get_generation_info)
+        # _get_trans_id_for_gen()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._get_trans_id_for_gen, 1)
+        # _get_transaction_log()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._get_transaction_log)
+        # create_doc()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db.create_doc, {})
+        # whats_changed()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db.whats_changed)
+        # _do_set_replica_gen_and_trans_id()
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
+        # fake a conflict so we can test resolve_doc()
+        first_rev = self.db._allocate_doc_rev(None)
+        doc = couch.CouchDocument(
+            doc_id='mydoc', rev=self.db._allocate_doc_rev(first_rev))
+        self.db._get_doc = Mock(return_value=doc)
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db.resolve_doc, doc, [first_rev])
 
 
 load_tests = tests.load_with_scenarios

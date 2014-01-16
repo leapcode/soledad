@@ -25,11 +25,17 @@ from u1db import errors
 from u1db.remote import http_errors
 
 
+class SoledadError(errors.U1DBError):
+    """
+    Base Soledad HTTP errors.
+    """
+    pass
+
 #
-# LockResource: a lock based on a document in the shared database.
+# LockResource errors
 #
 
-class InvalidTokenError(errors.U1DBError):
+class InvalidTokenError(SoledadError):
     """
     Exception raised when trying to unlock shared database with invalid token.
     """
@@ -38,7 +44,7 @@ class InvalidTokenError(errors.U1DBError):
     status = 401
 
 
-class NotLockedError(errors.U1DBError):
+class NotLockedError(SoledadError):
     """
     Exception raised when trying to unlock shared database when it is not
     locked.
@@ -48,7 +54,7 @@ class NotLockedError(errors.U1DBError):
     status = 404
 
 
-class AlreadyLockedError(errors.U1DBError):
+class AlreadyLockedError(SoledadError):
     """
     Exception raised when trying to lock shared database but it is already
     locked.
@@ -58,7 +64,7 @@ class AlreadyLockedError(errors.U1DBError):
     status = 403
 
 
-class LockTimedOutError(errors.U1DBError):
+class LockTimedOutError(SoledadError):
     """
     Exception raised when timing out while trying to lock the shared database.
     """
@@ -67,7 +73,7 @@ class LockTimedOutError(errors.U1DBError):
     status = 408
 
 
-class CouldNotObtainLockError(errors.U1DBError):
+class CouldNotObtainLockError(SoledadError):
     """
     Exception raised when timing out while trying to lock the shared database.
     """
@@ -76,10 +82,64 @@ class CouldNotObtainLockError(errors.U1DBError):
     status = 500
 
 
+#
+# CouchDatabase errors
+#
+
+class MissingDesignDocError(SoledadError):
+    """
+    Raised when trying to access a missing couch design document.
+    """
+
+    wire_description = "missing design document"
+    status = 500
+
+
+class MissingDesignDocNamedViewError(SoledadError):
+    """
+    Raised when trying to access a missing named view on a couch design
+    document.
+    """
+
+    wire_description = "missing design document named function"
+    status = 500
+
+
+class MissingDesignDocListFunctionError(SoledadError):
+    """
+    Raised when trying to access a missing list function on a couch design
+    document.
+    """
+
+    wire_description = "missing design document list function"
+    status = 500
+
+
+class MissingDesignDocDeletedError(SoledadError):
+    """
+    Raised when trying to access a deleted couch design document.
+    """
+
+    wire_description = "design document was deleted"
+    status = 500
+
+
+class DesignDocUnknownError(SoledadError):
+    """
+    Raised when trying to access a couch design document and getting an
+    unknown error.
+    """
+
+    wire_description = "missing design document unknown error"
+    status = 500
+
+
 # update u1db "wire description to status" and "wire description to exception"
 # maps.
 for e in [InvalidTokenError, NotLockedError, AlreadyLockedError,
-        LockTimedOutError, CouldNotObtainLockError]:
+        LockTimedOutError, CouldNotObtainLockError, MissingDesignDocError,
+        MissingDesignDocListFunctionError, MissingDesignDocNamedViewError,
+        MissingDesignDocDeletedError, DesignDocUnknownError]:
     http_errors.wire_description_to_status.update({
         e.wire_description: e.status})
     errors.wire_description_to_exc.update({
