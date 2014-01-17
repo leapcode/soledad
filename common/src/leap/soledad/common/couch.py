@@ -27,14 +27,23 @@ import socket
 
 
 from couchdb.client import Server
-from couchdb.http import ResourceNotFound, Unauthorized
-from u1db import errors, query_parser, vectorclock
+from couchdb.http import ResourceNotFound, Unauthorized, ServerError
+from u1db import query_parser, vectorclock
+from u1db.errors import (
+    DatabaseDoesNotExist,
+    InvalidGeneration,
+    RevisionConflict,
+    InvalidDocId,
+    ConflictedDoc,
+    DocumentDoesNotExist,
+    DocumentAlreadyDeleted,
+)
 from u1db.backends import CommonBackend, CommonSyncTarget
 from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
 
 
-from leap.soledad.common import USER_DB_PREFIX, ddocs
+from leap.soledad.common import USER_DB_PREFIX, ddocs, errors
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -153,6 +162,66 @@ class CouchDocument(SoledadDocument):
 http_app.Document = CouchDocument
 
 
+def raise_missing_design_doc_error(exc, ddoc_path):
+    """
+    Raise an appropriate exception when catching a ResourceNotFound when
+    accessing a design document.
+
+    :param exc: The exception cought.
+    :type exc: ResourceNotFound
+    :param ddoc_path: A list representing the requested path.
+    :type ddoc_path: list
+
+    :raise MissingDesignDocError: Raised when tried to access a missing design
+                                  document.
+    :raise MissingDesignDocListFunctionError: Raised when trying to access a
+                                              missing list function on a
+                                              design document.
+    :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                           missing named view on a design
+                                           document.
+    :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                         deleted design document.
+    :raise MissingDesignDocUnknownError: Raised when failed to access a design
+                                         document for an yet unknown reason.
+    """
+    path = "".join(ddoc_path)
+    if exc.message[1] == 'missing':
+        raise errors.MissingDesignDocError(path)
+    elif exc.message[1] == 'missing function' or \
+            exc.message[1].startswith('missing lists function'):
+        raise errors.MissingDesignDocListFunctionError(path)
+    elif exc.message[1] == 'missing_named_view':
+        raise errors.MissingDesignDocNamedViewError(path)
+    elif exc.message[1] == 'deleted':
+        raise errors.MissingDesignDocDeletedError(path)
+    # other errors are unknown for now
+    raise errors.DesignDocUnknownError(path)
+
+
+def raise_server_error(exc, ddoc_path):
+    """
+    Raise an appropriate exception when catching a ServerError when
+    accessing a design document.
+
+    :param exc: The exception cought.
+    :type exc: ResourceNotFound
+    :param ddoc_path: A list representing the requested path.
+    :type ddoc_path: list
+
+    :raise MissingDesignDocListFunctionError: Raised when trying to access a
+                                              missing list function on a
+                                              design document.
+    :raise MissingDesignDocUnknownError: Raised when failed to access a design
+                                         document for an yet unknown reason.
+    """
+    path = "".join(ddoc_path)
+    if exc.message[1][0] == 'unnamed_error':
+        raise errors.MissingDesignDocListFunctionError(path)
+    # other errors are unknown for now
+    raise errors.DesignDocUnknownError(path)
+
+
 class CouchDatabase(CommonBackend):
     """
     A U1DB implementation that uses CouchDB as its persistence layer.
@@ -182,7 +251,7 @@ class CouchDatabase(CommonBackend):
             server[dbname]
         except ResourceNotFound:
             if not create:
-                raise errors.DatabaseDoesNotExist()
+                raise DatabaseDoesNotExist()
         return cls(url, dbname)
 
     def __init__(self, url, dbname, replica_uid=None, full_commit=True,
@@ -318,12 +387,31 @@ class CouchDatabase(CommonBackend):
 
         :return: The current generation.
         :rtype: int
+
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         # query a couch list function
-        res = self._database.resource(
-            '_design', 'transactions', '_list', 'generation', 'log')
-        response = res.get_json()
-        return response[2]['generation']
+        ddoc_path = ['_design', 'transactions', '_list', 'generation', 'log']
+        res = self._database.resource(*ddoc_path)
+        try:
+            response = res.get_json()
+            return response[2]['generation']
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
+        except ServerError as e:
+            raise_server_error(e, ddoc_path)
 
     def _get_generation_info(self):
         """
@@ -331,12 +419,31 @@ class CouchDatabase(CommonBackend):
 
         :return: A tuple containing the current generation and transaction id.
         :rtype: (int, str)
+
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         # query a couch list function
-        res = self._database.resource(
-            '_design', 'transactions', '_list', 'generation', 'log')
-        response = res.get_json()
-        return (response[2]['generation'], response[2]['transaction_id'])
+        ddoc_path = ['_design', 'transactions', '_list', 'generation', 'log']
+        res = self._database.resource(*ddoc_path)
+        try:
+            response = res.get_json()
+            return (response[2]['generation'], response[2]['transaction_id'])
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
+        except ServerError as e:
+            raise_server_error(e, ddoc_path)
 
     def _get_trans_id_for_gen(self, generation):
         """
@@ -349,16 +456,36 @@ class CouchDatabase(CommonBackend):
         :rtype: str
 
         :raise InvalidGeneration: Raised when the generation does not exist.
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         if generation == 0:
             return ''
         # query a couch list function
-        res = self._database.resource(
-            '_design', 'transactions', '_list', 'trans_id_for_gen', 'log')
-        response = res.get_json(gen=generation)
-        if response[2] == {}:
-            raise errors.InvalidGeneration
-        return response[2]['transaction_id']
+        ddoc_path = [
+            '_design', 'transactions', '_list', 'trans_id_for_gen', 'log'
+        ]
+        res = self._database.resource(*ddoc_path)
+        try:
+            response = res.get_json(gen=generation)
+            if response[2] == {}:
+                raise InvalidGeneration
+            return response[2]['transaction_id']
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
+        except ServerError as e:
+            raise_server_error(e, ddoc_path)
 
     def _get_transaction_log(self):
         """
@@ -366,12 +493,31 @@ class CouchDatabase(CommonBackend):
 
         :return: The complete transaction log.
         :rtype: [(str, str)]
+
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         # query a couch view
-        res = self._database.resource(
-            '_design', 'transactions', '_view', 'log')
-        response = res.get_json()
-        return map(lambda row: (row['id'], row['value']), response[2]['rows'])
+        ddoc_path = ['_design', 'transactions', '_view', 'log']
+        res = self._database.resource(*ddoc_path)
+        try:
+            response = res.get_json()
+            return map(
+                lambda row: (row['id'], row['value']),
+                response[2]['rows'])
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
 
     def _get_doc(self, doc_id, check_for_conflicts=False):
         """
@@ -472,6 +618,19 @@ class CouchDatabase(CommonBackend):
 
         :raise RevisionConflict: Raised when trying to update a document but
                                  couch revisions mismatch.
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         trans_id = self._allocate_transaction_id()
         # encode content
@@ -489,26 +648,29 @@ class CouchDatabase(CommonBackend):
                             doc.get_conflicts()))
             )[:-1]  # exclude \n
         # perform the request
-        resource = self._database.resource(
-            '_design', 'docs', '_update', 'put', doc.doc_id)
-        response = resource.put_json(
-            body={
-                'couch_rev': old_doc.couch_rev
-                    if old_doc is not None else None,
-                'u1db_rev': doc.rev,
-                'content': content,
-                'trans_id': trans_id,
-                'conflicts': conflicts,
-                'update_conflicts': update_conflicts,
-            },
-            headers={'content-type': 'application/json'})
-        # the document might have been updated in between, so we check for the
-        # return message
-        msg = response[2].read()
-        if msg == 'ok':
-            return
-        elif msg == 'revision conflict':
-            raise errors.RevisionConflict()
+        ddoc_path = ['_design', 'docs', '_update', 'put', doc.doc_id]
+        resource = self._database.resource(*ddoc_path)
+        try:
+            response = resource.put_json(
+                body={
+                    'couch_rev': old_doc.couch_rev
+                        if old_doc is not None else None,
+                    'u1db_rev': doc.rev,
+                    'content': content,
+                    'trans_id': trans_id,
+                    'conflicts': conflicts,
+                    'update_conflicts': update_conflicts,
+                },
+                headers={'content-type': 'application/json'})
+            # the document might have been updated in between, so we check for
+            # the return message
+            msg = response[2].read()
+            if msg == 'ok':
+                return
+            elif msg == 'revision conflict':
+                raise RevisionConflict()
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
 
     def put_doc(self, doc):
         """
@@ -522,26 +684,26 @@ class CouchDatabase(CommonBackend):
         :return: new_doc_rev - The new revision identifier for the document.
             The Document object will also be updated.
 
-        :raise errors.InvalidDocId: Raised if the document's id is invalid.
-        :raise errors.DocumentTooBig: Raised if the document size is too big.
-        :raise errors.ConflictedDoc: Raised if the document has conflicts.
+        :raise InvalidDocId: Raised if the document's id is invalid.
+        :raise DocumentTooBig: Raised if the document size is too big.
+        :raise ConflictedDoc: Raised if the document has conflicts.
         """
         if doc.doc_id is None:
-            raise errors.InvalidDocId()
+            raise InvalidDocId()
         self._check_doc_id(doc.doc_id)
         self._check_doc_size(doc)
         old_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if old_doc and old_doc.has_conflicts:
-            raise errors.ConflictedDoc()
+            raise ConflictedDoc()
         if old_doc and doc.rev is None and old_doc.is_tombstone():
             new_rev = self._allocate_doc_rev(old_doc.rev)
         else:
             if old_doc is not None:
                     if old_doc.rev != doc.rev:
-                        raise errors.RevisionConflict()
+                        raise RevisionConflict()
             else:
                 if doc.rev is not None:
-                    raise errors.RevisionConflict()
+                    raise RevisionConflict()
             new_rev = self._allocate_doc_rev(doc.rev)
         doc.rev = new_rev
         self._put_doc(old_doc, doc)
@@ -563,32 +725,53 @@ class CouchDatabase(CommonBackend):
                  to the last intervening change and sorted by generation (old
                  changes first)
         :rtype: (int, str, [(str, int, str)])
+
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         # query a couch list function
-        res = self._database.resource(
-            '_design', 'transactions', '_list', 'whats_changed', 'log')
-        response = res.get_json(old_gen=old_generation)
-        results = map(
-            lambda row:
-                (row['generation'], row['doc_id'], row['transaction_id']),
-            response[2]['transactions'])
-        results.reverse()
-        cur_gen = old_generation
-        seen = set()
-        changes = []
-        newest_trans_id = ''
-        for generation, doc_id, trans_id in results:
-            if doc_id not in seen:
-                changes.append((doc_id, generation, trans_id))
-                seen.add(doc_id)
-        if changes:
-            cur_gen = changes[0][1]  # max generation
-            newest_trans_id = changes[0][2]
-            changes.reverse()
-        else:
-            cur_gen, newest_trans_id = self._get_generation_info()
+        ddoc_path = [
+            '_design', 'transactions', '_list', 'whats_changed', 'log'
+        ]
+        res = self._database.resource(*ddoc_path)
+        try:
+            response = res.get_json(old_gen=old_generation)
+            results = map(
+                lambda row:
+                    (row['generation'], row['doc_id'], row['transaction_id']),
+                response[2]['transactions'])
+            results.reverse()
+            cur_gen = old_generation
+            seen = set()
+            changes = []
+            newest_trans_id = ''
+            for generation, doc_id, trans_id in results:
+                if doc_id not in seen:
+                    changes.append((doc_id, generation, trans_id))
+                    seen.add(doc_id)
+            if changes:
+                cur_gen = changes[0][1]  # max generation
+                newest_trans_id = changes[0][2]
+                changes.reverse()
+            else:
+                cur_gen, newest_trans_id = self._get_generation_info()
 
-        return cur_gen, newest_trans_id, changes
+            return cur_gen, newest_trans_id, changes
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
+        except ServerError as e:
+            raise_server_error(e, ddoc_path)
 
     def delete_doc(self, doc):
         """
@@ -600,22 +783,22 @@ class CouchDatabase(CommonBackend):
         :param doc: The document to mark as deleted.
         :type doc: CouchDocument.
 
-        :raise errors.DocumentDoesNotExist: Raised if the document does not
+        :raise DocumentDoesNotExist: Raised if the document does not
                                             exist.
-        :raise errors.RevisionConflict: Raised if the revisions do not match.
-        :raise errors.DocumentAlreadyDeleted: Raised if the document is
+        :raise RevisionConflict: Raised if the revisions do not match.
+        :raise DocumentAlreadyDeleted: Raised if the document is
                                               already deleted.
-        :raise errors.ConflictedDoc: Raised if the doc has conflicts.
+        :raise ConflictedDoc: Raised if the doc has conflicts.
         """
         old_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if old_doc is None:
-            raise errors.DocumentDoesNotExist
+            raise DocumentDoesNotExist
         if old_doc.rev != doc.rev:
-            raise errors.RevisionConflict()
+            raise RevisionConflict()
         if old_doc.is_tombstone():
-            raise errors.DocumentAlreadyDeleted
+            raise DocumentAlreadyDeleted
         if old_doc.has_conflicts:
-            raise errors.ConflictedDoc()
+            raise ConflictedDoc()
         new_rev = self._allocate_doc_rev(doc.rev)
         doc.rev = new_rev
         doc.make_tombstone()
@@ -737,17 +920,34 @@ class CouchDatabase(CommonBackend):
         :param other_transaction_id: The transaction id associated with the
                                      generation.
         :type other_transaction_id: str
+
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         # query a couch update function
-        res = self._database.resource(
-            '_design', 'syncs', '_update', 'put', 'u1db_sync_log')
-        res.put_json(
-            body={
-                'other_replica_uid': other_replica_uid,
-                'other_generation': other_generation,
-                'other_transaction_id': other_transaction_id,
-            },
-            headers={'content-type': 'application/json'})
+        ddoc_path = ['_design', 'syncs', '_update', 'put', 'u1db_sync_log']
+        res = self._database.resource(*ddoc_path)
+        try:
+            res.put_json(
+                body={
+                    'other_replica_uid': other_replica_uid,
+                    'other_generation': other_generation,
+                    'other_transaction_id': other_transaction_id,
+                },
+                headers={'content-type': 'application/json'})
+        except ResourceNotFound as e:
+            raise_missing_design_doc_error(e, ddoc_path)
 
     def _add_conflict(self, doc, my_doc_rev, my_content):
         """
@@ -774,7 +974,7 @@ class CouchDatabase(CommonBackend):
         """
         Delete the conflicted revisions from the list of conflicts of C{doc}.
 
-        Note that thie method does not actually update the backed; rather, it
+        Note that this method does not actually update the backend; rather, it
         updates the CouchDocument object which will provide the conflict data
         when the atomic document update is made.
 
@@ -842,6 +1042,20 @@ class CouchDatabase(CommonBackend):
         :param conflicted_doc_revs: A list of revisions that the new content
                                     supersedes.
         :type conflicted_doc_revs: [str]
+
+        :raise MissingDesignDocError: Raised when tried to access a missing
+                                      design document.
+        :raise MissingDesignDocListFunctionError: Raised when trying to access
+                                                  a missing list function on a
+                                                  design document.
+        :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                               missing named view on a design
+                                               document.
+        :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                             deleted design document.
+        :raise MissingDesignDocUnknownError: Raised when failed to access a
+                                             design document for an yet
+                                             unknown reason.
         """
         cur_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         new_rev = self._ensure_maximal_rev(cur_doc.rev,
@@ -855,8 +1069,10 @@ class CouchDatabase(CommonBackend):
             self._add_conflict(doc, new_rev, doc.get_json())
             self._delete_conflicts(doc, superseded_revs)
             # perform request to resolve document in server
-            resource = self._database.resource(
-                '_design', 'docs', '_update', 'resolve_doc', doc.doc_id)
+            ddoc_path = [
+                '_design', 'docs', '_update', 'resolve_doc', doc.doc_id
+            ]
+            resource = self._database.resource(*ddoc_path)
             conflicts = None
             if doc.has_conflicts:
                 conflicts = binascii.b2a_base64(
@@ -864,12 +1080,15 @@ class CouchDatabase(CommonBackend):
                         map(lambda cdoc: (cdoc.rev, cdoc.content),
                             doc.get_conflicts()))
                 )[:-1]  # exclude \n
-            response = resource.put_json(
-                body={
-                    'couch_rev': cur_doc.couch_rev,
-                    'conflicts': conflicts,
-                },
-                headers={'content-type': 'application/json'})
+            try:
+                response = resource.put_json(
+                    body={
+                        'couch_rev': cur_doc.couch_rev,
+                        'conflicts': conflicts,
+                    },
+                    headers={'content-type': 'application/json'})
+            except ResourceNotFound as e:
+                raise_missing_design_doc_error(e, ddoc_path)
 
     def _put_doc_if_newer(self, doc, save_conflict, replica_uid, replica_gen,
                           replica_trans_id=''):
