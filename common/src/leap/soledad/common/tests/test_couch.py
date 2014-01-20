@@ -81,9 +81,10 @@ class CouchDBWrapper(object):
         mkdir_p(os.path.join(self.tempdir, 'lib'))
         mkdir_p(os.path.join(self.tempdir, 'log'))
         args = ['couchdb', '-n', '-a', confPath]
-        #null = open('/dev/null', 'w')
+        null = open('/dev/null', 'w')
+
         self.process = subprocess.Popen(
-            args, env=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            args, env=None, stdout=null.fileno(), stderr=null.fileno(),
             close_fds=True)
         # find port
         logPath = os.path.join(self.tempdir, 'log', 'couch.log')
@@ -126,21 +127,21 @@ class CouchDBTestCase(unittest.TestCase):
     TestCase base class for tests against a real CouchDB server.
     """
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         """
         Make sure we have a CouchDB instance for a test.
         """
-        self.wrapper = CouchDBWrapper()
-        self.wrapper.start()
+        cls.wrapper = CouchDBWrapper()
+        cls.wrapper.start()
         #self.db = self.wrapper.db
-        unittest.TestCase.setUp(self)
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         """
         Stop CouchDB instance for test.
         """
-        self.wrapper.stop()
-        unittest.TestCase.tearDown(self)
+        cls.wrapper.stop()
 
 
 #-----------------------------------------------------------------------------

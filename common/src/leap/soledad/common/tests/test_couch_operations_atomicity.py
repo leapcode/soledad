@@ -100,6 +100,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
 
     def tearDown(self):
+        self.db.delete_database()
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
 
