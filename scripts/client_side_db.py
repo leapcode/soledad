@@ -1,7 +1,11 @@
 #!/usr/bin/python
 
 # This script gives client-side access to one Soledad user database by using
-# the data stored in ~/.config/leap/soledad/
+# the data stored in the appropriate config dir given by get_path_prefix().
+#
+# Use it like this:
+#
+#     python -i client-side-db.py <uuid> <passphrase>
 
 import sys
 import os

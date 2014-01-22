@@ -2,6 +2,10 @@
 
 # This script gives server-side access to one Soledad user database by using
 # the configuration stored in /etc/leap/soledad-server.conf.
+#
+# Use it like this:
+# 
+#     python -i server-side-db.py <uuid>
 
 import sys
 from ConfigParser import ConfigParser
