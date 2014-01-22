@@ -199,7 +199,7 @@ def raise_missing_design_doc_error(exc, ddoc_path):
     elif exc.message[1] == 'deleted':
         raise errors.MissingDesignDocDeletedError(path)
     # other errors are unknown for now
-    raise errors.DesignDocUnknownError(path)
+    raise errors.DesignDocUnknownError("%s: %s" % (path, str(exc.message)))
 
 
 def raise_server_error(exc, ddoc_path):
