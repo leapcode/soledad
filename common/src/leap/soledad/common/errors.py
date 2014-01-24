@@ -25,14 +25,17 @@ from u1db import errors
 from u1db.remote import http_errors
 
 
-exceptions = []
-
-
 def register_exception(cls):
     """
-    A small decorator to make it easier to register exceptions.
+    A small decorator that registers exceptions in u1db maps.
     """
-    exceptions.append(cls)
+    # update u1db "wire description to status" and "wire description to
+    # exception" maps.
+    http_errors.wire_description_to_status.update({
+        cls.wire_description: cls.status})
+    errors.wire_description_to_exc.update({
+        cls.wire_description: cls})
+    # do not modify the exception
     return cls
 
 
@@ -42,6 +45,30 @@ class SoledadError(errors.U1DBError):
     """
     pass
 
+
+#
+# Authorization errors
+#
+
+@register_exception
+class MissingAuthTokenError(errors.Unauthorized):
+    """
+    Exception raised when failing to get authorization for some action because
+    the auth token is missing in the tokens db.
+    """
+
+    wire_description = "missing token"
+    status = 401
+
+@register_exception
+class InvalidAuthTokenError(errors.Unauthorized):
+    """
+    Exception raised when failing to get authorization for some action because
+    the provided token is different from the one in the tokens db.
+    """
+
+    wire_descrition = "token mismatch"
+    status = 401
 
 #
 # LockResource errors
@@ -154,15 +181,6 @@ class DesignDocUnknownError(SoledadError):
 
     wire_description = "missing design document unknown error"
     status = 500
-
-
-# update u1db "wire description to status" and "wire description to exception"
-# maps.
-for e in exceptions:
-    http_errors.wire_description_to_status.update({
-        e.wire_description: e.status})
-    errors.wire_description_to_exc.update({
-        e.wire_description: e})
 
 
 # u1db error statuses also have to be updated
