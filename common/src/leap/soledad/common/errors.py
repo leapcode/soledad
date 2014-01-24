@@ -25,16 +25,29 @@ from u1db import errors
 from u1db.remote import http_errors
 
 
+exceptions = []
+
+
+def register_exception(cls):
+    """
+    A small decorator to make it easier to register exceptions.
+    """
+    exceptions.append(cls)
+    return cls
+
+
 class SoledadError(errors.U1DBError):
     """
     Base Soledad HTTP errors.
     """
     pass
 
+
 #
 # LockResource errors
 #
 
+@register_exception
 class InvalidTokenError(SoledadError):
     """
     Exception raised when trying to unlock shared database with invalid token.
@@ -44,6 +57,7 @@ class InvalidTokenError(SoledadError):
     status = 401
 
 
+@register_exception
 class NotLockedError(SoledadError):
     """
     Exception raised when trying to unlock shared database when it is not
@@ -54,6 +68,7 @@ class NotLockedError(SoledadError):
     status = 404
 
 
+@register_exception
 class AlreadyLockedError(SoledadError):
     """
     Exception raised when trying to lock shared database but it is already
@@ -64,6 +79,7 @@ class AlreadyLockedError(SoledadError):
     status = 403
 
 
+@register_exception
 class LockTimedOutError(SoledadError):
     """
     Exception raised when timing out while trying to lock the shared database.
@@ -73,6 +89,7 @@ class LockTimedOutError(SoledadError):
     status = 408
 
 
+@register_exception
 class CouldNotObtainLockError(SoledadError):
     """
     Exception raised when timing out while trying to lock the shared database.
@@ -86,6 +103,7 @@ class CouldNotObtainLockError(SoledadError):
 # CouchDatabase errors
 #
 
+@register_exception
 class MissingDesignDocError(SoledadError):
     """
     Raised when trying to access a missing couch design document.
@@ -95,6 +113,7 @@ class MissingDesignDocError(SoledadError):
     status = 500
 
 
+@register_exception
 class MissingDesignDocNamedViewError(SoledadError):
     """
     Raised when trying to access a missing named view on a couch design
@@ -105,6 +124,7 @@ class MissingDesignDocNamedViewError(SoledadError):
     status = 500
 
 
+@register_exception
 class MissingDesignDocListFunctionError(SoledadError):
     """
     Raised when trying to access a missing list function on a couch design
@@ -115,6 +135,7 @@ class MissingDesignDocListFunctionError(SoledadError):
     status = 500
 
 
+@register_exception
 class MissingDesignDocDeletedError(SoledadError):
     """
     Raised when trying to access a deleted couch design document.
@@ -124,6 +145,7 @@ class MissingDesignDocDeletedError(SoledadError):
     status = 500
 
 
+@register_exception
 class DesignDocUnknownError(SoledadError):
     """
     Raised when trying to access a couch design document and getting an
@@ -136,10 +158,7 @@ class DesignDocUnknownError(SoledadError):
 
 # update u1db "wire description to status" and "wire description to exception"
 # maps.
-for e in [InvalidTokenError, NotLockedError, AlreadyLockedError,
-        LockTimedOutError, CouldNotObtainLockError, MissingDesignDocError,
-        MissingDesignDocListFunctionError, MissingDesignDocNamedViewError,
-        MissingDesignDocDeletedError, DesignDocUnknownError]:
+for e in exceptions:
     http_errors.wire_description_to_status.update({
         e.wire_description: e.status})
     errors.wire_description_to_exc.update({
