@@ -190,6 +190,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._set_crypto_pragmas(
                 self._db_handle, password, raw_key, cipher, kdf_iter,
                 cipher_page_size)
+            if os.environ.get('LEAP_SQLITE_NOSYNC'):
+                self._pragma_synchronous_off(self._db_handle)
+            if os.environ.get('LEAP_SQLITE_MEMSTORE'):
+                self._pragma_mem_temp_store(self._db_handle)
             self._real_replica_uid = None
             self._ensure_schema()
             self._crypto = crypto
@@ -733,6 +737,22 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             raise NotAnHexString(key)
         # XXX change passphrase param!
         db_handle.cursor().execute('PRAGMA rekey = "x\'%s"' % passphrase)
+
+    @classmethod
+    def _pragma_synchronous_off(cls, db_handle):
+        """
+        Change the setting of the "synchronous" flag to OFF.
+        """
+        logger.debug("SQLCIPHER: SETTING SYNCHRONOUS OFF")
+        db_handle.cursor().execute('PRAGMA synchronous=OFF')
+
+    @classmethod
+    def _pragma_mem_temp_store(cls, db_handle):
+        """
+        Use a in-memory store for temporary tables.
+        """
+        logger.debug("SQLCIPHER: SETTING TEMP_STORE MEMORY")
+        db_handle.cursor().execute('PRAGMA temp_store=MEMORY')
 
     # Extra query methods: extensions to the base sqlite implmentation.
 

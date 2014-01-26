@@ -1,0 +1,1 @@
+  o Add sync=off and tem_store=mem to soledad client, for optimization.
