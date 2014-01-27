@@ -1,0 +1,1 @@
+  o Always return unicode in helper method, even on UnicodeError. Related to #4998.

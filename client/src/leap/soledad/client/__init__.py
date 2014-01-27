@@ -859,7 +859,7 @@ class Soledad(object):
 
     def _convert_to_unicode(self, content):
         """
-        Converts content to utf8 (or all the strings in content)
+        Converts content to unicode (or all the strings in content)
 
         NOTE: Even though this method supports any type, it will
         currently ignore contents of lists, tuple or any other
@@ -874,13 +874,14 @@ class Soledad(object):
         if isinstance(content, unicode):
             return content
         elif isinstance(content, str):
+            result = chardet.detect(content)
+            default = "utf-8"
+            encoding = result["encoding"] or default
             try:
-                result = chardet.detect(content)
-                default = "utf-8"
-                encoding = result["encoding"] or default
                 content = content.decode(encoding)
-            except UnicodeError:
-                pass
+            except UnicodeError as e:
+                logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
+                content = content.decode(encoding, 'replace')
             return content
         else:
             if isinstance(content, dict):
