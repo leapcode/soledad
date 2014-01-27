@@ -25,16 +25,56 @@ from u1db import errors
 from u1db.remote import http_errors
 
 
+def register_exception(cls):
+    """
+    A small decorator that registers exceptions in u1db maps.
+    """
+    # update u1db "wire description to status" and "wire description to
+    # exception" maps.
+    http_errors.wire_description_to_status.update({
+        cls.wire_description: cls.status})
+    errors.wire_description_to_exc.update({
+        cls.wire_description: cls})
+    # do not modify the exception
+    return cls
+
+
 class SoledadError(errors.U1DBError):
     """
     Base Soledad HTTP errors.
     """
     pass
 
+
+#
+# Authorization errors
+#
+
+@register_exception
+class MissingAuthTokenError(errors.Unauthorized):
+    """
+    Exception raised when failing to get authorization for some action because
+    the auth token is missing in the tokens db.
+    """
+
+    wire_description = "missing token"
+    status = 401
+
+@register_exception
+class InvalidAuthTokenError(errors.Unauthorized):
+    """
+    Exception raised when failing to get authorization for some action because
+    the provided token is different from the one in the tokens db.
+    """
+
+    wire_descrition = "token mismatch"
+    status = 401
+
 #
 # LockResource errors
 #
 
+@register_exception
 class InvalidTokenError(SoledadError):
     """
     Exception raised when trying to unlock shared database with invalid token.
@@ -44,6 +84,7 @@ class InvalidTokenError(SoledadError):
     status = 401
 
 
+@register_exception
 class NotLockedError(SoledadError):
     """
     Exception raised when trying to unlock shared database when it is not
@@ -54,6 +95,7 @@ class NotLockedError(SoledadError):
     status = 404
 
 
+@register_exception
 class AlreadyLockedError(SoledadError):
     """
     Exception raised when trying to lock shared database but it is already
@@ -64,6 +106,7 @@ class AlreadyLockedError(SoledadError):
     status = 403
 
 
+@register_exception
 class LockTimedOutError(SoledadError):
     """
     Exception raised when timing out while trying to lock the shared database.
@@ -73,6 +116,7 @@ class LockTimedOutError(SoledadError):
     status = 408
 
 
+@register_exception
 class CouldNotObtainLockError(SoledadError):
     """
     Exception raised when timing out while trying to lock the shared database.
@@ -86,6 +130,7 @@ class CouldNotObtainLockError(SoledadError):
 # CouchDatabase errors
 #
 
+@register_exception
 class MissingDesignDocError(SoledadError):
     """
     Raised when trying to access a missing couch design document.
@@ -95,6 +140,7 @@ class MissingDesignDocError(SoledadError):
     status = 500
 
 
+@register_exception
 class MissingDesignDocNamedViewError(SoledadError):
     """
     Raised when trying to access a missing named view on a couch design
@@ -105,6 +151,7 @@ class MissingDesignDocNamedViewError(SoledadError):
     status = 500
 
 
+@register_exception
 class MissingDesignDocListFunctionError(SoledadError):
     """
     Raised when trying to access a missing list function on a couch design
@@ -115,6 +162,7 @@ class MissingDesignDocListFunctionError(SoledadError):
     status = 500
 
 
+@register_exception
 class MissingDesignDocDeletedError(SoledadError):
     """
     Raised when trying to access a deleted couch design document.
@@ -124,6 +172,7 @@ class MissingDesignDocDeletedError(SoledadError):
     status = 500
 
 
+@register_exception
 class DesignDocUnknownError(SoledadError):
     """
     Raised when trying to access a couch design document and getting an
@@ -132,18 +181,6 @@ class DesignDocUnknownError(SoledadError):
 
     wire_description = "missing design document unknown error"
     status = 500
-
-
-# update u1db "wire description to status" and "wire description to exception"
-# maps.
-for e in [InvalidTokenError, NotLockedError, AlreadyLockedError,
-        LockTimedOutError, CouldNotObtainLockError, MissingDesignDocError,
-        MissingDesignDocListFunctionError, MissingDesignDocNamedViewError,
-        MissingDesignDocDeletedError, DesignDocUnknownError]:
-    http_errors.wire_description_to_status.update({
-        e.wire_description: e.status})
-    errors.wire_description_to_exc.update({
-        e.wire_description: e})
 
 
 # u1db error statuses also have to be updated
