@@ -1,0 +1,2 @@
+o Add lock for create_doc and update_indexes call,
+  prevents concurrent access to the db. Closes #5139.
