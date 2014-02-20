@@ -147,6 +147,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     _index_storage_value = 'expand referenced encrypted'
     k_lock = threading.Lock()
+    create_doc_lock = threading.Lock()
+    update_indexes_lock = threading.Lock()
     _syncer = None
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
@@ -400,6 +402,22 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
+    def create_doc(self, content, doc_id=None):
+        """
+        Create a new document in the local encrypted database.
+
+        :param content: the contents of the new document
+        :type content: dict
+        :param doc_id: an optional identifier specifying the document id
+        :type doc_id: str
+
+        :return: the new document
+        :rtype: SoledadDocument
+        """
+        with self.create_doc_lock:
+            return sqlite_backend.SQLitePartialExpandDatabase.create_doc(
+                self, content, doc_id=doc_id)
+
     def _put_and_update_indexes(self, old_doc, doc):
         """
         Update a document and all indexes related to it.
@@ -409,12 +427,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :param doc: The new version of the document.
         :type doc: u1db.Document
         """
-        sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
-            self, old_doc, doc)
-        c = self._db_handle.cursor()
-        c.execute('UPDATE document SET syncable=? '
-                  'WHERE doc_id=?',
-                  (doc.syncable, doc.doc_id))
+        with self.update_indexes_lock:
+            sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
+                self, old_doc, doc)
+            c = self._db_handle.cursor()
+            c.execute('UPDATE document SET syncable=? '
+                      'WHERE doc_id=?',
+                      (doc.syncable, doc.doc_id))
 
     def _get_doc(self, doc_id, check_for_conflicts=False):
         """
