@@ -194,8 +194,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 cipher_page_size)
             if os.environ.get('LEAP_SQLITE_NOSYNC'):
                 self._pragma_synchronous_off(self._db_handle)
+            else:
+                self._pragma_synchronous_normal(self._db_handle)
             if os.environ.get('LEAP_SQLITE_MEMSTORE'):
                 self._pragma_mem_temp_store(self._db_handle)
+            self._pragma_write_ahead_logging(self._db_handle)
             self._real_replica_uid = None
             self._ensure_schema()
             self._crypto = crypto
@@ -766,12 +769,54 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         db_handle.cursor().execute('PRAGMA synchronous=OFF')
 
     @classmethod
+    def _pragma_synchronous_normal(cls, db_handle):
+        """
+        Change the setting of the "synchronous" flag to NORMAL.
+        """
+        logger.debug("SQLCIPHER: SETTING SYNCHRONOUS NORMAL")
+        db_handle.cursor().execute('PRAGMA synchronous=NORMAL')
+
+    @classmethod
     def _pragma_mem_temp_store(cls, db_handle):
         """
         Use a in-memory store for temporary tables.
         """
         logger.debug("SQLCIPHER: SETTING TEMP_STORE MEMORY")
         db_handle.cursor().execute('PRAGMA temp_store=MEMORY')
+
+    @classmethod
+    def _pragma_write_ahead_logging(cls, db_handle):
+        """
+        Enable write-ahead logging, and set the autocheckpoint to 50 pages.
+
+        Setting the autocheckpoint to a small value, we make the reads not
+        suffer too much performance degradation.
+
+        From the sqlite docs:
+
+        "There is a tradeoff between average read performance and average write
+        performance. To maximize the read performance, one wants to keep the
+        WAL as small as possible and hence run checkpoints frequently, perhaps
+        as often as every COMMIT. To maximize write performance, one wants to
+        amortize the cost of each checkpoint over as many writes as possible,
+        meaning that one wants to run checkpoints infrequently and let the WAL
+        grow as large as possible before each checkpoint. The decision of how
+        often to run checkpoints may therefore vary from one application to
+        another depending on the relative read and write performance
+        requirements of the application. The default strategy is to run a
+        checkpoint once the WAL reaches 1000 pages"
+        """
+        logger.debug("SQLCIPHER: SETTING WRITE-AHEAD LOGGING")
+        db_handle.cursor().execute('PRAGMA journal_mode=WAL')
+        # The optimum value can still use a little bit of tuning, but we favor
+        # small sizes of the WAL file to get fast reads, since we assume that
+        # the writes will be quick enough to not block too much.
+
+        # TODO
+        # As a further improvement, we might want to set autocheckpoint to 0
+        # here and do the checkpoints manually in a separate thread, to avoid
+        # any blocks in the main thread (we should run a loopingcall from here)
+        db_handle.cursor().execute('PRAGMA wal_autocheckpoint=50')
 
     # Extra query methods: extensions to the base sqlite implmentation.
 
