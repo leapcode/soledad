@@ -495,10 +495,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocError,
             self.db._get_transaction_log)
-        # create_doc()
-        self.assertRaises(
-            errors.MissingDesignDocError,
-            self.db.create_doc, {})
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocError,
@@ -645,10 +641,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
             self.db._get_transaction_log)
-        # create_doc()
-        self.assertRaises(
-            errors.MissingDesignDocDeletedError,
-            self.db.create_doc, {})
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
