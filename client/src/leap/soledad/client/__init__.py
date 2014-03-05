@@ -1311,9 +1311,17 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     # derived from httplib.py
 
     def connect(self):
-        "Connect to a host on a given (SSL) port."
-        sock = socket.create_connection((self.host, self.port),
-                                        SOLEDAD_TIMEOUT, self.source_address)
+        """
+        Connect to a host on a given (SSL) port.
+        """
+        try:
+            source = self.source_address
+            sock = socket.create_connection((self.host, self.port),
+                                            SOLEDAD_TIMEOUT, source)
+        except AttributeError:
+            # source_address was introduced in 2.7
+            sock = socket.create_connection((self.host, self.port),
+                                            SOLEDAD_TIMEOUT)
         if self._tunnel_host:
             self.sock = sock
             self._tunnel()
