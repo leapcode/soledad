@@ -91,10 +91,10 @@ def open(path, password, create=True, document_factory=None, crypto=None,
     database does not already exist.
 
     :param path: The filesystem path for the database to open.
-    :param type: str
+    :type path: str
     :param create: True/False, should the database be created if it doesn't
         already exist?
-    :param type: bool
+    :param create: bool
     :param document_factory: A function that will be called with the same
         parameters as Document.__init__.
     :type document_factory: callable
@@ -155,20 +155,22 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
                  kdf_iter=4000, cipher_page_size=1024):
         """
-        Create a new sqlcipher file.
+        Connect to an existing SQLCipher database, creating a new sqlcipher
+        database file if needed.
 
         :param sqlcipher_file: The path for the SQLCipher file.
         :type sqlcipher_file: str
         :param password: The password that protects the SQLCipher db.
         :type password: str
         :param document_factory: A function that will be called with the same
-            parameters as Document.__init__.
+                                 parameters as Document.__init__.
         :type document_factory: callable
         :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-            document contents when syncing.
+                       document contents when syncing.
         :type crypto: soledad.crypto.SoledadCrypto
-        :param raw_key: Whether C{password} is a raw 64-char hex string or a
-            passphrase that should be hashed to obtain the encyrption key.
+        :param raw_key: Whether password is a raw 64-char hex string or a
+                        passphrase that should be hashed to obtain the
+                        encyrption key.
         :type raw_key: bool
         :param cipher: The cipher and mode to use.
         :type cipher: str
