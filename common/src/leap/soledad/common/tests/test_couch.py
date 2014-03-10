@@ -503,14 +503,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocError,
             self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
-        # fake a conflict so we can test resolve_doc()
-        first_rev = self.db._allocate_doc_rev(None)
-        doc = couch.CouchDocument(
-            doc_id='mydoc', rev=self.db._allocate_doc_rev(first_rev))
-        self.db._get_doc = Mock(return_value=doc)
-        self.assertRaises(
-            errors.MissingDesignDocError,
-            self.db.resolve_doc, doc, [first_rev])
 
     def test_missing_design_doc_functions_raises(self):
         """
@@ -649,14 +641,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
             self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
-        # fake a conflict so we can test resolve_doc()
-        first_rev = self.db._allocate_doc_rev(None)
-        doc = couch.CouchDocument(
-            doc_id='mydoc', rev=self.db._allocate_doc_rev(first_rev))
-        self.db._get_doc = Mock(return_value=doc)
-        self.assertRaises(
-            errors.MissingDesignDocDeletedError,
-            self.db.resolve_doc, doc, [first_rev])
 
 
 load_tests = tests.load_with_scenarios

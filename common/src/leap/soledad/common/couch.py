@@ -123,6 +123,16 @@ class CouchDocument(SoledadDocument):
         """
         return self._conflicts
 
+    def set_conflicts(self, conflicts):
+        """
+        Set the conflicted versions of the document.
+
+        :param conflicts: The conflicted versions of the document.
+        :type conflicts: list
+        """
+        self._conflicts = conflicts
+        self.has_conflicts = len(self._conflicts) > 0
+
     def add_conflict(self, doc):
         """
         Add a conflict to this document.
@@ -658,8 +668,11 @@ class CouchDatabase(CommonBackend):
                 and '_attachments' in result \
                 and 'u1db_conflicts' in result['_attachments']:
             doc.has_conflicts = True
-            #doc.conflicts = self._build_conflicts(
-            #    json.loads(result['_attachments']['u1db_conflicts']))
+            doc.set_conflicts(
+                self._build_conflicts(
+                    doc.doc_id,
+                    json.loads(binascii.a2b_base64(
+                        result['_attachments']['u1db_conflicts']['data']))))
         # store couch revision
         doc.couch_rev = result['_rev']
         # store transactions
@@ -1196,33 +1209,24 @@ class CouchDatabase(CommonBackend):
                                            conflicted_doc_revs)
         superseded_revs = set(conflicted_doc_revs)
         doc.rev = new_rev
+        # this backend stores conflicts as properties of the documents, so we
+        # have to copy these conflicts over to the document being updated.
         if cur_doc.rev in superseded_revs:
+            # the newer doc version will supersede the one in the database, so
+            # we copy conflicts before updating the backend.
+            doc.set_conflicts(cur_doc.get_conflicts())  # copy conflicts over.
             self._delete_conflicts(doc, superseded_revs)
             self._put_doc(cur_doc, doc)
         else:
-            self._add_conflict(doc, new_rev, doc.get_json())
-            self._delete_conflicts(doc, superseded_revs)
-            # perform request to resolve document in server
-            ddoc_path = [
-                '_design', 'docs', '_update', 'resolve_doc', doc.doc_id
-            ]
-            resource = self._database.resource(*ddoc_path)
-            conflicts = None
-            if doc.has_conflicts:
-                conflicts = binascii.b2a_base64(
-                    json.dumps(
-                        map(lambda cdoc: (cdoc.rev, cdoc.content),
-                            doc.get_conflicts()))
-                )[:-1]  # exclude \n
-            try:
-                response = resource.put_json(
-                    body={
-                        'couch_rev': cur_doc.couch_rev,
-                        'conflicts': conflicts,
-                    },
-                    headers={'content-type': 'application/json'})
-            except ResourceNotFound as e:
-                raise_missing_design_doc_error(e, ddoc_path)
+            # the newer doc version does not supersede the one in the
+            # database, so we will add a conflict to the database and copy
+            # those over to the document the user has in her hands.
+            self._add_conflict(cur_doc, new_rev, doc.get_json())
+            self._delete_conflicts(cur_doc, superseded_revs)
+            self._put_doc(cur_doc, cur_doc)  # just update conflicts
+            # backend has been updated with current conflicts, now copy them
+            # to the current document.
+            doc.set_conflicts(cur_doc.get_conflicts())
 
     def _put_doc_if_newer(self, doc, save_conflict, replica_uid, replica_gen,
                           replica_trans_id=''):
