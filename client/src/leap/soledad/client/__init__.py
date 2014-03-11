@@ -778,7 +778,7 @@ class Soledad(object):
 
         ============================== WARNING ==============================
         This method converts the document's contents to unicode in-place. This
-        meanse that after calling C{put_doc(doc)}, the contents of the
+        means that after calling C{put_doc(doc)}, the contents of the
         document, i.e. C{doc.content}, might be different from before the
         call.
         ============================== WARNING ==============================
