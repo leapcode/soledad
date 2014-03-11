@@ -15,18 +15,26 @@
 
 import os
 import configparser
-import couchdb
 import logging
 import argparse
 import random
 import string
 import binascii
 import json
+import time
+import uuid
+
+
+from couchdb.client import Database
+from socket import error as socket_error
+from leap.soledad.common.couch import CouchDatabase
 
 
 SOLEDAD_CONFIG_FILE = '/etc/leap/soledad-server.conf'
 PREFIX = '/tmp/soledad_test'
 LOG_FORMAT = '%(asctime)s %(levelname)s %(message)s'
+RETRIES = 3  # number of times to retry uploading a document of a certain
+             # size after a failure
 
 
 # configure logger
@@ -55,27 +63,19 @@ def get_couch_url(config_file=SOLEDAD_CONFIG_FILE):
 
 
 # generate or load an uploadable doc with the given size in mb
-def gen_body(size):
-    if os.path.exists(
-            os.path.join(PREFIX, 'body-%d.json' % size)):
-        logger.debug('Loading body with %d MB...' % size)
-        with open(os.path.join(PREFIX, 'body-%d.json' % size), 'r') as f:
-            return json.loads(f.read())
+def get_content(size):
+    fname = os.path.join(PREFIX, 'content-%d.json' % size)
+    if os.path.exists(fname):
+        logger.debug('Loading content with %d MB...' % size)
+        with open(fname, 'r') as f:
+            return f.read()
     else:
         length = int(size * 1024 ** 2)
-        hexdata = binascii.hexlify(os.urandom(length))[:length]
-        body = {
-            'couch_rev': None,
-            'u1db_rev': '1',
-            'content': hexdata,
-            'trans_id': '1',
-            'conflicts': None,
-            'update_conflicts': False,
-        }
         logger.debug('Generating body with %d MB...' % size)
-        with open(os.path.join(PREFIX, 'body-%d.json' % size), 'w+') as f:
-            f.write(json.dumps(body))
-        return body
+        content = binascii.hexlify(os.urandom(length))[:length]
+        with open(fname, 'w') as f:
+            f.write(content)
+        return content
 
 
 def delete_doc(db):
@@ -83,57 +83,57 @@ def delete_doc(db):
     db.delete(doc)
 
 
-def upload(db, size):
-    ddoc_path = ['_design', 'docs', '_update', 'put', 'largedoc']
-    resource = db.resource(*ddoc_path)
-    body = gen_body(size)
-    try:
-        logger.debug('Uploading %d MB body...' % size)
-        response = resource.put_json(
-            body=body,
-            headers={'content-type': 'application/json'})
-        # the document might have been updated in between, so we check for
-        # the return message
-        msg = response[2].read()
-        if msg == 'ok':
-            delete_doc(db)
+def upload(db, size, couch_db):
+    # try many times to be sure that size is infeasible
+    for i in range(RETRIES):
+        # wait until server is up to upload
+        while True:
+            try:
+                'largedoc' in couch_db
+                break
+            except socket_error:
+                logger.debug('Waiting for server to come up...')
+                time.sleep(1)
+        # attempt to upload
+        try:
+            logger.debug(
+                'Trying to upload %d MB document (attempt %d/%d)...' %
+                (size, (i+1), RETRIES))
+            content = get_content(size)
+            logger.debug('Starting upload of %d bytes.' % len(content))
+            doc = db.create_doc({'data': content}, doc_id='largedoc')
+            delete_doc(couch_db)
             logger.debug('Success uploading %d MB doc.' % size)
             return True
-        else:
-            # should not happen
-            logger.error('Unexpected error uploading %d MB doc: %s' % (size, msg))
-            return False
-    except Exception as e:
-        logger.debug('Failed to upload %d MB doc: %s' % (size, str(e)))
-        return False
+        except Exception as e:
+            logger.debug('Failed to upload %d MB doc: %s' % (size, str(e)))
+    return False
 
 
-def find_max_upload_size(dbname):
-    couch_url = get_couch_url()
-    db_url = '%s/%s' % (couch_url, dbname)
-    logger.debug('Couch URL: %s' % db_url)
-    # get a 'raw' couch handler
-    server = couchdb.client.Server(couch_url)
-    db = server[dbname]
+def find_max_upload_size(db_uri):
+    db = CouchDatabase.open_database(db_uri, False)
+    couch_db = Database(db_uri)
+    logger.debug('Database URI: %s' % db_uri)
     # delete eventual leftover from last run
-    largedoc = db.get('largedoc')
-    if largedoc is not None:
-        db.delete(largedoc)
+    if 'largedoc' in couch_db:
+        delete_doc(couch_db)
     # phase 1: increase upload size exponentially
     logger.info('Starting phase 1: increasing size exponentially.')
     size = 1
+    #import ipdb; ipdb.set_trace()
     while True:
-        if upload(db, size):
+        if upload(db, size, couch_db):
             size *= 2
         else:
             break
+
     # phase 2: binary search for maximum value
     unable = size
     able = size / 2
     logger.info('Starting phase 2: binary search for maximum value.')
     while unable - able > 1:
         size = able + ((unable - able) / 2)
-        if upload(db, size):
+        if upload(db, size, couch_db):
             able = size
         else:
             unable = size
@@ -150,12 +150,12 @@ if __name__ == '__main__':
         '-l', dest='logfile',
         help='log output to file')
     parser.add_argument(
-        'dbname', help='the name of the database to test in')
+        'db_uri', help='the couch database URI to test')
     args = parser.parse_args()
 
     # log to file
     if args.logfile is not None:
-        add_file_handler(args.logfile)
+        log_to_file(args.logfile)
 
     # set loglevel
     if args.debug is True:
@@ -164,6 +164,6 @@ if __name__ == '__main__':
         config_log(logging.INFO)
 
     # run test and report
-    logger.info('Will test using db %s.' % args.dbname)
-    maxsize = find_max_upload_size(args.dbname)
+    logger.info('Will test using db at %s.' % args.db_uri)
+    maxsize = find_max_upload_size(args.db_uri)
     logger.info('Max upload size is %d MB.' % maxsize)
