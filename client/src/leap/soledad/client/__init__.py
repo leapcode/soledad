@@ -1086,14 +1086,33 @@ class Soledad(object):
             performed.
         :rtype: str
         """
+        #return
+        local_gen = None
         if self._db:
             # acquire lock before attempt to sync
-            with Soledad.syncing_lock[self._db._get_replica_uid()]:
-                local_gen = self._db.sync(
-                    urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                    creds=self._creds, autocreate=True)
-                signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
-                return local_gen
+            replica_uid = self._db._get_replica_uid()
+            logger.debug("REPLICA UID: %s", replica_uid)
+            lock = Soledad.syncing_lock[replica_uid]
+            # optional wait flag used to avoid blocking
+            if not lock.acquire(False):
+                logger.debug('Already syncing... Skipping!')
+                return
+            else:
+                print "CLIENT syncing..."
+                try:
+                    local_gen = self._db.sync(
+                        urlparse.urljoin(
+                            self.server_url, 'user-%s' % self._uuid),
+                        creds=self._creds, autocreate=True)
+                    #signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
+                except Exception as exc:
+                    logger.error("error during soledad sync")
+                    logger.exception(exc)
+                finally:
+                    lock.release()
+                    if local_gen is not None:
+                        print "CLIENT synced!!!", local_gen
+                        return local_gen
 
     def need_sync(self, url):
         """

@@ -351,6 +351,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :return: The local generation before the synchronisation was performed.
         :rtype: int
         """
+        print "***********************"
+        print "SQLCIPHER: sync started"
         if not self.syncer:
             self._create_syncer(url, creds=creds)
 
@@ -365,7 +367,12 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             logger.info("Replacing connection and trying again...")
             self._syncer = None
             self._create_syncer(url, creds=creds)
+            print "SQLCIPHER: syncer created, about to sync..."
             res = self.syncer.sync(autocreate=autocreate)
+        except Exception:
+            logger.error("error SQLITE sync")
+            raise
+        print "SQLCIPHER: sync DONE"
         return res
 
     @property
