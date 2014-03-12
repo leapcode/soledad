@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # sqlcipher.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,8 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 A U1DB backend that uses SQLCipher as its persistence layer.
 
@@ -143,7 +141,9 @@ class NotAnHexString(Exception):
 #
 
 class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
-    """A U1DB implementation that uses SQLCipher as its persistence layer."""
+    """
+    A U1DB implementation that uses SQLCipher as its persistence layer.
+    """
 
     _index_storage_value = 'expand referenced encrypted'
     k_lock = threading.Lock()
@@ -184,7 +184,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self.assert_db_is_encrypted(
                 sqlcipher_file, password, raw_key, cipher, kdf_iter,
                 cipher_page_size)
-        # connect to the database
+
+        self._sync_db_path = "%s-sync" % sqlcipher_file
+
+        # connect to the sqlcipher database
         with self.k_lock:
             self._db_handle = dbapi2.connect(
                 sqlcipher_file,
@@ -397,7 +400,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 self,
                 SoledadSyncTarget(url,
                                   creds=creds,
-                                  crypto=self._crypto))
+                                  crypto=self._crypto,
+                                  sync_db_path=self._sync_db_path))
 
     def _extra_schema_init(self, c):
         """

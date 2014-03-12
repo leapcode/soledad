@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # __init__.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,12 +27,15 @@ import binascii
 import errno
 import httplib
 import logging
+import multiprocessing
 import os
 import socket
+import sqlite3
 import ssl
 import urlparse
 import hmac
 
+#from functools import partial
 from hashlib import sha256
 from threading import Lock
 from collections import defaultdict
@@ -42,6 +45,7 @@ try:
 except ImportError:
     import chardet
 
+from taskthread import TimerTask
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
 
@@ -107,7 +111,7 @@ from leap.soledad.client.crypto import SoledadCrypto
 from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client.sqlcipher import open as sqlcipher_open
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
-from leap.soledad.client.target import SoledadSyncTarget
+from leap.soledad.client.target import SoledadSyncTarget, encrypt_docstr
 
 
 logger = logging.getLogger(name=__name__)
@@ -149,6 +153,85 @@ class BootstrapSequenceError(Exception):
     """
 
 
+def encrypt_doc_task(doc_id, doc_rev, content, key, secret):
+    encrypted_content = encrypt_docstr(
+        content, doc_id, doc_rev, key, secret)
+    return doc_id, doc_rev, encrypted_content
+
+
+class SyncEncrypterPool(object):
+    """
+    Pool of workers that spawn subprocesses to execute the symmetric encryption
+    of documents to be synced.
+    """
+    # TODO implement throttling to reduce cpu usage??
+    # TODO move to its own module
+
+    WORKERS = 10
+    TABLE_NAME = "docs_tosync"
+    FIELD_NAMES = "doc_id", "rev", "content"
+
+    def __init__(self, crypto, sync_db):
+        """
+        Initialize the pool of encryption-workers.
+
+        :param crypto: A SoledadCryto instance to perform the encryption.
+        :type crypto: leap.soledad.crypto.SoledadCrypto
+
+        :param sync_db: a database connection handle
+        :type sync_db: handle
+        """
+        self._pool = multiprocessing.Pool(self.WORKERS)
+        self._crypto = crypto
+        self._sync_db = sync_db
+
+    def encrypt_doc(self, doc):
+        """
+        Symmetrically encrypt a document.
+
+        :param doc: The document with contents to be encrypted.
+        :type doc: SoledadDocument
+        """
+        print "ENCRYPTING DOC --->", doc
+        soledad_assert(not doc.is_tombstone())
+        docstr = doc.get_json()
+        key = self._crypto.doc_passphrase(doc.doc_id)
+        secret = self._crypto.secret
+        args = doc.doc_id, doc.rev, docstr, key, secret
+
+        try:
+            self._pool.apply_async(encrypt_doc_task, args,
+                                   callback=self.encrypt_doc_cb)
+        except Exception as exc:
+            logger.exception(exc)
+
+    def encrypt_doc_cb(self, result):
+        doc_id, doc_rev, content = result
+        self.insert_encrypted_doc(doc_id, doc_rev, content)
+
+    def insert_encrypted_doc(self, doc_id, doc_rev, content):
+        """
+        Insert the contents of the encrypted doc into the local sync
+        database.
+
+        :param doc: The document with contents to be encrypted.
+        :type doc: SoledadDocument
+        :param content: The encrypted document.
+        :type content: str
+        """
+        print ">>>>>>>>>>>> inserting encrypted doc: ", content
+        c = self._sync_db.cursor()
+        sql_del = "DELETE FROM '%s' WHERE doc_id=?" % (self.TABLE_NAME,)
+        c.execute(sql_del, (doc_id, ))
+        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?)" % (self.TABLE_NAME,)
+        print "inserting encrypted -------------", doc_id, doc_rev
+        print "content: ", content
+        c.execute(sql_ins, (doc_id, doc_rev, content))
+        self._sync_db.commit()
+
+    # TODO have to cleanly handle removals too
+
+
 class Soledad(object):
     """
     Soledad provides encrypted data storage and sync.
@@ -185,6 +268,12 @@ class Soledad(object):
     LOCAL_DATABASE_FILE_NAME = 'soledad.u1db'
     """
     The name of the local SQLCipher U1DB database file.
+    """
+
+    LOCAL_SYMMETRIC_SYNC_FILE_NAME = 'sync.u1db'
+    """
+    The name of the local symmetrically encrypted documents to
+    sync database file.
     """
 
     STORAGE_SECRETS_FILE_NAME = "soledad.json"
@@ -249,30 +338,37 @@ class Soledad(object):
     """
 
     syncing_lock = defaultdict(Lock)
+    encrypting_lock = Lock()
     """
     A dictionary that hold locks which avoid multiple sync attempts from the
     same database replica.
     """
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
-                 server_url, cert_file, auth_token=None, secret_id=None):
+                 server_url, cert_file,
+                 auth_token=None, secret_id=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
         :param uuid: User's uuid.
         :type uuid: str
+
         :param passphrase: The passphrase for locking and unlocking encryption
                            secrets for local and remote storage.
         :type passphrase: unicode
+
         :param secrets_path: Path for storing encrypted key used for
                              symmetric encryption.
         :type secrets_path: str
+
         :param local_db_path: Path for local encrypted storage db.
         :type local_db_path: str
+
         :param server_url: URL for Soledad server. This is used either to sync
-            with the user's remote db and to interact with the shared recovery
-            database.
+                           with the user's remote db and to interact with the
+                           shared recovery database.
         :type server_url: str
+
         :param cert_file: Path to the certificate of the ca used
                           to validate the SSL certificate used by the remote
                           soledad server.
@@ -290,8 +386,12 @@ class Soledad(object):
         # init crypto variables
         self._secrets = {}
         self._secret_id = secret_id
+
         # init config (possibly with default values)
-        self._init_config(secrets_path, local_db_path, server_url)
+        sync_db_path = "%s-sync" % local_db_path
+        self._init_config(secrets_path, local_db_path, server_url,
+                          sync_db_path)
+
         self._set_token(auth_token)
         self._shared_db_instance = None
         # configure SSL certificate
@@ -300,7 +400,13 @@ class Soledad(object):
         # initiate bootstrap sequence
         self._bootstrap()  # might raise BootstrapSequenceError()
 
-    def _init_config(self, secrets_path, local_db_path, server_url):
+        # initialize syncing queue encryption pool
+        self._sync_pool = SyncEncrypterPool(self._crypto, self._sync_db)
+        self._sync_watcher = TimerTask(self._encrypt_syncing_docs, delay=10)
+        self._sync_watcher.start()
+
+    def _init_config(self, secrets_path, local_db_path, server_url,
+                     local_sync_path):
         """
         Initialize configuration using default values for missing params.
         """
@@ -319,6 +425,12 @@ class Soledad(object):
         soledad_assert(
             self._server_url is not None,
             'Missing URL for Soledad server.')
+        # initialize local_sync_path
+        self._local_sync_path = local_sync_path
+        print "INITIALIZING SYNC DB ---->", local_sync_path
+        if self._local_sync_path is None:
+            self._local_sync_path = os.path.join(
+                self.DEFAULT_PREFIX, self.LOCAL_SYMMETRIC_SYNC_FILE_NAME)
 
     #
     # initialization/destruction methods
@@ -447,6 +559,9 @@ class Soledad(object):
         else:
             raise secrets_problem
 
+        # STAGE 5 - local sync documents and queue initialization
+        self._init_sync_db()
+
     def _init_dirs(self):
         """
         Create work directories.
@@ -502,6 +617,27 @@ class Soledad(object):
             document_factory=SoledadDocument,
             crypto=self._crypto,
             raw_key=True)
+
+    def _init_sync_db(self):
+        """
+        Initialize the Symmetrically-Encrypted document to be synced database,
+        and the queue to communicate with subprocess workers.
+        """
+        print "INITIALIZING SYNC DB"
+        self._sync_db = sqlite3.connect(self._local_sync_path,
+                                        check_same_thread=False)
+        self._create_sync_db()
+        self._sync_queue = multiprocessing.Queue()
+
+    def _create_sync_db(self):
+        """
+        Create local sync documents db if needed.
+        """
+        sql = ("""CREATE TABLE IF NOT EXISTS %s """
+               """(doc_id, rev, content)""" % SyncEncrypterPool.TABLE_NAME)
+        c = self._sync_db.cursor()
+        c.execute(sql)
+        self._sync_db.commit()
 
     def close(self):
         """
@@ -790,7 +926,10 @@ class Soledad(object):
         :rtype: str
         """
         doc.content = self._convert_to_unicode(doc.content)
-        return self._db.put_doc(doc)
+        new_rev = self._db.put_doc(doc)
+        # enqueue the modified document for symmetric encryption before sync
+        self._sync_queue.put_nowait(doc)
+        return new_rev
 
     def delete_doc(self, doc):
         """
@@ -895,8 +1034,11 @@ class Soledad(object):
         :return: the new document
         :rtype: SoledadDocument
         """
-        return self._db.create_doc(
+        doc = self._db.create_doc(
             self._convert_to_unicode(content), doc_id=doc_id)
+        # enqueue the modified document for symmetric encryption before sync
+        self._sync_queue.put_nowait(doc)
+        return doc
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -915,7 +1057,10 @@ class Soledad(object):
         :return: The new cocument
         :rtype: SoledadDocument
         """
-        return self._db.create_doc_from_json(json, doc_id=doc_id)
+        doc = self._db.create_doc_from_json(json, doc_id=doc_id)
+        # enqueue the modified document for encryption before sync
+        self._sync_queue.put_nowait(doc)
+        return doc
 
     def create_index(self, index_name, *index_expressions):
         """
@@ -1313,6 +1458,31 @@ class Soledad(object):
 
     def _passphrase_as_string(self):
         return self._passphrase.encode('utf-8')
+
+    #
+    # Symmetric encryption
+    #
+
+    def _encrypt_syncing_docs(self):
+        """
+        Process the syncing queue and send the documents there
+        to be encrypted in the sync db.
+        """
+        lock = self.encrypting_lock
+        # optional wait flag used to avoid blocking
+        if not lock.acquire(False):
+            return
+        else:
+            queue = self._sync_queue
+            try:
+                while not queue.empty():
+                    doc = queue.get_nowait()
+                    self._sync_pool.encrypt_doc(doc)
+            except Exception as exc:
+                logger.error("Error while  encrypting docs to sync")
+                logger.exception(exc)
+            finally:
+                lock.release()
 
 
 #-----------------------------------------------------------------------------

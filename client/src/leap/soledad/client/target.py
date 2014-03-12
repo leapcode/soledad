@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # target.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,8 @@ import gzip
 import hashlib
 import hmac
 import logging
+import os
+import sqlite3
 import urllib
 
 import simplejson as json
@@ -56,6 +58,9 @@ from leap.soledad.client.crypto import (
     EncryptionMethods,
     UnknownEncryptionMethod,
 )
+from leap.soledad.client.crypto import encrypt_sym, doc_mac_key
+
+from leap.common.check import leap_check
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +81,7 @@ class DocumentNotEncrypted(Exception):
 #
 
 
-def mac_doc(crypto, doc_id, doc_rev, ciphertext, mac_method):
+def mac_doc(doc_id, doc_rev, ciphertext, mac_method, secret):
     """
     Calculate a MAC for C{doc} using C{ciphertext}.
 
@@ -86,8 +91,6 @@ def mac_doc(crypto, doc_id, doc_rev, ciphertext, mac_method):
         * msg: doc_id + doc_rev + ciphertext
         * digestmod: sha256
 
-    :param crypto: A SoledadCryto instance used to perform the encryption.
-    :type crypto: leap.soledad.crypto.SoledadCrypto
     :param doc_id: The id of the document.
     :type doc_id: str
     :param doc_rev: The revision of the document.
@@ -96,20 +99,22 @@ def mac_doc(crypto, doc_id, doc_rev, ciphertext, mac_method):
     :type ciphertext: str
     :param mac_method: The MAC method to use.
     :type mac_method: str
+    :param secret: soledad secret
+    :type secret: Soledad.secret_storage
 
     :return: The calculated MAC.
     :rtype: str
     """
     if mac_method == MacMethods.HMAC:
         return hmac.new(
-            crypto.doc_mac_key(doc_id),
+            doc_mac_key(doc_id, secret),
             str(doc_id) + str(doc_rev) + ciphertext,
             hashlib.sha256).digest()
     # raise if we do not know how to handle this MAC method
     raise UnknownMacMethod('Unknown MAC method: %s.' % mac_method)
 
 
-def encrypt_doc(crypto, doc):
+def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     """
     Encrypt C{doc}'s content.
 
@@ -125,21 +130,29 @@ def encrypt_doc(crypto, doc):
             MAC_METHOD_KEY: 'hmac'
         }
 
-    :param crypto: A SoledadCryto instance used to perform the encryption.
-    :type crypto: leap.soledad.crypto.SoledadCrypto
-    :param doc: The document with contents to be encrypted.
-    :type doc: SoledadDocument
+    :param docstr: A representation of the document to be encrypted.
+    :type docstr: str or unicode.
+
+    :param doc_id: The document id.
+    :type doc_id: str
+
+    :param doc_rev: The document revision.
+    :type doc_rev: str
+
+    :param key: The key used to encrypt ``data`` (must be 256 bits long).
+    :type key: str
+
+    :param secret:
+    :type secret:
 
     :return: The JSON serialization of the dict representing the encrypted
         content.
     :rtype: str
     """
-    soledad_assert(doc.is_tombstone() is False)
     # encrypt content using AES-256 CTR mode
-    iv, ciphertext = crypto.encrypt_sym(
-        str(doc.get_json()),  # encryption/decryption routines expect str
-        crypto.doc_passphrase(doc.doc_id),
-        method=EncryptionMethods.AES_256_CTR)
+    iv, ciphertext = encrypt_sym(
+        str(docstr),  # encryption/decryption routines expect str
+        key, method=EncryptionMethods.AES_256_CTR)
     # Return a representation for the encrypted content. In the following, we
     # convert binary data to hexadecimal representation so the JSON
     # serialization does not complain about what it tries to serialize.
@@ -150,9 +163,8 @@ def encrypt_doc(crypto, doc):
         ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
         ENC_IV_KEY: iv,
         MAC_KEY: binascii.b2a_hex(mac_doc(  # store the mac as hex.
-            crypto, doc.doc_id, doc.rev,
-            ciphertext,
-            MacMethods.HMAC)),
+            doc_id, doc_rev, ciphertext,
+            MacMethods.HMAC, secret)),
         MAC_METHOD_KEY: MacMethods.HMAC,
     })
 
@@ -197,9 +209,9 @@ def decrypt_doc(crypto, doc):
     ciphertext = binascii.a2b_hex(  # content is stored as hex.
         doc.content[ENC_JSON_KEY])
     mac = mac_doc(
-        crypto, doc.doc_id, doc.rev,
+        doc.doc_id, doc.rev,
         ciphertext,
-        doc.content[MAC_METHOD_KEY])
+        doc.content[MAC_METHOD_KEY], crypto.secret)
     # we compare mac's hashes to avoid possible timing attacks that might
     # exploit python's builtin comparison operator behaviour, which fails
     # immediatelly when non-matching bytes are found.
@@ -254,62 +266,49 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
     """
     A SyncTarget that encrypts data before sending and decrypts data after
     receiving.
+
+    Normally encryption will have been written to the sync database upon
+    document modification. The sync database is also used to write temporarily
+    the parsed documents that the remote send us, before being decrypted and
+    written to the main database.
     """
-
-    #
-    # Token auth methods.
-    #
-
-    def set_token_credentials(self, uuid, token):
-        """
-        Store given credentials so we can sign the request later.
-
-        :param uuid: The user's uuid.
-        :type uuid: str
-        :param token: The authentication token.
-        :type token: str
-        """
-        TokenBasedAuth.set_token_credentials(self, uuid, token)
-
-    def _sign_request(self, method, url_query, params):
-        """
-        Return an authorization header to be included in the HTTP request.
-
-        :param method: The HTTP method.
-        :type method: str
-        :param url_query: The URL query string.
-        :type url_query: str
-        :param params: A list with encoded query parameters.
-        :type param: list
-
-        :return: The Authorization header.
-        :rtype: list of tuple
-        """
-        return TokenBasedAuth._sign_request(self, method, url_query, params)
 
     #
     # Modified HTTPSyncTarget methods.
     #
 
-    @staticmethod
-    def connect(url, crypto=None):
-        return SoledadSyncTarget(url, crypto=crypto)
-
-    def __init__(self, url, creds=None, crypto=None):
+    def __init__(self, url, creds=None, crypto=None, sync_db_path=None):
         """
         Initialize the SoledadSyncTarget.
 
         :param url: The url of the target replica to sync with.
         :type url: str
+
         :param creds: optional dictionary giving credentials.
-            to authorize the operation with the server.
+                      to authorize the operation with the server.
         :type creds: dict
+
         :param soledad: An instance of Soledad so we can encrypt/decrypt
-            document contents when syncing.
+                        document contents when syncing.
         :type soledad: soledad.Soledad
+
+        :param sync_db_path: Optional. Path to the db with the symmetric
+                             encryption of the syncing documents. If
+                             None, encryption will be done in-place,
+                             instead of retreiving it from the dedicated
+                             database.
+        :type sync_db_path: str
         """
         HTTPSyncTarget.__init__(self, url, creds)
         self._crypto = crypto
+
+        self._sync_db = None
+        if sync_db_path is not None:
+            self._init_sync_db(sync_db_path)
+
+    @staticmethod
+    def connect(url, crypto=None):
+        return SoledadSyncTarget(url, crypto=crypto)
 
     def _parse_sync_stream(self, data, return_doc_cb, ensure_callback=None):
         """
@@ -322,17 +321,19 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         :param data: The body of the HTTP response.
         :type data: str
+
         :param return_doc_cb: A callback to insert docs from target.
         :type return_doc_cb: function
+
         :param ensure_callback: A callback to ensure we have the correct
-            target_replica_uid, if it was just created.
+                                target_replica_uid, if it was just created.
         :type ensure_callback: function
 
         :raise BrokenSyncStream: If C{data} is malformed.
 
         :return: A dictionary representing the first line of the response got
-            from remote replica.
-        :rtype: list of str
+                 from remote replica.
+        :rtype: dict
         """
         parts = data.splitlines()  # one at a time
         if not parts or parts[0] != '[':
@@ -475,10 +476,11 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :param last_known_trans_id: Target's last known transaction id.
         :type last_known_trans_id: str
         :param return_doc_cb: A callback for inserting received documents from
-            target.
+                              target.
         :type return_doc_cb: function
         :param ensure_callback: A callback that ensures we know the target
-            replica uid if the target replica was just created.
+                                replica uid if the target replica was just
+                                created.
         :type ensure_callback: function
 
         :return: The new generation and transaction id of the target replica.
@@ -507,6 +509,8 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             last_known_trans_id=last_known_trans_id,
             ensure=ensure_callback is not None)
         comma = ','
+
+        synced = []
         for doc, gen, trans_id in docs_by_generations:
             # skip non-syncable docs
             if isinstance(doc, SoledadDocument) and not doc.syncable:
@@ -516,13 +520,31 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             #-------------------------------------------------------------
             doc_json = doc.get_json()
             if not doc.is_tombstone():
-                doc_json = encrypt_doc(self._crypto, doc)
+                if self._sync_db is None:
+                    # fallback case, for tests
+                    doc_json = encrypt_docstr(
+                        json.dumps(doc.get_json()),
+                        doc.doc_id, doc.rev, self._crypto.secret)
+                else:
+                    try:
+                        doc_json = self.get_encrypted_doc_from_db(
+                            doc.doc_id, doc.rev)
+                    except Exception as exc:
+                        logger.error("Error while getting "
+                                     "encrypted doc from db")
+                        logger.exception(exc)
+                        continue
+                    if doc_json is None:
+                        # Not marked as tombstone, but we got nothing
+                        # from the sync db. Maybe not encrypted yet.
+                        continue
             #-------------------------------------------------------------
             # end of symmetric encryption
             #-------------------------------------------------------------
             size += prepare(id=doc.doc_id, rev=doc.rev,
                             content=doc_json,
                             gen=gen, trans_id=trans_id)
+            synced.append((doc.doc_id, doc.rev))
         entries.append('\r\n]')
         size += len(entries[-1])
         self._conn.putheader('content-length', str(size))
@@ -533,5 +555,94 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         data, headers = self._response()
 
         res = self._parse_sync_stream(data, return_doc_cb, ensure_callback)
+
+        # delete documents from the sync queue
+        self.delete_encrypted_docs_from_db(synced)
+
         data = None
         return res['new_generation'], res['new_transaction_id']
+
+    #
+    # Token auth methods.
+    #
+
+    def set_token_credentials(self, uuid, token):
+        """
+        Store given credentials so we can sign the request later.
+
+        :param uuid: The user's uuid.
+        :type uuid: str
+        :param token: The authentication token.
+        :type token: str
+        """
+        TokenBasedAuth.set_token_credentials(self, uuid, token)
+
+    def _sign_request(self, method, url_query, params):
+        """
+        Return an authorization header to be included in the HTTP request.
+
+        :param method: The HTTP method.
+        :type method: str
+        :param url_query: The URL query string.
+        :type url_query: str
+        :param params: A list with encoded query parameters.
+        :type param: list
+
+        :return: The Authorization header.
+        :rtype: list of tuple
+        """
+        return TokenBasedAuth._sign_request(self, method, url_query, params)
+
+    #
+    # Syncing db
+    #
+
+    def _init_sync_db(self, path):
+        """
+        Open a connection to the local db of encrypted docs for sync.
+
+        :param path: The path to the local db.
+        :type path: str
+        """
+        leap_check(path is not None, "Need a path to initialize db")
+        if not os.path.isfile(path):
+            logger.warning("Cannot open db: non-existent file!")
+            return
+        self._sync_db = sqlite3.connect(path, check_same_thread=False)
+
+    def get_encrypted_doc_from_db(self, doc_id, doc_rev):
+        """
+        Retrieve encrypted document from the database of encrypted docs for
+        sync.
+
+        :param doc_id: The Document id.
+        :type doc_id: str
+
+        :param doc_rev: The document revision
+        :type doc_rev: str
+        """
+        c = self._sync_db.cursor()
+        # XXX interpolate table name
+        sql = ("SELECT content FROM docs_tosync "
+               "WHERE doc_id=? and rev=?")
+        c.execute(sql, (doc_id, doc_rev))
+        res = c.fetchall()
+        if len(res) != 0:
+            return res[0][0]
+
+    def delete_encrypted_docs_from_db(self, docs_ids):
+        """
+        Delete several encrypted documents from the database of symmetrically
+        encrypted docs to sync.
+
+        :param docs_ids: an iterable with (doc_id, doc_rev) for all documents
+                         to be deleted.
+        :type docs_ids: any iterable of tuples of str
+        """
+        c = self._sync_db.cursor()
+        for doc_id, doc_rev in docs_ids:
+            # XXX interpolate table name
+            sql = ("DELETE FROM docs_tosync "
+                   "WHERE doc_id=? and rev=?")
+            c.execute(sql, (doc_id, doc_rev))
+        self._sync_db.commit()
