@@ -51,6 +51,17 @@ from leap.soledad.server import SoledadApp, LockResource
 from leap.soledad.server.auth import URLToAuthorization
 
 
+# monkey path CouchServerState so it can ensure databases.
+
+def _couch_ensure_database(self, dbname):
+    db = CouchDatabase.open_database(
+        self._couch_url + '/' + dbname,
+        create=True)
+    return db, db._replica_uid
+
+CouchServerState.ensure_database = _couch_ensure_database
+
+
 class ServerAuthorizationTestCase(BaseLeapTest):
     """
     Tests related to Soledad server authorization.
@@ -340,15 +351,16 @@ class EncryptedSyncTestCase(
         _, doclist = sol1.get_all_docs()
         self.assertEqual([], doclist)
         doc1 = sol1.create_doc(json.loads(simple_doc))
-        # sync with server
-        sol1._server_url = self.getURL()
-        sol1.sync()
-        # assert doc was sent to couch db
+        # ensure remote db exists before syncing
         db = CouchDatabase(
             self._couch_url,
             # the name of the user database is "user-<uuid>".
             'user-user-uuid',
         )
+        # sync with server
+        sol1._server_url = self.getURL()
+        sol1.sync()
+        # assert doc was sent to couch db
         _, doclist = db.get_all_docs()
         self.assertEqual(1, len(doclist))
         couchdoc = doclist[0]
@@ -395,15 +407,16 @@ class EncryptedSyncTestCase(
         _, doclist = sol1.get_all_docs()
         self.assertEqual([], doclist)
         doc1 = sol1.create_doc(json.loads(simple_doc))
-        # sync with server
-        sol1._server_url = self.getURL()
-        sol1.sync()
-        # assert doc was sent to couch db
+        # ensure remote db exists before syncing
         db = CouchDatabase(
             self._couch_url,
             # the name of the user database is "user-<uuid>".
             'user-user-uuid',
         )
+        # sync with server
+        sol1._server_url = self.getURL()
+        sol1.sync()
+        # assert doc was sent to couch db
         _, doclist = db.get_all_docs()
         self.assertEqual(1, len(doclist))
         couchdoc = doclist[0]
@@ -454,6 +467,12 @@ class EncryptedSyncTestCase(
         self.assertEqual([], doclist)
         content = binascii.hexlify(os.urandom(length/2))  # len() == length
         doc1 = sol1.create_doc({'data': content})
+        # ensure remote db exists before syncing
+        db = CouchDatabase(
+            self._couch_url,
+            # the name of the user database is "user-<uuid>".
+            'user-user-uuid',
+        )
         # sync with server
         sol1._server_url = self.getURL()
         sol1.sync()
@@ -473,11 +492,6 @@ class EncryptedSyncTestCase(
         # assert incoming doc is equal to the first sent doc
         self.assertEqual(doc1, doc2)
         # delete remote database
-        db = CouchDatabase(
-            self._couch_url,
-            # the name of the user database is "user-<uuid>".
-            'user-user-uuid',
-        )
         db.delete_database()
 
 
@@ -497,6 +511,12 @@ class EncryptedSyncTestCase(
         # create many small files
         for i in range(0, number_of_docs):
             sol1.create_doc(json.loads(simple_doc))
+        # ensure remote db exists before syncing
+        db = CouchDatabase(
+            self._couch_url,
+            # the name of the user database is "user-<uuid>".
+            'user-user-uuid',
+        )
         # sync with server
         sol1._server_url = self.getURL()
         sol1.sync()
@@ -516,11 +536,6 @@ class EncryptedSyncTestCase(
         for doc in doclist:
             self.assertEqual(sol1.get_doc(doc.doc_id), doc)
         # delete remote database
-        db = CouchDatabase(
-            self._couch_url,
-            # the name of the user database is "user-<uuid>".
-            'user-user-uuid',
-        )
         db.delete_database()
 
 class LockResourceTestCase(
@@ -542,6 +557,9 @@ class LockResourceTestCase(
         CouchDBTestCase.setUp(self)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        # create the databases
+        CouchDatabase(self._couch_url, 'shared')
+        CouchDatabase(self._couch_url, 'tokens')
         self._state = CouchServerState(
             self._couch_url, 'shared', 'tokens')
 

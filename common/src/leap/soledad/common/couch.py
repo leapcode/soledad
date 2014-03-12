@@ -35,7 +35,6 @@ from couchdb.client import Server
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
-    Unauthorized,
     ServerError,
     Session,
 )
@@ -48,6 +47,7 @@ from u1db.errors import (
     ConflictedDoc,
     DocumentDoesNotExist,
     DocumentAlreadyDeleted,
+    Unauthorized,
 )
 from u1db.backends import CommonBackend, CommonSyncTarget
 from u1db.remote import http_app
@@ -1451,7 +1451,6 @@ class CouchServerState(ServerState):
         :return: The CouchDatabase object.
         :rtype: CouchDatabase
         """
-        # TODO: open couch
         return CouchDatabase.open_database(
             self._couch_url + '/' + dbname,
             create=False)
@@ -1460,16 +1459,20 @@ class CouchServerState(ServerState):
         """
         Ensure couch database exists.
 
+        Usually, this method is used by the server to ensure the existence of
+        a database. In our setup, the Soledad user that accesses the underlying
+        couch server should never have permission to create (or delete)
+        databases. But, in case it ever does, by raising an exception here we
+        have one more guarantee that no modified client will be able to
+        enforce creation of a database when syncing.
+
         :param dbname: The name of the database to ensure.
         :type dbname: str
 
         :return: The CouchDatabase object and the replica uid.
         :rtype: (CouchDatabase, str)
         """
-        db = CouchDatabase.open_database(
-            self._couch_url + '/' + dbname,
-            create=True)
-        return db, db._replica_uid
+        raise Unauthorized()
 
     def delete_database(self, dbname):
         """
@@ -1478,7 +1481,7 @@ class CouchServerState(ServerState):
         :param dbname: The name of the database to delete.
         :type dbname: str
         """
-        CouchDatabase.delete_database(self._couch_url + '/' + dbname)
+        raise Unauthorized()
 
     def _set_couch_url(self, url):
         """
