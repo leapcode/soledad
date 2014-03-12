@@ -1091,7 +1091,7 @@ class Soledad(object):
             with Soledad.syncing_lock[self._db._get_replica_uid()]:
                 local_gen = self._db.sync(
                     urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                    creds=self._creds, autocreate=True)
+                    creds=self._creds, autocreate=False)
                 signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
                 return local_gen
 
