@@ -13,9 +13,16 @@ import requests
 import json
 import srp._pysrp as srp
 import binascii
+import logging
 
 from leap.common.config import get_path_prefix
 from leap.soledad.client import Soledad
+
+
+# create a logger
+logger = logging.getLogger(__name__)
+LOG_FORMAT = '%(asctime)s %(message)s'
+logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 
 safe_unhexlify = lambda x: binascii.unhexlify(x) if (
@@ -23,7 +30,7 @@ safe_unhexlify = lambda x: binascii.unhexlify(x) if (
 
 
 def fail(reason):
-    print 'Fail: ' + reason
+    logger.error('Fail: ' + reason)
     exit(2)
 
 
@@ -94,6 +101,8 @@ def get_soledad_instance(username, provider, passphrase, basedir):
     # setup soledad info
     uuid, server_url, cert_file, token = \
         get_soledad_info(username, provider, passphrase, basedir)
+    logger.info('UUID is %s' % uuid)
+    logger.info('Server URL is %s' % server_url)
     secrets_path = os.path.join(
         basedir, '%s.secret' % uuid)
     local_db_path = os.path.join(
@@ -138,7 +147,7 @@ if __name__ == '__main__':
     basedir = args.basedir
     if basedir is None:
         basedir = tempfile.mkdtemp()
-    print 'Using %s as base directory.' % basedir
+    logger.info('Using %s as base directory.' % basedir)
 
     # get the soledad instance
     s = get_soledad_instance(
