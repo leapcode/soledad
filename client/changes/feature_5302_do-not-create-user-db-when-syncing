@@ -1,0 +1,2 @@
+  o Do not autocreate remote user database when syncing. Tapicero should make
+    sure that that db is created when the user is created. Closes #5302.

@@ -35,7 +35,6 @@ from couchdb.client import Server
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
-    Unauthorized,
     ServerError,
     Session,
 )
@@ -48,6 +47,7 @@ from u1db.errors import (
     ConflictedDoc,
     DocumentDoesNotExist,
     DocumentAlreadyDeleted,
+    Unauthorized,
 )
 from u1db.backends import CommonBackend, CommonSyncTarget
 from u1db.remote import http_app
@@ -1354,14 +1354,6 @@ class CouchSyncTarget(CommonSyncTarget):
             source_replica_transaction_id)
 
 
-class NotEnoughCouchPermissions(Exception):
-    """
-    Raised when failing to assert for enough permissions on underlying Couch
-    Database.
-    """
-    pass
-
-
 class CouchServerState(ServerState):
     """
     Inteface of the WSGI server with the CouchDB backend.
@@ -1381,65 +1373,6 @@ class CouchServerState(ServerState):
         self._couch_url = couch_url
         self._shared_db_name = shared_db_name
         self._tokens_db_name = tokens_db_name
-        try:
-            self._check_couch_permissions()
-        except NotEnoughCouchPermissions:
-            logger.error("Not enough permissions on underlying couch "
-                         "database (%s)." % self._couch_url)
-        except (socket.error, socket.gaierror, socket.herror,
-                socket.timeout), e:
-            logger.error("Socket problem while trying to reach underlying "
-                         "couch database: (%s, %s)." %
-                         (self._couch_url, e))
-
-    def _check_couch_permissions(self):
-        """
-        Assert that Soledad Server has enough permissions on the underlying
-        couch database.
-
-        Soledad Server has to be able to do the following in the couch server:
-
-            * Create, read and write from/to 'shared' db.
-            * Create, read and write from/to 'user-<anything>' dbs.
-            * Read from 'tokens' db.
-
-        This function tries to perform the actions above using the "low level"
-        couch library to ensure that Soledad Server can do everything it needs
-        on the underlying couch database.
-
-        :param couch_url: The URL of the couch database.
-        :type couch_url: str
-
-        @raise NotEnoughCouchPermissions: Raised in case there are not enough
-            permissions to read/write/create the needed couch databases.
-        :rtype: bool
-        """
-
-        def _open_couch_db(dbname):
-            server = Server(url=self._couch_url)
-            try:
-                server[dbname]
-            except ResourceNotFound:
-                server.create(dbname)
-            return server[dbname]
-
-        def _create_delete_test_doc(db):
-            doc_id, _ = db.save({'test': 'document'})
-            doc = db[doc_id]
-            db.delete(doc)
-
-        try:
-            # test read/write auth for shared db
-            _create_delete_test_doc(
-                _open_couch_db(self._shared_db_name))
-            # test read/write auth for user-<something> db
-            _create_delete_test_doc(
-                _open_couch_db('%stest-db' % USER_DB_PREFIX))
-            # test read auth for tokens db
-            tokensdb = _open_couch_db(self._tokens_db_name)
-            tokensdb.info()
-        except Unauthorized:
-            raise NotEnoughCouchPermissions(self._couch_url)
 
     def open_database(self, dbname):
         """
@@ -1451,7 +1384,6 @@ class CouchServerState(ServerState):
         :return: The CouchDatabase object.
         :rtype: CouchDatabase
         """
-        # TODO: open couch
         return CouchDatabase.open_database(
             self._couch_url + '/' + dbname,
             create=False)
@@ -1460,16 +1392,20 @@ class CouchServerState(ServerState):
         """
         Ensure couch database exists.
 
+        Usually, this method is used by the server to ensure the existence of
+        a database. In our setup, the Soledad user that accesses the underlying
+        couch server should never have permission to create (or delete)
+        databases. But, in case it ever does, by raising an exception here we
+        have one more guarantee that no modified client will be able to
+        enforce creation of a database when syncing.
+
         :param dbname: The name of the database to ensure.
         :type dbname: str
 
         :return: The CouchDatabase object and the replica uid.
         :rtype: (CouchDatabase, str)
         """
-        db = CouchDatabase.open_database(
-            self._couch_url + '/' + dbname,
-            create=True)
-        return db, db._replica_uid
+        raise Unauthorized()
 
     def delete_database(self, dbname):
         """
@@ -1478,7 +1414,7 @@ class CouchServerState(ServerState):
         :param dbname: The name of the database to delete.
         :type dbname: str
         """
-        CouchDatabase.delete_database(self._couch_url + '/' + dbname)
+        raise Unauthorized()
 
     def _set_couch_url(self, url):
         """
