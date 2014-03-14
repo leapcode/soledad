@@ -1,0 +1,1 @@
+  o Parallelize get_docs() on couch backend to accelerate sync (#5008).
