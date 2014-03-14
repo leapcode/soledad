@@ -324,7 +324,7 @@ class Soledad(object):
         self._bootstrap()  # might raise BootstrapSequenceError()
 
         # initialize syncing queue encryption pool
-        self._sync_pool = SyncEncrypterPool(self._crypto, self._sync_db)
+        self._sync_enc_pool = SyncEncrypterPool(self._crypto, self._sync_db)
         self._sync_watcher = TimerTask(self._encrypt_syncing_docs, delay=10)
         self._sync_watcher.start()
 
@@ -1145,7 +1145,7 @@ class Soledad(object):
         if self._db:
             return self._db.resolve_doc(doc, conflicted_doc_revs)
 
-    def sync(self):
+    def sync(self, decrypt_inline=False):
         """
         Synchronize the local encrypted replica with a remote replica.
 
@@ -1155,11 +1155,15 @@ class Soledad(object):
         :param url: the url of the target replica to sync with
         :type url: str
 
-        :return: the local generation before the synchronisation was
-            performed.
+        :param decrypt_inline: Whether to do the decryption of received
+                               messages inline or not.
+        :type decrypt_inline: bool
+
+        :return: The local generation before the synchronisation was
+                 performed.
         :rtype: str
         """
-        #return
+        print "SYNC: inline? ", decrypt_inline
         local_gen = None
         if self._db:
             # acquire lock before attempt to sync
@@ -1176,8 +1180,9 @@ class Soledad(object):
                     local_gen = self._db.sync(
                         urlparse.urljoin(
                             self.server_url, 'user-%s' % self._uuid),
-                        creds=self._creds, autocreate=True)
-                    #signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
+                        creds=self._creds, autocreate=True,
+                        decrypt_inline=decrypt_inline)
+                    signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
                 except Exception as exc:
                     logger.error("error during soledad sync")
                     logger.exception(exc)
@@ -1388,7 +1393,7 @@ class Soledad(object):
         return self._passphrase.encode('utf-8')
 
     #
-    # Symmetric encryption / decryption
+    # Symmetric encryption of syncing docs
     #
 
     def _encrypt_syncing_docs(self):
@@ -1396,6 +1401,8 @@ class Soledad(object):
         Process the syncing queue and send the documents there
         to be encrypted in the sync db. They will be read by the
         SoledadSyncTarget during the sync_exchange.
+
+        Called periodical from the TimerTask self._sync_watcher.
         """
         lock = self.encrypting_lock
         # optional wait flag used to avoid blocking
@@ -1406,7 +1413,7 @@ class Soledad(object):
             try:
                 while not queue.empty():
                     doc = queue.get_nowait()
-                    self._sync_pool.encrypt_doc(doc)
+                    self._sync_enc_pool.encrypt_doc(doc)
             except Exception as exc:
                 logger.error("Error while  encrypting docs to sync")
                 logger.exception(exc)

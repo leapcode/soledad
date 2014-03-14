@@ -54,6 +54,7 @@ from u1db.sync import Synchronizer
 from u1db import errors as u1db_errors
 
 from leap.soledad.client.target import SoledadSyncTarget
+from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.common.document import SoledadDocument
 
 logger = logging.getLogger(__name__)
@@ -339,7 +340,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 crypto=crypto, raw_key=raw_key, cipher=cipher,
                 kdf_iter=kdf_iter, cipher_page_size=cipher_page_size)
 
-    def sync(self, url, creds=None, autocreate=True):
+    def sync(self, url, creds=None, autocreate=True, decrypt_inline=False):
         """
         Synchronize documents with remote replica exposed at url.
 
@@ -355,12 +356,21 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :rtype: int
         """
         print "***********************"
-        print "SQLCIPHER: sync started"
+        print "SQLCIPHER: sync started. inline?", decrypt_inline
         if not self.syncer:
             self._create_syncer(url, creds=creds)
 
+        old_decrypt_inline = self.syncer.sync_target.decrypt_inline
+        print "SETTING TARGET decrypt_inline to ", decrypt_inline
+        self.syncer.sync_target.set_decrypt_inline(decrypt_inline)
+
         try:
             res = self.syncer.sync(autocreate=autocreate)
+
+        except PendingReceivedDocsSyncError:
+            logger.warning("Local sync db is not clear, skipping sync...")
+            return
+
         except httplib.CannotSendRequest:
             # raised when you reuse httplib.HTTP object for new request
             # while you havn't called its getresponse()
@@ -371,10 +381,16 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._syncer = None
             self._create_syncer(url, creds=creds)
             print "SQLCIPHER: syncer created, about to sync..."
+            print "SETTING TARGET decrypt_inline to ", decrypt_inline
+            self.syncer.sync_target.set_decrypt_inline(decrypt_inline)
             res = self.syncer.sync(autocreate=autocreate)
         except Exception:
             logger.error("error SQLITE sync")
             raise
+        finally:
+            # restore the original decrypt inline behav
+            self.syncer.sync_target.set_decrypt_inline(old_decrypt_inline)
+
         print "SQLCIPHER: sync DONE"
         return res
 
