@@ -18,11 +18,8 @@
 A U1DB backend for encrypting data before sending to server and decrypting
 after receiving.
 """
-import binascii
 import cStringIO
 import gzip
-import hashlib
-import hmac
 import logging
 import os
 import sqlite3
@@ -37,28 +34,9 @@ from u1db import errors
 from u1db.remote.http_target import HTTPSyncTarget
 from u1db.remote.http_client import _encode_query_parameter
 
-
-from leap.soledad.common import soledad_assert
-from leap.soledad.common.crypto import (
-    EncryptionSchemes,
-    UnknownEncryptionScheme,
-    MacMethods,
-    UnknownMacMethod,
-    WrongMac,
-    ENC_JSON_KEY,
-    ENC_SCHEME_KEY,
-    ENC_METHOD_KEY,
-    ENC_IV_KEY,
-    MAC_KEY,
-    MAC_METHOD_KEY,
-)
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.auth import TokenBasedAuth
-from leap.soledad.client.crypto import (
-    EncryptionMethods,
-    UnknownEncryptionMethod,
-)
-from leap.soledad.client.crypto import encrypt_sym, doc_mac_key
+from leap.soledad.client.crypto import is_symmetrically_encrypted, decrypt_doc
 
 from leap.common.check import leap_check
 
@@ -67,177 +45,6 @@ logger = logging.getLogger(__name__)
 #
 # Exceptions
 #
-
-
-class DocumentNotEncrypted(Exception):
-    """
-    Raised for failures in document encryption.
-    """
-    pass
-
-
-#
-# Crypto utilities for a SoledadDocument.
-#
-
-
-def mac_doc(doc_id, doc_rev, ciphertext, mac_method, secret):
-    """
-    Calculate a MAC for C{doc} using C{ciphertext}.
-
-    Current MAC method used is HMAC, with the following parameters:
-
-        * key: sha256(storage_secret, doc_id)
-        * msg: doc_id + doc_rev + ciphertext
-        * digestmod: sha256
-
-    :param doc_id: The id of the document.
-    :type doc_id: str
-    :param doc_rev: The revision of the document.
-    :type doc_rev: str
-    :param ciphertext: The content of the document.
-    :type ciphertext: str
-    :param mac_method: The MAC method to use.
-    :type mac_method: str
-    :param secret: soledad secret
-    :type secret: Soledad.secret_storage
-
-    :return: The calculated MAC.
-    :rtype: str
-    """
-    if mac_method == MacMethods.HMAC:
-        return hmac.new(
-            doc_mac_key(doc_id, secret),
-            str(doc_id) + str(doc_rev) + ciphertext,
-            hashlib.sha256).digest()
-    # raise if we do not know how to handle this MAC method
-    raise UnknownMacMethod('Unknown MAC method: %s.' % mac_method)
-
-
-def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
-    """
-    Encrypt C{doc}'s content.
-
-    Encrypt doc's contents using AES-256 CTR mode and return a valid JSON
-    string representing the following:
-
-        {
-            ENC_JSON_KEY: '<encrypted doc JSON string>',
-            ENC_SCHEME_KEY: 'symkey',
-            ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
-            ENC_IV_KEY: '<the initial value used to encrypt>',
-            MAC_KEY: '<mac>'
-            MAC_METHOD_KEY: 'hmac'
-        }
-
-    :param docstr: A representation of the document to be encrypted.
-    :type docstr: str or unicode.
-
-    :param doc_id: The document id.
-    :type doc_id: str
-
-    :param doc_rev: The document revision.
-    :type doc_rev: str
-
-    :param key: The key used to encrypt ``data`` (must be 256 bits long).
-    :type key: str
-
-    :param secret:
-    :type secret:
-
-    :return: The JSON serialization of the dict representing the encrypted
-        content.
-    :rtype: str
-    """
-    # encrypt content using AES-256 CTR mode
-    iv, ciphertext = encrypt_sym(
-        str(docstr),  # encryption/decryption routines expect str
-        key, method=EncryptionMethods.AES_256_CTR)
-    # Return a representation for the encrypted content. In the following, we
-    # convert binary data to hexadecimal representation so the JSON
-    # serialization does not complain about what it tries to serialize.
-    hex_ciphertext = binascii.b2a_hex(ciphertext)
-    return json.dumps({
-        ENC_JSON_KEY: hex_ciphertext,
-        ENC_SCHEME_KEY: EncryptionSchemes.SYMKEY,
-        ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
-        ENC_IV_KEY: iv,
-        MAC_KEY: binascii.b2a_hex(mac_doc(  # store the mac as hex.
-            doc_id, doc_rev, ciphertext,
-            MacMethods.HMAC, secret)),
-        MAC_METHOD_KEY: MacMethods.HMAC,
-    })
-
-
-def decrypt_doc(crypto, doc):
-    """
-    Decrypt C{doc}'s content.
-
-    Return the JSON string representation of the document's decrypted content.
-
-    The content of the document should have the following structure:
-
-        {
-            ENC_JSON_KEY: '<enc_blob>',
-            ENC_SCHEME_KEY: '<enc_scheme>',
-            ENC_METHOD_KEY: '<enc_method>',
-            ENC_IV_KEY: '<initial value used to encrypt>',  # (optional)
-            MAC_KEY: '<mac>'
-            MAC_METHOD_KEY: 'hmac'
-        }
-
-    C{enc_blob} is the encryption of the JSON serialization of the document's
-    content. For now Soledad just deals with documents whose C{enc_scheme} is
-    EncryptionSchemes.SYMKEY and C{enc_method} is
-    EncryptionMethods.AES_256_CTR.
-
-    :param crypto: A SoledadCryto instance to perform the encryption.
-    :type crypto: leap.soledad.crypto.SoledadCrypto
-    :param doc: The document to be decrypted.
-    :type doc: SoledadDocument
-
-    :return: The JSON serialization of the decrypted content.
-    :rtype: str
-    """
-    soledad_assert(doc.is_tombstone() is False)
-    soledad_assert(ENC_JSON_KEY in doc.content)
-    soledad_assert(ENC_SCHEME_KEY in doc.content)
-    soledad_assert(ENC_METHOD_KEY in doc.content)
-    soledad_assert(MAC_KEY in doc.content)
-    soledad_assert(MAC_METHOD_KEY in doc.content)
-    # verify MAC
-    ciphertext = binascii.a2b_hex(  # content is stored as hex.
-        doc.content[ENC_JSON_KEY])
-    mac = mac_doc(
-        doc.doc_id, doc.rev,
-        ciphertext,
-        doc.content[MAC_METHOD_KEY], crypto.secret)
-    # we compare mac's hashes to avoid possible timing attacks that might
-    # exploit python's builtin comparison operator behaviour, which fails
-    # immediatelly when non-matching bytes are found.
-    doc_mac_hash = hashlib.sha256(
-        binascii.a2b_hex(  # the mac is stored as hex
-            doc.content[MAC_KEY])).digest()
-    calculated_mac_hash = hashlib.sha256(mac).digest()
-    if doc_mac_hash != calculated_mac_hash:
-        raise WrongMac('Could not authenticate document\'s contents.')
-    # decrypt doc's content
-    enc_scheme = doc.content[ENC_SCHEME_KEY]
-    plainjson = None
-    if enc_scheme == EncryptionSchemes.SYMKEY:
-        enc_method = doc.content[ENC_METHOD_KEY]
-        if enc_method == EncryptionMethods.AES_256_CTR:
-            soledad_assert(ENC_IV_KEY in doc.content)
-            plainjson = crypto.decrypt_sym(
-                ciphertext,
-                crypto.doc_passphrase(doc.doc_id),
-                method=enc_method,
-                iv=doc.content[ENC_IV_KEY])
-        else:
-            raise UnknownEncryptionMethod(enc_method)
-    else:
-        raise UnknownEncryptionScheme(enc_scheme)
-    return plainjson
 
 
 def _gunzip(data):
@@ -323,18 +130,22 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :type data: str
 
         :param return_doc_cb: A callback to insert docs from target.
-        :type return_doc_cb: function
+        :type return_doc_cb: callable
 
         :param ensure_callback: A callback to ensure we have the correct
                                 target_replica_uid, if it was just created.
-        :type ensure_callback: function
+        :type ensure_callback: callable
 
-        :raise BrokenSyncStream: If C{data} is malformed.
+        :raise BrokenSyncStream: If `data` is malformed.
 
         :return: A dictionary representing the first line of the response got
                  from remote replica.
         :rtype: dict
         """
+        # we keep a reference to the callback in case
+        # we defer the decryption
+        self._return_doc_cb = return_doc_cb
+
         parts = data.splitlines()  # one at a time
         if not parts or parts[0] != '[':
             raise BrokenSyncStream
@@ -469,15 +280,22 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                                     the last local generation the remote
                                     replica knows about.
         :type docs_by_generations: list of tuples
+
         :param source_replica_uid: The uid of the source replica.
         :type source_replica_uid: str
+
         :param last_known_generation: Target's last known generation.
         :type last_known_generation: int
+
         :param last_known_trans_id: Target's last known transaction id.
         :type last_known_trans_id: str
+
         :param return_doc_cb: A callback for inserting received documents from
-                              target.
+                              target. If not overriden, this will call u1db
+                              insert_doc_from_target in synchronizer, which
+                              implements the TAKE OTHER semantics.
         :type return_doc_cb: function
+
         :param ensure_callback: A callback that ensures we know the target
                                 replica uid if the target replica was just
                                 created.
@@ -623,8 +441,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         c = self._sync_db.cursor()
         # XXX interpolate table name
-        sql = ("SELECT content FROM docs_tosync "
-               "WHERE doc_id=? and rev=?")
+        sql = ("SELECT content FROM docs_tosync WHERE doc_id=? and rev=?")
         c.execute(sql, (doc_id, doc_rev))
         res = c.fetchall()
         if len(res) != 0:

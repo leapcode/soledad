@@ -392,7 +392,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :param url: The url of the target replica to sync with.
         :type url: str
         :param creds: optional dictionary giving credentials.
-            to authorize the operation with the server.
+                      to authorize the operation with the server.
         :type creds: dict
         """
         if self._syncer is None:
