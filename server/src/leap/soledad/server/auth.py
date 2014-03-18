@@ -25,7 +25,7 @@ import httplib
 import simplejson as json
 
 
-from u1db import DBNAME_CONSTRAINTS
+from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
 from couchdb.client import Server
@@ -36,8 +36,8 @@ from leap.soledad.common import (
     SHARED_DB_NAME,
     SHARED_DB_LOCK_DOC_ID_PREFIX,
     USER_DB_PREFIX,
-    errors,
 )
+from leap.soledad.common.errors import InvalidAuthTokenError
 
 
 class URLToAuthorization(object):
@@ -275,7 +275,7 @@ class SoledadAuthMiddleware(object):
                 return self._unauthorized_error(
                     start_response,
                     self._get_auth_error_string())
-        except Unauthorized as e:
+        except u1db_errors.Unauthorized as e:
             return self._error(
                 start_response,
                 401,
@@ -392,16 +392,14 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         """
         token = auth_data  # we expect a cleartext token at this point
         try:
-            return self._verify_token_in_couchdb(uuid, token)
-        except MissingAuthTokenError():
-            raise
-        except TokenMismatchError():
+            return self._verify_token_in_couch(uuid, token)
+        except InvalidAuthTokenError:
             raise
         except Exception as e:
             log.err(e)
             return False
 
-    def _verify_token_in_couchdb(self, uuid, token):
+    def _verify_token_in_couch(self, uuid, token):
         """
         Query couchdb to decide if C{token} is valid for C{uuid}.
 
@@ -410,17 +408,16 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         @param token: The token.
         @type token: str
 
-        @raise MissingAuthTokenError: Raised when given token is missing in
-                                      tokens db.
-        @raise InvalidAuthTokenError: Raised when token is invalid.
+        @raise InvalidAuthTokenError: Raised when token received from user is
+                                      either missing in the tokens db or is
+                                      invalid.
         """
         server = Server(url=self._app.state.couch_url)
         dbname = self.TOKENS_DB
         db = server[dbname]
         token = db.get(token)
-        if token is None:
-            raise MissingAuthTokenError()
-        if token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF or \
+        if token is None or \
+                token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF or \
                 token[self.TOKENS_USER_ID_KEY] != uuid:
             raise InvalidAuthTokenError()
         return True

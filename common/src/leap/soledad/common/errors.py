@@ -51,23 +51,15 @@ class SoledadError(errors.U1DBError):
 #
 
 @register_exception
-class MissingAuthTokenError(errors.Unauthorized):
-    """
-    Exception raised when failing to get authorization for some action because
-    the auth token is missing in the tokens db.
-    """
-
-    wire_description = "missing token"
-    status = 401
-
-@register_exception
 class InvalidAuthTokenError(errors.Unauthorized):
     """
     Exception raised when failing to get authorization for some action because
-    the provided token is different from the one in the tokens db.
+    the provided token either does not exist in the tokens database, has a
+    distinct structure from the expected one, or is associated with a user
+    with a distinct uuid than the one provided by the client.
     """
 
-    wire_descrition = "token mismatch"
+    wire_descrition = "invalid auth token"
     status = 401
 
 #
