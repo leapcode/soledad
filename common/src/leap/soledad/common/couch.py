@@ -377,7 +377,7 @@ class CouchDatabase(CommonBackend):
             self._release_fun()
 
     @classmethod
-    def open_database(cls, url, create):
+    def open_database(cls, url, create, ensure_ddocs=False):
         """
         Open a U1DB database using CouchDB as backend.
 
@@ -385,6 +385,8 @@ class CouchDatabase(CommonBackend):
         :type url: str
         :param create: should the replica be created if it does not exist?
         :type create: bool
+        :param ensure_ddocs: Ensure that the design docs exist on server.
+        :type ensure_ddocs: bool
 
         :return: the database instance
         :rtype: CouchDatabase
@@ -401,7 +403,7 @@ class CouchDatabase(CommonBackend):
         except ResourceNotFound:
             if not create:
                 raise DatabaseDoesNotExist()
-        return cls(url, dbname)
+        return cls(url, dbname, ensure_ddocs=ensure_ddocs)
 
     def __init__(self, url, dbname, replica_uid=None, full_commit=True,
                  session=None, ensure_ddocs=True):
@@ -1464,7 +1466,8 @@ class CouchServerState(ServerState):
         """
         return CouchDatabase.open_database(
             self._couch_url + '/' + dbname,
-            create=False)
+            create=False,
+            ensure_ddocs=False)
 
     def ensure_database(self, dbname):
         """
