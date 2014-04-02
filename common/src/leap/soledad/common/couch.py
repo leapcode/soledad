@@ -30,6 +30,7 @@ import threading
 
 
 from StringIO import StringIO
+from collections import defaultdict
 
 
 from couchdb.client import Server
@@ -337,6 +338,8 @@ class CouchDatabase(CommonBackend):
 
     # We spawn threads to parallelize the CouchDatabase.get_docs() method
     MAX_GET_DOCS_THREADS = 20
+
+    update_handler_lock = defaultdict(threading.Lock)
 
     class _GetDocThread(threading.Thread):
         """
@@ -1133,13 +1136,14 @@ class CouchDatabase(CommonBackend):
         ddoc_path = ['_design', 'syncs', '_update', 'put', 'u1db_sync_log']
         res = self._database.resource(*ddoc_path)
         try:
-            res.put_json(
-                body={
-                    'other_replica_uid': other_replica_uid,
-                    'other_generation': other_generation,
-                    'other_transaction_id': other_transaction_id,
-                },
-                headers={'content-type': 'application/json'})
+            with CouchDatabase.update_handler_lock[self._get_replica_uid()]:
+                res.put_json(
+                    body={
+                        'other_replica_uid': other_replica_uid,
+                        'other_generation': other_generation,
+                        'other_transaction_id': other_transaction_id,
+                    },
+                    headers={'content-type': 'application/json'})
         except ResourceNotFound as e:
             raise_missing_design_doc_error(e, ddoc_path)
 
@@ -1367,7 +1371,7 @@ class CouchDatabase(CommonBackend):
             if save_conflict:
                 self._force_doc_sync_conflict(doc)
         if replica_uid is not None and replica_gen is not None:
-            self._do_set_replica_gen_and_trans_id(
+            self._set_replica_gen_and_trans_id(
                 replica_uid, replica_gen, replica_trans_id)
         # update info
         old_doc.rev = doc.rev
