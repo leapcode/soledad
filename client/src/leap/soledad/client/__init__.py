@@ -34,6 +34,8 @@ import urlparse
 import hmac
 
 from hashlib import sha256
+from threading import Lock
+from collections import defaultdict
 
 try:
     import cchardet as chardet
@@ -52,6 +54,7 @@ from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
     AlreadyLockedError,
+    LockTimedOutError,
 )
 from leap.soledad.common.crypto import (
     MacMethods,
@@ -245,6 +248,12 @@ class Soledad(object):
     Prefix for default values for path.
     """
 
+    syncing_lock = defaultdict(Lock)
+    """
+    A dictionary that hold locks which avoid multiple sync attempts from the
+    same database replica.
+    """
+
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, auth_token=None, secret_id=None):
         """
@@ -315,6 +324,47 @@ class Soledad(object):
     # initialization/destruction methods
     #
 
+    def _get_or_gen_crypto_secrets(self):
+        """
+        Retrieves or generates the crypto secrets.
+
+        Might raise BootstrapSequenceError
+        """
+        doc = self._get_secrets_from_shared_db()
+
+        if doc:
+            logger.info(
+                'Found cryptographic secrets in shared recovery '
+                'database.')
+            _, mac = self.import_recovery_document(doc.content)
+            if mac is False:
+                self.put_secrets_in_shared_db()
+            self._store_secrets()  # save new secrets in local file
+            if self._secret_id is None:
+                self._set_secret_id(self._secrets.items()[0][0])
+        else:
+            # STAGE 3 - there are no secrets in server also, so
+            # generate a secret and store it in remote db.
+            logger.info(
+                'No cryptographic secrets found, creating new '
+                ' secrets...')
+            self._set_secret_id(self._gen_secret())
+            try:
+                self._put_secrets_in_shared_db()
+            except Exception as ex:
+                # storing generated secret in shared db failed for
+                # some reason, so we erase the generated secret and
+                # raise.
+                try:
+                    os.unlink(self._secrets_path)
+                except OSError as e:
+                    if e.errno != errno.ENOENT:  # no such file or directory
+                        logger.exception(e)
+                logger.exception(ex)
+                raise BootstrapSequenceError(
+                    'Could not store generated secret in the shared '
+                    'database, bailing out...')
+
     def _bootstrap(self):
         """
         Bootstrap local Soledad instance.
@@ -342,6 +392,8 @@ class Soledad(object):
         self._init_dirs()
         self._crypto = SoledadCrypto(self)
 
+        secrets_problem = None
+
         # STAGE 1 - verify if secrets exist locally
         if not self._has_secret():  # try to load from local storage.
 
@@ -359,39 +411,13 @@ class Soledad(object):
                 token, timeout = self._shared_db.lock()
             except AlreadyLockedError:
                 raise BootstrapSequenceError('Database is already locked.')
+            except LockTimedOutError:
+                raise BootstrapSequenceError('Lock operation timed out.')
 
-            doc = self._get_secrets_from_shared_db()
-            if doc:
-                logger.info(
-                    'Found cryptographic secrets in shared recovery '
-                    'database.')
-                _, mac = self.import_recovery_document(doc.content)
-                if mac is False:
-                    self.put_secrets_in_shared_db()
-                self._store_secrets()  # save new secrets in local file
-                if self._secret_id is None:
-                    self._set_secret_id(self._secrets.items()[0][0])
-            else:
-                # STAGE 3 - there are no secrets in server also, so
-                # generate a secret and store it in remote db.
-                logger.info(
-                    'No cryptographic secrets found, creating new '
-                    ' secrets...')
-                self._set_secret_id(self._gen_secret())
-                try:
-                    self._put_secrets_in_shared_db()
-                except Exception:
-                    # storing generated secret in shared db failed for
-                    # some reason, so we erase the generated secret and
-                    # raise.
-                    try:
-                        os.unlink(self._secrets_path)
-                    except OSError as e:
-                        if errno == 2:  # no such file or directory
-                            pass
-                    raise BootstrapSequenceError(
-                        'Could not store generated secret in the shared '
-                        'database, bailing out...')
+            try:
+                self._get_or_gen_crypto_secrets()
+            except Exception as e:
+                secrets_problem = e
 
             # release the lock on shared db
             try:
@@ -416,7 +442,10 @@ class Soledad(object):
             # --- end of atomic operation in shared db ---
 
         # STAGE 4 - local database initialization
-        self._init_db()
+        if secrets_problem is None:
+            self._init_db()
+        else:
+            raise secrets_problem
 
     def _init_dirs(self):
         """
@@ -749,7 +778,7 @@ class Soledad(object):
 
         ============================== WARNING ==============================
         This method converts the document's contents to unicode in-place. This
-        meanse that after calling C{put_doc(doc)}, the contents of the
+        means that after calling C{put_doc(doc)}, the contents of the
         document, i.e. C{doc.content}, might be different from before the
         call.
         ============================== WARNING ==============================
@@ -806,9 +835,9 @@ class Soledad(object):
             in matching doc_ids order.
         :rtype: generator
         """
-        return self._db.get_docs(doc_ids,
-                                 check_for_conflicts=check_for_conflicts,
-                                 include_deleted=include_deleted)
+        return self._db.get_docs(
+            doc_ids, check_for_conflicts=check_for_conflicts,
+            include_deleted=include_deleted)
 
     def get_all_docs(self, include_deleted=False):
         """Get the JSON content for all documents in the database.
@@ -824,7 +853,7 @@ class Soledad(object):
 
     def _convert_to_unicode(self, content):
         """
-        Converts content to utf8 (or all the strings in content)
+        Converts content to unicode (or all the strings in content)
 
         NOTE: Even though this method supports any type, it will
         currently ignore contents of lists, tuple or any other
@@ -839,13 +868,14 @@ class Soledad(object):
         if isinstance(content, unicode):
             return content
         elif isinstance(content, str):
+            result = chardet.detect(content)
+            default = "utf-8"
+            encoding = result["encoding"] or default
             try:
-                result = chardet.detect(content)
-                default = "utf-8"
-                encoding = result["encoding"] or default
                 content = content.decode(encoding)
-            except UnicodeError:
-                pass
+            except UnicodeError as e:
+                logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
+                content = content.decode(encoding, 'replace')
             return content
         else:
             if isinstance(content, dict):
@@ -910,7 +940,8 @@ class Soledad(object):
             "number(fieldname, width)", "lower(fieldname)"
         """
         if self._db:
-            return self._db.create_index(index_name, *index_expressions)
+            return self._db.create_index(
+                index_name, *index_expressions)
 
     def delete_index(self, index_name):
         """
@@ -954,6 +985,23 @@ class Soledad(object):
         """
         if self._db:
             return self._db.get_from_index(index_name, *key_values)
+
+    def get_count_from_index(self, index_name, *key_values):
+        """
+        Return the count of the documents that match the keys and
+        values supplied.
+
+        :param index_name: The index to query
+        :type index_name: str
+        :param key_values: values to match. eg, if you have
+                           an index with 3 fields then you would have:
+                           get_from_index(index_name, val1, val2, val3)
+        :type key_values: tuple
+        :return: count.
+        :rtype: int
+        """
+        if self._db:
+            return self._db.get_count_from_index(index_name, *key_values)
 
     def get_range_from_index(self, index_name, start_value, end_value):
         """
@@ -1028,6 +1076,9 @@ class Soledad(object):
         """
         Synchronize the local encrypted replica with a remote replica.
 
+        This method blocks until a syncing lock is acquired, so there are no
+        attempts of concurrent syncs from the same client replica.
+
         :param url: the url of the target replica to sync with
         :type url: str
 
@@ -1036,11 +1087,13 @@ class Soledad(object):
         :rtype: str
         """
         if self._db:
-            local_gen = self._db.sync(
-                urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                creds=self._creds, autocreate=True)
-            signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
-            return local_gen
+            # acquire lock before attempt to sync
+            with Soledad.syncing_lock[self._db._get_replica_uid()]:
+                local_gen = self._db.sync(
+                    urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
+                    creds=self._creds, autocreate=False)
+                signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
+                return local_gen
 
     def need_sync(self, url):
         """
@@ -1158,7 +1211,7 @@ class Soledad(object):
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # check mac of the recovery document
-        mac_auth = False
+        #mac_auth = False  # XXX ?
         mac = None
         if MAC_KEY in data:
             soledad_assert(data[MAC_KEY] is not None)
@@ -1181,7 +1234,7 @@ class Soledad(object):
             if mac != data[MAC_KEY]:
                 raise WrongMac('Could not authenticate recovery document\'s '
                                'contents.')
-            mac_auth = True
+            #mac_auth = True  # XXX ?
         # include secrets in the secret pool.
         secrets = 0
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
@@ -1248,7 +1301,7 @@ class Soledad(object):
 #-----------------------------------------------------------------------------
 
 # We need a more reasonable timeout (in seconds)
-SOLEDAD_TIMEOUT = 10
+SOLEDAD_TIMEOUT = 120
 
 
 class VerifiedHTTPSConnection(httplib.HTTPSConnection):
@@ -1258,9 +1311,17 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     # derived from httplib.py
 
     def connect(self):
-        "Connect to a host on a given (SSL) port."
-        sock = socket.create_connection((self.host, self.port),
-                                        SOLEDAD_TIMEOUT, self.source_address)
+        """
+        Connect to a host on a given (SSL) port.
+        """
+        try:
+            source = self.source_address
+            sock = socket.create_connection((self.host, self.port),
+                                            SOLEDAD_TIMEOUT, source)
+        except AttributeError:
+            # source_address was introduced in 2.7
+            sock = socket.create_connection((self.host, self.port),
+                                            SOLEDAD_TIMEOUT)
         if self._tunnel_host:
             self.sock = sock
             self._tunnel()

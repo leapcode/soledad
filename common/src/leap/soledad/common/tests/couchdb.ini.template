@@ -6,7 +6,7 @@
 database_dir = %(tempdir)s/lib
 view_index_dir = %(tempdir)s/lib
 max_document_size = 4294967296 ; 4 GB
-os_process_timeout = 5000 ; 5 seconds. for view and external servers.
+os_process_timeout = 120000 ; 120 seconds. for view and external servers.
 max_dbs_open = 100
 delayed_commits = true ; set this to false to ensure an fsync before 201 Created is returned
 uri_file = %(tempdir)s/lib/couch.uri
@@ -74,6 +74,8 @@ use_users_db = false
 
 [query_servers]
 ; javascript = %(tempdir)s/server/main.js
+javascript = /usr/bin/couchjs /usr/share/couchdb/server/main.js
+coffeescript = /usr/bin/couchjs /usr/share/couchdb/server/main-coffee.js
 
 
 ; Changing reduce_limit to false will disable reduce_limit.

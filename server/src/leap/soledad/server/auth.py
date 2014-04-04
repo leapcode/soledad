@@ -25,7 +25,7 @@ import httplib
 import simplejson as json
 
 
-from u1db import DBNAME_CONSTRAINTS
+from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
 from couchdb.client import Server
@@ -37,16 +37,7 @@ from leap.soledad.common import (
     SHARED_DB_LOCK_DOC_ID_PREFIX,
     USER_DB_PREFIX,
 )
-
-
-#-----------------------------------------------------------------------------
-# Authentication
-#-----------------------------------------------------------------------------
-
-class Unauthorized(Exception):
-    """
-    User authentication failed.
-    """
+from leap.soledad.common.errors import InvalidAuthTokenError
 
 
 class URLToAuthorization(object):
@@ -279,10 +270,16 @@ class SoledadAuthMiddleware(object):
             return self._unauthorized_error("Wrong authentication scheme")
 
         # verify if user is athenticated
-        if not self._verify_authentication_data(uuid, auth_data):
-            return self._unauthorized_error(
+        try:
+            if not self._verify_authentication_data(uuid, auth_data):
+                return self._unauthorized_error(
+                    start_response,
+                    self._get_auth_error_string())
+        except u1db_errors.Unauthorized as e:
+            return self._error(
                 start_response,
-                self._get_auth_error_string())
+                401,
+                e.wire_description)
 
         # verify if user is authorized to perform action
         if not self._verify_authorization(environ, uuid):
@@ -319,6 +316,9 @@ class SoledadAuthMiddleware(object):
 
         @return: Whether the token is valid for authenticating the request.
         @rtype: bool
+
+        @raise Unauthorized: Raised when C{auth_data} is not enough to
+                             authenticate C{uuid}.
         """
         return None
 
@@ -386,11 +386,20 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
 
         @return: Whether the token is valid for authenticating the request.
         @rtype: bool
+
+        @raise Unauthorized: Raised when C{auth_data} is not enough to
+                             authenticate C{uuid}.
         """
         token = auth_data  # we expect a cleartext token at this point
-        return self._verify_token_in_couchdb(uuid, token)
+        try:
+            return self._verify_token_in_couch(uuid, token)
+        except InvalidAuthTokenError:
+            raise
+        except Exception as e:
+            log.err(e)
+            return False
 
-    def _verify_token_in_couchdb(self, uuid, token):
+    def _verify_token_in_couch(self, uuid, token):
         """
         Query couchdb to decide if C{token} is valid for C{uuid}.
 
@@ -398,19 +407,19 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         @type uuid: str
         @param token: The token.
         @type token: str
+
+        @raise InvalidAuthTokenError: Raised when token received from user is
+                                      either missing in the tokens db or is
+                                      invalid.
         """
         server = Server(url=self._app.state.couch_url)
-        try:
-            dbname = self.TOKENS_DB
-            db = server[dbname]
-            token = db.get(token)
-            if token is None:
-                return False
-            return token[self.TOKENS_TYPE_KEY] == self.TOKENS_TYPE_DEF and \
-                token[self.TOKENS_USER_ID_KEY] == uuid
-        except Exception as e:
-            log.err(e)
-            return False
+        dbname = self.TOKENS_DB
+        db = server[dbname]
+        token = db.get(token)
+        if token is None or \
+                token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF or \
+                token[self.TOKENS_USER_ID_KEY] != uuid:
+            raise InvalidAuthTokenError()
         return True
 
     def _get_auth_error_string(self):

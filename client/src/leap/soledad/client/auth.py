@@ -68,4 +68,3 @@ class TokenBasedAuth(object):
         else:
             raise errors.UnknownAuthMethod(
                 'Wrong credentials: %s' % self._creds)
-

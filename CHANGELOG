@@ -1,3 +1,69 @@
+0.4.5 Apr 4:
+Client:
+  o Catch lock timeout exception. Fixes #4435.
+  o Add lock for create_doc and update_indexes call, prevents
+    concurrent access to the db. Closes #5139.
+  o Back-compatibility for socket.create_connection interface in
+    2.6. Closes #5208.
+  o Always return unicode in helper method, even on
+    UnicodeError. Related to #4998.
+  o Fix a bug in soledad.client.sqlcipher by which we were creating a
+    new connection for each sync.
+  o Unlock shared_db if anything fails in the bootstrap
+    sequence. Fixes #4702.
+  o Avoid concurrent syncs for the same account, but allow for
+    distinct accounts. Fixes #4451.
+  o Adds a get_count_by_index to sqlcipher u1db backend. Related to:
+    #4616.
+  o Do not autocreate remote user database when syncing. Tapicero
+    should make sure that that db is created when the user is
+    created. Closes #5302.
+  o Add a read-write lock for all client operations. Addresses: #4972
+  o Add sync=off and tem_store=mem to soledad client, for
+    optimization.
+
+Common:
+  o Add lock timeout HTTP error. Fixes #4435.
+  o Remodel couch backend to fix concurrency and scalability. Closes
+    #4475, #4682, #4683 and #4680.
+  o Remove check for design docs on couch server state initialization
+    Closes #5387.
+  o Renew HTTP session after multipart PUTs to avoid request hanging.
+    Fixes #5449.
+  o Preload time.strptime() to avoid multi-threaded problem on couch
+    backend get_docs() method. Fixes #5449.
+  o Improve error messages. Closes #5035.
+  o Add MissingTokenError and InvalidTokenError as sub exceptions
+    from Unauthorized.
+  o Allow sync of large files (~100MB). Closes #4836.
+  o Add exceptions to deal with missing design documents. Fixes #4994.
+  o Parallelize get_docs() on couch backend to accelerate sync.
+    Closes #5008.
+  o Use less memory when putting docs on couch. Fixes #5011.
+  o Prevent CouchServerState from creating or deleting databases. This
+    way, Soledad remote clients won't ever be able to do these
+    operations when syncing. Part of #5302.
+  o Avoid concurrent syncs problem by adding a lock for PUTting to the
+    sync log update handler. Fixes #5388.
+  o Remove check for couch permissions when CouchServerState is
+    instantiated. This is not necessary anymore because platform
+    takes care of giving the soledad user enough permissions and
+    tapicero takes care of uploading the needed design documents.
+
+Server:
+  o Send propper lock timeout response. Fixes #4435.
+  o Fix raising of auth token errors. Fixes #5191.
+  o Allow sync of large files (~100MB). Closes #4836.
+  o Use a temporary directory for server side locks. Fixes #4918.
+  o Catch couchdb.http.ResourceNotFound exceptions when accessing
+    design documents on couch backend, and raise appropriate missing
+    design documents exceptions. Fixes #4994.
+  o Do not try to create the shared database when running the Soledad
+    Server application. Fixes #5302.
+  o Enable Gzip compression on the soledad wsgi app.
+
+-- 2014 --
+
 0.4.4 Dec 6:
 Client:
   o Add MAC verirication to the recovery document and

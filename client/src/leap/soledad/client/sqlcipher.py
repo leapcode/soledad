@@ -43,16 +43,19 @@ So, as the statements above were introduced for backwards compatibility with
 SLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
+import httplib
 import logging
 import os
-import time
 import string
 import threading
+import time
 
-
-from u1db.backends import sqlite_backend
 from pysqlcipher import dbapi2
+from u1db.backends import sqlite_backend
+from u1db.sync import Synchronizer
 from u1db import errors as u1db_errors
+
+from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.common.document import SoledadDocument
 
 logger = logging.getLogger(__name__)
@@ -88,10 +91,10 @@ def open(path, password, create=True, document_factory=None, crypto=None,
     database does not already exist.
 
     :param path: The filesystem path for the database to open.
-    :param type: str
+    :type path: str
     :param create: True/False, should the database be created if it doesn't
         already exist?
-    :param type: bool
+    :param create: bool
     :param document_factory: A function that will be called with the same
         parameters as Document.__init__.
     :type document_factory: callable
@@ -144,25 +147,30 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     _index_storage_value = 'expand referenced encrypted'
     k_lock = threading.Lock()
+    create_doc_lock = threading.Lock()
+    update_indexes_lock = threading.Lock()
+    _syncer = None
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
                  kdf_iter=4000, cipher_page_size=1024):
         """
-        Create a new sqlcipher file.
+        Connect to an existing SQLCipher database, creating a new sqlcipher
+        database file if needed.
 
         :param sqlcipher_file: The path for the SQLCipher file.
         :type sqlcipher_file: str
         :param password: The password that protects the SQLCipher db.
         :type password: str
         :param document_factory: A function that will be called with the same
-            parameters as Document.__init__.
+                                 parameters as Document.__init__.
         :type document_factory: callable
         :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-            document contents when syncing.
+                       document contents when syncing.
         :type crypto: soledad.crypto.SoledadCrypto
-        :param raw_key: Whether C{password} is a raw 64-char hex string or a
-            passphrase that should be hashed to obtain the encyrption key.
+        :param raw_key: Whether password is a raw 64-char hex string or a
+                        passphrase that should be hashed to obtain the
+                        encyrption key.
         :type raw_key: bool
         :param cipher: The cipher and mode to use.
         :type cipher: str
@@ -186,6 +194,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._set_crypto_pragmas(
                 self._db_handle, password, raw_key, cipher, kdf_iter,
                 cipher_page_size)
+            if os.environ.get('LEAP_SQLITE_NOSYNC'):
+                self._pragma_synchronous_off(self._db_handle)
+            else:
+                self._pragma_synchronous_normal(self._db_handle)
+            if os.environ.get('LEAP_SQLITE_MEMSTORE'):
+                self._pragma_mem_temp_store(self._db_handle)
+            self._pragma_write_ahead_logging(self._db_handle)
             self._real_replica_uid = None
             self._ensure_schema()
             self._crypto = crypto
@@ -336,13 +351,46 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :return: The local generation before the synchronisation was performed.
         :rtype: int
         """
-        from u1db.sync import Synchronizer
-        from leap.soledad.client.target import SoledadSyncTarget
-        return Synchronizer(
-            self,
-            SoledadSyncTarget(url,
-                              creds=creds,
-                              crypto=self._crypto)).sync(autocreate=autocreate)
+        if not self.syncer:
+            self._create_syncer(url, creds=creds)
+
+        try:
+            res = self.syncer.sync(autocreate=autocreate)
+        except httplib.CannotSendRequest:
+            # raised when you reuse httplib.HTTP object for new request
+            # while you havn't called its getresponse()
+            # this catch works for the current connclass used
+            # by our HTTPClientBase, since it uses httplib.
+            # we will have to replace it if it changes.
+            logger.info("Replacing connection and trying again...")
+            self._syncer = None
+            self._create_syncer(url, creds=creds)
+            res = self.syncer.sync(autocreate=autocreate)
+        return res
+
+    @property
+    def syncer(self):
+        """
+        Accesor for synchronizer.
+        """
+        return self._syncer
+
+    def _create_syncer(self, url, creds=None):
+        """
+        Creates a synchronizer
+
+        :param url: The url of the target replica to sync with.
+        :type url: str
+        :param creds: optional dictionary giving credentials.
+            to authorize the operation with the server.
+        :type creds: dict
+        """
+        if self._syncer is None:
+            self._syncer = Synchronizer(
+                self,
+                SoledadSyncTarget(url,
+                                  creds=creds,
+                                  crypto=self._crypto))
 
     def _extra_schema_init(self, c):
         """
@@ -359,6 +407,22 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
+    def create_doc(self, content, doc_id=None):
+        """
+        Create a new document in the local encrypted database.
+
+        :param content: the contents of the new document
+        :type content: dict
+        :param doc_id: an optional identifier specifying the document id
+        :type doc_id: str
+
+        :return: the new document
+        :rtype: SoledadDocument
+        """
+        with self.create_doc_lock:
+            return sqlite_backend.SQLitePartialExpandDatabase.create_doc(
+                self, content, doc_id=doc_id)
+
     def _put_and_update_indexes(self, old_doc, doc):
         """
         Update a document and all indexes related to it.
@@ -368,12 +432,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :param doc: The new version of the document.
         :type doc: u1db.Document
         """
-        sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
-            self, old_doc, doc)
-        c = self._db_handle.cursor()
-        c.execute('UPDATE document SET syncable=? '
-                  'WHERE doc_id=?',
-                  (doc.syncable, doc.doc_id))
+        with self.update_indexes_lock:
+            sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
+                self, old_doc, doc)
+            c = self._db_handle.cursor()
+            c.execute('UPDATE document SET syncable=? '
+                      'WHERE doc_id=?',
+                      (doc.syncable, doc.doc_id))
 
     def _get_doc(self, doc_id, check_for_conflicts=False):
         """
@@ -696,6 +761,115 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             raise NotAnHexString(key)
         # XXX change passphrase param!
         db_handle.cursor().execute('PRAGMA rekey = "x\'%s"' % passphrase)
+
+    @classmethod
+    def _pragma_synchronous_off(cls, db_handle):
+        """
+        Change the setting of the "synchronous" flag to OFF.
+        """
+        logger.debug("SQLCIPHER: SETTING SYNCHRONOUS OFF")
+        db_handle.cursor().execute('PRAGMA synchronous=OFF')
+
+    @classmethod
+    def _pragma_synchronous_normal(cls, db_handle):
+        """
+        Change the setting of the "synchronous" flag to NORMAL.
+        """
+        logger.debug("SQLCIPHER: SETTING SYNCHRONOUS NORMAL")
+        db_handle.cursor().execute('PRAGMA synchronous=NORMAL')
+
+    @classmethod
+    def _pragma_mem_temp_store(cls, db_handle):
+        """
+        Use a in-memory store for temporary tables.
+        """
+        logger.debug("SQLCIPHER: SETTING TEMP_STORE MEMORY")
+        db_handle.cursor().execute('PRAGMA temp_store=MEMORY')
+
+    @classmethod
+    def _pragma_write_ahead_logging(cls, db_handle):
+        """
+        Enable write-ahead logging, and set the autocheckpoint to 50 pages.
+
+        Setting the autocheckpoint to a small value, we make the reads not
+        suffer too much performance degradation.
+
+        From the sqlite docs:
+
+        "There is a tradeoff between average read performance and average write
+        performance. To maximize the read performance, one wants to keep the
+        WAL as small as possible and hence run checkpoints frequently, perhaps
+        as often as every COMMIT. To maximize write performance, one wants to
+        amortize the cost of each checkpoint over as many writes as possible,
+        meaning that one wants to run checkpoints infrequently and let the WAL
+        grow as large as possible before each checkpoint. The decision of how
+        often to run checkpoints may therefore vary from one application to
+        another depending on the relative read and write performance
+        requirements of the application. The default strategy is to run a
+        checkpoint once the WAL reaches 1000 pages"
+        """
+        logger.debug("SQLCIPHER: SETTING WRITE-AHEAD LOGGING")
+        db_handle.cursor().execute('PRAGMA journal_mode=WAL')
+        # The optimum value can still use a little bit of tuning, but we favor
+        # small sizes of the WAL file to get fast reads, since we assume that
+        # the writes will be quick enough to not block too much.
+
+        # TODO
+        # As a further improvement, we might want to set autocheckpoint to 0
+        # here and do the checkpoints manually in a separate thread, to avoid
+        # any blocks in the main thread (we should run a loopingcall from here)
+        db_handle.cursor().execute('PRAGMA wal_autocheckpoint=50')
+
+    # Extra query methods: extensions to the base sqlite implmentation.
+
+    def get_count_from_index(self, index_name, *key_values):
+        """
+        Returns the count for a given combination of index_name
+        and key values.
+
+        Extension method made from similar methods in u1db version 13.09
+
+        :param index_name: The index to query
+        :type index_name: str
+        :param key_values: values to match. eg, if you have
+                           an index with 3 fields then you would have:
+                           get_from_index(index_name, val1, val2, val3)
+        :type key_values: tuple
+        :return: count.
+        :rtype: int
+        """
+        c = self._db_handle.cursor()
+        definition = self._get_index_definition(index_name)
+
+        if len(key_values) != len(definition):
+            raise u1db_errors.InvalidValueForIndex()
+        tables = ["document_fields d%d" % i for i in range(len(definition))]
+        novalue_where = ["d.doc_id = d%d.doc_id"
+                         " AND d%d.field_name = ?"
+                         % (i, i) for i in range(len(definition))]
+        exact_where = [novalue_where[i]
+                       + (" AND d%d.value = ?" % (i,))
+                       for i in range(len(definition))]
+        args = []
+        where = []
+        for idx, (field, value) in enumerate(zip(definition, key_values)):
+            args.append(field)
+            where.append(exact_where[idx])
+            args.append(value)
+
+        tables = ["document_fields d%d" % i for i in range(len(definition))]
+        statement = (
+            "SELECT COUNT(*) FROM document d, %s WHERE %s " % (
+                ', '.join(tables),
+                ' AND '.join(where),
+            ))
+        try:
+            c.execute(statement, tuple(args))
+        except dbapi2.OperationalError, e:
+            raise dbapi2.OperationalError(
+                str(e) + '\nstatement: %s\nargs: %s\n' % (statement, args))
+        res = c.fetchall()
+        return res[0][0]
 
     def __del__(self):
         """
