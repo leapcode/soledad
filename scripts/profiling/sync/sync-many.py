@@ -25,7 +25,7 @@ from client_side_db import get_soledad_instance
 from leap.soledad.client import BootstrapSequenceError
 
 
-NUMBER_OF_REPLICAS = 5
+NUMBER_OF_REPLICAS = 1
 DOCUMENTS_PER_REPLICA = 10
 
 

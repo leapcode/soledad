@@ -1,0 +1,1 @@
+  o Renew HTTP session after multipart PUTs to avoid request hanging (#5449).
