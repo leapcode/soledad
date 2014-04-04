@@ -1,1 +1,0 @@
-  o Back-compatibility for socket.create_connection interface in 2.6. Closes: #5208

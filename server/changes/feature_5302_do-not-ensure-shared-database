@@ -1,2 +1,0 @@
-  o Do not try to create the shared database when running the Soledad Server
-    application (#5302).

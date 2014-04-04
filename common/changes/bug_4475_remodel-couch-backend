@@ -1,2 +1,0 @@
-  o Remodel couch backend to fix concurrency and scalability. Closes #4475,
-    #4682, #4683 and #4680.

@@ -1,3 +1,0 @@
-  o Improve error messages. Closes #5035.
-      * Add MissingTokenError and InvalidTokenError as sub exceptions from
-        Unauthorized.

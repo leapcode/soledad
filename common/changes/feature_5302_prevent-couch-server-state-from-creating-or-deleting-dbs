@@ -1,3 +1,0 @@
-  o Prevent CouchServerState from creating or deleting databases. This way,
-    Soledad remote clients won't ever be able to do these operations when
-    syncing. Part of #5302.

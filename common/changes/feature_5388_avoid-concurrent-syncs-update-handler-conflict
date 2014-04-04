@@ -1,2 +1,0 @@
-  o Avoid concurrent syncs problem by adding a lock for PUTting to the sync
-    log update handler (#5388).

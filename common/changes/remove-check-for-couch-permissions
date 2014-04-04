@@ -1,4 +1,0 @@
-  o Remove check for couch permissions when CouchServerState is instantiated.
-    This is not necessary anymore because platform takes care of giving the
-    soledad user enough permissions and tapicero takes care of uploading the
-    needed design documents.

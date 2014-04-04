@@ -1,3 +1,0 @@
-  o Catch couchdb.http.ResourceNotFound exceptions when accessing design
-    documents on couch backend, and raise appropriate missing design documents
-    exceptions. Fixes #4994.
