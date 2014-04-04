@@ -855,6 +855,7 @@ class CouchDatabase(CommonBackend):
         try:
             self._database.resource.put_json(
                 doc.doc_id, body=buf.getvalue(), headers=envelope.headers)
+            self._renew_couch_session()
         except ResourceConflict:
             raise RevisionConflict()
 
@@ -1414,6 +1415,15 @@ class CouchDatabase(CommonBackend):
             if t._doc.is_tombstone() and not include_deleted:
                 continue
             yield t._doc
+
+    def _renew_couch_session(self):
+        """
+        Create a new couch connection session.
+
+        This is a workaround for #5448. Will not be needed once bigcouch is
+        merged with couchdb.
+        """
+        self._database.resource.session = Session(timeout=COUCH_TIMEOUT)
 
 
 class CouchSyncTarget(CommonSyncTarget):
