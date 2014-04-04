@@ -1,0 +1,2 @@
+  o Preload time.strptime() to avoid multi-threaded problem on couch backend
+    get_docs() method (#5449).
