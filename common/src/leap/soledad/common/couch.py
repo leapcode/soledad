@@ -1401,6 +1401,17 @@ class CouchDatabase(CommonBackend):
                  in matching doc_ids order.
         :rtype: iterable
         """
+        # Workaround for:
+        #
+        #   http://bugs.python.org/issue7980
+        #   https://leap.se/code/issues/5449
+        #
+        # python-couchdb uses time.strptime, which is not thread safe. In
+        # order to avoid the problem described on the issues above, we preload
+        # strptime here by evaluating the conversion of an arbitrary date.
+        # This will not be needed when/if we switch from python-couchdb to
+        # paisley.
+        time.strptime('Mar 4 1917', '%b %d %Y')
         # spawn threads to retrieve docs
         threads = []
         for doc_id in doc_ids:
