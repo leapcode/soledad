@@ -1489,9 +1489,9 @@ class CouchServerState(ServerState):
         :return: The CouchDatabase object.
         :rtype: CouchDatabase
         """
-        return CouchDatabase.open_database(
-            self._couch_url + '/' + dbname,
-            create=False,
+        return CouchDatabase(
+            self._couch_url,
+            dbname,
             ensure_ddocs=False)
 
     def ensure_database(self, dbname):
