@@ -353,7 +353,7 @@ class CouchDatabase(CommonBackend):
                      release_fun):
             """
             :param db: The database from where to get the document.
-            :type db: u1db.Database
+            :type db: CouchDatabase
             :param doc_id: The doc_id of the document to be retrieved.
             :type doc_id: str
             :param check_for_conflicts: Whether the get_doc() method should
