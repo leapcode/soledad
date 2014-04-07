@@ -1411,7 +1411,7 @@ class CouchDatabase(CommonBackend):
         # strptime here by evaluating the conversion of an arbitrary date.
         # This will not be needed when/if we switch from python-couchdb to
         # paisley.
-        time.strptime('Mar 4 1917', '%b %d %Y')
+        time.strptime('Mar 8 1917', '%b %d %Y')
         # spawn threads to retrieve docs
         threads = []
         for doc_id in doc_ids:
