@@ -27,6 +27,7 @@ import mock
 import time
 import binascii
 
+from urlparse import urljoin
 
 from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.common.couch import (
@@ -56,7 +57,8 @@ from leap.soledad.server.auth import URLToAuthorization
 def _couch_ensure_database(self, dbname):
     db = CouchDatabase.open_database(
         self._couch_url + '/' + dbname,
-        create=True)
+        create=True,
+        ensure_ddocs=True)
     return db, db._replica_uid
 
 CouchServerState.ensure_database = _couch_ensure_database
@@ -352,11 +354,10 @@ class EncryptedSyncTestCase(
         self.assertEqual([], doclist)
         doc1 = sol1.create_doc(json.loads(simple_doc))
         # ensure remote db exists before syncing
-        db = CouchDatabase(
-            self._couch_url,
-            # the name of the user database is "user-<uuid>".
-            'user-user-uuid',
-        )
+        db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'user-user-uuid'),
+            create=True,
+            ensure_ddocs=True)
         # sync with server
         sol1._server_url = self.getURL()
         sol1.sync()
@@ -408,11 +409,10 @@ class EncryptedSyncTestCase(
         self.assertEqual([], doclist)
         doc1 = sol1.create_doc(json.loads(simple_doc))
         # ensure remote db exists before syncing
-        db = CouchDatabase(
-            self._couch_url,
-            # the name of the user database is "user-<uuid>".
-            'user-user-uuid',
-        )
+        db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'user-user-uuid'),
+            create=True,
+            ensure_ddocs=True)
         # sync with server
         sol1._server_url = self.getURL()
         sol1.sync()
@@ -468,11 +468,10 @@ class EncryptedSyncTestCase(
         content = binascii.hexlify(os.urandom(length/2))  # len() == length
         doc1 = sol1.create_doc({'data': content})
         # ensure remote db exists before syncing
-        db = CouchDatabase(
-            self._couch_url,
-            # the name of the user database is "user-<uuid>".
-            'user-user-uuid',
-        )
+        db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'user-user-uuid'),
+            create=True,
+            ensure_ddocs=True)
         # sync with server
         sol1._server_url = self.getURL()
         sol1.sync()
@@ -512,11 +511,10 @@ class EncryptedSyncTestCase(
         for i in range(0, number_of_docs):
             sol1.create_doc(json.loads(simple_doc))
         # ensure remote db exists before syncing
-        db = CouchDatabase(
-            self._couch_url,
-            # the name of the user database is "user-<uuid>".
-            'user-user-uuid',
-        )
+        db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'user-user-uuid'),
+            create=True,
+            ensure_ddocs=True)
         # sync with server
         sol1._server_url = self.getURL()
         sol1.sync()
@@ -558,8 +556,14 @@ class LockResourceTestCase(
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self._couch_url = 'http://localhost:' + str(self.wrapper.port)
         # create the databases
-        CouchDatabase(self._couch_url, 'shared')
-        CouchDatabase(self._couch_url, 'tokens')
+        CouchDatabase.open_database(
+            urljoin(self._couch_url, 'shared'),
+            create=True,
+            ensure_ddocs=True)
+        CouchDatabase.open_database(
+            urljoin(self._couch_url, 'tokens'),
+            create=True,
+            ensure_ddocs=True)
         self._state = CouchServerState(
             self._couch_url, 'shared', 'tokens')
 
@@ -567,10 +571,10 @@ class LockResourceTestCase(
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
         # delete remote database
-        db = CouchDatabase(
-            self._couch_url,
-            'shared',
-        )
+        db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'shared'),
+            create=True,
+            ensure_ddocs=True)
         db.delete_database()
 
     def test__try_obtain_filesystem_lock(self):

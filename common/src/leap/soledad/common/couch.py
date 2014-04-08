@@ -31,9 +31,10 @@ import threading
 
 from StringIO import StringIO
 from collections import defaultdict
+from urlparse import urljoin
 
 
-from couchdb.client import Server
+from couchdb.client import Server, Database
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
@@ -380,7 +381,7 @@ class CouchDatabase(CommonBackend):
             self._release_fun()
 
     @classmethod
-    def open_database(cls, url, create, ensure_ddocs=False):
+    def open_database(cls, url, create, replica_uid=None, ensure_ddocs=False):
         """
         Open a U1DB database using CouchDB as backend.
 
@@ -388,6 +389,8 @@ class CouchDatabase(CommonBackend):
         :type url: str
         :param create: should the replica be created if it does not exist?
         :type create: bool
+        :param replica_uid: an optional unique replica identifier
+        :type replica_uid: str
         :param ensure_ddocs: Ensure that the design docs exist on server.
         :type ensure_ddocs: bool
 
@@ -406,10 +409,11 @@ class CouchDatabase(CommonBackend):
         except ResourceNotFound:
             if not create:
                 raise DatabaseDoesNotExist()
-        return cls(url, dbname, ensure_ddocs=ensure_ddocs)
+            server.create(dbname)
+        return cls(url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
 
-    def __init__(self, url, dbname, replica_uid=None, full_commit=True,
-                 session=None, ensure_ddocs=True):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True,
+                 session=None):
         """
         Create a new Couch data container.
 
@@ -419,31 +423,23 @@ class CouchDatabase(CommonBackend):
         :type dbname: str
         :param replica_uid: an optional unique replica identifier
         :type replica_uid: str
-        :param full_commit: turn on the X-Couch-Full-Commit header
-        :type full_commit: bool
-        :param session: an http.Session instance or None for a default session
-        :type session: http.Session
         :param ensure_ddocs: Ensure that the design docs exist on server.
         :type ensure_ddocs: bool
+        :param session: an http.Session instance or None for a default session
+        :type session: http.Session
         """
         # save params
         self._url = url
-        self._full_commit = full_commit
         if session is None:
             session = Session(timeout=COUCH_TIMEOUT)
         self._session = session
         self._factory = CouchDocument
         self._real_replica_uid = None
         # configure couch
-        self._server = Server(url=self._url,
-                              full_commit=self._full_commit,
-                              session=self._session)
         self._dbname = dbname
-        try:
-            self._database = self._server[self._dbname]
-        except ResourceNotFound:
-            self._server.create(self._dbname)
-            self._database = self._server[self._dbname]
+        self._database = Database(
+            urljoin(self._url, self._dbname),
+            self._session)
         if replica_uid is not None:
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
@@ -482,7 +478,8 @@ class CouchDatabase(CommonBackend):
         """
         Delete a U1DB CouchDB database.
         """
-        del(self._server[self._dbname])
+        server = Server(url=self._url)
+        del(server[self._dbname])
 
     def close(self):
         """
@@ -494,7 +491,6 @@ class CouchDatabase(CommonBackend):
         self._url = None
         self._full_commit = None
         self._session = None
-        self._server = None
         self._database = None
         return True
 
