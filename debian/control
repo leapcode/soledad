@@ -9,7 +9,7 @@ Package: soledad-server
 Architecture: all
 Depends: ${misc:Depends}, ${python:Depends}, python-configparser, python-couchdb, 
  python-simplejson, python-oauth, python-u1db, python-routes, python-openssl, 
- soledad-common (>= 0.3.0-1), 
+ soledad-common (>= 0.5.0), 
  python-six, python-twisted (>= 13.0.0-1~bpo70+1), python-twisted-bin (>= 13.0.0-1~bpo70+1), 
  python-twisted-conch (>= 1:13.0.0-1~bpo70+1), python-twisted-core (>= 13.0.0-1~bpo70+1), 
  python-twisted-lore (>= 13.0.0-1~bpo70+1), python-twisted-mail (>= 13.0.0-1~bpo70+1), 
