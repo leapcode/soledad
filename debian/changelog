@@ -1,8 +1,8 @@
-soledad (0.5.0~rc) unstable; urgency=low
+soledad (0.5.0) unstable; urgency=low
 
-  * Update to 0.5.0 release: couchdb consistency release.
+  * Update to 0.5.0 release.
 
- -- Ben Carrillo <ben@futeisha.org>  Mon, 23 Dec 2013 01:57:06 -0400
+ -- Ben Carrillo <ben@futeisha.org>  Wed, 09 Apr 2014 15:47:11 -0500
 
 soledad (0.4.4.1) unstable; urgency=medium
 
