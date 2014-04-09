@@ -25,6 +25,7 @@ import copy
 import shutil
 from base64 import b64decode
 from mock import Mock
+from urlparse import urljoin
 
 from couchdb.client import Server
 from u1db import errors as u1db_errors
@@ -151,8 +152,11 @@ class CouchDBTestCase(unittest.TestCase):
 class TestCouchBackendImpl(CouchDBTestCase):
 
     def test__allocate_doc_id(self):
-        db = couch.CouchDatabase('http://localhost:' + str(self.wrapper.port),
-                                 'u1db_tests', ensure_ddocs=True)
+        db = couch.CouchDatabase.open_database(
+            urljoin(
+                'http://localhost:' + str(self.wrapper.port), 'u1db_tests'),
+                create=True,
+                ensure_ddocs=True)
         doc_id1 = db._allocate_doc_id()
         self.assertTrue(doc_id1.startswith('D-'))
         self.assertEqual(34, len(doc_id1))
@@ -166,28 +170,35 @@ class TestCouchBackendImpl(CouchDBTestCase):
 
 def make_couch_database_for_test(test, replica_uid):
     port = str(test.wrapper.port)
-    return couch.CouchDatabase('http://localhost:' + port, replica_uid,
-                               replica_uid=replica_uid or 'test',
-                               ensure_ddocs=True)
+    return couch.CouchDatabase.open_database(
+        urljoin('http://localhost:' + port, replica_uid),
+        create=True,
+        replica_uid=replica_uid or 'test',
+        ensure_ddocs=True)
 
 
 def copy_couch_database_for_test(test, db):
     port = str(test.wrapper.port)
     couch_url = 'http://localhost:' + port
     new_dbname = db._replica_uid + '_copy'
-    new_db = couch.CouchDatabase(couch_url,
-                                 new_dbname,
-                                 replica_uid=db._replica_uid or 'test')
+    new_db = couch.CouchDatabase.open_database(
+        urljoin(couch_url, new_dbname),
+        create=True,
+        replica_uid=db._replica_uid or 'test')
     # copy all docs
     old_couch_db = Server(couch_url)[db._replica_uid]
     new_couch_db = Server(couch_url)[new_dbname]
     for doc_id in old_couch_db:
         doc = old_couch_db.get(doc_id)
+        # bypass u1db_config document
+        if doc_id == 'u1db_config':
+            pass
         # copy design docs
-        if ('u1db_rev' not in doc):
+        elif doc_id.startswith('_design'):
+            del doc['_rev']
             new_couch_db.save(doc)
         # copy u1db docs
-        else:
+        elif 'u1db_rev' in doc:
             new_doc = {
                 '_id': doc['_id'],
                 'u1db_transactions': doc['u1db_transactions'],
@@ -228,7 +239,7 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
     def setUp(self):
         test_backends.AllDatabaseTests.setUp(self)
         # save db info because of test_close
-        self._server = self.db._server
+        self._url = self.db._url
         self._dbname = self.db._dbname
 
     def tearDown(self):
@@ -238,7 +249,8 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
         if self.id() == \
                 'leap.soledad.common.tests.test_couch.CouchTests.' \
                 'test_close(couch)':
-            del(self._server[self._dbname])
+            server = Server(url=self._url)
+            del(server[self._dbname])
         else:
             self.db.delete_database()
         test_backends.AllDatabaseTests.tearDown(self)
@@ -355,10 +367,10 @@ from u1db.backends.inmemory import InMemoryIndex
 
 class IndexedCouchDatabase(couch.CouchDatabase):
 
-    def __init__(self, url, dbname, replica_uid=None, full_commit=True,
-                     session=None, ensure_ddocs=True):
-        old_class.__init__(self, url, dbname, replica_uid, full_commit,
-                           session, ensure_ddocs=ensure_ddocs)
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True,
+            session=None):
+        old_class.__init__(self, url, dbname, replica_uid=replica_uid, 
+                           ensure_ddocs=ensure_ddocs, session=session)
         self._indexes = {}
 
     def _put_doc(self, old_doc, doc):
@@ -467,8 +479,9 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
-        self.db = couch.CouchDatabase(
-            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+        self.db = couch.CouchDatabase.open_database(
+            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            create=True,
             ensure_ddocs=False)  # note that we don't enforce ddocs here
 
     def tearDown(self):
@@ -509,8 +522,9 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents list functions
         will raise if the functions are not present.
         """
-        self.db = couch.CouchDatabase(
-            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+        self.db = couch.CouchDatabase.open_database(
+            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            create=True,
             ensure_ddocs=True)
         # erase views from _design/transactions
         transactions = self.db._database['_design/transactions']
@@ -538,8 +552,9 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents list functions
         will raise if the functions are not present.
         """
-        self.db = couch.CouchDatabase(
-            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+        self.db = couch.CouchDatabase.open_database(
+            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            create=True,
             ensure_ddocs=True)
         # erase views from _design/transactions
         transactions = self.db._database['_design/transactions']
@@ -567,8 +582,9 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents' named views  will
         raise if the views are not present.
         """
-        self.db = couch.CouchDatabase(
-            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+        self.db = couch.CouchDatabase.open_database(
+            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            create=True,
             ensure_ddocs=True)
         # erase views from _design/docs
         docs = self.db._database['_design/docs']
@@ -608,8 +624,9 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents will raise if the
         design docs are not present.
         """
-        self.db = couch.CouchDatabase(
-            'http://127.0.0.1:%d' % self.wrapper.port, 'test',
+        self.db = couch.CouchDatabase.open_database(
+            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            create=True,
             ensure_ddocs=True)
         # delete _design/docs
         del self.db._database['_design/docs']

@@ -24,6 +24,10 @@ import mock
 import tempfile
 import threading
 
+
+from urlparse import urljoin
+
+
 from leap.soledad.client import Soledad
 from leap.soledad.common.couch import CouchDatabase, CouchServerState
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
@@ -101,8 +105,11 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
         self._couch_url = 'http://localhost:' + str(self.wrapper.port)
-        self.db = CouchDatabase(
-            self._couch_url, 'user-user-uuid', replica_uid='replica')
+        self.db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'user-user-uuid'),
+            create=True,
+            replica_uid='replica',
+            ensure_ddocs=True)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
 
     def tearDown(self):
