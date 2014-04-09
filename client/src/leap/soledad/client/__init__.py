@@ -34,6 +34,8 @@ import urlparse
 import hmac
 
 from hashlib import sha256
+from threading import Lock
+from collections import defaultdict
 
 try:
     import cchardet as chardet
@@ -52,6 +54,7 @@ from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
     AlreadyLockedError,
+    LockTimedOutError,
 )
 from leap.soledad.common.crypto import (
     MacMethods,
@@ -245,6 +248,12 @@ class Soledad(object):
     Prefix for default values for path.
     """
 
+    syncing_lock = defaultdict(Lock)
+    """
+    A dictionary that hold locks which avoid multiple sync attempts from the
+    same database replica.
+    """
+
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, auth_token=None, secret_id=None):
         """
@@ -402,6 +411,8 @@ class Soledad(object):
                 token, timeout = self._shared_db.lock()
             except AlreadyLockedError:
                 raise BootstrapSequenceError('Database is already locked.')
+            except LockTimedOutError:
+                raise BootstrapSequenceError('Lock operation timed out.')
 
             try:
                 self._get_or_gen_crypto_secrets()
@@ -767,7 +778,7 @@ class Soledad(object):
 
         ============================== WARNING ==============================
         This method converts the document's contents to unicode in-place. This
-        meanse that after calling C{put_doc(doc)}, the contents of the
+        means that after calling C{put_doc(doc)}, the contents of the
         document, i.e. C{doc.content}, might be different from before the
         call.
         ============================== WARNING ==============================
@@ -824,9 +835,9 @@ class Soledad(object):
             in matching doc_ids order.
         :rtype: generator
         """
-        return self._db.get_docs(doc_ids,
-                                 check_for_conflicts=check_for_conflicts,
-                                 include_deleted=include_deleted)
+        return self._db.get_docs(
+            doc_ids, check_for_conflicts=check_for_conflicts,
+            include_deleted=include_deleted)
 
     def get_all_docs(self, include_deleted=False):
         """Get the JSON content for all documents in the database.
@@ -842,7 +853,7 @@ class Soledad(object):
 
     def _convert_to_unicode(self, content):
         """
-        Converts content to utf8 (or all the strings in content)
+        Converts content to unicode (or all the strings in content)
 
         NOTE: Even though this method supports any type, it will
         currently ignore contents of lists, tuple or any other
@@ -857,13 +868,14 @@ class Soledad(object):
         if isinstance(content, unicode):
             return content
         elif isinstance(content, str):
+            result = chardet.detect(content)
+            default = "utf-8"
+            encoding = result["encoding"] or default
             try:
-                result = chardet.detect(content)
-                default = "utf-8"
-                encoding = result["encoding"] or default
                 content = content.decode(encoding)
-            except UnicodeError:
-                pass
+            except UnicodeError as e:
+                logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
+                content = content.decode(encoding, 'replace')
             return content
         else:
             if isinstance(content, dict):
@@ -928,7 +940,8 @@ class Soledad(object):
             "number(fieldname, width)", "lower(fieldname)"
         """
         if self._db:
-            return self._db.create_index(index_name, *index_expressions)
+            return self._db.create_index(
+                index_name, *index_expressions)
 
     def delete_index(self, index_name):
         """
@@ -1063,6 +1076,9 @@ class Soledad(object):
         """
         Synchronize the local encrypted replica with a remote replica.
 
+        This method blocks until a syncing lock is acquired, so there are no
+        attempts of concurrent syncs from the same client replica.
+
         :param url: the url of the target replica to sync with
         :type url: str
 
@@ -1071,11 +1087,13 @@ class Soledad(object):
         :rtype: str
         """
         if self._db:
-            local_gen = self._db.sync(
-                urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                creds=self._creds, autocreate=True)
-            signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
-            return local_gen
+            # acquire lock before attempt to sync
+            with Soledad.syncing_lock[self._db._get_replica_uid()]:
+                local_gen = self._db.sync(
+                    urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
+                    creds=self._creds, autocreate=False)
+                signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
+                return local_gen
 
     def need_sync(self, url):
         """
@@ -1193,7 +1211,7 @@ class Soledad(object):
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # check mac of the recovery document
-        mac_auth = False
+        #mac_auth = False  # XXX ?
         mac = None
         if MAC_KEY in data:
             soledad_assert(data[MAC_KEY] is not None)
@@ -1216,7 +1234,7 @@ class Soledad(object):
             if mac != data[MAC_KEY]:
                 raise WrongMac('Could not authenticate recovery document\'s '
                                'contents.')
-            mac_auth = True
+            #mac_auth = True  # XXX ?
         # include secrets in the secret pool.
         secrets = 0
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
@@ -1293,9 +1311,17 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     # derived from httplib.py
 
     def connect(self):
-        "Connect to a host on a given (SSL) port."
-        sock = socket.create_connection((self.host, self.port),
-                                        SOLEDAD_TIMEOUT, self.source_address)
+        """
+        Connect to a host on a given (SSL) port.
+        """
+        try:
+            source = self.source_address
+            sock = socket.create_connection((self.host, self.port),
+                                            SOLEDAD_TIMEOUT, source)
+        except AttributeError:
+            # source_address was introduced in 2.7
+            sock = socket.create_connection((self.host, self.port),
+                                            SOLEDAD_TIMEOUT)
         if self._tunnel_host:
             self.sock = sock
             self._tunnel()

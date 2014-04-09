@@ -1,2 +1,0 @@
-  o Unlock shared_db if anything fails in the bootstrap
-    sequence. Fixes #4702.
