@@ -32,6 +32,7 @@ import threading
 from StringIO import StringIO
 from collections import defaultdict
 from urlparse import urljoin
+from contextlib import contextmanager
 
 
 from couchdb.client import Server, Database
@@ -39,7 +40,7 @@ from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
     ServerError,
-    Session,
+    Session as CouchHTTPSession,
 )
 from u1db import query_parser, vectorclock
 from u1db.errors import (
@@ -332,6 +333,35 @@ class MultipartWriter(object):
                 self.headers[name] = value
 
 
+class Session(CouchHTTPSession):
+    """
+    An HTTP session that can be closed.
+    """
+
+    def close_connections(self):
+        for key, conns in list(self.conns.items()):
+            for conn in conns:
+                conn.close()
+
+
+@contextmanager
+def couch_server(url):
+    """
+    Provide a connection to a couch server and cleanup after use.
+
+    For database creation and deletion we use an ephemeral connection to the
+    couch server. That connection has to be properly closed, so we provide it
+    as a context manager.
+
+    :param url: The URL of the Couch server.
+    :type url: str
+    """
+    session = Session(timeout=COUCH_TIMEOUT)
+    server = Server(url=url, session=session)
+    yield server
+    session.close_connections()
+
+
 class CouchDatabase(CommonBackend):
     """
     A U1DB implementation that uses CouchDB as its persistence layer.
@@ -403,17 +433,16 @@ class CouchDatabase(CommonBackend):
             raise InvalidURLError
         url = m.group(1)
         dbname = m.group(2)
-        server = Server(url=url)
-        try:
-            server[dbname]
-        except ResourceNotFound:
-            if not create:
-                raise DatabaseDoesNotExist()
-            server.create(dbname)
+        with couch_server(url) as server:
+            try:
+                server[dbname]
+            except ResourceNotFound:
+                if not create:
+                    raise DatabaseDoesNotExist()
+                server.create(dbname)
         return cls(url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True,
-                 session=None):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
         """
         Create a new Couch data container.
 
@@ -425,14 +454,10 @@ class CouchDatabase(CommonBackend):
         :type replica_uid: str
         :param ensure_ddocs: Ensure that the design docs exist on server.
         :type ensure_ddocs: bool
-        :param session: an http.Session instance or None for a default session
-        :type session: http.Session
         """
         # save params
         self._url = url
-        if session is None:
-            session = Session(timeout=COUCH_TIMEOUT)
-        self._session = session
+        self._session = Session(timeout=COUCH_TIMEOUT)
         self._factory = CouchDocument
         self._real_replica_uid = None
         # configure couch
@@ -478,8 +503,9 @@ class CouchDatabase(CommonBackend):
         """
         Delete a U1DB CouchDB database.
         """
-        server = Server(url=self._url)
-        del(server[self._dbname])
+        with couch_server(self._url) as server:
+            del(server[self._dbname])
+        self.close_connections()
 
     def close(self):
         """
@@ -488,11 +514,25 @@ class CouchDatabase(CommonBackend):
         :return: True if db was succesfully closed.
         :rtype: bool
         """
+        self.close_connections()
         self._url = None
         self._full_commit = None
         self._session = None
         self._database = None
         return True
+
+    def close_connections(self):
+        """
+        Close all open connections to the couch server.
+        """
+        if self._session is not None:
+            self._session.close_connections()
+
+    def __del__(self):
+        """
+        Close the database upon garbage collection.
+        """
+        self.close()
 
     def _set_replica_uid(self, replica_uid):
         """
@@ -851,7 +891,9 @@ class CouchDatabase(CommonBackend):
         try:
             self._database.resource.put_json(
                 doc.doc_id, body=buf.getvalue(), headers=envelope.headers)
-            self._renew_couch_session()
+            # What follows is a workaround for an ugly bug. See:
+            # https://leap.se/code/issues/5448
+            self.close_connections()
         except ResourceConflict:
             raise RevisionConflict()
 
@@ -1422,15 +1464,6 @@ class CouchDatabase(CommonBackend):
             if t._doc.is_tombstone() and not include_deleted:
                 continue
             yield t._doc
-
-    def _renew_couch_session(self):
-        """
-        Create a new couch connection session.
-
-        This is a workaround for #5448. Will not be needed once bigcouch is
-        merged with couchdb.
-        """
-        self._database.resource.session = Session(timeout=COUCH_TIMEOUT)
 
 
 class CouchSyncTarget(CommonSyncTarget):
