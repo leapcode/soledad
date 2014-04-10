@@ -114,6 +114,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
     def tearDown(self):
         self.db.delete_database()
+        self.db.close()
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
 
@@ -218,6 +219,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
         _create_docs_and_sync(sol, 0)
         _create_docs_and_sync(sol, 1)
+        sol.close()
 
     #
     # Concurrency tests
@@ -351,6 +353,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             self.assertEqual(
                 1,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
+        sol.close()
 
     def test_concurrent_syncs_do_not_fail(self):
         """
@@ -394,3 +397,4 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             self.assertEqual(
                 1,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
+        sol.close()

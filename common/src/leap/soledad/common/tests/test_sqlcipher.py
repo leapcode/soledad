@@ -469,11 +469,9 @@ class SQLCipherDatabaseSyncTests(
 
     def setUp(self):
         test_sync.DatabaseSyncTests.setUp(self)
-        BaseSoledadTest.setUp(self)
 
     def tearDown(self):
         test_sync.DatabaseSyncTests.tearDown(self)
-        BaseSoledadTest.tearDown(self)
 
     def test_sync_autoresolves(self):
         """
@@ -683,11 +681,9 @@ class SQLCipherSyncTargetTests(
 
     def setUp(self):
         test_sync.DatabaseSyncTargetTests.setUp(self)
-        #BaseSoledadTest.setUp(self)
 
     def tearDown(self):
         test_sync.DatabaseSyncTargetTests.tearDown(self)
-        BaseSoledadTest.tearDown(self)
 
     def test_sync_exchange(self):
         """

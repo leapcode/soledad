@@ -85,7 +85,6 @@ class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
     whitebox = True
 
     def setUp(self):
-        tests.DatabaseBaseTests.setUp(self)
         tests.TestCaseWithServer.setUp(self)
         self.db, self.st = self.create_db_and_target(self)
         self.other_changes = []
@@ -94,7 +93,6 @@ class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
         # We delete them explicitly, so that connections are cleanly closed
         del self.st
         self.db.close()
-        del self.db
         super(DatabaseSyncTargetTests, self).tearDown()
 
     def create_db_and_target(self, *args):
@@ -1013,30 +1011,30 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
     def test_sync_supersedes_conflicts(self):
         self.db1 = self.create_database('test1', 'both')
         self.db2 = self.create_database('test2', 'target')
-        db3 = self.create_database('test3', 'both')
+        self.db3 = self.create_database('test3', 'both')
         doc1 = self.db1.create_doc_from_json('{"a": 1}', doc_id='the-doc')
         self.db2.create_doc_from_json('{"b": 1}', doc_id='the-doc')
-        db3.create_doc_from_json('{"c": 1}', doc_id='the-doc')
-        self.sync(db3, self.db1)
+        self.db3.create_doc_from_json('{"c": 1}', doc_id='the-doc')
+        self.sync(self.db3, self.db1)
         self.assertEqual(
             self.db1._get_generation_info(),
-            db3._get_replica_gen_and_trans_id(self.db1._replica_uid))
+            self.db3._get_replica_gen_and_trans_id(self.db1._replica_uid))
         self.assertEqual(
-            db3._get_generation_info(),
-            self.db1._get_replica_gen_and_trans_id(db3._replica_uid))
-        self.sync(db3, self.db2)
+            self.db3._get_generation_info(),
+            self.db1._get_replica_gen_and_trans_id(self.db3._replica_uid))
+        self.sync(self.db3, self.db2)
         self.assertEqual(
             self.db2._get_generation_info(),
-            db3._get_replica_gen_and_trans_id(self.db2._replica_uid))
+            self.db3._get_replica_gen_and_trans_id(self.db2._replica_uid))
         self.assertEqual(
-            db3._get_generation_info(),
-            self.db2._get_replica_gen_and_trans_id(db3._replica_uid))
-        self.assertEqual(3, len(db3.get_doc_conflicts('the-doc')))
+            self.db3._get_generation_info(),
+            self.db2._get_replica_gen_and_trans_id(self.db3._replica_uid))
+        self.assertEqual(3, len(self.db3.get_doc_conflicts('the-doc')))
         doc1.set_json('{"a": 2}')
         self.db1.put_doc(doc1)
-        self.sync(db3, self.db1)
+        self.sync(self.db3, self.db1)
         # original doc1 should have been removed from conflicts
-        self.assertEqual(3, len(db3.get_doc_conflicts('the-doc')))
+        self.assertEqual(3, len(self.db3.get_doc_conflicts('the-doc')))
 
     def test_sync_stops_after_get_sync_info(self):
         self.db1 = self.create_database('test1', 'source')
@@ -1054,70 +1052,70 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc1')
         self.sync(self.db1, self.db2)
-        db1_copy = self.copy_database(self.db1)
+        self.db1_copy = self.copy_database(self.db1)
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            errors.InvalidGeneration, self.sync, db1_copy, self.db2)
+            errors.InvalidGeneration, self.sync, self.db1_copy, self.db2)
 
     def test_sync_detects_rollback_in_target(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
-        db2_copy = self.copy_database(self.db2)
+        self.db2_copy = self.copy_database(self.db2)
         self.db2.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            errors.InvalidGeneration, self.sync, self.db1, db2_copy)
+            errors.InvalidGeneration, self.sync, self.db1, self.db2_copy)
 
     def test_sync_detects_diverged_source(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
-        db3 = self.copy_database(self.db1)
+        self.db3 = self.copy_database(self.db1)
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
-        db3.create_doc_from_json(tests.simple_doc, doc_id="divergent")
+        self.db3.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            errors.InvalidTransactionId, self.sync, db3, self.db2)
+            errors.InvalidTransactionId, self.sync, self.db3, self.db2)
 
     def test_sync_detects_diverged_target(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
-        db3 = self.copy_database(self.db2)
-        db3.create_doc_from_json(tests.nested_doc, doc_id="divergent")
+        self.db3 = self.copy_database(self.db2)
+        self.db3.create_doc_from_json(tests.nested_doc, doc_id="divergent")
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            errors.InvalidTransactionId, self.sync, self.db1, db3)
+            errors.InvalidTransactionId, self.sync, self.db1, self.db3)
 
     def test_sync_detects_rollback_and_divergence_in_source(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc1')
         self.sync(self.db1, self.db2)
-        db1_copy = self.copy_database(self.db1)
+        self.db1_copy = self.copy_database(self.db1)
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.sync(self.db1, self.db2)
-        db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
-        db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
+        self.db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
+        self.db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.assertRaises(
-            errors.InvalidTransactionId, self.sync, db1_copy, self.db2)
+            errors.InvalidTransactionId, self.sync, self.db1_copy, self.db2)
 
     def test_sync_detects_rollback_and_divergence_in_target(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
-        db2_copy = self.copy_database(self.db2)
+        self.db2_copy = self.copy_database(self.db2)
         self.db2.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.db2.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.sync(self.db1, self.db2)
-        db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
-        db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
+        self.db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
+        self.db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.assertRaises(
-            errors.InvalidTransactionId, self.sync, self.db1, db2_copy)
+            errors.InvalidTransactionId, self.sync, self.db1, self.db2_copy)
 
 
 class TestDbSync(tests.TestCaseWithServer):

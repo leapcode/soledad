@@ -49,6 +49,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         secrets_path = os.path.dirname(sol.secrets_path)
         self.assertTrue(os.path.isdir(local_db_dir))
         self.assertTrue(os.path.isdir(secrets_path))
+        sol.close()
 
     def test__init_db(self):
         sol = self._soledad_instance()
@@ -61,6 +62,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol._init_db()
         from leap.soledad.client.sqlcipher import SQLCipherDatabase
         self.assertIsInstance(sol._db, SQLCipherDatabase)
+        sol.close()
 
     def test__init_config_defaults(self):
         """
@@ -103,6 +105,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
             os.path.join(self.tempdir, 'value_2'),
             sol.local_db_path)
         self.assertEqual('value_1', sol.server_url)
+        sol.close()
 
     def test_change_passphrase(self):
         """
@@ -118,6 +121,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
 
         # change the passphrase
         sol.change_passphrase(u'654321')
+        sol.close()
 
         self.assertRaises(
             WrongMac,
@@ -132,6 +136,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
             prefix=self.rand_prefix)
         doc2 = sol2.get_doc(doc_id)
         self.assertEqual(doc, doc2)
+        sol2.close()
 
     def test_change_passphrase_with_short_passphrase_raises(self):
         """
@@ -145,6 +150,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         self.assertRaises(
             PassphraseTooShort,
             sol.change_passphrase, u'54321')
+        sol.close()
 
     def test_get_passphrase(self):
         """
@@ -152,6 +158,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         """
         sol = self._soledad_instance()
         self.assertEqual('123', sol.passphrase)
+        sol.close()
 
 
 class SoledadSharedDBTestCase(BaseSoledadTest):
@@ -164,6 +171,9 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         self._shared_db = SoledadSharedDatabase(
             'https://provider/', ADDRESS, document_factory=SoledadDocument,
             creds=None)
+
+    def tearDown(self):
+        BaseSoledadTest.tearDown(self)
 
     def test__get_secrets_from_shared_db(self):
         """
@@ -209,7 +219,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         BaseSoledadTest.setUp(self)
 
     def tearDown(self):
-        pass
+        BaseSoledadTest.tearDown(self)
 
     def _pop_mock_call(self, mocked):
         mocked.call_args_list.pop()
@@ -283,6 +293,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # assert db was locked and unlocked
         sol._shared_db.lock.assert_called_with()
         sol._shared_db.unlock.assert_called_with('atoken')
+        sol.close()
 
     def test_stage2_bootstrap_signals(self):
         """
@@ -305,6 +316,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             def __call__(self):
                 return self
 
+        sol.close()
         # reset mock
         soledad.client.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
@@ -328,6 +340,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
+        sol.close()
 
     def test_stage1_bootstrap_signals(self):
         """
@@ -337,6 +350,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # get an existent instance so it emits only some of bootstrap signals
         sol = self._soledad_instance()
         self.assertEqual([], soledad.client.signal.mock_calls)
+        sol.close()
 
     def test_sync_signals(self):
         """
@@ -355,6 +369,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             proto.SOLEDAD_DONE_DATA_SYNC,
             ADDRESS,
         )
+        sol.close()
 
     def test_need_sync_signals(self):
         """
@@ -375,3 +390,4 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             ADDRESS,
         )
         SoledadSyncTarget.get_sync_info = old_get_sync_info
+        sol.close()
