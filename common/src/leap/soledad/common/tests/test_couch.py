@@ -27,8 +27,8 @@ from base64 import b64decode
 from mock import Mock
 from urlparse import urljoin
 
-from couchdb.client import Server
 from u1db import errors as u1db_errors
+from couchdb.client import Server
 
 from leap.common.files import mkdir_p
 
@@ -186,8 +186,9 @@ def copy_couch_database_for_test(test, db):
         create=True,
         replica_uid=db._replica_uid or 'test')
     # copy all docs
-    old_couch_db = Server(couch_url)[db._replica_uid]
-    new_couch_db = Server(couch_url)[new_dbname]
+    session = couch.Session()
+    old_couch_db = Server(couch_url, session=session)[db._replica_uid]
+    new_couch_db = Server(couch_url, session=session)[new_dbname]
     for doc_id in old_couch_db:
         doc = old_couch_db.get(doc_id)
         # bypass u1db_config document
@@ -217,6 +218,8 @@ def copy_couch_database_for_test(test, db):
                 if (att is not None):
                     new_couch_db.put_attachment(new_doc, att,
                                                 filename=att_name)
+    # cleanup connections to prevent file descriptor leaking
+    session.close_connections()
     return new_db
 
 
@@ -249,8 +252,10 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
         if self.id() == \
                 'leap.soledad.common.tests.test_couch.CouchTests.' \
                 'test_close(couch)':
-            server = Server(url=self._url)
+            session = couch.Session()
+            server = Server(url=self._url, session=session)
             del(server[self._dbname])
+            session.close_connections()
         else:
             self.db.delete_database()
         test_backends.AllDatabaseTests.tearDown(self)
@@ -367,10 +372,9 @@ from u1db.backends.inmemory import InMemoryIndex
 
 class IndexedCouchDatabase(couch.CouchDatabase):
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True,
-            session=None):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
         old_class.__init__(self, url, dbname, replica_uid=replica_uid, 
-                           ensure_ddocs=ensure_ddocs, session=session)
+                           ensure_ddocs=ensure_ddocs)
         self._indexes = {}
 
     def _put_doc(self, old_doc, doc):
@@ -459,19 +463,22 @@ class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
         self.db1 = None
         self.db2 = None
         self.db3 = None
+        self.db1_copy = None
+        self.db2_copy = None
         test_sync.DatabaseSyncTests.setUp(self)
 
     def tearDown(self):
-        self.db and self.db.delete_database()
-        self.db1 and self.db1.delete_database()
-        self.db2 and self.db2.delete_database()
-        self.db3 and self.db3.delete_database()
-        db = self.create_database('test1_copy', 'source')
-        db.delete_database()
-        db = self.create_database('test2_copy', 'target')
-        db.delete_database()
-        db = self.create_database('test3', 'target')
-        db.delete_database()
+        for db in [self.db, self.db1, self.db2, self.db3, self.db1_copy,
+                self.db2_copy]:
+            if db is not None:
+                db.delete_database()
+                db.close()
+        for replica_uid, dbname in [('test1_copy', 'source'),
+                ('test2_copy', 'target'), ('test3', 'target')]:
+            db = self.create_database(replica_uid, dbname)
+            db.delete_database()
+            # cleanup connections to avoid leaking of file descriptors
+            db.close()
         test_sync.DatabaseSyncTests.tearDown(self)
 
 
@@ -486,6 +493,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
 
     def tearDown(self):
         self.db.delete_database()
+        self.db.close()
 
     def test_missing_design_doc_raises(self):
         """

@@ -391,6 +391,9 @@ class EncryptedSyncTestCase(
         # assert incoming doc is equal to the first sent doc
         self.assertEqual(doc1, doc2)
         db.delete_database()
+        db.close()
+        sol1.close()
+        sol2.close()
 
     def test_encrypted_sym_sync_with_unicode_passphrase(self):
         """
@@ -450,6 +453,9 @@ class EncryptedSyncTestCase(
         # assert incoming doc is equal to the first sent doc
         self.assertEqual(doc1, doc2)
         db.delete_database()
+        db.close()
+        sol1.close()
+        sol2.close()
 
     def test_sync_very_large_files(self):
         """
@@ -492,6 +498,9 @@ class EncryptedSyncTestCase(
         self.assertEqual(doc1, doc2)
         # delete remote database
         db.delete_database()
+        db.close()
+        sol1.close()
+        sol2.close()
 
 
     def test_sync_many_small_files(self):
@@ -535,6 +544,9 @@ class EncryptedSyncTestCase(
             self.assertEqual(sol1.get_doc(doc.doc_id), doc)
         # delete remote database
         db.delete_database()
+        db.close()
+        sol1.close()
+        sol2.close()
 
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):

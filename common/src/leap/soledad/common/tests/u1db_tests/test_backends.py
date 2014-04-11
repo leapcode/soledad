@@ -355,6 +355,9 @@ class LocalDatabaseTests(tests.DatabaseBaseTests):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS
 
+    def setUp(self):
+        tests.DatabaseBaseTests.setUp(self)
+
     def test_create_doc_different_ids_diff_db(self):
         doc1 = self.db.create_doc_from_json(simple_doc)
         db2 = self.create_database('other-uid')
