@@ -1,0 +1,2 @@
+  o Close connection with server after syncing to avoid client hanging on exit
+    (#5507).
