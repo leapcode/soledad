@@ -371,6 +371,7 @@ class CouchDatabase(CommonBackend):
     MAX_GET_DOCS_THREADS = 20
 
     update_handler_lock = defaultdict(threading.Lock)
+    sync_info_lock = defaultdict(threading.Lock)
 
     class _GetDocThread(threading.Thread):
         """
@@ -440,7 +441,8 @@ class CouchDatabase(CommonBackend):
                 if not create:
                     raise DatabaseDoesNotExist()
                 server.create(dbname)
-        return cls(url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
+        return cls(
+            url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
 
     def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
         """
@@ -575,6 +577,8 @@ class CouchDatabase(CommonBackend):
             return self._real_replica_uid
 
     _replica_uid = property(_get_replica_uid, _set_replica_uid)
+
+    replica_uid = property(_get_replica_uid)
 
     def _get_generation(self):
         """
@@ -869,7 +873,7 @@ class CouchDatabase(CommonBackend):
             # Date.prototype.getTime() which was used before inside a couchdb
             # update handler.
             (int(time.time() * 1000),
-            self._allocate_transaction_id()))
+             self._allocate_transaction_id()))
         # build the couch document
         couch_doc = {
             '_id': doc.doc_id,
