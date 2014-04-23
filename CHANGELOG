@@ -1,4 +1,4 @@
-0.4.5 Apr 4:
+0.5.0 Apr 4, 2014:
 Client:
   o Catch lock timeout exception. Fixes #4435.
   o Add lock for create_doc and update_indexes call, prevents
@@ -62,9 +62,7 @@ Server:
     Server application. Fixes #5302.
   o Enable Gzip compression on the soledad wsgi app.
 
--- 2014 --
-
-0.4.4 Dec 6:
+0.4.4 Dec 6, 2013:
 Client:
   o Add MAC verirication to the recovery document and
     soledad.json. Closes #4348.
@@ -72,14 +70,14 @@ Common:
   o Add unicode conversion to put_doc(). Closes #4095.
   o Remove tests dependency on nose2. Closes #4258.
 
-0.4.3 Nov 15:
+0.4.3 Nov 15, 2013:
 Client:
   o Defaults detected encoding to utf-8 to avoid bug if detected
     encoding is None. Closes: #4417
   o Open db in autocommit mode, to avoid nested transactions problems.
     Closes: #4400
 
-0.4.2 Nov 1:
+0.4.2 Nov 1, 2013:
 Client:
   o Support non-ascii passwords. Closes #4001.
   o Change error severity for missing secrets path.
@@ -93,11 +91,11 @@ Common:
 Server:
   o Allow for locking the shared database. Closes #4097.
 
-0.4.1 Oct 4:
+0.4.1 Oct 4, 2013:
 Client:
   o Save only UTF8 strings. Related to #3660.
 
-0.4.0 Sep 20:
+0.4.0 Sep 20, 2013:
 Client:
   o Remove redundant logging when creating data dirs.
 Server:
@@ -107,14 +105,14 @@ Common:
   o Turn couchdb dependency for common into optional. Closes #2167.
   o Add verification for couch permissions. Closes #3501.
 
-0.3.2 Sep 6:
+0.3.2 Sep 6, 2013:
 Client:
   o Use dirspec instead of plain xdg. Closes #3574.
 Server:
   o Fix the init script for soledad server so that it uses the new
     package namespace.
 
-0.3.1 Aug 23:
+0.3.1 Aug 23, 2013:
 Client:
   o Add libsqlite3-dev requirement for soledad.
   o Check for None in private methods that depend on _db. Closes:
@@ -134,7 +132,7 @@ Common:
     #3487.
   o Add versioneer, parse_requirements
 
-0.3.0 Aug 9:
+0.3.0 Aug 9, 2013:
 Client:
   o Thread safe wrapper for pysqlcipher.
   o Fix a couple of typos that prevented certain functionality to
@@ -143,7 +141,7 @@ Server:
   o A plaintext port is not opened by soledad server initscript call
     to twistd web anymore. Closes #3254.
 
-0.2.3 Jul 26:
+0.2.3 Jul 26, 2013:
 Client:
   o Avoid possible timing attack in document's mac comparison by
     comparing hashes instead of plain macs. Closes #3243.
@@ -154,13 +152,13 @@ Server:
     pointing the PRIVKEY_PATH to /etc/leap/soledad-server.key. Fixes
     #3174.
 
-0.2.2 Jul 12:
+0.2.2 Jul 12, 2013:
 Client:
   o Add method for password change.
 Server:
   o Use the right name as the WSGI server
 
-0.2.1 Jun 28:
+0.2.1 Jun 28, 2013:
 Client:
   o Do not list the backends in the __init__'s __all__ to allow not
     supporting couch on the client side until the code is diveded into
