@@ -720,8 +720,9 @@ class Soledad(object):
         :return: the hash
         :rtype: str
         """
-        return sha256('%s%s' %
-                     (self._passphrase_as_string(), self.uuid)).hexdigest()
+        return sha256(
+            '%s%s' %
+            (self._passphrase_as_string(), self.uuid)).hexdigest()
 
     def _get_secrets_from_shared_db(self):
         """
@@ -1211,7 +1212,6 @@ class Soledad(object):
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # check mac of the recovery document
-        #mac_auth = False  # XXX ?
         mac = None
         if MAC_KEY in data:
             soledad_assert(data[MAC_KEY] is not None)
@@ -1234,7 +1234,6 @@ class Soledad(object):
             if mac != data[MAC_KEY]:
                 raise WrongMac('Could not authenticate recovery document\'s '
                                'contents.')
-            #mac_auth = True  # XXX ?
         # include secrets in the secret pool.
         secrets = 0
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
@@ -1296,9 +1295,9 @@ class Soledad(object):
         return self._passphrase.encode('utf-8')
 
 
-#-----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Monkey patching u1db to be able to provide a custom SSL cert
-#-----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 # We need a more reasonable timeout (in seconds)
 SOLEDAD_TIMEOUT = 120
