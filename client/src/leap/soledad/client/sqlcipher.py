@@ -55,14 +55,14 @@ from contextlib import contextmanager
 
 from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
-from u1db.sync import Synchronizer
 from u1db import errors as u1db_errors
 
+from leap.soledad.client.sync import Synchronizer
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.common.document import SoledadDocument
 
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
 sqlite_backend.dbapi2 = dbapi2
@@ -214,6 +214,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                                    syncable=syncable)
         self.set_document_factory(factory)
         self._syncers = {}
+        self._real_sync_state = None
 
     @classmethod
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
@@ -359,6 +360,14 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             res = syncer.sync(autocreate=autocreate)
         return res
 
+    def stop_sync(self):
+        """
+        Interrupt all ongoing syncs.
+        """
+        for url in self._syncers:
+            _, syncer = self._syncers[url]
+            syncer.stop()
+
     @contextmanager
     def syncer(self, url, creds=None):
         """
@@ -379,7 +388,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :type creds: dict
 
         :return: A synchronizer.
-        :rtype: u1db.sync.Synchronizer
+        :rtype: Synchronizer
         """
         # we want to store at most one syncer for each url, so we also store a
         # hash of the connection credentials and replace the stored syncer for
@@ -881,5 +890,42 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         if self._db_handle is not None:
             self._db_handle.close()
 
+    def _get_sync_state(self):
+        """
+        Get the current sync state.
+
+        :return: The current sync state.
+        :rtype: dict
+        """
+        if self._real_sync_state is not None:
+            return self._real_sync_state
+        c = self._db_handle.cursor()
+        c.execute("SELECT value FROM u1db_config"
+                  " WHERE name = 'sync_state'")
+        val = c.fetchone()
+        if val is None:
+            return None
+        self._real_sync_state = json.loads(val[0])
+        return self._real_sync_state
+
+    def _set_sync_state(self, state):
+        """
+        Set the current sync state.
+
+        :param state: The sync state to be set.
+        :type state: dict
+        """
+        c = self._db_handle.cursor()
+        if state is None:
+            c.execute("DELETE FROM u1db_config"
+                      " WHERE name = 'sync_state'")
+        else:
+            c.execute("INSERT OR REPLACE INTO u1db_config"
+                      " VALUES ('sync_state', ?)",
+                      (json.dumps(state),))
+        self._real_sync_state = state
+
+    sync_state = property(
+        _get_sync_state, _set_sync_state, doc="The current sync state.")
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)

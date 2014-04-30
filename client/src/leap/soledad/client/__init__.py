@@ -1096,6 +1096,13 @@ class Soledad(object):
                 signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
                 return local_gen
 
+    def stop_sync(self):
+        """
+        Stop the current syncing process.
+        """
+        if self._db:
+            self._db.stop_sync()
+
     def need_sync(self, url):
         """
         Return if local db replica differs from remote url's replica.
