@@ -58,6 +58,11 @@ from leap.soledad.client.crypto import (
     EncryptionMethods,
     UnknownEncryptionMethod,
 )
+from leap.soledad.client.events import (
+    SOLEDAD_SYNC_SEND_STATUS,
+    SOLEDAD_SYNC_RECEIVE_STATUS,
+    signal,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -404,7 +409,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 return None, None
             # try to fetch one document from target
             data, _ = _post_get_doc()
-            self._sync_state.received += 1
             # decode incoming stream
             entries = None
             try:
@@ -441,6 +445,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             # end of symmetric decryption
             # -------------------------------------------------------------
             return_doc_cb(doc, entry['gen'], entry['trans_id'])
+            self._sync_state.received += 1
+            signal(
+                SOLEDAD_SYNC_RECEIVE_STATUS,
+                "%d/%d" % (self._sync_state.received, number_of_changes))
         return entries[0]['new_generation'], entries[0]['new_transaction_id']
 
     def _request(self, method, url_parts, params=None, body=None,
@@ -649,6 +657,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 headers, cur_target_gen, cur_target_trans_id, id=doc.doc_id,
                 rev=doc.rev, content=doc_json, gen=gen, trans_id=trans_id)
             self._sync_state.sent += 1
+            signal(
+                SOLEDAD_SYNC_SEND_STATUS,
+                "%d/%d" % (self._sync_state.sent, len(docs_by_generations)))
 
         # get docs from target
         cur_target_gen, cur_target_trans_id = self._get_remote_docs(

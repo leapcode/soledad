@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # __init__.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,7 +49,11 @@ import scrypt
 import simplejson as json
 
 from leap.common.config import get_path_prefix
-from leap.soledad.common import SHARED_DB_NAME
+from leap.soledad.common import (
+    SHARED_DB_NAME,
+    soledad_assert,
+    soledad_assert_type
+)
 from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
@@ -63,45 +67,17 @@ from leap.soledad.common.crypto import (
     MAC_KEY,
     MAC_METHOD_KEY,
 )
-
-#
-# Signaling function
-#
-
-SOLEDAD_CREATING_KEYS = 'Creating keys...'
-SOLEDAD_DONE_CREATING_KEYS = 'Done creating keys.'
-SOLEDAD_DOWNLOADING_KEYS = 'Downloading keys...'
-SOLEDAD_DONE_DOWNLOADING_KEYS = 'Done downloading keys.'
-SOLEDAD_UPLOADING_KEYS = 'Uploading keys...'
-SOLEDAD_DONE_UPLOADING_KEYS = 'Done uploading keys.'
-SOLEDAD_NEW_DATA_TO_SYNC = 'New data available.'
-SOLEDAD_DONE_DATA_SYNC = 'Done data sync.'
-
-# we want to use leap.common.events to emits signals, if it is available.
-try:
-    from leap.common import events
-    from leap.common.events import signal
-    SOLEDAD_CREATING_KEYS = events.events_pb2.SOLEDAD_CREATING_KEYS
-    SOLEDAD_DONE_CREATING_KEYS = events.events_pb2.SOLEDAD_DONE_CREATING_KEYS
-    SOLEDAD_DOWNLOADING_KEYS = events.events_pb2.SOLEDAD_DOWNLOADING_KEYS
-    SOLEDAD_DONE_DOWNLOADING_KEYS = \
-        events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS
-    SOLEDAD_UPLOADING_KEYS = events.events_pb2.SOLEDAD_UPLOADING_KEYS
-    SOLEDAD_DONE_UPLOADING_KEYS = \
-        events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS
-    SOLEDAD_NEW_DATA_TO_SYNC = events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC
-    SOLEDAD_DONE_DATA_SYNC = events.events_pb2.SOLEDAD_DONE_DATA_SYNC
-
-except ImportError:
-    # we define a fake signaling function and fake signal constants that will
-    # allow for logging signaling attempts in case leap.common.events is not
-    # available.
-
-    def signal(signal, content=""):
-        logger.info("Would signal: %s - %s." % (str(signal), content))
-
-
-from leap.soledad.common import soledad_assert, soledad_assert_type
+from leap.soledad.client.events import (
+    SOLEDAD_CREATING_KEYS,
+    SOLEDAD_DONE_CREATING_KEYS,
+    SOLEDAD_DOWNLOADING_KEYS,
+    SOLEDAD_DONE_DOWNLOADING_KEYS,
+    SOLEDAD_UPLOADING_KEYS,
+    SOLEDAD_DONE_UPLOADING_KEYS,
+    SOLEDAD_NEW_DATA_TO_SYNC,
+    SOLEDAD_DONE_DATA_SYNC,
+    signal,
+)
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.crypto import SoledadCrypto
 from leap.soledad.client.shared_db import SoledadSharedDatabase
