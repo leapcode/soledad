@@ -1,2 +1,0 @@
-  o Prevent Couch Server State from making one uneeded GET request on
-    instantiation (#5386).

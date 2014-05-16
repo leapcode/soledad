@@ -1,3 +1,16 @@
+0.5.1 May 16, 2014:
+Client:
+  o Close connection with server after syncing to avoid client hanging
+    on exit. Fixes #5507.
+
+Common:
+  o Properly close connections on couch backend. Also prevent file
+    descriptor leaks on tests. Closes #5493.
+  o Prevent couch backend from always trying to create the
+    database. Fixes #5386.
+  o Prevent Couch Server State from making one uneeded GET request on
+    instantiation. Fixes #5386.
+
 0.5.0 Apr 4, 2014:
 Client:
   o Catch lock timeout exception. Fixes #4435.

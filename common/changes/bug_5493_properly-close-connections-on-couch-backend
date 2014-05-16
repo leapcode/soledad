@@ -1,2 +1,0 @@
-  o Properly close connections on couch backend. Also prevent file descriptor
-    leaks on tests. Closes #5493.

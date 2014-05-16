@@ -1,1 +1,0 @@
-  o Prevent couch backend from always trying to create the database (#5386).
