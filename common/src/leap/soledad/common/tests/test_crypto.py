@@ -44,7 +44,6 @@ from leap.soledad.common.crypto import WrongMac, UnknownMacMethod
 from leap.soledad.common.tests.u1db_tests import (
     simple_doc,
     nested_doc,
-    TestCaseWithServer,
 )
 
 
@@ -95,6 +94,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(self._soledad._get_storage_secret(),
                          s._get_storage_secret(),
                          'Failed settinng secret for symmetric encryption.')
+        s.close()
 
 
 class SoledadSecretsTestCase(BaseSoledadTest):
@@ -110,6 +110,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         # generate new secret
         secret_id_2 = sol._gen_secret()
         self.assertTrue(secret_id_1 != secret_id_2)
+        sol.close()
         # re-instantiate
         sol = self._soledad_instance(
             user='user@leap.se',
@@ -130,6 +131,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         # assert id is hash of new secret
         self.assertTrue(
             secret_id_2 == hashlib.sha256(sol.storage_secret).hexdigest())
+        sol.close()
 
     def test__has_secret(self):
         sol = self._soledad_instance(
@@ -144,6 +146,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         # but not being able to decrypt correctly should
         sol._secrets[sol.secret_id][sol.SECRET_KEY] = None
         self.assertFalse(sol._has_secret())
+        sol.close()
 
 
 class MacAuthTestCase(BaseSoledadTest):

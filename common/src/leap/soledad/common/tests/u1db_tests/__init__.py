@@ -208,8 +208,8 @@ class DatabaseBaseTests(TestCase):
         self.db = self.create_database('test')
 
     def tearDown(self):
-        # TODO: Add close_database parameterization
-        # self.close_database(self.db)
+        if hasattr(self, 'db') and self.db is not None:
+            self.db.close()
         super(DatabaseBaseTests, self).tearDown()
 
     def assertTransactionLog(self, doc_ids, db):
@@ -334,6 +334,13 @@ class TestCaseWithServer(TestCase):
     def setUp(self):
         super(TestCaseWithServer, self).setUp()
         self.server = self.server_thread = None
+
+    def tearDown(self):
+        if self.server is not None:
+            self.server.shutdown()
+            self.server_thread.join()
+            self.server.server_close()
+        super(TestCaseWithServer, self).tearDown()
 
     @property
     def url_scheme(self):
