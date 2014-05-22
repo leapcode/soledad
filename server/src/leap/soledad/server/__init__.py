@@ -258,6 +258,7 @@ class HTTPInvocationByMethodWithBody(
                 raise http_app.BadRequest()
 
 
+# monkey patch server with new http invocation
 http_app.HTTPInvocationByMethodWithBody = HTTPInvocationByMethodWithBody
 
 
