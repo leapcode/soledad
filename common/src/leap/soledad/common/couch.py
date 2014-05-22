@@ -467,6 +467,10 @@ class CouchDatabase(CommonBackend):
         self._database = Database(
             urljoin(self._url, self._dbname),
             self._session)
+        try:
+            self._database.info()
+        except ResourceNotFound:
+            raise DatabaseDoesNotExist()
         if replica_uid is not None:
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
@@ -1541,8 +1545,8 @@ class CouchServerState(ServerState):
         :param dbname: The name of the database to ensure.
         :type dbname: str
 
-        :return: The CouchDatabase object and the replica uid.
-        :rtype: (CouchDatabase, str)
+        :raise Unauthorized: Always, because Soledad server is not allowed to
+                             create databases.
         """
         raise Unauthorized()
 
@@ -1552,6 +1556,9 @@ class CouchServerState(ServerState):
 
         :param dbname: The name of the database to delete.
         :type dbname: str
+
+        :raise Unauthorized: Always, because Soledad server is not allowed to
+                             delete databases.
         """
         raise Unauthorized()
 
