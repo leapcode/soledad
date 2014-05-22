@@ -63,6 +63,7 @@ from leap.soledad.client.events import (
     SOLEDAD_SYNC_RECEIVE_STATUS,
     signal,
 )
+from leap.soledad.client.sync import ClientSyncState
 
 logger = logging.getLogger(__name__)
 
@@ -410,26 +411,33 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             # try to fetch one document from target
             data, _ = _post_get_doc()
             # decode incoming stream
-            entries = None
-            try:
-                entries = json.loads(data)
-            except ValueError:
+            parts = data.splitlines()
+            if not parts or parts[0] != '[' or parts[-1] != ']':
                 raise BrokenSyncStream
+            data = parts[1:-1]
+            # decode metadata
+            line, comma = utils.check_and_strip_comma(data[0])
+            metadata = None
+            try:
+                metadata = json.loads(line)
+                soledad_assert('number_of_changes' in metadata)
+                soledad_assert('new_generation' in metadata)
+                soledad_assert('new_transaction_id' in metadata)
+                number_of_changes = metadata['number_of_changes']
+            except json.JSONDecodeError, AssertionError:
+                raise BrokenSyncStream
+            # make sure we have replica_uid from fresh new dbs
+            if ensure_callback and 'replica_uid' in metadata:
+                ensure_callback(metadata['replica_uid'])
             # bail out if there are no documents to be received
-            try:
-                number_of_changes = entries[0]['number_of_changes']
-            except IndexError, KeyError:
-                raise BrokenSyncStream
             if number_of_changes == 0:
                 break
             # decrypt incoming document and insert into local database
             entry = None
             try:
-                entry = entries[1]
+                entry = json.loads(data[1])
             except IndexError:
                 raise BrokenSyncStream
-            if ensure_callback and 'replica_uid' in res:
-                ensure_callback(res['replica_uid'])
             # -------------------------------------------------------------
             # symmetric decryption of document's contents
             # -------------------------------------------------------------
@@ -448,8 +456,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_state.received += 1
             signal(
                 SOLEDAD_SYNC_RECEIVE_STATUS,
-                "%d/%d" % (self._sync_state.received, number_of_changes))
-        return entries[0]['new_generation'], entries[0]['new_transaction_id']
+                "%d/%d" %
+                (self._sync_state.received, number_of_changes))
+        return metadata['new_generation'], metadata['new_transaction_id']
 
     def _request(self, method, url_parts, params=None, body=None,
                  content_type=None):
@@ -587,8 +596,12 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :return: The new generation and transaction id of the target replica.
         :rtype: tuple
         """
-        self.start()
+        # get the sync state information from client
         self._sync_state = sync_state
+        if self._sync_state is None:
+            self._sync_state = ClientSyncState()
+
+        self.start()
 
         self._ensure_connection()
         if self._trace_hook:  # for tests
