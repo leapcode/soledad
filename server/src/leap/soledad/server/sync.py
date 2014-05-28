@@ -120,7 +120,7 @@ class ServerSyncState(object):
         resource = self._db._database.resource(*ddoc_path)
         response = resource.get_json(key=self._key(self._source_replica_uid))
         data = response[2]
-        if len(data['rows']) > 0:
+        if data['rows']:
             entry = data['rows'].pop()
             return entry['value']['seen_ids']
         return []
@@ -153,7 +153,7 @@ class ServerSyncState(object):
         Return information about the current sync state.
 
         :return: The generation and transaction id of the target database
-                 which will be synced, and the number of documents do return,
+                 which will be synced, and the number of documents to return,
                  or a tuple of Nones if those have not already been sent to
                  server.
         :rtype: tuple
@@ -165,7 +165,7 @@ class ServerSyncState(object):
         gen = None
         trans_id = None
         number_of_changes = None
-        if len(data['rows']) > 0 and data['rows'][0]['value'] is not None:
+        if data['rows'] and data['rows'][0]['value'] is not None:
             value = data['rows'][0]['value']
             gen = value['gen']
             trans_id = value['trans_id']
@@ -186,7 +186,7 @@ class ServerSyncState(object):
             key=self._key(
                 [self._source_replica_uid, received]))
         data = response[2]
-        if len(data['rows']) == 0:
+        if not data['rows']:
             return None, None, None
         value = data['rows'][0]['value']
         gen = value['gen']
@@ -215,14 +215,6 @@ class SyncExchange(sync.SyncExchange):
         self._trace_hook = None
         # recover sync state
         self._sync_state = ServerSyncState(self._db, self.source_replica_uid)
-        # for tests
-        #self._incoming_trace = []
-        #if hasattr(self._db, '_incoming_trace'):
-        #    self._incoming_trace = self._db._incoming_trace
-        #self._db._last_exchange_log = {
-        #    'receive': {'docs': self._incoming_trace},
-        #    'return': None
-        #    }
 
 
     def find_changes_to_return(self, received):
@@ -243,10 +235,6 @@ class SyncExchange(sync.SyncExchange):
                  to the source syncing replica.
         :rtype: int
         """
-        if hasattr(self._db, '_last_exchange_log'):
-            self._db._last_exchange_log['receive'].update({  # for tests
-                'last_known_gen': self.source_last_known_generation
-            })
         # check if changes to return have already been calculated
         new_gen, new_trans_id, number_of_changes = self._sync_state.sync_info()
         if number_of_changes is None:
@@ -269,9 +257,7 @@ class SyncExchange(sync.SyncExchange):
         self.new_gen = new_gen
         self.new_trans_id = new_trans_id
         # and append one change
-        self.changes_to_return = []
-        if next_change_to_return is not None:
-            self.changes_to_return.append(next_change_to_return)
+        self.change_to_return = next_change_to_return
         return self.new_gen, number_of_changes
 
     def return_one_doc(self, return_doc_cb):
@@ -287,27 +273,10 @@ class SyncExchange(sync.SyncExchange):
                               replica.
         :type return_doc_cb: callable(doc, gen, trans_id)
         """
-        changes_to_return = self.changes_to_return
-        # return docs, including conflicts
-        changed_doc_ids = [doc_id for doc_id, _, _ in changes_to_return]
-        self._trace('before get_docs')
-        docs = self._db.get_docs(
-            changed_doc_ids, check_for_conflicts=False, include_deleted=True)
-
-        docs_by_gen = izip(
-            docs, (gen for _, gen, _ in changes_to_return),
-            (trans_id for _, _, trans_id in changes_to_return))
-        for doc, gen, trans_id in docs_by_gen:
+        if self.change_to_return is not None:
+            changed_doc_id, gen, trans_id = self.change_to_return
+            doc = self._db.get_doc(changed_doc_id, include_deleted=True)
             return_doc_cb(doc, gen, trans_id)
-            # for tests
-            if hasattr(self._db, '_outgoing_trace'):
-                self._db._outgoing_trace.append((doc.doc_id, doc.rev))
-        # for tests
-        if hasattr(self._db, '_outgoing_trace'):
-            self._db._last_exchange_log['return'] = {
-                'docs': self._db._outgoing_trace,
-                'last_gen': self.new_gen
-            }
 
     def insert_doc_from_source(self, doc, source_gen, trans_id):
         """Try to insert synced document from source.
@@ -342,14 +311,6 @@ class SyncExchange(sync.SyncExchange):
         else:
             # conflict that we will returne
             assert state == 'conflicted'
-        # for tests
-        if hasattr(self._db, '_incoming_trace') \
-                and hasattr(self._db, '_last_exchange_log'):
-            self._db._incoming_trace.append((doc.doc_id, doc.rev))
-            self._db._last_exchange_log['receive'].update({
-                'source_uid': self.source_replica_uid,
-                'source_gen': source_gen
-            })
 
 
 class SyncResource(http_app.SyncResource):
@@ -373,7 +334,7 @@ class SyncResource(http_app.SyncResource):
         :param last_known_trans_id: The last server replica transaction_id the
                                     client knows about.
         :type last_known_trans_id: str
-        :param ensure: Wether the server replica should be created if it does
+        :param ensure: Whether the server replica should be created if it does
                        not already exist.
         :type ensure: bool
         """

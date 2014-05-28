@@ -703,9 +703,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
     @property
     def stopped(self):
         """
-        Return wether this sync session is stopped.
+        Return whether this sync session is stopped.
 
-        :return: Wether this sync session is stopped.
+        :return: Whether this sync session is stopped.
         :rtype: bool
         """
         with self._stop_lock:

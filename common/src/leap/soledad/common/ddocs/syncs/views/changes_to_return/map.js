@@ -6,6 +6,7 @@ function(doc) {
         emit([source_replica_uid, 0], null);
       else if (changes.length == 0)
         emit([source_replica_uid, 0], []);
+      else
         for (var i = 0; i < changes['changes_to_return'].length; i++)
           emit(
             [source_replica_uid, i],

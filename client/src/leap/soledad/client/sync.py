@@ -52,7 +52,7 @@ class ClientSyncState(object):
 
     @property
     def _public_attr_keys(self):
-        return [k for k in self._public_attrs]
+        return self._public_attrs.keys()
 
     def __init__(self, db=None):
         """
@@ -113,15 +113,16 @@ class ClientSyncState(object):
 
     def has_stored_info(self):
         """
-        Return wether there is any sync state info stored on the database.
+        Return whether there is any sync state info stored on the database.
 
-        :return: Wether there's any sync state info store on db.
+        :return: Whether there's any sync state info store on db.
         :rtype: bool
         """
         return self._db is not None and self._db.sync_state is not None
 
     def __str__(self):
-        ', '.join(['%s: %s' % (k, getattr(self, k)) for k in self._public_attr_keys])
+        return 'ClientSyncState: %s' % ', '.join(
+            ['%s: %s' % (k, getattr(self, k)) for k in self._public_attr_keys])
 
 class Synchronizer(U1DBSynchronizer):
     """
@@ -140,7 +141,7 @@ class Synchronizer(U1DBSynchronizer):
         """
         Synchronize documents between source and target.
 
-        :param autocreate: Wether the target replica should be created or not.
+        :param autocreate: Whether the target replica should be created or not.
         :type autocreate: bool
         """
         sync_target = self.sync_target
@@ -173,8 +174,8 @@ class Synchronizer(U1DBSynchronizer):
                     raise
                 # will try to ask sync_exchange() to create the db
                 self.target_replica_uid = None
-                target_gen, target_trans_id = 0, ''
-                target_my_gen, target_my_trans_id = 0, ''
+                target_gen, target_trans_id = (0, '')
+                target_my_gen, target_my_trans_id = (0, '')
 
         # make sure we'll have access to target replica uid once it exists
         if self.target_replica_uid is None:
