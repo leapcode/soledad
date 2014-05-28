@@ -57,7 +57,7 @@ from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
 from u1db import errors as u1db_errors
 
-from leap.soledad.client.sync import Synchronizer
+from leap.soledad.client.sync import Synchronizer, ClientSyncState
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.common.document import SoledadDocument
 
@@ -214,7 +214,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                                    syncable=syncable)
         self.set_document_factory(factory)
         self._syncers = {}
-        self._real_sync_state = None
 
     @classmethod
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
@@ -890,30 +889,29 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         if self._db_handle is not None:
             self._db_handle.close()
 
-    def _get_sync_state(self):
+    def _get_stored_sync_state(self):
         """
-        Get the current sync state.
+        Retrieve the currently stored sync state.
 
-        :return: The current sync state.
-        :rtype: dict
+        :return: The current stored sync state or None if there's no stored
+                 state.
+        :rtype: dict or None
         """
-        if self._real_sync_state is not None:
-            return self._real_sync_state
         c = self._db_handle.cursor()
         c.execute("SELECT value FROM u1db_config"
                   " WHERE name = 'sync_state'")
         val = c.fetchone()
         if val is None:
             return None
-        self._real_sync_state = json.loads(val[0])
-        return self._real_sync_state
+        return json.loads(val[0])
 
-    def _set_sync_state(self, state):
+    def _set_stored_sync_state(self, state):
         """
-        Set the current sync state.
+        Stored the sync state.
 
-        :param state: The sync state to be set.
-        :type state: dict
+        :param state: The sync state to be stored or None to delete any stored
+                      state.
+        :type state: dict or None
         """
         c = self._db_handle.cursor()
         if state is None:
@@ -923,9 +921,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             c.execute("INSERT OR REPLACE INTO u1db_config"
                       " VALUES ('sync_state', ?)",
                       (json.dumps(state),))
-        self._real_sync_state = state
 
-    sync_state = property(
-        _get_sync_state, _set_sync_state, doc="The current sync state.")
+    stored_sync_state = property(
+        _get_stored_sync_state, _set_stored_sync_state,
+        doc="The current sync state dict.")
+
+    @property
+    def sync_state(self):
+        return ClientSyncState(self)
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)

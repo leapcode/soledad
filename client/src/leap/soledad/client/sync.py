@@ -86,29 +86,29 @@ class ClientSyncState(object):
         for attr in self._public_attr_keys:
             setattr(self, attr, self._public_attrs[attr])
         # fetch info from stored sync state
-        sync_state = None
+        sync_state_dict = None
         if self._db is not None:
-            sync_state = self._db.sync_state
-        if sync_state is not None:
+            sync_state_dict = self._db.stored_sync_state
+        if sync_state_dict is not None:
             for attr in self._public_attr_keys:
-                setattr(self, attr, sync_state[attr])
+                setattr(self, attr, sync_state_dict[attr])
 
     def save(self):
         """
         Save the current sync state in the database.
         """
-        sync_state = {}
+        sync_state_dict = {}
         for attr in self._public_attr_keys:
-            sync_state[attr] = getattr(self, attr)
+            sync_state_dict[attr] = getattr(self, attr)
         if self._db is not None:
-            self._db.sync_state = sync_state
+            self._db.stored_sync_state = sync_state_dict
 
     def clear(self):
         """
         Clear the sync state info data.
         """
         if self._db is not None:
-            self._db.sync_state = None
+            self._db.stored_sync_state = None
         self._init_state()
 
     def has_stored_info(self):
@@ -118,7 +118,7 @@ class ClientSyncState(object):
         :return: Whether there's any sync state info store on db.
         :rtype: bool
         """
-        return self._db is not None and self._db.sync_state is not None
+        return self._db is not None and self._db.stored_sync_state is not None
 
     def __str__(self):
         return 'ClientSyncState: %s' % ', '.join(
@@ -147,7 +147,7 @@ class Synchronizer(U1DBSynchronizer):
         sync_target = self.sync_target
 
         # recover current sync state from source database
-        sync_state = ClientSyncState(self.source)
+        sync_state = self.source.sync_state
         self.target_replica_uid = sync_state.target_replica_uid
         target_gen = sync_state.target_gen
         target_trans_id = sync_state.target_trans_id
