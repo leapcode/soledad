@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # target.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,9 +25,11 @@ import hashlib
 import hmac
 import logging
 import urllib
+import threading
 
 import simplejson as json
 from time import sleep
+from uuid import uuid4
 
 from u1db.remote import utils, http_errors
 from u1db.errors import BrokenSyncStream
@@ -56,6 +58,12 @@ from leap.soledad.client.crypto import (
     EncryptionMethods,
     UnknownEncryptionMethod,
 )
+from leap.soledad.client.events import (
+    SOLEDAD_SYNC_SEND_STATUS,
+    SOLEDAD_SYNC_RECEIVE_STATUS,
+    signal,
+)
+from leap.soledad.client.sync import ClientSyncState
 
 logger = logging.getLogger(__name__)
 
@@ -149,10 +157,12 @@ def encrypt_doc(crypto, doc):
         ENC_SCHEME_KEY: EncryptionSchemes.SYMKEY,
         ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
         ENC_IV_KEY: iv,
-        MAC_KEY: binascii.b2a_hex(mac_doc(  # store the mac as hex.
-            crypto, doc.doc_id, doc.rev,
-            ciphertext,
-            MacMethods.HMAC)),
+        # store the mac as hex.
+        MAC_KEY: binascii.b2a_hex(
+            mac_doc(
+                crypto, doc.doc_id, doc.rev,
+                ciphertext,
+                MacMethods.HMAC)),
         MAC_METHOD_KEY: MacMethods.HMAC,
     })
 
@@ -310,23 +320,55 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         HTTPSyncTarget.__init__(self, url, creds)
         self._crypto = crypto
+        self._stopped = True
+        self._sync_state = None
+        self._stop_lock = threading.Lock()
 
-    def _parse_sync_stream(self, data, return_doc_cb, ensure_callback=None):
+    def _init_post_request(self, url, action, headers, content_length):
         """
-        Parse incoming synchronization stream and insert documents in the
+        Initiate a syncing POST request.
+
+        :param url: The syncing URL.
+        :type url: str
+        :param action: The syncing action, either 'get' or 'receive'.
+        :type action: str
+        :param headers: The initial headers to be sent on this request.
+        :type headers: dict
+        :param content_length: The content-length of the request.
+        :type content_length: int
+        """
+        self._conn.putrequest('POST', url)
+        self._conn.putheader(
+            'content-type', 'application/x-soledad-sync-%s' % action)
+        for header_name, header_value in headers:
+            self._conn.putheader(header_name, header_value)
+        self._conn.putheader('accept-encoding', 'gzip')
+        self._conn.putheader('content-length', str(content_length))
+        self._conn.endheaders()
+
+    def _get_remote_docs(self, url, last_known_generation, last_known_trans_id,
+                         headers, return_doc_cb, ensure_callback=None):
+        """
+        Fetch sync documents from the remote database and insert them in the
         local database.
 
         If an incoming document's encryption scheme is equal to
         EncryptionSchemes.SYMKEY, then this method will decrypt it with
         Soledad's symmetric key.
 
-        :param data: The body of the HTTP response.
-        :type data: str
+        :param url: The syncing URL.
+        :type url: str
+        :param last_known_generation: Target's last known generation.
+        :type last_known_generation: int
+        :param last_known_trans_id: Target's last known transaction id.
+        :type last_known_trans_id: str
+        :param headers: The headers of the HTTP request.
+        :type headers: dict
         :param return_doc_cb: A callback to insert docs from target.
-        :type return_doc_cb: function
+        :type return_doc_cb: callable
         :param ensure_callback: A callback to ensure we have the correct
-            target_replica_uid, if it was just created.
-        :type ensure_callback: function
+                                target_replica_uid, if it was just created.
+        :type ensure_callback: callable
 
         :raise BrokenSyncStream: If C{data} is malformed.
 
@@ -334,54 +376,105 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             from remote replica.
         :rtype: list of str
         """
-        parts = data.splitlines()  # one at a time
-        if not parts or parts[0] != '[':
-            raise BrokenSyncStream
-        data = parts[1:-1]
-        comma = False
-        if data:
+
+        def _post_get_doc():
+            """
+            Get a sync document from server by means of a POST request.
+            """
+            entries = ['[']
+            size = 1
+            # add remote replica metadata to the request
+            size += self._prepare(
+                '', entries,
+                last_known_generation=last_known_generation,
+                last_known_trans_id=last_known_trans_id,
+                ensure=ensure_callback is not None)
+            # inform server of how many documents have already been received
+            size += self._prepare(
+                ',', entries, received=self._sync_state.received)
+            entries.append('\r\n]')
+            size += len(entries[-1])
+            # send headers
+            self._init_post_request(url, 'get', headers, size)
+            # get document
+            for entry in entries:
+                self._conn.send(entry)
+            return self._response()
+
+        number_of_changes = None
+
+        while number_of_changes is None or \
+                self._sync_state.received < number_of_changes:
+            # bail out if sync process was interrupted
+            if self.stopped is True:
+                return None, None
+            # try to fetch one document from target
+            data, _ = _post_get_doc()
+            # decode incoming stream
+            parts = data.splitlines()
+            if not parts or parts[0] != '[' or parts[-1] != ']':
+                raise BrokenSyncStream
+            data = parts[1:-1]
+            # decode metadata
             line, comma = utils.check_and_strip_comma(data[0])
-            res = json.loads(line)
-            if ensure_callback and 'replica_uid' in res:
-                ensure_callback(res['replica_uid'])
-            for entry in data[1:]:
-                if not comma:  # missing in between comma
-                    raise BrokenSyncStream
-                line, comma = utils.check_and_strip_comma(entry)
-                entry = json.loads(line)
-                #-------------------------------------------------------------
-                # symmetric decryption of document's contents
-                #-------------------------------------------------------------
-                # if arriving content was symmetrically encrypted, we decrypt
-                # it.
-                doc = SoledadDocument(
-                    entry['id'], entry['rev'], entry['content'])
-                if doc.content and ENC_SCHEME_KEY in doc.content:
-                    if doc.content[ENC_SCHEME_KEY] == \
-                            EncryptionSchemes.SYMKEY:
-                        doc.set_json(decrypt_doc(self._crypto, doc))
-                #-------------------------------------------------------------
-                # end of symmetric decryption
-                #-------------------------------------------------------------
-                return_doc_cb(doc, entry['gen'], entry['trans_id'])
-        if parts[-1] != ']':
+            metadata = None
             try:
-                partdic = json.loads(parts[-1])
-            except ValueError:
-                pass
-            else:
-                if isinstance(partdic, dict):
-                    self._error(partdic)
-            raise BrokenSyncStream
-        if not data or comma:  # no entries or bad extra comma
-            raise BrokenSyncStream
-        return res
+                metadata = json.loads(line)
+                soledad_assert('number_of_changes' in metadata)
+                soledad_assert('new_generation' in metadata)
+                soledad_assert('new_transaction_id' in metadata)
+                number_of_changes = metadata['number_of_changes']
+            except json.JSONDecodeError, AssertionError:
+                raise BrokenSyncStream
+            # make sure we have replica_uid from fresh new dbs
+            if ensure_callback and 'replica_uid' in metadata:
+                ensure_callback(metadata['replica_uid'])
+            # bail out if there are no documents to be received
+            if number_of_changes == 0:
+                break
+            # decrypt incoming document and insert into local database
+            entry = None
+            try:
+                entry = json.loads(data[1])
+            except IndexError:
+                raise BrokenSyncStream
+            # -------------------------------------------------------------
+            # symmetric decryption of document's contents
+            # -------------------------------------------------------------
+            # if arriving content was symmetrically encrypted, we decrypt
+            # it.
+            doc = SoledadDocument(
+                entry['id'], entry['rev'], entry['content'])
+            if doc.content and ENC_SCHEME_KEY in doc.content:
+                if doc.content[ENC_SCHEME_KEY] == \
+                        EncryptionSchemes.SYMKEY:
+                    doc.set_json(decrypt_doc(self._crypto, doc))
+            # -------------------------------------------------------------
+            # end of symmetric decryption
+            # -------------------------------------------------------------
+            return_doc_cb(doc, entry['gen'], entry['trans_id'])
+            self._sync_state.received += 1
+            signal(
+                SOLEDAD_SYNC_RECEIVE_STATUS,
+                "%d/%d" %
+                (self._sync_state.received, number_of_changes))
+        return metadata['new_generation'], metadata['new_transaction_id']
 
     def _request(self, method, url_parts, params=None, body=None,
                  content_type=None):
         """
-        Overloaded method. See u1db docs.
-        Patched for adding gzip encoding.
+        Perform an HTTP request.
+
+        :param method: The HTTP request method.
+        :type method: str
+        :param url_parts: A list representing the request path.
+        :type url_parts: list
+        :param params: Parameters for the URL query string.
+        :type params: dict
+        :param body: The body of the request.
+        :type body: str
+        :param content-type: The content-type of the request.
+        :type content-type: str
         """
 
         self._ensure_connection()
@@ -425,8 +518,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
     def _response(self):
         """
-        Overloaded method, see u1db docs.
-        We patched it for decrypting gzip content.
+        Return the response of the (possibly gzipped) HTTP request.
+
+        :return: The body and headers of the response.
+        :rtype: tuple
         """
         resp = self._conn.getresponse()
         body = resp.read()
@@ -453,9 +548,26 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             raise errors.Unavailable(body, headers)
         raise errors.HTTPError(resp.status, body, headers)
 
+    def _prepare(self, comma, entries, **dic):
+        """
+        Prepare an entry to be sent through a syncing POST request.
+
+        :param comma: A string to be prepended to the current entry.
+        :type comma: str
+        :param entries: A list of entries accumulated to be sent on the
+                        request.
+        :type entries: list
+        :param dic: The data to be included in this entry.
+        :type dic: dict
+        """
+        entry = comma + '\r\n' + json.dumps(dic)
+        entries.append(entry)
+        return len(entry)
+
     def sync_exchange(self, docs_by_generations, source_replica_uid,
                       last_known_generation, last_known_trans_id,
-                      return_doc_cb, ensure_callback=None):
+                      return_doc_cb, ensure_callback=None,
+                      sync_state=None):
         """
         Find out which documents the remote database does not know about,
         encrypt and send them.
@@ -484,54 +596,117 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :return: The new generation and transaction id of the target replica.
         :rtype: tuple
         """
+        # get the sync state information from client
+        self._sync_state = sync_state
+        if self._sync_state is None:
+            self._sync_state = ClientSyncState()
+
+        self.start()
+
         self._ensure_connection()
         if self._trace_hook:  # for tests
             self._trace_hook('sync_exchange')
         url = '%s/sync-from/%s' % (self._url.path, source_replica_uid)
-        self._conn.putrequest('POST', url)
-        self._conn.putheader('content-type', 'application/x-u1db-sync-stream')
-        for header_name, header_value in self._sign_request('POST', url, {}):
-            self._conn.putheader(header_name, header_value)
-        self._conn.putheader('accept-encoding', 'gzip')
-        entries = ['[']
-        size = 1
+        headers = self._sign_request('POST', url, {})
 
-        def prepare(**dic):
-            entry = comma + '\r\n' + json.dumps(dic)
-            entries.append(entry)
-            return len(entry)
+        def _post_put_doc(headers, last_known_generation, last_known_trans_id,
+                          id, rev, content, gen, trans_id):
+            """
+            Put a sync document on server by means of a POST request.
 
-        comma = ''
-        size += prepare(
-            last_known_generation=last_known_generation,
-            last_known_trans_id=last_known_trans_id,
-            ensure=ensure_callback is not None)
-        comma = ','
+            :param received: How many documents have already been received in
+                             this sync session.
+            :type received: int
+            """
+            # prepare to send the document
+            entries = ['[']
+            size = 1
+            # add remote replica metadata to the request
+            size += self._prepare(
+                '', entries,
+                last_known_generation=last_known_generation,
+                last_known_trans_id=last_known_trans_id,
+                ensure=ensure_callback is not None)
+            # add the document to the request
+            size += self._prepare(
+                ',', entries,
+                id=id, rev=rev, content=content, gen=gen, trans_id=trans_id)
+            entries.append('\r\n]')
+            size += len(entries[-1])
+            # send headers
+            self._init_post_request(url, 'put', headers, size)
+            # send document
+            for entry in entries:
+                self._conn.send(entry)
+            data, _ = self._response()
+            data = json.loads(data)
+            return data[0]['new_generation'], data[0]['new_transaction_id']
+
+        cur_target_gen = last_known_generation
+        cur_target_trans_id = last_known_trans_id
+
+        # skip docs that were already sent
+        if self._sync_state.sent > 0:
+            docs_by_generations = docs_by_generations[self._sync_state.sent:]
+
+        # send docs
         for doc, gen, trans_id in docs_by_generations:
+            # allow for interrupting the sync process
+            if self.stopped is True:
+                break
             # skip non-syncable docs
             if isinstance(doc, SoledadDocument) and not doc.syncable:
                 continue
-            #-------------------------------------------------------------
+            # -------------------------------------------------------------
             # symmetric encryption of document's contents
-            #-------------------------------------------------------------
+            # -------------------------------------------------------------
             doc_json = doc.get_json()
             if not doc.is_tombstone():
                 doc_json = encrypt_doc(self._crypto, doc)
-            #-------------------------------------------------------------
+            # -------------------------------------------------------------
             # end of symmetric encryption
-            #-------------------------------------------------------------
-            size += prepare(id=doc.doc_id, rev=doc.rev,
-                            content=doc_json,
-                            gen=gen, trans_id=trans_id)
-        entries.append('\r\n]')
-        size += len(entries[-1])
-        self._conn.putheader('content-length', str(size))
-        self._conn.endheaders()
-        for entry in entries:
-            self._conn.send(entry)
-        entries = None
-        data, headers = self._response()
+            # -------------------------------------------------------------
+            cur_target_gen, cur_target_trans_id = _post_put_doc(
+                headers, cur_target_gen, cur_target_trans_id, id=doc.doc_id,
+                rev=doc.rev, content=doc_json, gen=gen, trans_id=trans_id)
+            self._sync_state.sent += 1
+            signal(
+                SOLEDAD_SYNC_SEND_STATUS,
+                "%d/%d" % (self._sync_state.sent, len(docs_by_generations)))
 
-        res = self._parse_sync_stream(data, return_doc_cb, ensure_callback)
-        data = None
-        return res['new_generation'], res['new_transaction_id']
+        # get docs from target
+        cur_target_gen, cur_target_trans_id = self._get_remote_docs(
+            url,
+            last_known_generation, last_known_trans_id, headers,
+            return_doc_cb, ensure_callback)
+        self.stop()
+        return cur_target_gen, cur_target_trans_id
+
+    def start(self):
+        """
+        Mark current sync session as running.
+        """
+        with self._stop_lock:
+            self._stopped = False
+
+    def stop(self):
+        """
+        Mark current sync session as stopped.
+
+        This will eventually interrupt the sync_exchange() method and return
+        enough information to the synchronizer so the sync session can be
+        recovered afterwards.
+        """
+        with self._stop_lock:
+            self._stopped = True
+
+    @property
+    def stopped(self):
+        """
+        Return whether this sync session is stopped.
+
+        :return: Whether this sync session is stopped.
+        :rtype: bool
+        """
+        with self._stop_lock:
+            return self._stopped is True

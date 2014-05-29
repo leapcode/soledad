@@ -30,6 +30,7 @@ import threading
 
 from pysqlcipher import dbapi2
 from StringIO import StringIO
+from urlparse import urljoin
 
 
 # u1db stuff.
@@ -54,19 +55,26 @@ from leap.soledad.common.crypto import (
     ENC_JSON_KEY,
     ENC_SCHEME_KEY,
 )
-from leap.soledad.client.target import decrypt_doc
+from leap.soledad.client.target import (
+    decrypt_doc,
+    SoledadSyncTarget,
+)
 
 
 # u1db tests stuff.
+from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.common.tests import u1db_tests as tests, BaseSoledadTest
 from leap.soledad.common.tests.u1db_tests import test_sqlite_backend
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_open
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.client.target import SoledadSyncTarget
-from leap.common.testing.basetest import BaseLeapTest
-
-PASSWORD = '123456'
+from leap.soledad.common.tests.util import (
+    make_sqlcipher_database_for_test,
+    copy_sqlcipher_database_for_test,
+    make_soledad_app,
+    SoledadWithCouchServerMixin,
+    PASSWORD,
+)
 
 
 #-----------------------------------------------------------------------------
@@ -87,32 +95,6 @@ class TestSQLCipherBackendImpl(tests.TestCase):
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_backends`.
 #-----------------------------------------------------------------------------
-
-def make_sqlcipher_database_for_test(test, replica_uid):
-    db = SQLCipherDatabase(':memory:', PASSWORD)
-    db._set_replica_uid(replica_uid)
-    return db
-
-
-def copy_sqlcipher_database_for_test(test, db):
-    # DO NOT COPY OR REUSE THIS CODE OUTSIDE TESTS: COPYING U1DB DATABASES IS
-    # THE WRONG THING TO DO, THE ONLY REASON WE DO SO HERE IS TO TEST THAT WE
-    # CORRECTLY DETECT IT HAPPENING SO THAT WE CAN RAISE ERRORS RATHER THAN
-    # CORRUPT USER DATA. USE SYNC INSTEAD, OR WE WILL SEND NINJA TO YOUR
-    # HOUSE.
-    new_db = SQLCipherDatabase(':memory:', PASSWORD)
-    tmpfile = StringIO()
-    for line in db._db_handle.iterdump():
-        if not 'sqlite_sequence' in line:  # work around bug in iterdump
-            tmpfile.write('%s\n' % line)
-    tmpfile.seek(0)
-    new_db._db_handle = dbapi2.connect(':memory:')
-    new_db._db_handle.cursor().executescript(tmpfile.read())
-    new_db._db_handle.commit()
-    new_db._set_replica_uid(db._replica_uid)
-    new_db._factory = db._factory
-    return new_db
-
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
     return SoledadDocument(doc_id, rev, content, has_conflicts=has_conflicts)
@@ -451,7 +433,7 @@ sync_scenarios.append(('pyleap', {
     'copy_database_for_test': test_sync.copy_database_for_http_test,
     'make_document_for_test': make_document_for_test,
     'make_app_with_state': tests.test_remote_sync_target.make_http_app,
-    'do_sync': sync_via_synchronizer_and_leap,
+    'do_sync': test_sync.sync_via_synchronizer,
 }))
 
 
@@ -616,7 +598,7 @@ class SQLCipherDatabaseSyncTests(
         # update on 1
         doc1.set_json('{"a": 3}')
         self.db1.put_doc(doc1)
-        # conflicts
+       # conflicts
         self.sync(self.db2, self.db1)
         self.sync(db3, self.db1)
         self.assertTrue(self.db2.get_doc('the-doc').has_conflicts)
@@ -658,32 +640,35 @@ class SQLCipherDatabaseSyncTests(
              'return': {'docs': [], 'last_gen': 1}})
 
 
-def _make_local_db_and_leap_target(test, path='test'):
+def _make_local_db_and_token_http_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = SoledadSyncTarget.connect(test.getURL(path), test._soledad._crypto)
+    st = SoledadSyncTarget.connect(
+        test.getURL(path), crypto=test._soledad._crypto)
     st.set_token_credentials('user-uuid', 'auth-token')
     return db, st
 
 
 target_scenarios = [
     ('leap', {
-        'create_db_and_target': _make_local_db_and_leap_target,
-        'make_app_with_state': tests.test_remote_sync_target.make_http_app}),
+        'create_db_and_target': _make_local_db_and_token_http_target,
+#        'make_app_with_state': tests.test_remote_sync_target.make_http_app,
+        'make_app_with_state': make_soledad_app,
+        'do_sync': test_sync.sync_via_synchronizer}),
 ]
 
 
 class SQLCipherSyncTargetTests(
-        test_sync.DatabaseSyncTargetTests, BaseSoledadTest):
+        SoledadWithCouchServerMixin, test_sync.DatabaseSyncTargetTests):
 
     scenarios = (tests.multiply_scenarios(SQLCIPHER_SCENARIOS,
                                           target_scenarios))
 
-    def setUp(self):
-        test_sync.DatabaseSyncTargetTests.setUp(self)
+    whitebox = False
 
-    def tearDown(self):
-        test_sync.DatabaseSyncTargetTests.tearDown(self)
+    def setUp(self):
+        self.main_test_class = test_sync.DatabaseSyncTargetTests
+        SoledadWithCouchServerMixin.setUp(self)
 
     def test_sync_exchange(self):
         """

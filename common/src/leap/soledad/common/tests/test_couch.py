@@ -249,9 +249,7 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
         # if current test is `test_close` we have to use saved objects to
         # delete the database because the close() method will have removed the
         # references needed to do it using the CouchDatabase.
-        if self.id() == \
-                'leap.soledad.common.tests.test_couch.CouchTests.' \
-                'test_close(couch)':
+        if self.id().endswith('test_couch.CouchTests.test_close(couch)'):
             session = couch.Session()
             server = Server(url=self._url, session=session)
             del(server[self._dbname])
@@ -365,8 +363,6 @@ class CouchDatabaseSyncTargetTests(test_sync.DatabaseSyncTargetTests,
 
 
 # The following tests need that the database have an index, so we fake one.
-old_class = couch.CouchDatabase
-
 from u1db.backends.inmemory import InMemoryIndex
 
 
@@ -444,7 +440,12 @@ class IndexedCouchDatabase(couch.CouchDatabase):
         return list(set([tuple(key.split('\x01')) for key in keys]))
 
 
-couch.CouchDatabase = IndexedCouchDatabase
+# monkey patch CouchDatabase (once) to include virtual indexes
+if getattr(couch.CouchDatabase, '_old_class', None) is None:
+    old_class = couch.CouchDatabase
+    IndexedCouchDatabase._old_class = old_class
+    couch.CouchDatabase = IndexedCouchDatabase
+
 
 sync_scenarios = []
 for name, scenario in COUCH_SCENARIOS:

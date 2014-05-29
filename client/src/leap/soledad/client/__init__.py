@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # __init__.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,7 +49,11 @@ import scrypt
 import simplejson as json
 
 from leap.common.config import get_path_prefix
-from leap.soledad.common import SHARED_DB_NAME
+from leap.soledad.common import (
+    SHARED_DB_NAME,
+    soledad_assert,
+    soledad_assert_type
+)
 from leap.soledad.common.errors import (
     InvalidTokenError,
     NotLockedError,
@@ -63,45 +67,17 @@ from leap.soledad.common.crypto import (
     MAC_KEY,
     MAC_METHOD_KEY,
 )
-
-#
-# Signaling function
-#
-
-SOLEDAD_CREATING_KEYS = 'Creating keys...'
-SOLEDAD_DONE_CREATING_KEYS = 'Done creating keys.'
-SOLEDAD_DOWNLOADING_KEYS = 'Downloading keys...'
-SOLEDAD_DONE_DOWNLOADING_KEYS = 'Done downloading keys.'
-SOLEDAD_UPLOADING_KEYS = 'Uploading keys...'
-SOLEDAD_DONE_UPLOADING_KEYS = 'Done uploading keys.'
-SOLEDAD_NEW_DATA_TO_SYNC = 'New data available.'
-SOLEDAD_DONE_DATA_SYNC = 'Done data sync.'
-
-# we want to use leap.common.events to emits signals, if it is available.
-try:
-    from leap.common import events
-    from leap.common.events import signal
-    SOLEDAD_CREATING_KEYS = events.events_pb2.SOLEDAD_CREATING_KEYS
-    SOLEDAD_DONE_CREATING_KEYS = events.events_pb2.SOLEDAD_DONE_CREATING_KEYS
-    SOLEDAD_DOWNLOADING_KEYS = events.events_pb2.SOLEDAD_DOWNLOADING_KEYS
-    SOLEDAD_DONE_DOWNLOADING_KEYS = \
-        events.events_pb2.SOLEDAD_DONE_DOWNLOADING_KEYS
-    SOLEDAD_UPLOADING_KEYS = events.events_pb2.SOLEDAD_UPLOADING_KEYS
-    SOLEDAD_DONE_UPLOADING_KEYS = \
-        events.events_pb2.SOLEDAD_DONE_UPLOADING_KEYS
-    SOLEDAD_NEW_DATA_TO_SYNC = events.events_pb2.SOLEDAD_NEW_DATA_TO_SYNC
-    SOLEDAD_DONE_DATA_SYNC = events.events_pb2.SOLEDAD_DONE_DATA_SYNC
-
-except ImportError:
-    # we define a fake signaling function and fake signal constants that will
-    # allow for logging signaling attempts in case leap.common.events is not
-    # available.
-
-    def signal(signal, content=""):
-        logger.info("Would signal: %s - %s." % (str(signal), content))
-
-
-from leap.soledad.common import soledad_assert, soledad_assert_type
+from leap.soledad.client.events import (
+    SOLEDAD_CREATING_KEYS,
+    SOLEDAD_DONE_CREATING_KEYS,
+    SOLEDAD_DOWNLOADING_KEYS,
+    SOLEDAD_DONE_DOWNLOADING_KEYS,
+    SOLEDAD_UPLOADING_KEYS,
+    SOLEDAD_DONE_UPLOADING_KEYS,
+    SOLEDAD_NEW_DATA_TO_SYNC,
+    SOLEDAD_DONE_DATA_SYNC,
+    signal,
+)
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.crypto import SoledadCrypto
 from leap.soledad.client.shared_db import SoledadSharedDatabase
@@ -720,8 +696,9 @@ class Soledad(object):
         :return: the hash
         :rtype: str
         """
-        return sha256('%s%s' %
-                     (self._passphrase_as_string(), self.uuid)).hexdigest()
+        return sha256(
+            '%s%s' %
+            (self._passphrase_as_string(), self.uuid)).hexdigest()
 
     def _get_secrets_from_shared_db(self):
         """
@@ -1095,6 +1072,13 @@ class Soledad(object):
                 signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
                 return local_gen
 
+    def stop_sync(self):
+        """
+        Stop the current syncing process.
+        """
+        if self._db:
+            self._db.stop_sync()
+
     def need_sync(self, url):
         """
         Return if local db replica differs from remote url's replica.
@@ -1211,7 +1195,6 @@ class Soledad(object):
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # check mac of the recovery document
-        #mac_auth = False  # XXX ?
         mac = None
         if MAC_KEY in data:
             soledad_assert(data[MAC_KEY] is not None)
@@ -1234,7 +1217,6 @@ class Soledad(object):
             if mac != data[MAC_KEY]:
                 raise WrongMac('Could not authenticate recovery document\'s '
                                'contents.')
-            #mac_auth = True  # XXX ?
         # include secrets in the secret pool.
         secrets = 0
         for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
@@ -1296,9 +1278,9 @@ class Soledad(object):
         return self._passphrase.encode('utf-8')
 
 
-#-----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Monkey patching u1db to be able to provide a custom SSL cert
-#-----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 # We need a more reasonable timeout (in seconds)
 SOLEDAD_TIMEOUT = 120
