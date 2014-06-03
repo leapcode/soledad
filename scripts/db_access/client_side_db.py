@@ -118,30 +118,37 @@ def get_soledad_instance(username, provider, passphrase, basedir):
         auth_token=token)
 
 
+class ValidateUserHandle(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        m = re.compile('^([^@]+)@([^@]+\.[^@]+)$')
+        res = m.match(values)
+        if res == None:
+            parser.error('User handle should have the form user@provider.')
+        setattr(namespace, 'username', res.groups()[0])
+        setattr(namespace, 'provider', res.groups()[1])
+
+
 # main program
 
 if __name__ == '__main__':
-
-    class ValidateUserHandle(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            m = re.compile('^([^@]+)@([^@]+\.[^@]+)$')
-            res = m.match(values)
-            if res == None:
-                parser.error('User handle should have the form user@provider.')
-            setattr(namespace, 'username', res.groups()[0])
-            setattr(namespace, 'provider', res.groups()[1])
 
     # parse command line
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'user@provider', action=ValidateUserHandle, help='the user handle')
     parser.add_argument(
-        '-b', dest='basedir', required=False, default=None, help='the user handle')
+        '-b', dest='basedir', required=False, default=None,
+        help='soledad base directory')
+    parser.add_argument(
+        '-p', dest='passphrase', required=False, default=None,
+        help='the user passphrase')
     args = parser.parse_args()
 
     # get the password
-    passphrase = getpass.getpass(
-        'Password for %s@%s: ' % (args.username, args.provider))
+    passphrase = args.passphrase
+    if passphrase is None:
+        passphrase = getpass.getpass(
+            'Password for %s@%s: ' % (args.username, args.provider))
 
     # get the basedir
     basedir = args.basedir
