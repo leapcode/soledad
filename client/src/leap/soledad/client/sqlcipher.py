@@ -57,7 +57,7 @@ from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
 from u1db import errors as u1db_errors
 
-from leap.soledad.client.sync import Synchronizer, ClientSyncState
+from leap.soledad.client.sync import Synchronizer
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.common.document import SoledadDocument
 
@@ -889,45 +889,5 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         if self._db_handle is not None:
             self._db_handle.close()
 
-    def _get_stored_sync_state(self):
-        """
-        Retrieve the currently stored sync state.
-
-        :return: The current stored sync state or None if there's no stored
-                 state.
-        :rtype: dict or None
-        """
-        c = self._db_handle.cursor()
-        c.execute("SELECT value FROM u1db_config"
-                  " WHERE name = 'sync_state'")
-        val = c.fetchone()
-        if val is None:
-            return None
-        return json.loads(val[0])
-
-    def _set_stored_sync_state(self, state):
-        """
-        Stored the sync state.
-
-        :param state: The sync state to be stored or None to delete any stored
-                      state.
-        :type state: dict or None
-        """
-        c = self._db_handle.cursor()
-        if state is None:
-            c.execute("DELETE FROM u1db_config"
-                      " WHERE name = 'sync_state'")
-        else:
-            c.execute("INSERT OR REPLACE INTO u1db_config"
-                      " VALUES ('sync_state', ?)",
-                      (json.dumps(state),))
-
-    stored_sync_state = property(
-        _get_stored_sync_state, _set_stored_sync_state,
-        doc="The current sync state dict.")
-
-    @property
-    def sync_state(self):
-        return ClientSyncState(self)
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)

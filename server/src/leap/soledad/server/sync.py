@@ -48,7 +48,7 @@ class ServerSyncState(object):
     called 'u1db_sync_state'.
     """
 
-    def __init__(self, db, source_replica_uid):
+    def __init__(self, db, source_replica_uid, sync_id):
         """
         Initialize the sync state object.
 
@@ -59,6 +59,7 @@ class ServerSyncState(object):
         """
         self._db = db
         self._source_replica_uid = source_replica_uid
+        self._sync_id = sync_id
 
     def _key(self, key):
         """
@@ -91,6 +92,7 @@ class ServerSyncState(object):
         with CouchDatabase.sync_info_lock[self._db.replica_uid]:
             res.put_json(
                 body={
+                    'sync_id': self._sync_id,
                     'source_replica_uid': self._source_replica_uid,
                     key: value,
                 },
@@ -118,7 +120,8 @@ class ServerSyncState(object):
         """
         ddoc_path = ['_design', 'syncs', '_view', 'seen_ids']
         resource = self._db._database.resource(*ddoc_path)
-        response = resource.get_json(key=self._key(self._source_replica_uid))
+        response = resource.get_json(
+            key=self._key([self._source_replica_uid, self._sync_id]))
         data = response[2]
         if data['rows']:
             entry = data['rows'].pop()
@@ -160,7 +163,8 @@ class ServerSyncState(object):
         """
         ddoc_path = ['_design', 'syncs', '_view', 'state']
         resource = self._db._database.resource(*ddoc_path)
-        response = resource.get_json(key=self._key(self._source_replica_uid))
+        response = resource.get_json(
+            key=self._key([self._source_replica_uid, self._sync_id]))
         data = response[2]
         gen = None
         trans_id = None
@@ -184,7 +188,7 @@ class ServerSyncState(object):
         resource = self._db._database.resource(*ddoc_path)
         response = resource.get_json(
             key=self._key(
-                [self._source_replica_uid, received]))
+                [self._source_replica_uid, self._sync_id, received]))
         data = response[2]
         if not data['rows']:
             return None, None, None
@@ -197,7 +201,7 @@ class ServerSyncState(object):
 
 class SyncExchange(sync.SyncExchange):
 
-    def __init__(self, db, source_replica_uid, last_known_generation):
+    def __init__(self, db, source_replica_uid, last_known_generation, sync_id):
         """
         :param db: The target syncing database.
         :type db: CouchDatabase
@@ -210,11 +214,13 @@ class SyncExchange(sync.SyncExchange):
         self._db = db
         self.source_replica_uid = source_replica_uid
         self.source_last_known_generation = last_known_generation
+        self.sync_id = sync_id
         self.new_gen = None
         self.new_trans_id = None
         self._trace_hook = None
         # recover sync state
-        self._sync_state = ServerSyncState(self._db, self.source_replica_uid)
+        self._sync_state = ServerSyncState(
+            self._db, self.source_replica_uid, sync_id)
 
 
     def find_changes_to_return(self, received):
@@ -322,9 +328,9 @@ class SyncResource(http_app.SyncResource):
 
     @http_app.http_method(
         last_known_generation=int, last_known_trans_id=http_app.none_or_str,
-        content_as_args=True)
+        sync_id=http_app.none_or_str, content_as_args=True)
     def post_args(self, last_known_generation, last_known_trans_id=None,
-                  ensure=False):
+                  sync_id=None, ensure=False):
         """
         Handle the initial arguments for the sync POST request from client.
 
@@ -348,7 +354,7 @@ class SyncResource(http_app.SyncResource):
             last_known_generation, last_known_trans_id)
         # get a sync exchange object
         self.sync_exch = self.sync_exchange_class(
-            db, self.source_replica_uid, last_known_generation)
+            db, self.source_replica_uid, last_known_generation, sync_id)
 
     @http_app.http_method(content_as_args=True)
     def post_put(self, id, rev, content, gen, trans_id):
@@ -405,8 +411,8 @@ class SyncResource(http_app.SyncResource):
 
     def post_end(self):
         """
-        Return the current generation and transaction_id after inserting a
-        series of incoming documents.
+        Return the current generation and transaction_id after inserting one
+        incoming document.
         """
         self.responder.content_type = 'application/x-soledad-sync-response'
         self.responder.start_response(200)

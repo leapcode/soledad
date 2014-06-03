@@ -29,6 +29,7 @@
  *     '_rev' '<str>',
  *     'ongoing_syncs': {
  *         '<source_replica_uid>': {
+ *             'sync_id': '<sync_id>',
  *             'seen_ids': [['<doc_id>', <at_gen>[, ...],
  *             'changes_to_return': {
  *                  'gen': <gen>,
@@ -59,17 +60,22 @@ function(doc, req) {
     // parse and validate incoming data
     var body = JSON.parse(req.body);
     if (body['source_replica_uid'] == null)
-        return [null, 'invalid data']
+        return [null, 'invalid data'];
     var source_replica_uid = body['source_replica_uid'];
+
+    if (body['sync_id'] == null)
+        return [null, 'invalid data'];
+    var sync_id = body['sync_id'];
 
     // trash outdated sync data for that replica if that exists
     if (doc['ongoing_syncs'][source_replica_uid] != null &&
-            doc['ongoing_syncs'][source_replica_uid] == null)
+            doc['ongoing_syncs'][source_replica_uid]['sync_id'] != sync_id)
         delete doc['ongoing_syncs'][source_replica_uid];
 
     // create an entry for that source replica
     if (doc['ongoing_syncs'][source_replica_uid] == null)
         doc['ongoing_syncs'][source_replica_uid] = {
+            'sync_id': sync_id,
             'seen_ids': {},
             'changes_to_return': null,
         };
