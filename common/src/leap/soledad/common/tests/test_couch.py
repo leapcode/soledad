@@ -219,7 +219,6 @@ def copy_couch_database_for_test(test, db):
                     new_couch_db.put_attachment(new_doc, att,
                                                 filename=att_name)
     # cleanup connections to prevent file descriptor leaking
-    session.close_connections()
     return new_db
 
 
@@ -253,7 +252,6 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
             session = couch.Session()
             server = Server(url=self._url, session=session)
             del(server[self._dbname])
-            session.close_connections()
         else:
             self.db.delete_database()
         test_backends.AllDatabaseTests.tearDown(self)
