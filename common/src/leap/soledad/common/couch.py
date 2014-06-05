@@ -40,7 +40,9 @@ from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
     ServerError,
-    Session as CouchHTTPSession,
+    Session,
+    urljoin as couch_urljoin,
+    Resource,
 )
 from u1db import query_parser, vectorclock
 from u1db.errors import (
@@ -333,17 +335,6 @@ class MultipartWriter(object):
                 self.headers[name] = value
 
 
-class Session(CouchHTTPSession):
-    """
-    An HTTP session that can be closed.
-    """
-
-    def close_connections(self):
-        for key, conns in list(self.conns.items()):
-            for conn in conns:
-                conn.close()
-
-
 @contextmanager
 def couch_server(url):
     """
@@ -359,7 +350,6 @@ def couch_server(url):
     session = Session(timeout=COUCH_TIMEOUT)
     server = Server(url=url, session=session)
     yield server
-    session.close_connections()
 
 
 class CouchDatabase(CommonBackend):
@@ -511,7 +501,6 @@ class CouchDatabase(CommonBackend):
         """
         with couch_server(self._url) as server:
             del(server[self._dbname])
-        self.close_connections()
 
     def close(self):
         """
@@ -520,19 +509,11 @@ class CouchDatabase(CommonBackend):
         :return: True if db was succesfully closed.
         :rtype: bool
         """
-        self.close_connections()
         self._url = None
         self._full_commit = None
         self._session = None
         self._database = None
         return True
-
-    def close_connections(self):
-        """
-        Close all open connections to the couch server.
-        """
-        if self._session is not None:
-            self._session.close_connections()
 
     def __del__(self):
         """
@@ -897,11 +878,9 @@ class CouchDatabase(CommonBackend):
         envelope.close()
         # try to save and fail if there's a revision conflict
         try:
-            self._database.resource.put_json(
+            resource = self._new_resource()
+            resource.put_json(
                 doc.doc_id, body=buf.getvalue(), headers=envelope.headers)
-            # What follows is a workaround for an ugly bug. See:
-            # https://leap.se/code/issues/5448
-            self.close_connections()
         except ResourceConflict:
             raise RevisionConflict()
 
@@ -1472,6 +1451,20 @@ class CouchDatabase(CommonBackend):
             if t._doc.is_tombstone() and not include_deleted:
                 continue
             yield t._doc
+
+    def _new_resource(self, *path):
+        """
+        Return a new resource for accessing a couch database.
+
+        :return: A resource for accessing a couch database.
+        :rtype: couchdb.http.Resource
+        """
+        # Workaround for: https://leap.se/code/issues/5448
+        url = couch_urljoin(self._database.resource.url, *path)
+        resource = Resource(url, Session(timeout=COUCH_TIMEOUT))
+        resource.credentials = self._database.resource.credentials
+        resource.headers = self._database.resource.headers.copy()
+        return resource
 
 
 class CouchSyncTarget(CommonSyncTarget):
