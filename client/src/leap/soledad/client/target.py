@@ -378,6 +378,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         def _post_get_doc(received):
             """
             Get a sync document from server by means of a POST request.
+
+            :param received: The number of documents already received in the
+                             current sync session.
+            :type received: int
             """
             entries = ['[']
             size = 1
