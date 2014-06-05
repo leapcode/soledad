@@ -52,6 +52,7 @@ import json
 
 from hashlib import sha256
 from contextlib import contextmanager
+from collections import defaultdict
 
 from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
@@ -152,6 +153,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     k_lock = threading.Lock()
     create_doc_lock = threading.Lock()
     update_indexes_lock = threading.Lock()
+
+    syncing_lock = defaultdict(threading.Lock)
+    """
+    A dictionary that hold locks which avoid multiple sync attempts from the
+    same database replica.
+    """
+
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
@@ -343,6 +351,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Synchronize documents with remote replica exposed at url.
 
+        There can be at most one instance syncing the same database replica at
+        the same time, so this method will block until the syncing lock can be
+        acquired.
+
         :param url: The url of the target replica to sync with.
         :type url: str
         :param creds: optional dictionary giving credentials.
@@ -355,6 +367,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :rtype: int
         """
         res = None
+        # the following context manager blocks until the syncing lock can be
+        # acquired.
         with self.syncer(url, creds=creds) as syncer:
             res = syncer.sync(autocreate=autocreate)
         return res
@@ -371,10 +385,16 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     def syncer(self, url, creds=None):
         """
         Accesor for synchronizer.
+
+        As we reuse the same synchronizer for every sync, there can be only
+        one instance synchronizing the same database replica at the same time.
+        Because of that, this method blocks until the syncing lock can be
+        acquired.
         """
-        syncer = self._get_syncer(url, creds=creds)
-        yield syncer
-        syncer.sync_target.close()
+        with SQLCipherDatabase.syncing_lock[self._get_replica_uid()]:
+            syncer = self._get_syncer(url, creds=creds)
+            yield syncer
+            syncer.sync_target.close()
 
     def _get_syncer(self, url, creds=None):
         """
