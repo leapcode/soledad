@@ -1065,6 +1065,7 @@ class Soledad(object):
         """
         if self._db:
             # acquire lock before attempt to sync
+            # TODO: move this lock to inside SQLCipherDatabase.
             with Soledad.syncing_lock[self._db._get_replica_uid()]:
                 local_gen = self._db.sync(
                     urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),

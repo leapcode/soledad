@@ -401,6 +401,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                                   creds=creds,
                                   crypto=self._crypto))
             self._syncers[url] = (h, syncer)
+        # in order to reuse the same synchronizer multiple times we have to
+        # reset its state (i.e. the number of documents received from target
+        # and inserted in the local replica).
+        syncer.num_inserted = 0
         return syncer
 
     def _extra_schema_init(self, c):
