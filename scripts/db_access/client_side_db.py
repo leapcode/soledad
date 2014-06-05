@@ -15,8 +15,12 @@ import srp._pysrp as srp
 import binascii
 import logging
 
+
 from leap.common.config import get_path_prefix
 from leap.soledad.client import Soledad
+
+
+from util import ValidateUserHandle
 
 
 # create a logger
@@ -116,16 +120,6 @@ def get_soledad_instance(username, provider, passphrase, basedir):
         server_url=server_url,
         cert_file=cert_file,
         auth_token=token)
-
-
-class ValidateUserHandle(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        m = re.compile('^([^@]+)@([^@]+\.[^@]+)$')
-        res = m.match(values)
-        if res == None:
-            parser.error('User handle should have the form user@provider.')
-        setattr(namespace, 'username', res.groups()[0])
-        setattr(namespace, 'provider', res.groups()[1])
 
 
 # main program
