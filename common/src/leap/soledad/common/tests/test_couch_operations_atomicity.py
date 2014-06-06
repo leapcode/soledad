@@ -24,6 +24,10 @@ import mock
 import tempfile
 import threading
 
+
+from urlparse import urljoin
+
+
 from leap.soledad.client import Soledad
 from leap.soledad.common.couch import CouchDatabase, CouchServerState
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
@@ -101,12 +105,16 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
         self._couch_url = 'http://localhost:' + str(self.wrapper.port)
-        self.db = CouchDatabase(
-            self._couch_url, 'user-user-uuid', replica_uid='replica')
+        self.db = CouchDatabase.open_database(
+            urljoin(self._couch_url, 'user-user-uuid'),
+            create=True,
+            replica_uid='replica',
+            ensure_ddocs=True)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
 
     def tearDown(self):
         self.db.delete_database()
+        self.db.close()
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
 
@@ -211,6 +219,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
         _create_docs_and_sync(sol, 0)
         _create_docs_and_sync(sol, 1)
+        sol.close()
 
     #
     # Concurrency tests
@@ -344,6 +353,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             self.assertEqual(
                 1,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
+        sol.close()
 
     def test_concurrent_syncs_do_not_fail(self):
         """
@@ -387,3 +397,4 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             self.assertEqual(
                 1,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
+        sol.close()

@@ -43,12 +43,15 @@ So, as the statements above were introduced for backwards compatibility with
 SLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
-import httplib
 import logging
 import os
 import string
 import threading
 import time
+import json
+
+from hashlib import sha256
+from contextlib import contextmanager
 
 from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
@@ -149,7 +152,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     k_lock = threading.Lock()
     create_doc_lock = threading.Lock()
     update_indexes_lock = threading.Lock()
-    _syncer = None
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
@@ -211,6 +213,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                                    has_conflicts=has_conflicts,
                                    syncable=syncable)
         self.set_document_factory(factory)
+        self._syncers = {}
 
     @classmethod
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
@@ -351,46 +354,46 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :return: The local generation before the synchronisation was performed.
         :rtype: int
         """
-        if not self.syncer:
-            self._create_syncer(url, creds=creds)
-
-        try:
-            res = self.syncer.sync(autocreate=autocreate)
-        except httplib.CannotSendRequest:
-            # raised when you reuse httplib.HTTP object for new request
-            # while you havn't called its getresponse()
-            # this catch works for the current connclass used
-            # by our HTTPClientBase, since it uses httplib.
-            # we will have to replace it if it changes.
-            logger.info("Replacing connection and trying again...")
-            self._syncer = None
-            self._create_syncer(url, creds=creds)
-            res = self.syncer.sync(autocreate=autocreate)
+        res = None
+        with self.syncer(url, creds=creds) as syncer:
+            res = syncer.sync(autocreate=autocreate)
         return res
 
-    @property
-    def syncer(self):
+    @contextmanager
+    def syncer(self, url, creds=None):
         """
         Accesor for synchronizer.
         """
-        return self._syncer
+        syncer = self._get_syncer(url, creds=creds)
+        yield syncer
+        syncer.sync_target.close()
 
-    def _create_syncer(self, url, creds=None):
+    def _get_syncer(self, url, creds=None):
         """
-        Creates a synchronizer
+        Get a synchronizer for C{url} using C{creds}.
 
         :param url: The url of the target replica to sync with.
         :type url: str
         :param creds: optional dictionary giving credentials.
-            to authorize the operation with the server.
+                      to authorize the operation with the server.
         :type creds: dict
+
+        :return: A synchronizer.
+        :rtype: u1db.sync.Synchronizer
         """
-        if self._syncer is None:
-            self._syncer = Synchronizer(
+        # we want to store at most one syncer for each url, so we also store a
+        # hash of the connection credentials and replace the stored syncer for
+        # a certain url if credentials have changed.
+        h = sha256(json.dumps([url, creds])).hexdigest()
+        cur_h, syncer = self._syncers.get(url, (None, None))
+        if syncer is None or h != cur_h:
+            syncer = Synchronizer(
                 self,
                 SoledadSyncTarget(url,
                                   creds=creds,
                                   crypto=self._crypto))
+            self._syncers[url] = (h, syncer)
+        return syncer
 
     def _extra_schema_init(self, c):
         """

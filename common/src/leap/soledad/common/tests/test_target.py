@@ -272,11 +272,9 @@ class TestSoledadParsingSyncStream(
 
     def setUp(self):
         test_remote_sync_target.TestParsingSyncStream.setUp(self)
-        BaseSoledadTest.setUp(self)
 
     def tearDown(self):
         test_remote_sync_target.TestParsingSyncStream.tearDown(self)
-        BaseSoledadTest.tearDown(self)
 
     def test_extra_comma(self):
         """
@@ -646,6 +644,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertEqual(([], 1, last_trans_id),
                          (self.other_changes, new_gen, last_trans_id))
         self.assertEqual(10, self.st.get_sync_info('replica')[3])
+        sol.close()
 
     def test_sync_exchange_push_many(self):
         """
