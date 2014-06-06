@@ -1,3 +1,9 @@
+soledad (0.5.2) unstable; urgency=low
+
+  * Update to 0.5.2 release.
+
+ -- db <db@leap.se>  Fri, 06 Jun 2014 16:53:03 -0300
+
 soledad (0.5.1) unstable; urgency=low
 
   * Update to 0.5.1 release.
