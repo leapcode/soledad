@@ -26,7 +26,7 @@ export GIT_DIR=${workdir}/soledad/.git
 export GIT_WORK_TREE=${workdir}/soledad
 git remote add leapcode ${SOLEDAD_MAIN_REPO}
 git fetch leapcode
-git checkout debian
+git checkout -b debian leapcode/debian
 git merge --no-edit ${branch}
 (cd ${workdir}/soledad && debuild -uc -us)
 echo "Packages generated in ${workdir}"

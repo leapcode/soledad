@@ -52,17 +52,18 @@ import json
 
 from hashlib import sha256
 from contextlib import contextmanager
+from collections import defaultdict
 
 from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
-from u1db.sync import Synchronizer
 from u1db import errors as u1db_errors
 
+from leap.soledad.client.sync import Synchronizer
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.common.document import SoledadDocument
 
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
 sqlite_backend.dbapi2 = dbapi2
@@ -152,6 +153,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     k_lock = threading.Lock()
     create_doc_lock = threading.Lock()
     update_indexes_lock = threading.Lock()
+
+    syncing_lock = defaultdict(threading.Lock)
+    """
+    A dictionary that hold locks which avoid multiple sync attempts from the
+    same database replica.
+    """
+
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
@@ -343,6 +351,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Synchronize documents with remote replica exposed at url.
 
+        There can be at most one instance syncing the same database replica at
+        the same time, so this method will block until the syncing lock can be
+        acquired.
+
         :param url: The url of the target replica to sync with.
         :type url: str
         :param creds: optional dictionary giving credentials.
@@ -355,18 +367,34 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :rtype: int
         """
         res = None
+        # the following context manager blocks until the syncing lock can be
+        # acquired.
         with self.syncer(url, creds=creds) as syncer:
             res = syncer.sync(autocreate=autocreate)
         return res
+
+    def stop_sync(self):
+        """
+        Interrupt all ongoing syncs.
+        """
+        for url in self._syncers:
+            _, syncer = self._syncers[url]
+            syncer.stop()
 
     @contextmanager
     def syncer(self, url, creds=None):
         """
         Accesor for synchronizer.
+
+        As we reuse the same synchronizer for every sync, there can be only
+        one instance synchronizing the same database replica at the same time.
+        Because of that, this method blocks until the syncing lock can be
+        acquired.
         """
-        syncer = self._get_syncer(url, creds=creds)
-        yield syncer
-        syncer.sync_target.close()
+        with SQLCipherDatabase.syncing_lock[self._get_replica_uid()]:
+            syncer = self._get_syncer(url, creds=creds)
+            yield syncer
+            syncer.sync_target.close()
 
     def _get_syncer(self, url, creds=None):
         """
@@ -379,7 +407,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :type creds: dict
 
         :return: A synchronizer.
-        :rtype: u1db.sync.Synchronizer
+        :rtype: Synchronizer
         """
         # we want to store at most one syncer for each url, so we also store a
         # hash of the connection credentials and replace the stored syncer for
@@ -393,6 +421,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                                   creds=creds,
                                   crypto=self._crypto))
             self._syncers[url] = (h, syncer)
+        # in order to reuse the same synchronizer multiple times we have to
+        # reset its state (i.e. the number of documents received from target
+        # and inserted in the local replica).
+        syncer.num_inserted = 0
         return syncer
 
     def _extra_schema_init(self, c):

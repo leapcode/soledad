@@ -40,7 +40,9 @@ from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
     ServerError,
-    Session as CouchHTTPSession,
+    Session,
+    urljoin as couch_urljoin,
+    Resource,
 )
 from u1db import query_parser, vectorclock
 from u1db.errors import (
@@ -333,17 +335,6 @@ class MultipartWriter(object):
                 self.headers[name] = value
 
 
-class Session(CouchHTTPSession):
-    """
-    An HTTP session that can be closed.
-    """
-
-    def close_connections(self):
-        for key, conns in list(self.conns.items()):
-            for conn in conns:
-                conn.close()
-
-
 @contextmanager
 def couch_server(url):
     """
@@ -359,7 +350,6 @@ def couch_server(url):
     session = Session(timeout=COUCH_TIMEOUT)
     server = Server(url=url, session=session)
     yield server
-    session.close_connections()
 
 
 class CouchDatabase(CommonBackend):
@@ -371,6 +361,7 @@ class CouchDatabase(CommonBackend):
     MAX_GET_DOCS_THREADS = 20
 
     update_handler_lock = defaultdict(threading.Lock)
+    sync_info_lock = defaultdict(threading.Lock)
 
     class _GetDocThread(threading.Thread):
         """
@@ -440,7 +431,8 @@ class CouchDatabase(CommonBackend):
                 if not create:
                     raise DatabaseDoesNotExist()
                 server.create(dbname)
-        return cls(url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
+        return cls(
+            url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
 
     def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
         """
@@ -465,6 +457,10 @@ class CouchDatabase(CommonBackend):
         self._database = Database(
             urljoin(self._url, self._dbname),
             self._session)
+        try:
+            self._database.info()
+        except ResourceNotFound:
+            raise DatabaseDoesNotExist()
         if replica_uid is not None:
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
@@ -505,7 +501,6 @@ class CouchDatabase(CommonBackend):
         """
         with couch_server(self._url) as server:
             del(server[self._dbname])
-        self.close_connections()
 
     def close(self):
         """
@@ -514,19 +509,11 @@ class CouchDatabase(CommonBackend):
         :return: True if db was succesfully closed.
         :rtype: bool
         """
-        self.close_connections()
         self._url = None
         self._full_commit = None
         self._session = None
         self._database = None
         return True
-
-    def close_connections(self):
-        """
-        Close all open connections to the couch server.
-        """
-        if self._session is not None:
-            self._session.close_connections()
 
     def __del__(self):
         """
@@ -575,6 +562,8 @@ class CouchDatabase(CommonBackend):
             return self._real_replica_uid
 
     _replica_uid = property(_get_replica_uid, _set_replica_uid)
+
+    replica_uid = property(_get_replica_uid)
 
     def _get_generation(self):
         """
@@ -869,7 +858,7 @@ class CouchDatabase(CommonBackend):
             # Date.prototype.getTime() which was used before inside a couchdb
             # update handler.
             (int(time.time() * 1000),
-            self._allocate_transaction_id()))
+             self._allocate_transaction_id()))
         # build the couch document
         couch_doc = {
             '_id': doc.doc_id,
@@ -889,11 +878,9 @@ class CouchDatabase(CommonBackend):
         envelope.close()
         # try to save and fail if there's a revision conflict
         try:
-            self._database.resource.put_json(
+            resource = self._new_resource()
+            resource.put_json(
                 doc.doc_id, body=buf.getvalue(), headers=envelope.headers)
-            # What follows is a workaround for an ugly bug. See:
-            # https://leap.se/code/issues/5448
-            self.close_connections()
         except ResourceConflict:
             raise RevisionConflict()
 
@@ -1465,6 +1452,20 @@ class CouchDatabase(CommonBackend):
                 continue
             yield t._doc
 
+    def _new_resource(self, *path):
+        """
+        Return a new resource for accessing a couch database.
+
+        :return: A resource for accessing a couch database.
+        :rtype: couchdb.http.Resource
+        """
+        # Workaround for: https://leap.se/code/issues/5448
+        url = couch_urljoin(self._database.resource.url, *path)
+        resource = Resource(url, Session(timeout=COUCH_TIMEOUT))
+        resource.credentials = self._database.resource.credentials
+        resource.headers = self._database.resource.headers.copy()
+        return resource
+
 
 class CouchSyncTarget(CommonSyncTarget):
     """
@@ -1537,8 +1538,8 @@ class CouchServerState(ServerState):
         :param dbname: The name of the database to ensure.
         :type dbname: str
 
-        :return: The CouchDatabase object and the replica uid.
-        :rtype: (CouchDatabase, str)
+        :raise Unauthorized: Always, because Soledad server is not allowed to
+                             create databases.
         """
         raise Unauthorized()
 
@@ -1548,6 +1549,9 @@ class CouchServerState(ServerState):
 
         :param dbname: The name of the database to delete.
         :type dbname: str
+
+        :raise Unauthorized: Always, because Soledad server is not allowed to
+                             delete databases.
         """
         raise Unauthorized()
 

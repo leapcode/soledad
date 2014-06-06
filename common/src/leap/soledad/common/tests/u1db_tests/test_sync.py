@@ -1155,12 +1155,12 @@ class TestDbSync(tests.TestCaseWithServer):
         super(TestDbSync, self).setUp()
         self.startServer()
         self.db = self.make_database_for_test(self, 'test1')
-        self.db2 = self.request_state._create_database('test2.db')
+        self.db2 = self.request_state._create_database('test2')
 
     def test_db_sync(self):
         doc1 = self.db.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
-        local_gen_before_sync = self.do_sync('test2.db')
+        local_gen_before_sync = self.do_sync('test2')
         gen, _, changes = self.db.whats_changed(local_gen_before_sync)
         self.assertEqual(1, len(changes))
         self.assertEqual(doc2.doc_id, changes[0][0])
