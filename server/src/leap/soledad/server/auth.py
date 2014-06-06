@@ -30,6 +30,7 @@ from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
 from couchdb.client import Server
 from twisted.python import log
+from hashlib import sha512
 
 
 from leap.soledad.common import (
@@ -415,10 +416,17 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         server = Server(url=self._app.state.couch_url)
         dbname = self.TOKENS_DB
         db = server[dbname]
-        token = db.get(token)
-        if token is None or \
-                token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF or \
-                token[self.TOKENS_USER_ID_KEY] != uuid:
+        # lookup key is a hash of the token to prevent timing attacks.
+        token = db.get(sha512(token).hexdigest())
+        if token is None:
+            raise InvalidAuthTokenError()
+        # we compare uuid hashes to avoid possible timing attacks that
+        # might exploit python's builtin comparison operator behaviour,
+        # which fails immediatelly when non-matching bytes are found.
+        couch_uuid_hash = sha512(token[self.TOKENS_USER_ID_KEY]).digest()
+        req_uuid_hash = sha512(uuid).digest()
+        if token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF \
+                or couch_uuid_hash != req_uuid_hash:
             raise InvalidAuthTokenError()
         return True
 

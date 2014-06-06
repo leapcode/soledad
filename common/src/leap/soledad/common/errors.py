@@ -62,6 +62,7 @@ class InvalidAuthTokenError(errors.Unauthorized):
     wire_descrition = "invalid auth token"
     status = 401
 
+
 #
 # LockResource errors
 #

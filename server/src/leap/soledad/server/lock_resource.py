@@ -178,9 +178,8 @@ class LockResource(object):
                 error=InvalidTokenError.wire_description)
         else:
             self._shared_db.delete_doc(lock_doc)
-            self._responder.send_response_json(200)  # success: should use 204
-                                                     # but u1db does not
-                                                     # support it.
+            # respond success: should use 204 but u1db does not support it.
+            self._responder.send_response_json(200)
 
     def _remaining(self, lock_doc, now):
         """
