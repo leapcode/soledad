@@ -1,2 +1,0 @@
-  o Use a dedicated HTTP resource for couch multipart PUTs to avoid bigcouch
-    bug (#5739).

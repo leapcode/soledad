@@ -1,2 +1,0 @@
-  o Reset synchronizer state in order to reuse the same synchronizer object
-    multiple times.
