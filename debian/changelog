@@ -1,3 +1,10 @@
+soledad (0.5.2.1) unstable; urgency=medium
+
+  * Update soledad-client version dependency on python-pycryptopp
+    to make backports to wheezy easier
+
+ -- Micah Anderson <micah@debian.org>  Tue, 01 Jul 2014 14:37:45 -0400
+
 soledad (0.5.2) unstable; urgency=low
 
   * Update to 0.5.2 release.
