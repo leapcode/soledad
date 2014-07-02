@@ -14,16 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Test sqlcipher backend internals.
 """
-
-
 import os
 import time
-import unittest
 import simplejson as json
 import threading
 
@@ -50,15 +45,9 @@ from leap.soledad.client.sqlcipher import (
     DatabaseIsNotEncrypted,
     open as u1db_open,
 )
-from leap.soledad.common.crypto import (
-    EncryptionSchemes,
-    ENC_JSON_KEY,
-    ENC_SCHEME_KEY,
-)
-from leap.soledad.client.target import (
-    decrypt_doc,
-    SoledadSyncTarget,
-)
+from leap.soledad.client.target import SoledadSyncTarget
+from leap.soledad.common.crypto import ENC_SCHEME_KEY
+from leap.soledad.client.crypto import decrypt_doc_dict
 
 
 # u1db tests stuff.
@@ -269,6 +258,7 @@ class TestSQLCipherPartialExpandDatabase(
         db = SQLCipherDatabase.__new__(
             SQLCipherDatabase)
         db._db_handle = dbapi2.connect(path)  # db is there but not yet init-ed
+        db._syncers = {}
         c = db._db_handle.cursor()
         c.execute('PRAGMA key="%s"' % PASSWORD)
         self.addCleanup(db.close)
@@ -614,7 +604,12 @@ class SQLCipherDatabaseSyncTests(
         self.sync(self.db2, db3)
         doc3 = db3.get_doc('the-doc')
         if ENC_SCHEME_KEY in doc3.content:
-            doc3.set_json(decrypt_doc(self._soledad._crypto, doc3))
+            _crypto = self._soledad._crypto
+            key = _crypto.doc_passphrase(doc3.doc_id)
+            secret = _crypto.secret
+            doc3.set_json(decrypt_doc_dict(
+                doc3.content,
+                doc3.doc_id, doc3.rev, key, secret))
         self.assertEqual(doc4.get_json(), doc3.get_json())
         self.assertFalse(doc3.has_conflicts)
 
@@ -796,7 +791,7 @@ class SQLCipherEncryptionTest(BaseLeapTest):
             # trying to open the a non-encrypted database with sqlcipher
             # backend should raise a DatabaseIsNotEncrypted exception.
             SQLCipherDatabase(self.DB_FILE, PASSWORD)
-            raise db1pi2.DatabaseError(
+            raise dbapi2.DatabaseError(
                 "SQLCipher backend should not be able to open non-encrypted "
                 "dbs.")
         except DatabaseIsNotEncrypted:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # __init__.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 """
 Tests to make sure Soledad provides U1DB functionality and more.
 """
-
 import os
 import random
 import string
@@ -29,11 +28,8 @@ from mock import Mock
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client import Soledad
-from leap.soledad.client.crypto import SoledadCrypto
-from leap.soledad.client.target import (
-    decrypt_doc,
-    ENC_SCHEME_KEY,
-)
+from leap.soledad.client.crypto import decrypt_doc_dict
+from leap.soledad.client.crypto import ENC_SCHEME_KEY
 from leap.common.testing.basetest import BaseLeapTest
 
 
@@ -49,6 +45,7 @@ class BaseSoledadTest(BaseLeapTest):
     """
     Instantiates Soledad for usage in tests.
     """
+    defer_sync_encryption = False
 
     def setUp(self):
         # config info
@@ -73,10 +70,25 @@ class BaseSoledadTest(BaseLeapTest):
         self._db1.close()
         self._db2.close()
         self._soledad.close()
+
         # XXX should not access "private" attrs
         for f in [self._soledad._local_db_path, self._soledad._secrets_path]:
             if os.path.isfile(f):
                 os.unlink(f)
+
+    def get_default_shared_mock(self, put_doc_side_effect):
+        """
+        Get a default class for mocking the shared DB
+        """
+        class defaultMockSharedDB(object):
+            get_doc = Mock(return_value=None)
+            put_doc = Mock(side_effect=put_doc_side_effect)
+            lock = Mock(return_value=('atoken', 300))
+            unlock = Mock(return_value=True)
+
+            def __call__(self):
+                return self
+        return defaultMockSharedDB
 
     def _soledad_instance(self, user=ADDRESS, passphrase=u'123',
                           prefix='',
@@ -88,18 +100,11 @@ class BaseSoledadTest(BaseLeapTest):
         def _put_doc_side_effect(doc):
             self._doc_put = doc
 
-        class MockSharedDB(object):
-
-            get_doc = Mock(return_value=None)
-            put_doc = Mock(side_effect=_put_doc_side_effect)
-            lock = Mock(return_value=('atoken', 300))
-            unlock = Mock(return_value=True)
-
-            def __call__(self):
-                return self
-
         if shared_db_class is not None:
             MockSharedDB = shared_db_class
+        else:
+            MockSharedDB = self.get_default_shared_mock(
+                _put_doc_side_effect)
 
         Soledad._shared_db = MockSharedDB()
         return Soledad(
@@ -111,7 +116,8 @@ class BaseSoledadTest(BaseLeapTest):
                 self.tempdir, prefix, local_db_path),
             server_url=server_url,  # Soledad will fail if not given an url.
             cert_file=cert_file,
-            secret_id=secret_id)
+            secret_id=secret_id,
+            defer_encryption=self.defer_sync_encryption)
 
     def assertGetEncryptedDoc(
             self, db, doc_id, doc_rev, content, has_conflicts):
@@ -121,8 +127,15 @@ class BaseSoledadTest(BaseLeapTest):
         exp_doc = self.make_document(doc_id, doc_rev, content,
                                      has_conflicts=has_conflicts)
         doc = db.get_doc(doc_id)
+
         if ENC_SCHEME_KEY in doc.content:
-            doc.set_json(decrypt_doc(self._soledad._crypto, doc))
+            # XXX check for SYM_KEY too
+            key = self._soledad._crypto.doc_passphrase(doc.doc_id)
+            secret = self._soledad._crypto.secret
+            decrypted = decrypt_doc_dict(
+                doc.content, doc.doc_id, doc.rev,
+                key, secret)
+            doc.set_json(decrypted)
         self.assertEqual(exp_doc.doc_id, doc.doc_id)
         self.assertEqual(exp_doc.rev, doc.rev)
         self.assertEqual(exp_doc.has_conflicts, doc.has_conflicts)
