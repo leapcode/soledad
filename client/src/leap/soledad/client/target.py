@@ -652,7 +652,7 @@ class HTTPDocumentSyncer(HTTPClientBase, TokenBasedAuth):
         return self._response()
 
     def _put_doc(self, sync_id, last_known_generation, last_known_trans_id,
-            id, rev, content, gen, trans_id, number_of_docs):
+            id, rev, content, gen, trans_id, number_of_docs, doc_idx):
         """
         Put a sync document on server by means of a POST request.
 
@@ -676,6 +676,8 @@ class HTTPDocumentSyncer(HTTPClientBase, TokenBasedAuth):
         :param number_of_docs: The total amount of documents sent on this sync
                                session.
         :type number_of_docs: int
+        :param doc_idx: The index of the current document being sent.
+        :type doc_idx: int
 
         :return: The body and headers of the response.
         :rtype: tuple
@@ -694,7 +696,7 @@ class HTTPDocumentSyncer(HTTPClientBase, TokenBasedAuth):
         size += self._prepare(
             ',', entries,
             id=id, rev=rev, content=content, gen=gen, trans_id=trans_id,
-            number_of_docs=number_of_docs)
+            number_of_docs=number_of_docs, doc_idx=doc_idx)
         entries.append('\r\n]')
         size += len(entries[-1])
         # send headers
@@ -1189,7 +1191,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             t.doc_syncer.set_request_method(
                 'put', sync_id, cur_target_gen, cur_target_trans_id,
                 id=doc.doc_id, rev=doc.rev, content=doc_json, gen=gen,
-                trans_id=trans_id, number_of_docs=number_of_docs)
+                trans_id=trans_id, number_of_docs=number_of_docs, doc_idx=sent + 1)
             # set the success calback
 
             def _success_callback(idx, total, response):

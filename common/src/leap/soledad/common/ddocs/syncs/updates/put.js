@@ -53,8 +53,13 @@ function(doc, req){
     var other_transaction_id = body['other_transaction_id']
     var sync_id = body['sync_id'];
     var number_of_docs = body['number_of_docs'];
+    var doc_idx = body['doc_idx'];
+
+    // parse integers
     if (number_of_docs != null)
         number_of_docs = parseInt(number_of_docs);
+    if (doc_idx != null)
+        doc_idx = parseInt(doc_idx);
 
     if (other_replica_uid == null
             || other_generation == null
@@ -69,7 +74,7 @@ function(doc, req){
     var current_gen = other_generation;
     var current_trans_id = other_transaction_id;
 
-    /*------------ Wait for end of sync session before storing ------------*/
+    /*------------- Wait for sequential values before storing -------------*/
 
     // we just try to obtain pending log if we received a sync_id
     if (sync_id != null) {
@@ -80,31 +85,49 @@ function(doc, req){
             doc['pending'][other_replica_uid] = {
                 'sync_id': sync_id,
                 'log': [],
+                'last_doc_idx': 0,
             }
         }
 
         // append incoming data to pending log
         doc['pending'][other_replica_uid]['log'].push([
             other_generation,
-            other_transaction_id
+            other_transaction_id,
+            doc_idx,
         ])
 
-        // leave the sync log untouched if we still did not receive all docs
-        if (doc['pending'][other_replica_uid]['log'].length < number_of_docs)
-            return [doc, 'ok'];
-
-        // otherwise, sort pending log according to generation
+        // sort pending log according to generation
         doc['pending'][other_replica_uid]['log'].sort(function(a, b) {
             return a[0] - b[0];
         });
 
         // get most up-to-date information from pending log
-        pending = doc['pending'][other_replica_uid]['log'].pop()
-        current_gen = pending[0];
-        current_trans_id = pending[1];
+        var last_doc_idx = doc['pending'][other_replica_uid]['last_doc_idx'];
+        var pending_idx = doc['pending'][other_replica_uid]['log'][0][2];
 
-        // and remove all pending data from that replica
-        delete doc['pending'][other_replica_uid]
+        current_gen = null;
+        current_trans_id = null;
+
+        while (last_doc_idx + 1 == pending_idx) {
+            pending = doc['pending'][other_replica_uid]['log'].shift()
+            current_gen = pending[0];
+            current_trans_id = pending[1];
+            last_doc_idx = pending[2]
+            if (doc['pending'][other_replica_uid]['log'].length == 0)
+                break;
+            pending_idx = doc['pending'][other_replica_uid]['log'][0][2];
+        }
+
+        // leave the sync log untouched if we still did not receive enough docs
+        if (current_gen == null)
+            return [doc, 'ok'];
+
+        // update last index of received doc
+        doc['pending'][other_replica_uid]['last_doc_idx'] = last_doc_idx;
+
+        // eventually remove all pending data from that replica
+        if (last_doc_idx == number_of_docs)
+            delete doc['pending'][other_replica_uid]
     }
 
     /*--------------- Store source replica info on sync log ---------------*/

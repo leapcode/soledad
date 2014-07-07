@@ -1107,7 +1107,8 @@ class CouchDatabase(CommonBackend):
 
     def _set_replica_gen_and_trans_id(self, other_replica_uid,
                                       other_generation, other_transaction_id,
-                                      number_of_docs=None, sync_id=None):
+                                      number_of_docs=None, doc_idx=None,
+                                      sync_id=None):
         """
         Set the last-known generation and transaction id for the other
         database replica.
@@ -1126,16 +1127,18 @@ class CouchDatabase(CommonBackend):
         :param number_of_docs: The total amount of documents sent on this sync
                                session.
         :type number_of_docs: int
+        :param doc_idx: The index of the current document being sent.
+        :type doc_idx: int
         :param sync_id: The id of the current sync session.
         :type sync_id: str
         """
         self._do_set_replica_gen_and_trans_id(
             other_replica_uid, other_generation, other_transaction_id,
-            number_of_docs=number_of_docs, sync_id=sync_id)
+            number_of_docs=number_of_docs, doc_idx=doc_idx, sync_id=sync_id)
 
     def _do_set_replica_gen_and_trans_id(
             self, other_replica_uid, other_generation, other_transaction_id,
-            number_of_docs=None, sync_id=None):
+            number_of_docs=None, doc_idx=None, sync_id=None):
         """
         Set the last-known generation and transaction id for the other
         database replica.
@@ -1154,6 +1157,8 @@ class CouchDatabase(CommonBackend):
         :param number_of_docs: The total amount of documents sent on this sync
                                session.
         :type number_of_docs: int
+        :param doc_idx: The index of the current document being sent.
+        :type doc_idx: int
         :param sync_id: The id of the current sync session.
         :type sync_id: str
 
@@ -1181,10 +1186,12 @@ class CouchDatabase(CommonBackend):
                     'other_generation': other_generation,
                     'other_transaction_id': other_transaction_id,
                 }
-                if sync_id is not None:
-                    body['sync_id'] = sync_id
                 if number_of_docs is not None:
                     body['number_of_docs'] = number_of_docs
+                if doc_idx is not None:
+                    body['doc_idx'] = doc_idx
+                if sync_id is not None:
+                    body['sync_id'] = sync_id
                 res.put_json(
                     body=body,
                     headers={'content-type': 'application/json'})
@@ -1325,7 +1332,7 @@ class CouchDatabase(CommonBackend):
 
     def _put_doc_if_newer(self, doc, save_conflict, replica_uid, replica_gen,
                           replica_trans_id='', number_of_docs=None,
-                          sync_id=None):
+                          doc_idx=None, sync_id=None):
         """
         Insert/update document into the database with a given revision.
 
@@ -1361,6 +1368,8 @@ class CouchDatabase(CommonBackend):
         :param number_of_docs: The total amount of documents sent on this sync
                                session.
         :type number_of_docs: int
+        :param doc_idx: The index of the current document being sent.
+        :type doc_idx: int
         :param sync_id: The id of the current sync session.
         :type sync_id: str
 
@@ -1423,7 +1432,8 @@ class CouchDatabase(CommonBackend):
         if replica_uid is not None and replica_gen is not None:
             self._set_replica_gen_and_trans_id(
                 replica_uid, replica_gen, replica_trans_id,
-                number_of_docs=number_of_docs, sync_id=sync_id)
+                number_of_docs=number_of_docs, doc_idx=doc_idx,
+                sync_id=sync_id)
         # update info
         old_doc.rev = doc.rev
         if doc.is_tombstone():

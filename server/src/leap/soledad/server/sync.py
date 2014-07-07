@@ -287,7 +287,7 @@ class SyncExchange(sync.SyncExchange):
             return_doc_cb(doc, gen, trans_id)
 
     def insert_doc_from_source(self, doc, source_gen, trans_id,
-            number_of_docs=None, sync_id=None):
+            number_of_docs=None, doc_idx=None, sync_id=None):
         """Try to insert synced document from source.
 
         Conflicting documents are not inserted but will be sent over
@@ -308,13 +308,15 @@ class SyncExchange(sync.SyncExchange):
         :param number_of_docs: The total amount of documents sent on this sync
                                session.
         :type number_of_docs: int
+        :param doc_idx: The index of the current document.
+        :type doc_idx: int
         :param sync_id: The id of the current sync session.
         :type sync_id: str
         """
         state, at_gen = self._db._put_doc_if_newer(
             doc, save_conflict=False, replica_uid=self.source_replica_uid,
             replica_gen=source_gen, replica_trans_id=trans_id,
-            number_of_docs=number_of_docs, sync_id=sync_id)
+            number_of_docs=number_of_docs, doc_idx=doc_idx, sync_id=sync_id)
         if state == 'inserted':
             self._sync_state.put_seen_id(doc.doc_id, at_gen)
         elif state == 'converged':
@@ -369,7 +371,8 @@ class SyncResource(http_app.SyncResource):
         self._sync_id = sync_id
 
     @http_app.http_method(content_as_args=True)
-    def post_put(self, id, rev, content, gen, trans_id, number_of_docs):
+    def post_put(self, id, rev, content, gen, trans_id, number_of_docs,
+            doc_idx):
         """
         Put one incoming document into the server replica.
 
@@ -388,11 +391,13 @@ class SyncResource(http_app.SyncResource):
         :param number_of_docs: The total amount of documents sent on this sync
                                session.
         :type number_of_docs: int
+        :param doc_idx: The index of the current document.
+        :type doc_idx: int
         """
         doc = Document(id, rev, content)
         self.sync_exch.insert_doc_from_source(
             doc, gen, trans_id, number_of_docs=number_of_docs,
-            sync_id=self._sync_id)
+            doc_idx=doc_idx, sync_id=self._sync_id)
 
     @http_app.http_method(received=int, content_as_args=True)
     def post_get(self, received):
