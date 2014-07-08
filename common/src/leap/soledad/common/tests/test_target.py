@@ -437,13 +437,17 @@ class TestSoledadSyncTarget(
 
         def bomb_put_doc_if_newer(self, doc, save_conflict,
                                   replica_uid=None, replica_gen=None,
-                                  replica_trans_id=None):
+                                  replica_trans_id=None, number_of_docs=None,
+                                  doc_idx=None, sync_id=None):
             if doc.doc_id in trigger_ids:
                 raise Exception
             return _put_doc_if_newer(doc, save_conflict=save_conflict,
                                      replica_uid=replica_uid,
                                      replica_gen=replica_gen,
-                                     replica_trans_id=replica_trans_id)
+                                     replica_trans_id=replica_trans_id,
+                                     number_of_docs=number_of_docs,
+                                     doc_idx=doc_idx,
+                                     sync_id=sync_id)
         from leap.soledad.common.tests.test_couch import IndexedCouchDatabase
         self.patch(
             IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
@@ -457,9 +461,8 @@ class TestSoledadSyncTarget(
         doc1 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
         doc2 = self.make_document('doc-here2', 'replica:1',
                                   '{"value": "here2"}')
-        self.assertRaises(
-            u1db.errors.HTTPError,
-            remote_target.sync_exchange,
+        # We do not expect an exception here because the sync fails gracefully
+        remote_target.sync_exchange(
             [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
             'replica', last_known_generation=0, last_known_trans_id=None,
             return_doc_cb=receive_doc)
@@ -480,11 +483,9 @@ class TestSoledadSyncTarget(
         self.assertEqual(
             (11, 'T-sud'), db._get_replica_gen_and_trans_id('replica'))
         self.assertEqual(2, new_gen)
-        # we do not expect the document to be bounced back because soledad has
-        # stateful sync
-        #self.assertEqual(
-        #    ('doc-here', 'replica:1', '{"value": "here"}', 1),
-        #    other_changes[0][:-1])
+        self.assertEqual(
+            ('doc-here', 'replica:1', '{"value": "here"}', 1),
+            other_changes[0][:-1])
 
     def test_sync_exchange_send_ensure_callback(self):
         """

@@ -329,7 +329,7 @@ class TestSoledadSyncTarget(
         def bomb_put_doc_if_newer(self, doc, save_conflict,
                                   replica_uid=None, replica_gen=None,
                                   replica_trans_id=None, number_of_docs=None,
-                                  sync_id=None):
+                                  doc_idx=None, sync_id=None):
             if doc.doc_id in trigger_ids:
                 raise Exception
             return _put_doc_if_newer(doc, save_conflict=save_conflict,
@@ -337,7 +337,7 @@ class TestSoledadSyncTarget(
                                      replica_gen=replica_gen,
                                      replica_trans_id=replica_trans_id,
                                      number_of_docs=number_of_docs,
-                                     sync_id=sync_id)
+                                     doc_idx=doc_idx, sync_id=sync_id)
         from leap.soledad.common.tests.test_couch import IndexedCouchDatabase
         self.patch(
             IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
@@ -353,37 +353,30 @@ class TestSoledadSyncTarget(
                                   '{"value": "here2"}')
 
         # we do not expect an HTTPError because soledad sync fails gracefully
-        sync_id = str(uuid4())  # we shall use the same sync_id to allow sync
-                                # recovery.
         remote_target.sync_exchange(
             [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
             'replica', last_known_generation=0, last_known_trans_id=None,
-            return_doc_cb=receive_doc, defer_decryption=False, sync_id=sync_id)
+            return_doc_cb=receive_doc)
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}',
             False)
-        # here we expect the remote log to not be updated as the sync was
-        # interrupted.
         self.assertEqual(
-            (0, ''), db._get_replica_gen_and_trans_id('replica'))
+            (10, 'T-sid'), db._get_replica_gen_and_trans_id('replica'))
         self.assertEqual([], other_changes)
         # retry
         trigger_ids = []
         new_gen, trans_id = remote_target.sync_exchange(
             [(doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, return_doc_cb=receive_doc,
-            defer_decryption=False, sync_id=sync_id)
+            last_known_trans_id=None, return_doc_cb=receive_doc)
         self.assertGetEncryptedDoc(
             db, 'doc-here2', 'replica:1', '{"value": "here2"}',
             False)
         self.assertEqual(
             (11, 'T-sud'), db._get_replica_gen_and_trans_id('replica'))
         self.assertEqual(2, new_gen)
-        # we do not expect the document to be bounced back because soledad has
-        # stateful sync
-        #self.assertEqual(
-        #    ('doc-here', 'replica:1', '{"value": "here"}', 1),
-        #    other_changes[0][:-1])
+        self.assertEqual(
+            ('doc-here', 'replica:1', '{"value": "here"}', 1),
+            other_changes[0][:-1])
 
     def test_sync_exchange_send_ensure_callback(self):
         """
