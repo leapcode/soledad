@@ -860,7 +860,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             new_generation = metadata['new_generation']
             new_transaction_id = metadata['new_transaction_id']
             number_of_changes = metadata['number_of_changes']
-        except json.JSONDecodeError, KeyError:
+        except (json.JSONDecodeError, KeyError):
             raise errors.BrokenSyncStream
         # make sure we have replica_uid from fresh new dbs
         if self._ensure_callback and 'replica_uid' in metadata:
@@ -879,7 +879,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 content = entry['content']
                 gen = entry['gen']
                 trans_id = entry['trans_id']
-            except IndexError, KeyError:
+            except (IndexError, KeyError):
                 raise errors.BrokenSyncStream
         return new_generation, new_transaction_id, number_of_changes, \
             doc_id, rev, content, gen, trans_id
