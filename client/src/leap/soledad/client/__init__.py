@@ -497,6 +497,7 @@ class Soledad(object):
         if hasattr(self, '_db') and isinstance(
                 self._db,
                 SQLCipherDatabase):
+            self._db.stop_sync()
             self._db.close()
 
     #
