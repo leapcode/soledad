@@ -180,32 +180,33 @@ class SoledadSynchronizer(Synchronizer):
         #
         # The sync_exchange method may be interrupted, in which case it will
         # return a tuple of Nones.
-        new_gen, new_trans_id = sync_target.sync_exchange(
-            docs_by_generation, self.source._replica_uid,
-            target_last_known_gen, target_last_known_trans_id,
-            self._insert_doc_from_target, ensure_callback=ensure_callback,
-            defer_decryption=defer_decryption)
+        try:
+            new_gen, new_trans_id = sync_target.sync_exchange(
+                docs_by_generation, self.source._replica_uid,
+                target_last_known_gen, target_last_known_trans_id,
+                self._insert_doc_from_target, ensure_callback=ensure_callback,
+                defer_decryption=defer_decryption)
+            logger.debug(
+                "Soledad source sync info after sync exchange:\n"
+                "  source target gen: %d\n"
+                "  source target trans_id: %s"
+                % (new_gen, new_trans_id))
+            info = {
+                "target_replica_uid": self.target_replica_uid,
+                "new_gen": new_gen,
+                "new_trans_id": new_trans_id,
+                "my_gen": my_gen
+            }
+            self._syncing_info = info
+            if defer_decryption and not sync_target.has_syncdb():
+                logger.debug("Sync target has no valid sync db, "
+                             "aborting defer_decryption")
+                defer_decryption = False
+            self.complete_sync()
+        except Exception as e:
+            logger.error("Soledad sync error: %s" % str(e))
+            sync_target.stop()
 
-        logger.debug(
-            "Soledad source sync info after sync exchange:\n"
-            "  source target gen: %d\n"
-            "  source target trans_id: %s"
-            % (new_gen, new_trans_id))
-
-        info = {
-            "target_replica_uid": self.target_replica_uid,
-            "new_gen": new_gen,
-            "new_trans_id": new_trans_id,
-            "my_gen": my_gen
-        }
-        self._syncing_info = info
-
-        if defer_decryption and not sync_target.has_syncdb():
-            logger.debug("Sync target has no valid sync db, "
-                         "aborting defer_decryption")
-            defer_decryption = False
-
-        self.complete_sync()
         return my_gen
 
     def complete_sync(self):
