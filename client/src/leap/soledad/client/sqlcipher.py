@@ -480,13 +480,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     @property
     def syncing(self):
-        syncing = False
-        for url in self._syncers:
-            _, _, lock = self._syncers[url]
-            is_not_locked = lock.acquire(blocking=False)
-            if is_not_locked is False:
-                return True
-            lock.release()
+        lock = SQLCipherDatabase.syncing_lock[self._get_replica_uid()]
+        acquired_lock = lock.acquire(False)
+        if acquired_lock is False:
+            return True
+        lock.release()
         return False
 
     def _get_syncer(self, url, creds=None):
