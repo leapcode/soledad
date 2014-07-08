@@ -269,6 +269,12 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                                    has_conflicts=has_conflicts,
                                    syncable=syncable)
         self.set_document_factory(factory)
+        # we store syncers in a dictionary indexed by the target URL. We also
+        # store a hash of the auth info in case auth info expires and we need
+        # to rebuild the syncer for that target. The final self._syncers
+        # format is the following:
+        #
+        #     self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
         self._syncers = {}
 
     @classmethod
