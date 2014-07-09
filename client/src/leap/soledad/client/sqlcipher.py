@@ -482,7 +482,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         with SQLCipherDatabase.syncing_lock[self._get_replica_uid()]:
             syncer = self._get_syncer(url, creds=creds)
             yield syncer
-            #syncer.sync_target.close()
 
     @property
     def syncing(self):

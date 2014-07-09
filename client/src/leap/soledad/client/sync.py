@@ -206,6 +206,8 @@ class SoledadSynchronizer(Synchronizer):
         except Exception as e:
             logger.error("Soledad sync error: %s" % str(e))
             sync_target.stop()
+        finally:
+            sync_target.close()
 
         return my_gen
 

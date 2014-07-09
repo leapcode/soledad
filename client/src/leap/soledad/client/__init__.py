@@ -407,6 +407,7 @@ class Soledad(object):
             # release the lock on shared db
             try:
                 self._shared_db.unlock(token)
+                self._shared_db.close()
             except NotLockedError:
                 # for some reason the lock expired. Despite that, secret
                 # loading or generation/storage must have been executed

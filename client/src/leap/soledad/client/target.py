@@ -833,6 +833,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_watcher.shutdown()
         if self._sync_decr_pool is not None:
             self._sync_decr_pool.close()
+        HTTPSyncTarget.close(self)
 
     @staticmethod
     def connect(url, source_replica_uid=None, crypto=None):
@@ -1237,6 +1238,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 last_known_generation, last_known_trans_id, headers,
                 return_doc_cb, ensure_callback, sync_id, syncer_pool,
                 defer_decryption=defer_decryption)
+        syncer_pool.cleanup()
 
         # delete documents from the sync database
         if defer_encryption:
@@ -1249,7 +1251,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_exchange_lock.release()
             self._sync_watcher.stop()
 
-        syncer_pool.cleanup()
         self.stop()
         return cur_target_gen, cur_target_trans_id
 
