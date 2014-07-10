@@ -32,6 +32,7 @@ Extend u1db Synchronizer with the ability to:
 import json
 
 import logging
+import traceback
 from threading import Lock
 
 from u1db import errors
@@ -85,13 +86,11 @@ class SoledadSynchronizer(Synchronizer):
             return self._sync(autocreate=autocreate,
                               defer_decryption=defer_decryption)
         except Exception:
-            # We release the lock if there was an error.
-            # Otherwise, the lock should be released from the function
-            # `complete_sync`.
-            self.release_syncing_lock()
             # re-raising the exceptions to let syqlcipher.sync catch them
             # (and re-create the syncer instance if needed)
             raise
+        finally:
+            self.release_syncing_lock()
 
     def _sync(self, autocreate=False, defer_decryption=True):
         """
@@ -161,7 +160,6 @@ class SoledadSynchronizer(Synchronizer):
         if not changes and target_last_known_gen == target_gen:
             if target_trans_id != target_last_known_trans_id:
                 raise errors.InvalidTransactionId
-            self.release_syncing_lock()
             return my_gen
 
         # prepare to send all the changed docs
@@ -205,6 +203,7 @@ class SoledadSynchronizer(Synchronizer):
             self.complete_sync()
         except Exception as e:
             logger.error("Soledad sync error: %s" % str(e))
+            logger.error(traceback.format_exc())
             sync_target.stop()
         finally:
             sync_target.close()
@@ -228,7 +227,6 @@ class SoledadSynchronizer(Synchronizer):
 
         # if gapless record current reached generation with target
         self._record_sync_info_with_the_target(info["my_gen"])
-        self.syncing_lock.release()
 
     @property
     def syncing(self):
