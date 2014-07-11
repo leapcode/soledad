@@ -13,8 +13,9 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
-
-"""Test infrastructure for U1DB"""
+"""
+Test infrastructure for U1DB
+"""
 
 import copy
 import shutil

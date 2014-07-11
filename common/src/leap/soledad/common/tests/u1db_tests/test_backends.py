@@ -41,7 +41,7 @@ from u1db.remote import (
 )
 
 
-def make_http_database_for_test(test, replica_uid, path='test'):
+def make_http_database_for_test(test, replica_uid, path='test', *args):
     test.startServer()
     test.request_state._create_database(replica_uid)
     return http_database.HTTPDatabase(test.getURL(path))

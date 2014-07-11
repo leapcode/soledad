@@ -3,6 +3,9 @@ simplejson
 u1db
 scrypt
 pycryptopp
+cchardet
+taskthread
+zope.proxy
 
 #
 # leap deps
@@ -20,5 +23,3 @@ oauth
 
 # pysqlite should not be a dep, see #2945
 pysqlite
-
-cchardet
