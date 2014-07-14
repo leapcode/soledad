@@ -743,29 +743,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
                     sql_ins,
                     (doc_id, doc_rev, docstr, gen, trans_id, 1))
 
-    def insert_marker_for_received_doc(self, doc_id, doc_rev, gen):
-        """
-        Insert a marker with the document id, revision and generation on the
-        sync db. This document does not have an encrypted payload, so the
-        content has already been inserted into the decrypted_docs dictionary
-        from where it can be picked following generation order.
-        We need to leave here the marker to be able to calculate the expected
-        insertion order for a synchronization batch.
-
-        :param doc_id: The Document ID.
-        :type doc_id: str
-        :param doc_rev: The Document Revision
-        :param doc_rev: str
-        :param gen: the Document Generation
-        :type gen: int
-        """
-        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?, ?, ?, ?)" % (
-            self.TABLE_NAME,)
-        con = self._sync_db
-        with self._sync_db_write_lock:
-            with con:
-                con.execute(sql_ins, (doc_id, doc_rev, '', gen, '', 0))
-
     def insert_received_doc(self, doc_id, doc_rev, content, gen, trans_id):
         """
         Insert a document that is not symmetrically encrypted.
@@ -783,16 +760,15 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :param trans_id: Transaction ID
         :type trans_id: str
         """
-        # XXX this need a deeper review / testing.
-        # I believe that what I'm doing here is prone to problems
-        # if the sync is interrupted (ie, client crash) in the worst possible
-        # moment. We would need a recover strategy in that case
-        # (or, insert the document in the table all the same, but with a flag
-        # saying if the document is sym-encrypted or not),
         content = json.dumps(content)
-        result = doc_id, doc_rev, content, gen, trans_id
-        self.decrypted_docs[gen] = result
-        self.insert_marker_for_received_doc(doc_id, doc_rev, gen)
+        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?, ?, ?, ?)" % (
+            self.TABLE_NAME,)
+        con = self._sync_db
+        with self._sync_db_write_lock:
+            with con:
+                con.execute(
+                    sql_ins,
+                    (doc_id, doc_rev, content, gen, trans_id, 0))
 
     def delete_encrypted_received_doc(self, doc_id, doc_rev):
         """
