@@ -876,7 +876,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         """
         doc_id, rev, content, gen, trans_id = result
         logger.debug("Sync decrypter pool: decrypted doc %s: %s %s" % (doc_id, rev, gen))
-        self.decrypted_docs[gen] = result
+        self.insert_received_doc(doc_id, rev, content, gen, trans_id)
 
     def get_docs_by_generation(self):
         """
