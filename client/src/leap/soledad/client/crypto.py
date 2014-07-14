@@ -691,7 +691,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
     """
     # TODO implement throttling to reduce cpu usage??
     TABLE_NAME = "docs_received"
-    FIELD_NAMES = "doc_id, rev, content, gen, trans_id"
+    FIELD_NAMES = "doc_id, rev, content, gen, trans_id, encrypted"
 
     write_encrypted_lock = threading.Lock()
 
@@ -733,13 +733,15 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :type trans_id: str
         """
         docstr = json.dumps(content)
-        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?, ?, ?)" % (
+        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?, ?, ?, ?)" % (
             self.TABLE_NAME,)
 
         con = self._sync_db
         with self._sync_db_write_lock:
             with con:
-                con.execute(sql_ins, (doc_id, doc_rev, docstr, gen, trans_id))
+                con.execute(
+                    sql_ins,
+                    (doc_id, doc_rev, docstr, gen, trans_id, 1))
 
     def insert_marker_for_received_doc(self, doc_id, doc_rev, gen):
         """
@@ -757,12 +759,12 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :param gen: the Document Generation
         :type gen: int
         """
-        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?, ?, ?)" % (
+        sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?, ?, ?, ?)" % (
             self.TABLE_NAME,)
         con = self._sync_db
         with self._sync_db_write_lock:
             with con:
-                con.execute(sql_ins, (doc_id, doc_rev, '', gen, ''))
+                con.execute(sql_ins, (doc_id, doc_rev, '', gen, '', 0))
 
     def insert_received_doc(self, doc_id, doc_rev, content, gen, trans_id):
         """
