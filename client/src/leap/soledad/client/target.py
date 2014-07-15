@@ -804,16 +804,20 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_db = sync_db
             self._sync_db_write_lock = sync_db_write_lock
 
-    def _setup_sync_decr_pool(self):
+    def _setup_sync_decr_pool(self, last_known_generation):
         """
         Set up the SyncDecrypterPool for deferred decryption.
+
+        :param last_known_generation: Target's last known generation.
+        :type last_known_generation: int
         """
         if self._sync_decr_pool is None:
             # initialize syncing queue decryption pool
             self._sync_decr_pool = SyncDecrypterPool(
                 self._crypto, self._sync_db,
                 self._sync_db_write_lock,
-                insert_doc_cb=self._insert_doc_cb)
+                insert_doc_cb=self._insert_doc_cb,
+                last_known_generation=last_known_generation)
             self._sync_decr_pool.set_source_replica_uid(
                 self.source_replica_uid)
 
@@ -1127,7 +1131,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         if defer_decryption:
             self._sync_exchange_lock.acquire()
-            self._setup_sync_decr_pool()
+            self._setup_sync_decr_pool(last_known_generation)
             self._setup_sync_watcher()
             self._defer_decryption = True
 
@@ -1402,7 +1406,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :rtype: bool
         """
         if self._sync_decr_pool is not None:
-            return self._sync_decr_pool.count_received_encrypted_docs() == 0
+            return self._sync_decr_pool.count_docs_in_sync_db() == 0
         else:
             return True
 
