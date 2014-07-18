@@ -1,3 +1,26 @@
+0.6.0 Jul 18, 2014:
+Client:
+  o Close all connections after syncing. Fixes #5518.
+  o Reset synchronizer state in order to reuse the same synchronizer
+    object multiple times.
+  o Use temporal database for encryption/decryption during
+    sync. Closes #5326.
+  o Add sync status signals. Closes #5517.
+  o Allow for interrupting and recovering sync. Closes #5517.
+  o Parallelize sync requests and reuse HTTP connections.
+  o Split sync in multiple POST requests in client. Closes #5571.
+
+Common:
+  o Use a dedicated HTTP resource for couch multipart PUTs to avoid
+    bigcouch. Closes #5739.
+
+Server:
+  o Pin PyOpenSSL dependency version to <0.14 to avoid yet another
+    crypto dependency.
+  o Authenticate in time-insensitive manner. Closes #3399.
+  o Allow for interrupting and recovering sync. Closes #5517.
+  o Split sync in multiple POST requests in server. Closes #5571.
+
 0.5.2 Jun 6, 2014:
 Client:
   o Reset synchronizer state in order to reuse the same synchronizer

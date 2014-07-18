@@ -14,18 +14,13 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Tests for general Soledad functionality.
 """
-
-
 import os
 from mock import Mock
 
 
-from pysqlcipher.dbapi2 import DatabaseError
 from leap.common.events import events_pb2 as proto
 from leap.soledad.common.tests import (
     BaseSoledadTest,
