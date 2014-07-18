@@ -1,2 +1,0 @@
-  o Pin PyOpenSSL dependency version to <0.14 to avoid yet another crypto
-    dependency.
