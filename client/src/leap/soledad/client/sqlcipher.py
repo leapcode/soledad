@@ -243,19 +243,14 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._ensure_schema()
             self._crypto = crypto
 
+        # define sync-db attrs
         self._sync_db = None
         self._sync_db_write_lock = None
         self._sync_enc_pool = None
+        self._init_sync_db(sqlcipher_file)
 
         if self.defer_encryption:
-            if sqlcipher_file != ":memory:":
-                self._sync_db_path = "%s-sync" % sqlcipher_file
-            else:
-                self._sync_db_path = ":memory:"
-
             # initialize sync db
-            self._init_sync_db()
-
             # initialize syncing queue encryption pool
             self._sync_enc_pool = SyncEncrypterPool(
                 self._crypto, self._sync_db, self._sync_db_write_lock)
@@ -449,7 +444,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         # the following context manager blocks until the syncing lock can be
         # acquired.
         with self.syncer(url, creds=creds) as syncer:
-
             # XXX could mark the critical section here...
             try:
                 res = syncer.sync(autocreate=autocreate,
@@ -542,14 +536,21 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
-    def _init_sync_db(self):
+    def _init_sync_db(self, sqlcipher_file):
         """
         Initialize the Symmetrically-Encrypted document to be synced database,
         and the queue to communicate with subprocess workers.
-        """
-        self._sync_db = sqlite3.connect(self._sync_db_path,
-                                        check_same_thread=False)
 
+        :param sqlcipher_file: The path for the SQLCipher file.
+        :type sqlcipher_file: str
+        """
+        sync_db_path = None
+        if sqlcipher_file != ":memory:":
+            sync_db_path = "%s-sync" % sqlcipher_file
+        else:
+            sync_db_path = ":memory:"
+        self._sync_db = sqlite3.connect(sync_db_path,
+                                        check_same_thread=False)
         self._sync_db_write_lock = threading.Lock()
         self._create_sync_db_tables()
         self.sync_queue = multiprocessing.Queue()
