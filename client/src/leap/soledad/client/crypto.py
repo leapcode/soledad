@@ -690,7 +690,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :type last_known_generation: int
         """
         self._insert_doc_cb = kwargs.pop("insert_doc_cb")
-        self._last_known_generation = kwargs.pop("last_known_generation")
         SyncEncryptDecryptPool.__init__(self, *args, **kwargs)
         self.source_replica_uid = None
 
@@ -858,8 +857,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :type result: tuple(str, str, str)
         """
         doc_id, rev, content, gen, trans_id = result
-        logger.debug("Sync decrypter pool: decrypted doc %s: %s %s"
-                     % (doc_id, rev, gen))
+        logger.debug("Sync decrypter pool: decrypted doc %s: %s %s %s"
+                     % (doc_id, rev, gen, trans_id))
         self.insert_received_doc(doc_id, rev, content, gen, trans_id)
 
     def get_docs_by_generation(self, encrypted=None):
@@ -878,7 +877,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
               % self.TABLE_NAME
         if encrypted is not None:
             sql += " WHERE encrypted = %d" % int(encrypted)
-        sql += " ORDER BY gen"
+        sql += " ORDER BY gen ASC"
         c = self._sync_db.cursor()
         c.execute(sql)
         # TODO: due to unknown reasons, the fetchall() method may return empty
@@ -891,20 +890,24 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         """
         Return a list of documents ready to be inserted.
         """
-        docs = self.get_docs_by_generation(encrypted=False)
+        all_docs = self.get_docs_by_generation()
+        decrypted_docs = self.get_docs_by_generation(encrypted=False)
         insertable = []
-        if docs:
-            last_gen = self._last_known_generation
-            for doc_id, rev, content, gen, trans_id, _ in docs:
-                if gen != (last_gen + 1):
-                    break
+        for doc_id, rev, content, gen, trans_id, encrypted in all_docs:
+            next_decrypted = decrypted_docs.pop(0)
+            if doc_id == next_decrypted[0]:
                 insertable.append((doc_id, rev, content, gen, trans_id))
-                last_gen = gen
+            else:
+                break
         return insertable
 
-    def count_docs_in_sync_db(self):
+    def count_docs_in_sync_db(self, encrypted=None):
         """
         Count how many documents we have in the table for received docs.
+
+        :param encrypted: If not None, return count of documents with
+                          encrypted field equal to given parameter.
+        :type encrypted: bool
 
         :return: The count of documents.
         :rtype: int
@@ -914,6 +917,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             return
         c = self._sync_db.cursor()
         sql = "SELECT COUNT(*) FROM %s" % (self.TABLE_NAME,)
+        if encrypted is not None:
+            sql += " WHERE encrypted = %d" % int(encrypted)
         c.execute(sql)
         res = c.fetchone()
         if res is not None:
@@ -982,7 +987,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             doc = SoledadDocument(doc_id, doc_rev, content)
             gen = int(gen)
             insert_fun(doc, gen, trans_id)
-            self._last_known_generation = gen
         except Exception as exc:
             logger.error("Sync decrypter pool: error while inserting "
                          "decrypted doc into local db.")

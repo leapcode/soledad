@@ -816,8 +816,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_decr_pool = SyncDecrypterPool(
                 self._crypto, self._sync_db,
                 self._sync_db_write_lock,
-                insert_doc_cb=self._insert_doc_cb,
-                last_known_generation=last_known_generation)
+                insert_doc_cb=self._insert_doc_cb)
             self._sync_decr_pool.set_source_replica_uid(
                 self.source_replica_uid)
 
@@ -1251,15 +1250,26 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             sent += 1
 
         # make sure all threads finished and we have up-to-date info
+        last_successful_thread = None
         while threads:
             # check if there are failures
             t, doc = threads.pop(0)
             t.join()
             if t.success:
                 synced.append((doc.doc_id, doc.rev))
+                last_successful_thread = t
 
-        if defer_decryption:
-            self._sync_watcher.start()
+        # delete documents from the sync database
+        if defer_encryption:
+            self.delete_encrypted_docs_from_db(synced)
+
+        # get target gen and trans_id after docs
+        gen_after_send = None
+        trans_id_after_send = None
+        if last_successful_thread is not None:
+            response_dict = json.loads(last_successful_thread.response[0])[0]
+            gen_after_send = response_dict['new_generation']
+            trans_id_after_send  = response_dict['new_transaction_id']
 
         # get docs from target
         if self.stopped is False:
@@ -1268,19 +1278,23 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                 last_known_generation, last_known_trans_id, headers,
                 return_doc_cb, ensure_callback, sync_id, syncer_pool,
                 defer_decryption=defer_decryption)
+
         syncer_pool.cleanup()
 
-        # delete documents from the sync database
-        if defer_encryption:
-            self.delete_encrypted_docs_from_db(synced)
-
-        # wait for deferred decryption to finish
+        # decrypt docs in case of deferred decryption
         if defer_decryption:
+            self._sync_watcher.start()
             while self.clear_to_sync() is False:
                 sleep(self.DECRYPT_TASK_PERIOD)
             self._teardown_sync_watcher()
             self._teardown_sync_decr_pool()
             self._sync_exchange_lock.release()
+
+        # update gen and trans id info in case we just sent and did not
+        # receive docs.
+        if gen_after_send is not None and gen_after_send > cur_target_gen:
+            cur_target_gen = gen_after_send
+            cur_target_trans_id = trans_id_after_send
 
         self.stop()
         return cur_target_gen, cur_target_trans_id
