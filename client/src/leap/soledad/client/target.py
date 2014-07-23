@@ -376,6 +376,12 @@ class DocumentSyncerPool(object):
             t.request_lock.release()
             t.callback_lock.acquire(False)  # just in case
             t.callback_lock.release()
+        # release any blocking semaphores
+        for i in xrange(DocumentSyncerPool.POOL_SIZE):
+            try:
+                self._semaphore_pool.release()
+            except ValueError:
+                break
         logger.warning("Soledad sync: cancelled sync threads.")
 
     def cleanup(self):
