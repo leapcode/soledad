@@ -224,7 +224,7 @@ class SoledadCrypto(object):
 
         The password is derived using HMAC having sha256 as underlying hash
         function. The key used for HMAC are the first
-        C{soledad.REMOTE_STORAGE_SECRET_KENGTH} bytes of Soledad's storage
+        C{soledad.REMOTE_STORAGE_SECRET_LENGTH} bytes of Soledad's storage
         secret stripped from the first MAC_KEY_LENGTH characters. The HMAC
         message is C{doc_id}.
 
@@ -623,9 +623,8 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
 
         con = self._sync_db
         with self._sync_db_write_lock:
-            with con:
-                con.execute(sql_del, (doc_id, ))
-                con.execute(sql_ins, (doc_id, doc_rev, content))
+            con.execute(sql_del, (doc_id, ))
+            con.execute(sql_ins, (doc_id, doc_rev, content))
 
 
 def decrypt_doc_task(doc_id, doc_rev, content, gen, trans_id, key, secret):
@@ -726,11 +725,10 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
         con = self._sync_db
         with self._sync_db_write_lock:
-            with con:
-                con.execute(sql_del, (doc_id, ))
-                con.execute(
-                    sql_ins,
-                    (doc_id, doc_rev, docstr, gen, trans_id, 1))
+            con.execute(sql_del, (doc_id, ))
+            con.execute(
+                sql_ins,
+                (doc_id, doc_rev, docstr, gen, trans_id, 1))
 
     def insert_received_doc(self, doc_id, doc_rev, content, gen, trans_id):
         """
@@ -757,11 +755,10 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             self.TABLE_NAME,)
         con = self._sync_db
         with self._sync_db_write_lock:
-            with con:
-                con.execute(sql_del, (doc_id,))
-                con.execute(
-                    sql_ins,
-                    (doc_id, doc_rev, content, gen, trans_id, 0))
+            con.execute(sql_del, (doc_id,))
+            con.execute(
+                sql_ins,
+                (doc_id, doc_rev, content, gen, trans_id, 0))
 
     def delete_received_doc(self, doc_id, doc_rev):
         """
@@ -776,8 +773,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             self.TABLE_NAME,)
         con = self._sync_db
         with self._sync_db_write_lock:
-            with con:
-                con.execute(sql_del, (doc_id, doc_rev))
+            con.execute(sql_del, (doc_id, doc_rev))
 
     def decrypt_doc(self, doc_id, rev, content, gen, trans_id,
                     source_replica_uid, workers=True):
@@ -878,12 +874,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         if encrypted is not None:
             sql += " WHERE encrypted = %d" % int(encrypted)
         sql += " ORDER BY gen ASC"
-        c = self._sync_db.cursor()
-        c.execute(sql)
-        # TODO: due to unknown reasons, the fetchall() method may return empty
-        # values, so we filter them out here. We have to perform some tests to
-        # understand why and when this happens.
-        docs = filter(lambda entry: len(entry) > 0, c.fetchall())
+        docs = self._sync_db.select(sql)
         return docs
 
     def get_insertable_docs_by_gen(self):
@@ -894,7 +885,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         decrypted_docs = self.get_docs_by_generation(encrypted=False)
         insertable = []
         for doc_id, rev, content, gen, trans_id, encrypted in all_docs:
-            next_decrypted = decrypted_docs.pop(0)
+            next_decrypted = decrypted_docs.next()
             if doc_id == next_decrypted[0]:
                 insertable.append((doc_id, rev, content, gen, trans_id))
             else:
@@ -915,14 +906,13 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         if self._sync_db is None:
             logger.warning("cannot return count with null sync_db")
             return
-        c = self._sync_db.cursor()
         sql = "SELECT COUNT(*) FROM %s" % (self.TABLE_NAME,)
         if encrypted is not None:
             sql += " WHERE encrypted = %d" % int(encrypted)
-        c.execute(sql)
-        res = c.fetchone()
+        res = self._sync_db.select(sql)
         if res is not None:
-            return res[0]
+            val = res.next()
+            return val[0]
         else:
             return 0
 
@@ -932,8 +922,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         decrypt worker to decrypt each one of them.
         """
         docs_by_generation = self.get_docs_by_generation(encrypted=True)
-        logger.debug("Sync decrypter pool: There are %d documents to " \
-                     "decrypt." % len(docs_by_generation))
         for doc_id, rev, content, gen, trans_id, _ \
                 in filter(None, docs_by_generation):
             self.decrypt_doc(

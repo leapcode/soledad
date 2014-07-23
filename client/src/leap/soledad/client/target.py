@@ -1346,13 +1346,16 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :type doc_rev: str
         """
         encr = SyncEncrypterPool
-        c = self._sync_db.cursor()
         sql = ("SELECT content FROM %s WHERE doc_id=? and rev=?" % (
             encr.TABLE_NAME,))
-        c.execute(sql, (doc_id, doc_rev))
-        res = c.fetchall()
-        if len(res) != 0:
-            return res[0][0]
+        res = self._sync_db.select(sql, (doc_id, doc_rev))
+        try:
+            val = res.next()
+            return val[0]
+        except StopIteration:
+            # no doc found
+            return None
+
 
     def delete_encrypted_docs_from_db(self, docs_ids):
         """
@@ -1365,12 +1368,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         if docs_ids:
             encr = SyncEncrypterPool
-            c = self._sync_db.cursor()
             for doc_id, doc_rev in docs_ids:
                 sql = ("DELETE FROM %s WHERE doc_id=? and rev=?" % (
                     encr.TABLE_NAME,))
-                c.execute(sql, (doc_id, doc_rev))
-            self._sync_db.commit()
+                self._sync_db.execute(sql, (doc_id, doc_rev))
 
     def _save_encrypted_received_doc(self, doc, gen, trans_id, idx, total):
         """

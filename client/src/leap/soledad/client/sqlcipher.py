@@ -44,7 +44,6 @@ handled by Soledad should be created by SQLCipher >= 2.0.
 import logging
 import multiprocessing
 import os
-import sqlite3
 import string
 import threading
 import time
@@ -63,6 +62,7 @@ from leap.soledad.client.crypto import SyncEncrypterPool, SyncDecrypterPool
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
+from leap.soledad.client.mp_safe_db import MPSafeSQLiteDB
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -549,8 +549,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             sync_db_path = "%s-sync" % sqlcipher_file
         else:
             sync_db_path = ":memory:"
-        self._sync_db = sqlite3.connect(sync_db_path,
-                                        check_same_thread=False)
+        self._sync_db = MPSafeSQLiteDB(sync_db_path)
         self._sync_db_write_lock = threading.Lock()
         self._create_sync_db_tables()
         self.sync_queue = multiprocessing.Queue()
@@ -567,9 +566,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             decr.TABLE_NAME, decr.FIELD_NAMES))
 
         with self._sync_db_write_lock:
-            with self._sync_db:
-                self._sync_db.execute(sql_encr)
-                self._sync_db.execute(sql_decr)
+            self._sync_db.execute(sql_encr)
+            self._sync_db.execute(sql_decr)
 
     #
     # Symmetric encryption of syncing docs
@@ -1076,16 +1074,28 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         Close db_handle and close syncer.
         """
         logger.debug("Sqlcipher backend: closing")
+        # stop the sync watcher for deferred encryption
         if self._sync_watcher is not None:
             self._sync_watcher.stop()
             self._sync_watcher.shutdown()
+        # close all open syncers
         for url in self._syncers:
             _, syncer = self._syncers[url]
             syncer.close()
+        # stop the encryption pool
         if self._sync_enc_pool is not None:
             self._sync_enc_pool.close()
+        # close the actual database
         if self._db_handle is not None:
             self._db_handle.close()
+        # close the sync database
+        if self._sync_db is not None:
+            self._sync_db.close()
+        # close the sync queue
+        if self.sync_queue is not None:
+            self.sync_queue.close()
+            del self.sync_queue
+            self.sync_queue = None
 
     @property
     def replica_uid(self):
