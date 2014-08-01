@@ -242,7 +242,7 @@ class SoledadCrypto(object):
         return hmac.new(
             self.secret[
                 MAC_KEY_LENGTH:
-                self._soledad.REMOTE_STORAGE_SECRET_LENGTH],
+                self._soledad.secrets.REMOTE_STORAGE_SECRET_LENGTH],
             doc_id,
             hashlib.sha256).digest()
 
@@ -819,7 +819,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         try:
             content = json.loads(content)
         except TypeError:
-            logger.warning("Wrong type while decoding json: %s" % repr(docstr))
+            logger.warning("Wrong type while decoding json: %s"
+                           % repr(content))
             return
 
         key = self._crypto.doc_passphrase(doc_id)
@@ -884,11 +885,15 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         all_docs = self.get_docs_by_generation()
         decrypted_docs = self.get_docs_by_generation(encrypted=False)
         insertable = []
-        for doc_id, rev, content, gen, trans_id, encrypted in all_docs:
-            next_decrypted = decrypted_docs.next()
-            if doc_id == next_decrypted[0]:
-                insertable.append((doc_id, rev, content, gen, trans_id))
-            else:
+        for doc_id, rev, _, gen, trans_id, encrypted in all_docs:
+            try:
+                next_decrypted = decrypted_docs.next()
+                if doc_id == next_decrypted[0]:
+                    content = next_decrypted[2]
+                    insertable.append((doc_id, rev, content, gen, trans_id))
+                else:
+                    break
+            except StopIteration:
                 break
         return insertable
 
@@ -966,7 +971,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         """
         # could pass source_replica in params for callback chain
         insert_fun = self._insert_doc_cb[self.source_replica_uid]
-        logger.debug("Sync decrypter pool: inserting doc in local db: " \
+        logger.debug("Sync decrypter pool: inserting doc in local db: "
                      "%s:%s %s" % (doc_id, doc_rev, gen))
         try:
             # convert deleted documents to avoid error on document creation
