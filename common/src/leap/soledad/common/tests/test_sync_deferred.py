@@ -37,9 +37,6 @@ DEFER_DECRYPTION = True
 WAIT_STEP = 1
 MAX_WAIT = 10
 
-from leap.soledad.common.tests import test_sqlcipher as ts
-from leap.soledad.server import SoledadApp
-
 
 from leap.soledad.client.sqlcipher import open as open_sqlcipher
 from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
@@ -89,11 +86,8 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
         self._soledad.close()
 
         # XXX should not access "private" attrs
-        for f in [self._soledad._local_db_path,
-                  self._soledad._secrets_path,
-                  self.db1._sync_db_path]:
-            if os.path.isfile(f):
-                os.unlink(f)
+        import shutil
+        shutil.rmtree(os.path.dirname(self._soledad._local_db_path))
 
 
 #SQLCIPHER_SCENARIOS = [

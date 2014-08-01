@@ -302,6 +302,7 @@ class EncryptedSyncTestCase(
             put_doc = mock.Mock(side_effect=_put_doc_side_effect)
             lock = mock.Mock(return_value=('atoken', 300))
             unlock = mock.Mock()
+            close = mock.Mock()
 
             def __call__(self):
                 return self
@@ -373,9 +374,9 @@ class EncryptedSyncTestCase(
         sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
         _, doclist = sol2.get_all_docs()
         self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
+        sol2.secrets_path = sol1.secrets_path
+        sol2.secrets._load_secrets()
+        sol2.set_secret_id(sol1.secret_id)
         # sync the new instance
         sol2._server_url = self.getURL()
         sol2.sync()
@@ -435,9 +436,9 @@ class EncryptedSyncTestCase(
         )
         _, doclist = sol2.get_all_docs()
         self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
+        sol2.secrets_path = sol1.secrets_path
+        sol2.secrets._load_secrets()
+        sol2.set_secret_id(sol1.secret_id)
         # sync the new instance
         sol2._server_url = self.getURL()
         sol2.sync()
@@ -479,9 +480,9 @@ class EncryptedSyncTestCase(
         sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
         _, doclist = sol2.get_all_docs()
         self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
+        sol2.secrets_path = sol1.secrets_path
+        sol2.secrets._load_secrets()
+        sol2.set_secret_id(sol1.secret_id)
         # sync the new instance
         sol2._server_url = self.getURL()
         sol2.sync()
@@ -524,9 +525,9 @@ class EncryptedSyncTestCase(
         sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
         _, doclist = sol2.get_all_docs()
         self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
+        sol2.secrets_path = sol1.secrets_path
+        sol2.secrets._load_secrets()
+        sol2.set_secret_id(sol1.secret_id)
         # sync the new instance
         sol2._server_url = self.getURL()
         sol2.sync()
