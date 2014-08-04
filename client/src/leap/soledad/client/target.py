@@ -1149,8 +1149,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         setProxiedObject(self._insert_doc_cb[source_replica_uid],
                          return_doc_cb)
 
+        # empty the database before starting a new sync
         if defer_decryption is True and not self.clear_to_sync():
-            raise PendingReceivedDocsSyncError
+            self._sync_decr_pool.empty()
 
         self._ensure_connection()
         if self._trace_hook:  # for tests

@@ -986,3 +986,10 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         else:
             # If no errors found, remove it from the received database.
             self.delete_received_doc(doc_id, doc_rev)
+
+    def empty(self):
+        """
+        Empty the received docs table of the sync database.
+        """
+        sql = "DELETE FROM %s WHERE 1" % (self.TABLE_NAME,)
+        res = self._sync_db.execute(sql)
