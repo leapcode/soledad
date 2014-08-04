@@ -59,13 +59,18 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
     def test_export_recovery_document_raw(self):
         rd = self._soledad.secrets._export_recovery_document()
         secret_id = rd[self._soledad.secrets.STORAGE_SECRETS_KEY].items()[0][0]
-        secret = rd[self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id]
+        # assert exported secret is the same
+        secret = self._soledad.secrets._decrypt_storage_secret(
+            rd[self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id])
         self.assertEqual(secret_id, self._soledad.secrets._secret_id)
         self.assertEqual(secret, self._soledad.secrets._secrets[secret_id])
-        self.assertTrue(self._soledad.secrets.CIPHER_KEY in secret)
-        self.assertTrue(secret[self._soledad.secrets.CIPHER_KEY] == 'aes256')
-        self.assertTrue(self._soledad.secrets.LENGTH_KEY in secret)
-        self.assertTrue(self._soledad.secrets.SECRET_KEY in secret)
+        # assert recovery document structure
+        encrypted_secret = rd[self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id]
+        self.assertTrue(self._soledad.secrets.CIPHER_KEY in encrypted_secret)
+        self.assertTrue(
+            encrypted_secret[self._soledad.secrets.CIPHER_KEY] == 'aes256')
+        self.assertTrue(self._soledad.secrets.LENGTH_KEY in encrypted_secret)
+        self.assertTrue(self._soledad.secrets.SECRET_KEY in encrypted_secret)
 
     def test_import_recovery_document(self):
         rd = self._soledad.secrets._export_recovery_document()
@@ -103,8 +108,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         # assert format of secret 1
         self.assertTrue(sol.storage_secret is not None)
         self.assertIsInstance(sol.storage_secret, str)
-        secret_length = sol.secrets.LOCAL_STORAGE_SECRET_LENGTH \
-            + sol.secrets.REMOTE_STORAGE_SECRET_LENGTH
+        secret_length = sol.secrets.GEN_SECRET_LENGTH
         self.assertTrue(len(sol.storage_secret) == secret_length)
         # assert format of secret 2
         sol.set_secret_id(secret_id_2)
@@ -129,7 +133,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
             sol.secrets._has_secret(),
             "Should have a secret at this point")
         # but not being able to decrypt correctly should
-        sol.secrets._secrets[sol.secret_id][sol.secrets.SECRET_KEY] = None
+        sol.secrets._secrets[sol.secret_id] = None
         self.assertFalse(sol.secrets._has_secret())
         sol.close()
 

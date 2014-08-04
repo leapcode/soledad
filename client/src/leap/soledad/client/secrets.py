@@ -123,6 +123,14 @@ class SoledadSecrets(object):
     encryption.
     """
 
+    GEN_SECRET_LENGTH = LOCAL_STORAGE_SECRET_LENGTH \
+        + REMOTE_STORAGE_SECRET_LENGTH \
+        + SALT_LENGTH  # for sync db
+    """
+    The length of the secret to be generated. This includes local and remote
+    secrets, and the salt for deriving the sync db secret.
+    """
+
     MINIMUM_PASSPHRASE_LENGTH = 6
     """
     The minimum length for a passphrase. The passphrase length is only checked
@@ -268,12 +276,21 @@ class SoledadSecrets(object):
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
         _, mac = self._import_recovery_document(content)
-        if mac is False:
-            self._store_secrets()
-            self._put_secrets_in_shared_db()
         # choose first secret if no secret_id was given
         if self._secret_id is None:
             self.set_secret_id(self._secrets.items()[0][0])
+        # enlarge secret if needed
+        enlarged = False
+        if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
+            gen_len = self.GEN_SECRET_LENGTH \
+                - len(self._secrets[self._secret_id])
+            new_piece = os.urandom(gen_len)
+            self._secrets[self._secret_id] += new_piece
+            enlarged = True
+        # store and save in shared db if needed
+        if mac is False or enlarged is True:
+            self._store_secrets()
+            self._put_secrets_in_shared_db()
 
     def _get_or_gen_crypto_secrets(self):
         """
@@ -596,9 +613,7 @@ class SoledadSecrets(object):
         """
         signal(SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
-        secret = os.urandom(
-            self.LOCAL_STORAGE_SECRET_LENGTH
-            + self.REMOTE_STORAGE_SECRET_LENGTH)
+        secret = os.urandom(self.GEN_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         self._secrets[secret_id] = secret
         self._store_secrets()
@@ -667,24 +682,29 @@ class SoledadSecrets(object):
     def _passphrase_as_string(self):
         return self._passphrase.encode('utf-8')
 
-    def get_syncdb_secret(self):
-        """
-        Return the secret for sync db.
-        """
-        # TODO: implement.
-        pass
+    #
+    # remote storage secret
+    #
 
-    def _get_remote_storage_secret(self):
+    @property
+    def remote_storage_secret(self):
         """
         Return the secret for remote storage.
         """
-        # TODO: implement
-        pass
+        key_start = 0
+        key_end =  self.REMOTE_STORAGE_SECRET_LENGTH
+        return self.storage_secret[key_start:key_end]
 
+    #
+    # local storage key
+    #
 
     def _get_local_storage_secret(self):
         """
         Return the local storage secret.
+
+        :return: The local storage secret.
+        :rtype: str
         """
         pwd_start = self.REMOTE_STORAGE_SECRET_LENGTH + self.SALT_LENGTH
         pwd_end = self.REMOTE_STORAGE_SECRET_LENGTH + self.LOCAL_STORAGE_SECRET_LENGTH
@@ -693,6 +713,9 @@ class SoledadSecrets(object):
     def _get_local_storage_salt(self):
         """
         Return the local storage salt.
+
+        :return: The local storage salt.
+        :rtype: str
         """
         salt_start = self.REMOTE_STORAGE_SECRET_LENGTH
         salt_end = salt_start + self.SALT_LENGTH
@@ -701,9 +724,38 @@ class SoledadSecrets(object):
     def get_local_storage_key(self):
         """
         Return the local storage key derived from the local storage secret.
+
+        :return: The key for protecting the local database.
+        :rtype: str
         """
         return scrypt.hash(
             self._get_local_storage_secret(),  # the password
             self._get_local_storage_salt(),    # the salt
+            buflen=32,  # we need a key with 256 bits (32 bytes)
+        )
+
+   #
+   # sync db key
+   #
+
+    def _get_sync_db_salt(self):
+        """
+        Return the salt for sync db.
+        """
+        salt_start = self.LOCAL_STORAGE_SECRET_LENGTH \
+            + self.REMOTE_STORAGE_SECRET_LENGTH
+        salt_end = salt_start + self.SALT_LENGTH
+        return self.storage_secret[salt_start:salt_end]
+
+    def get_sync_db_key(self):
+        """
+        Return the key for protecting the sync database.
+
+        :return: The key for protecting the sync database.
+        :rtype: str
+        """
+        return scrypt.hash(
+            self._get_local_storage_secret(),  # the password
+            self._get_sync_db_salt(),    # the salt
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )

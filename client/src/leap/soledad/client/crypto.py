@@ -240,9 +240,7 @@ class SoledadCrypto(object):
         if self.secret is None:
             raise NoSymmetricSecret()
         return hmac.new(
-            self.secret[
-                MAC_KEY_LENGTH:
-                self._soledad.secrets.REMOTE_STORAGE_SECRET_LENGTH],
+            self.secret[MAC_KEY_LENGTH:],
             doc_id,
             hashlib.sha256).digest()
 
@@ -251,7 +249,7 @@ class SoledadCrypto(object):
     #
 
     def _get_secret(self):
-        return self._soledad.storage_secret
+        return self._soledad.secrets.remote_storage_secret
 
     secret = property(
         _get_secret, doc='The secret used for symmetric encryption')
