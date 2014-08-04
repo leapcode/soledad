@@ -92,7 +92,16 @@ SQLITE_ISOLATION_LEVEL = None
 def open(path, password, create=True, document_factory=None, crypto=None,
          raw_key=False, cipher='aes-256-cbc', kdf_iter=4000,
          cipher_page_size=1024, defer_encryption=False):
-    """Open a database at the given location.
+    """
+    Open a database at the given location.
+
+    *** IMPORTANT ***
+
+    Don't forget to close the database after use by calling the close()
+    method otherwise some resources might not be freed and you may experience
+    several kinds of leakages.
+
+    *** IMPORTANT ***
 
     Will raise u1db.errors.DatabaseDoesNotExist if create=False and the
     database does not already exist.
@@ -194,6 +203,14 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Connect to an existing SQLCipher database, creating a new sqlcipher
         database file if needed.
+
+        *** IMPORTANT ***
+
+        Don't forget to close the database after use by calling the close()
+        method otherwise some resources might not be freed and you may
+        experience several kinds of leakages.
+
+        *** IMPORTANT ***
 
         :param sqlcipher_file: The path for the SQLCipher file.
         :type sqlcipher_file: str
@@ -355,6 +372,14 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                       cipher_page_size=1024, defer_encryption=False):
         """
         Open a SQLCipher database.
+
+        *** IMPORTANT ***
+
+        Don't forget to close the database after use by calling the close()
+        method otherwise some resources might not be freed and you may
+        experience several kinds of leakages.
+
+        *** IMPORTANT ***
 
         :param sqlcipher_file: The path for the SQLCipher file.
         :type sqlcipher_file: str
@@ -1096,6 +1121,16 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self.sync_queue.close()
             del self.sync_queue
             self.sync_queue = None
+
+    def __del__(self):
+        """
+        Free resources when deleting or garbage collecting the database.
+
+        This is only here to minimze problems if someone ever forgets to call
+        the close() method after using the database; you should not rely on
+        garbage collecting to free up the database resources.
+        """
+        self.close()
 
     @property
     def replica_uid(self):
