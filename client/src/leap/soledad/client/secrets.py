@@ -252,13 +252,9 @@ class SoledadSecrets(object):
             try:
                 self._load_secrets()  # try to load from disk
             except IOError as e:
-                logger.warning('IOError: %s' % str(e))
-        try:
-            self.storage_secret
-            return True
-        except Exception as e:
-            logger.warning("Couldn't load storage secret: %s" % str(e))
-            return False
+                logger.warning('IOError while loading secrets from disk: %s' % str(e))
+                return False
+        return self.storage_secret is not None
 
     def _load_secrets(self):
         """
@@ -371,15 +367,21 @@ class SoledadSecrets(object):
         # create salt and key for calculating MAC
         salt = os.urandom(self.SALT_LENGTH)
         key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
+        # encrypt secrets
+        encrypted_secrets = {}
+        for secret_id in self._secrets:
+            encrypted_secrets[secret_id] = self._encrypt_storage_secret(
+                self._secrets[secret_id])
+        # create the recovery document
         data = {
-            self.STORAGE_SECRETS_KEY: self._secrets,
+            self.STORAGE_SECRETS_KEY: encrypted_secrets,
             self.KDF_KEY: self.KDF_SCRYPT,
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
             MAC_METHOD_KEY: MacMethods.HMAC,
             MAC_KEY: hmac.new(
                 key,
-                json.dumps(self._secrets),
+                json.dumps(encrypted_secrets),
                 sha256).hexdigest(),
         }
         return data
@@ -425,10 +427,11 @@ class SoledadSecrets(object):
                                'contents.')
         # include secrets in the secret pool.
         secrets = 0
-        for secret_id, secret_data in data[self.STORAGE_SECRETS_KEY].items():
+        for secret_id, encrypted_secret in data[self.STORAGE_SECRETS_KEY].items():
             if secret_id not in self._secrets:
                 secrets += 1
-                self._secrets[secret_id] = secret_data
+                self._secrets[secret_id] = \
+                    self._decrypt_storage_secret(encrypted_secret)
         return secrets, mac
 
     def _get_secrets_from_shared_db(self):
@@ -480,30 +483,92 @@ class SoledadSecrets(object):
     # Management of secret for symmetric encryption.
     #
 
+    def _decrypt_storage_secret(self, encrypted_secret_dict):
+        """
+        Decrypt the storage secret.
+
+        Storage secret is encrypted before being stored. This method decrypts
+        and returns the decrypted storage secret.
+
+        :param encrypted_secret_dict: The encrypted storage secret.
+        :type encrypted_secret_dict:  dict
+
+        :return: The decrypted storage secret.
+        :rtype: str
+        """
+        # calculate the encryption key
+        if encrypted_secret_dict[self.KDF_KEY] != self.KDF_SCRYPT:
+            raise Exception("Unknown KDF in stored secret.")
+        key = scrypt.hash(
+            self._passphrase_as_string(),
+            # the salt is stored base64 encoded
+            binascii.a2b_base64(
+                encrypted_secret_dict[self.KDF_SALT_KEY]),
+            buflen=32,  # we need a key with 256 bits (32 bytes).
+        )
+        if encrypted_secret_dict[self.KDF_LENGTH_KEY] != len(key):
+            raise Exception("Wrong length of decryption key.")
+        if encrypted_secret_dict[self.CIPHER_KEY] != self.CIPHER_AES256:
+            raise Exception("Unknown cipher in stored secret.")
+        # recover the initial value and ciphertext
+        iv, ciphertext = encrypted_secret_dict[self.SECRET_KEY].split(
+            self.IV_SEPARATOR, 1)
+        ciphertext = binascii.a2b_base64(ciphertext)
+        decrypted_secret = self._crypto.decrypt_sym(ciphertext, key, iv=iv)
+        if encrypted_secret_dict[self.LENGTH_KEY] != len(decrypted_secret):
+            raise Exception("Wrong length of decrypted secret.")
+        return decrypted_secret
+
+    def _encrypt_storage_secret(self, decrypted_secret):
+        """
+        Encrypt the storage secret.
+
+        An encrypted secret has the following structure:
+
+            {
+                '<secret_id>': {
+                        'kdf': 'scrypt',
+                        'kdf_salt': '<b64 repr of salt>'
+                        'kdf_length': <key length>
+                        'cipher': 'aes256',
+                        'length': <secret length>,
+                        'secret': '<encrypted b64 repr of storage_secret>',
+                }
+            }
+
+        :param decrypted_secret: The decrypted storage secret.
+        :type decrypted_secret: str
+
+        :return: The encrypted storage secret.
+        :rtype: dict
+        """
+        # generate random salt
+        salt = os.urandom(self.SALT_LENGTH)
+        # get a 256-bit key
+        key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
+        iv, ciphertext = self._crypto.encrypt_sym(decrypted_secret, key)
+        encrypted_secret_dict = {
+            # leap.soledad.crypto submodule uses AES256 for symmetric
+            # encryption.
+            self.KDF_KEY: self.KDF_SCRYPT,
+            self.KDF_SALT_KEY: binascii.b2a_base64(salt),
+            self.KDF_LENGTH_KEY: len(key),
+            self.CIPHER_KEY: self.CIPHER_AES256,
+            self.LENGTH_KEY: len(decrypted_secret),
+            self.SECRET_KEY: '%s%s%s' % (
+                str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
+        }
+        return encrypted_secret_dict
+
     @property
     def storage_secret(self):
         """
         Return the storage secret.
 
-        Storage secret is encrypted before being stored. This method decrypts
-        and returns the stored secret.
-
-        :return: The storage secret.
+        :return: The decrypted storage secret.
         :rtype: str
         """
-        # calculate the encryption key
-        key = scrypt.hash(
-            self._passphrase_as_string(),
-            # the salt is stored base64 encoded
-            binascii.a2b_base64(
-                self._secrets[self._secret_id][self.KDF_SALT_KEY]),
-            buflen=32,  # we need a key with 256 bits (32 bytes).
-        )
-        # recover the initial value and ciphertext
-        iv, ciphertext = self._secrets[self._secret_id][self.SECRET_KEY].split(
-            self.IV_SEPARATOR, 1)
-        ciphertext = binascii.a2b_base64(ciphertext)
-        return self._crypto.decrypt_sym(ciphertext, key, iv=iv)
+        return self._secrets.get(self._secret_id)
 
     def set_secret_id(self, secret_id):
         """
@@ -526,19 +591,6 @@ class SoledadSecrets(object):
             * SOLEDAD_CREATING_KEYS
             * SOLEDAD_DONE_CREATING_KEYS
 
-        A secret has the following structure:
-
-            {
-                '<secret_id>': {
-                        'kdf': 'scrypt',
-                        'kdf_salt': '<b64 repr of salt>'
-                        'kdf_length': <key length>
-                        'cipher': 'aes256',
-                        'length': <secret length>,
-                        'secret': '<encrypted b64 repr of storage_secret>',
-                }
-            }
-
         :return: The id of the generated secret.
         :rtype: str
         """
@@ -548,22 +600,7 @@ class SoledadSecrets(object):
             self.LOCAL_STORAGE_SECRET_LENGTH
             + self.REMOTE_STORAGE_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
-        # generate random salt
-        salt = os.urandom(self.SALT_LENGTH)
-        # get a 256-bit key
-        key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
-        iv, ciphertext = self._crypto.encrypt_sym(secret, key)
-        self._secrets[secret_id] = {
-            # leap.soledad.crypto submodule uses AES256 for symmetric
-            # encryption.
-            self.KDF_KEY: self.KDF_SCRYPT,
-            self.KDF_SALT_KEY: binascii.b2a_base64(salt),
-            self.KDF_LENGTH_KEY: len(key),
-            self.CIPHER_KEY: self.CIPHER_AES256,
-            self.LENGTH_KEY: len(secret),
-            self.SECRET_KEY: '%s%s%s' % (
-                str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
-        }
+        self._secrets[secret_id] = secret
         self._store_secrets()
         signal(SOLEDAD_DONE_CREATING_KEYS, self._uuid)
         return secret_id
@@ -596,24 +633,6 @@ class SoledadSecrets(object):
         # ensure there's a secret for which the passphrase will be changed.
         if not self._has_secret():
             raise NoStorageSecret()
-        secret = self.storage_secret
-        # generate random salt
-        new_salt = os.urandom(self.SALT_LENGTH)
-        # get a 256-bit key
-        key = scrypt.hash(new_passphrase.encode('utf-8'), new_salt, buflen=32)
-        iv, ciphertext = self._crypto.encrypt_sym(secret, key)
-        # XXX update all secrets in the dict
-        self._secrets[self._secret_id] = {
-            # leap.soledad.crypto submodule uses AES256 for symmetric
-            # encryption.
-            self.KDF_KEY: self.KDF_SCRYPT,  # TODO: remove hard coded kdf
-            self.KDF_SALT_KEY: binascii.b2a_base64(new_salt),
-            self.KDF_LENGTH_KEY: len(key),
-            self.CIPHER_KEY: self.CIPHER_AES256,
-            self.LENGTH_KEY: len(secret),
-            self.SECRET_KEY: '%s%s%s' % (
-                str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
-        }
         self._passphrase = new_passphrase
         self._store_secrets()
         self._put_secrets_in_shared_db()
@@ -655,27 +674,36 @@ class SoledadSecrets(object):
         # TODO: implement.
         pass
 
-    def get_remote_secret(self):
+    def _get_remote_storage_secret(self):
         """
         Return the secret for remote storage.
         """
         # TODO: implement
         pass
 
+
+    def _get_local_storage_secret(self):
+        """
+        Return the local storage secret.
+        """
+        pwd_start = self.REMOTE_STORAGE_SECRET_LENGTH + self.SALT_LENGTH
+        pwd_end = self.REMOTE_STORAGE_SECRET_LENGTH + self.LOCAL_STORAGE_SECRET_LENGTH
+        return self.storage_secret[pwd_start:pwd_end]
+
+    def _get_local_storage_salt(self):
+        """
+        Return the local storage salt.
+        """
+        salt_start = self.REMOTE_STORAGE_SECRET_LENGTH
+        salt_end = salt_start + self.SALT_LENGTH
+        return self.storage_secret[salt_start:salt_end]
+
     def get_local_storage_key(self):
         """
         Return the local storage key derived from the local storage secret.
         """
-        # salt indexes
-        salt_start = self.REMOTE_STORAGE_SECRET_LENGTH
-        salt_end = salt_start + self.SALT_LENGTH
-        # password indexes
-        pwd_start = salt_end
-        pwd_end = salt_start + self.LOCAL_STORAGE_SECRET_LENGTH
-        # calculate the key for local encryption
-        secret = self.storage_secret
         return scrypt.hash(
-            secret[pwd_start:pwd_end],  # the password
-            secret[salt_start:salt_end],  # the salt
+            self._get_local_storage_secret(),  # the password
+            self._get_local_storage_salt(),    # the salt
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
