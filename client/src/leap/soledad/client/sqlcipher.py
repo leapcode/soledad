@@ -91,7 +91,7 @@ SQLITE_ISOLATION_LEVEL = None
 
 def open(path, password, create=True, document_factory=None, crypto=None,
          raw_key=False, cipher='aes-256-cbc', kdf_iter=4000,
-         cipher_page_size=1024, defer_encryption=False):
+         cipher_page_size=1024, defer_encryption=False, sync_db_key=None):
     """
     Open a database at the given location.
 
@@ -136,7 +136,8 @@ def open(path, password, create=True, document_factory=None, crypto=None,
     return SQLCipherDatabase.open_database(
         path, password, create=create, document_factory=document_factory,
         crypto=crypto, raw_key=raw_key, cipher=cipher, kdf_iter=kdf_iter,
-        cipher_page_size=cipher_page_size, defer_encryption=defer_encryption)
+        cipher_page_size=cipher_page_size, defer_encryption=defer_encryption,
+        sync_db_key=sync_db_key)
 
 
 #
@@ -199,7 +200,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
-                 kdf_iter=4000, cipher_page_size=1024):
+                 kdf_iter=4000, cipher_page_size=1024, sync_db_key=None):
         """
         Connect to an existing SQLCipher database, creating a new sqlcipher
         database file if needed.
@@ -264,7 +265,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         self._sync_db = None
         self._sync_db_write_lock = None
         self._sync_enc_pool = None
-        self._init_sync_db(sqlcipher_file)
+        self._init_sync_db(sqlcipher_file, sync_db_key)
 
         if self.defer_encryption:
             # initialize sync db
@@ -293,7 +294,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
                        crypto=None, raw_key=False, cipher='aes-256-cbc',
                        kdf_iter=4000, cipher_page_size=1024,
-                       defer_encryption=False):
+                       defer_encryption=False, sync_db_key=None):
         """
         Open a SQLCipher database.
 
@@ -363,13 +364,14 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         return SQLCipherDatabase._sqlite_registry[v](
             sqlcipher_file, password, document_factory=document_factory,
             crypto=crypto, raw_key=raw_key, cipher=cipher, kdf_iter=kdf_iter,
-            cipher_page_size=cipher_page_size)
+            cipher_page_size=cipher_page_size, sync_db_key=sync_db_key)
 
     @classmethod
     def open_database(cls, sqlcipher_file, password, create, backend_cls=None,
                       document_factory=None, crypto=None, raw_key=False,
                       cipher='aes-256-cbc', kdf_iter=4000,
-                      cipher_page_size=1024, defer_encryption=False):
+                      cipher_page_size=1024, defer_encryption=False,
+                      sync_db_key=None):
         """
         Open a SQLCipher database.
 
@@ -429,7 +431,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 sqlcipher_file, password, document_factory=document_factory,
                 crypto=crypto, raw_key=raw_key, cipher=cipher,
                 kdf_iter=kdf_iter, cipher_page_size=cipher_page_size,
-                defer_encryption=defer_encryption)
+                defer_encryption=defer_encryption, sync_db_key=sync_db_key)
         except u1db_errors.DatabaseDoesNotExist:
             if not create:
                 raise
@@ -440,7 +442,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             return backend_cls(
                 sqlcipher_file, password, document_factory=document_factory,
                 crypto=crypto, raw_key=raw_key, cipher=cipher,
-                kdf_iter=kdf_iter, cipher_page_size=cipher_page_size)
+                kdf_iter=kdf_iter, cipher_page_size=cipher_page_size,
+                sync_db_key=sync_db_key)
 
     def sync(self, url, creds=None, autocreate=True, defer_decryption=True):
         """
@@ -561,7 +564,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
-    def _init_sync_db(self, sqlcipher_file):
+    def _init_sync_db(self, sqlcipher_file, sync_db_password):
         """
         Initialize the Symmetrically-Encrypted document to be synced database,
         and the queue to communicate with subprocess workers.
@@ -575,6 +578,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         else:
             sync_db_path = ":memory:"
         self._sync_db = MPSafeSQLiteDB(sync_db_path)
+        # protect the sync db with a password
+        if sync_db_password is not None:
+            self._set_crypto_pragmas(
+                self._sync_db, sync_db_password, True,
+                'aes-256-cbc', 4000, 1024)
         self._sync_db_write_lock = threading.Lock()
         self._create_sync_db_tables()
         self.sync_queue = multiprocessing.Queue()

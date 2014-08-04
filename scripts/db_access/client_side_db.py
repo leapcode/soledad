@@ -120,7 +120,7 @@ def get_soledad_instance(username, provider, passphrase, basedir):
         server_url=server_url,
         cert_file=cert_file,
         auth_token=token,
-        defer_encryption=True)
+        defer_encryption=False)
 
 
 # main program
@@ -154,3 +154,4 @@ if __name__ == '__main__':
     # get the soledad instance
     s = get_soledad_instance(
         args.username, args.provider, passphrase, basedir)
+    s.sync()

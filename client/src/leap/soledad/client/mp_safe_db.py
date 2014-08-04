@@ -23,7 +23,7 @@ Multiprocessing-safe SQLite database.
 
 from threading import Thread
 from Queue import Queue
-from sqlite3 import connect as sqlite3_connect
+from pysqlcipher import dbapi2
 
 
 # Thanks to http://code.activestate.com/recipes/526618/
@@ -49,7 +49,7 @@ class MPSafeSQLiteDB(Thread):
         """
         Run the multiprocessing-safe database accessor.
         """
-        conn = sqlite3_connect(self._db_path)
+        conn = dbapi2.connect(self._db_path)
         while True:
             req, arg, res = self._requests.get()
             if req == self.CLOSE:
@@ -99,3 +99,14 @@ class MPSafeSQLiteDB(Thread):
         """
         self.execute(self.CLOSE)
         self.join()
+
+    def cursor(self):
+        """
+        Return a fake cursor object.
+
+        Not really a cursor, but allows for calling db.cursor().execute().
+
+        :return: Self.
+        :rtype: MPSafeSQLiteDatabase
+        """
+        return self

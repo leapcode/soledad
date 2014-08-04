@@ -264,6 +264,7 @@ class Soledad(object):
         uses the 'raw PRAGMA key' format to handle the key to SQLCipher.
         """
         key = self._secrets.get_local_storage_key()
+        sync_db_key = self._secrets.get_sync_db_key()
         self._db = sqlcipher_open(
             self._local_db_path,
             binascii.b2a_hex(key),  # sqlcipher only accepts the hex version
@@ -271,7 +272,8 @@ class Soledad(object):
             document_factory=SoledadDocument,
             crypto=self._crypto,
             raw_key=True,
-            defer_encryption=self._defer_encryption)
+            defer_encryption=self._defer_encryption,
+            sync_db_key=binascii.b2a_hex(sync_db_key))
 
     def close(self):
         """
