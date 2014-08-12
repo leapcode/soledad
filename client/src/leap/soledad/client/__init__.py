@@ -755,7 +755,7 @@ class Soledad(object):
     @property
     def remote_storage_secret(self):
         """
-        Return the secret used for encryption of remotelly stored data.
+        Return the secret used for encryption of remotely stored data.
         """
         return self._secrets.remote_storage_secret
 

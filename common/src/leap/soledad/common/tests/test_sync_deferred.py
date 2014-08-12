@@ -73,7 +73,8 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
         self.db1 = open_sqlcipher(self.db1_file, DBPASS, create=True,
                                   document_factory=SoledadDocument,
                                   crypto=self._soledad._crypto,
-                                  defer_encryption=True)
+                                  defer_encryption=True,
+                                  sync_db_key=DBPASS)
         self.db2 = couch.CouchDatabase.open_database(
             urljoin(
                 'http://localhost:' + str(self.wrapper.port), 'test'),

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# crypto.py
+# mp_safe_db.py
 # Copyright (C) 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify

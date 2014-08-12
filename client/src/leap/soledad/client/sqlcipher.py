@@ -63,6 +63,7 @@ from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client.mp_safe_db import MPSafeSQLiteDB
+from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -262,13 +263,16 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._crypto = crypto
 
         # define sync-db attrs
+        self._sqlcipher_file = sqlcipher_file
+        self._sync_db_key = sync_db_key
         self._sync_db = None
         self._sync_db_write_lock = None
         self._sync_enc_pool = None
-        self._init_sync_db(sqlcipher_file, sync_db_key)
+        self.sync_queue = None
 
         if self.defer_encryption:
             # initialize sync db
+            self._init_sync_db()
             # initialize syncing queue encryption pool
             self._sync_enc_pool = SyncEncrypterPool(
                 self._crypto, self._sync_db, self._sync_db_write_lock)
@@ -471,6 +475,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         res = None
         # the following context manager blocks until the syncing lock can be
         # acquired.
+        if defer_decryption:
+            self._init_sync_db()
         with self.syncer(url, creds=creds) as syncer:
             # XXX could mark the critical section here...
             try:
@@ -564,28 +570,27 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
-    def _init_sync_db(self, sqlcipher_file, sync_db_password):
+    def _init_sync_db(self):
         """
         Initialize the Symmetrically-Encrypted document to be synced database,
         and the queue to communicate with subprocess workers.
-
-        :param sqlcipher_file: The path for the SQLCipher file.
-        :type sqlcipher_file: str
         """
-        sync_db_path = None
-        if sqlcipher_file != ":memory:":
-            sync_db_path = "%s-sync" % sqlcipher_file
-        else:
-            sync_db_path = ":memory:"
-        self._sync_db = MPSafeSQLiteDB(sync_db_path)
-        # protect the sync db with a password
-        if sync_db_password is not None:
-            self._set_crypto_pragmas(
-                self._sync_db, sync_db_password, True,
-                'aes-256-cbc', 4000, 1024)
-        self._sync_db_write_lock = threading.Lock()
-        self._create_sync_db_tables()
-        self.sync_queue = multiprocessing.Queue()
+        if self._sync_db is None:
+            soledad_assert(self._sync_db_key is not None)
+            sync_db_path = None
+            if self._sqlcipher_file != ":memory:":
+                sync_db_path = "%s-sync" % self._sqlcipher_file
+            else:
+                sync_db_path = ":memory:"
+            self._sync_db = MPSafeSQLiteDB(sync_db_path)
+            # protect the sync db with a password
+            if self._sync_db_key is not None:
+                self._set_crypto_pragmas(
+                    self._sync_db, self._sync_db_key, False,
+                    'aes-256-cbc', 4000, 1024)
+            self._sync_db_write_lock = threading.Lock()
+            self._create_sync_db_tables()
+            self.sync_queue = multiprocessing.Queue()
 
     def _create_sync_db_tables(self):
         """
@@ -1106,24 +1111,30 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Close db_handle and close syncer.
         """
-        logger.debug("Sqlcipher backend: closing")
+        if logger is not None:  # logger might be none if called from __del__
+            logger.debug("Sqlcipher backend: closing")
         # stop the sync watcher for deferred encryption
         if self._sync_watcher is not None:
             self._sync_watcher.stop()
             self._sync_watcher.shutdown()
+            self._sync_watcher = None
         # close all open syncers
         for url in self._syncers:
             _, syncer = self._syncers[url]
             syncer.close()
+        self._syncers = []
         # stop the encryption pool
         if self._sync_enc_pool is not None:
             self._sync_enc_pool.close()
+            self._sync_enc_pool = None
         # close the actual database
         if self._db_handle is not None:
             self._db_handle.close()
+            self._db_handle = None
         # close the sync database
         if self._sync_db is not None:
             self._sync_db.close()
+            self._sync_db = None
         # close the sync queue
         if self.sync_queue is not None:
             self.sync_queue.close()

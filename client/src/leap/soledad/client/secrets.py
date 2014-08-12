@@ -69,21 +69,28 @@ logger = logging.getLogger(name=__name__)
 # Exceptions
 #
 
-class NoStorageSecret(Exception):
+
+class SecretsException(Exception):
+    """
+    Generic exception type raised by this module.
+    """
+
+
+class NoStorageSecret(SecretsException):
     """
     Raised when trying to use a storage secret but none is available.
     """
     pass
 
 
-class PassphraseTooShort(Exception):
+class PassphraseTooShort(SecretsException):
     """
     Raised when trying to change the passphrase but the provided passphrase is
     too short.
     """
 
 
-class BootstrapSequenceError(Exception):
+class BootstrapSequenceError(SecretsException):
     """
     Raised when an attempt to generate a secret and store it in a recovery
     document on server failed.
@@ -107,34 +114,35 @@ class SoledadSecrets(object):
 
     LOCAL_STORAGE_SECRET_LENGTH = 512
     """
-    The length of the secret used to derive a passphrase for the SQLCipher
-    database.
+    The length, in bytes, of the secret used to derive a passphrase for the
+    SQLCipher database.
     """
 
     REMOTE_STORAGE_SECRET_LENGTH = 512
     """
-    The length of the secret used to derive an encryption key and a MAC auth
-    key for remote storage.
+    The length, in bytes, of the secret used to derive an encryption key and a
+    MAC auth key for remote storage.
     """
 
     SALT_LENGTH = 64
     """
-    The length of the salt used to derive the key for the storage secret
-    encryption.
+    The length, in bytes, of the salt used to derive the key for the storage
+    secret encryption.
     """
 
     GEN_SECRET_LENGTH = LOCAL_STORAGE_SECRET_LENGTH \
         + REMOTE_STORAGE_SECRET_LENGTH \
         + SALT_LENGTH  # for sync db
     """
-    The length of the secret to be generated. This includes local and remote
-    secrets, and the salt for deriving the sync db secret.
+    The length, in bytes, of the secret to be generated. This includes local
+    and remote secrets, and the salt for deriving the sync db secret.
     """
 
     MINIMUM_PASSPHRASE_LENGTH = 6
     """
-    The minimum length for a passphrase. The passphrase length is only checked
-    when the user changes her passphrase, not when she instantiates Soledad.
+    The minimum length, in bytes, for a passphrase. The passphrase length is
+    only checked when the user changes her passphrase, not when she
+    instantiates Soledad.
     """
 
     IV_SEPARATOR = ":"
@@ -288,7 +296,7 @@ class SoledadSecrets(object):
             self._secrets[self._secret_id] += new_piece
             enlarged = True
         # store and save in shared db if needed
-        if mac is False or enlarged is True:
+        if not mac or enlarged:
             self._store_secrets()
             self._put_secrets_in_shared_db()
 
@@ -443,13 +451,17 @@ class SoledadSecrets(object):
                 raise WrongMac('Could not authenticate recovery document\'s '
                                'contents.')
         # include secrets in the secret pool.
-        secrets = 0
+        secret_count = 0
         for secret_id, encrypted_secret in data[self.STORAGE_SECRETS_KEY].items():
             if secret_id not in self._secrets:
-                secrets += 1
-                self._secrets[secret_id] = \
-                    self._decrypt_storage_secret(encrypted_secret)
-        return secrets, mac
+                try:
+                    self._secrets[secret_id] = \
+                        self._decrypt_storage_secret(encrypted_secret)
+                    secret_count += 1
+                except SecretsException as e:
+                    logger.error("Failed to decrypt storage secret: %s"
+                                 % str(e))
+        return secret_count, mac
 
     def _get_secrets_from_shared_db(self):
         """
@@ -512,10 +524,13 @@ class SoledadSecrets(object):
 
         :return: The decrypted storage secret.
         :rtype: str
+
+        :raise SecretsException: Raised in case the decryption of the storage
+                                 secret fails for some reason.
         """
         # calculate the encryption key
         if encrypted_secret_dict[self.KDF_KEY] != self.KDF_SCRYPT:
-            raise Exception("Unknown KDF in stored secret.")
+            raise SecretsException("Unknown KDF in stored secret.")
         key = scrypt.hash(
             self._passphrase_as_string(),
             # the salt is stored base64 encoded
@@ -524,16 +539,16 @@ class SoledadSecrets(object):
             buflen=32,  # we need a key with 256 bits (32 bytes).
         )
         if encrypted_secret_dict[self.KDF_LENGTH_KEY] != len(key):
-            raise Exception("Wrong length of decryption key.")
+            raise SecretsException("Wrong length of decryption key.")
         if encrypted_secret_dict[self.CIPHER_KEY] != self.CIPHER_AES256:
-            raise Exception("Unknown cipher in stored secret.")
+            raise SecretsException("Unknown cipher in stored secret.")
         # recover the initial value and ciphertext
         iv, ciphertext = encrypted_secret_dict[self.SECRET_KEY].split(
             self.IV_SEPARATOR, 1)
         ciphertext = binascii.a2b_base64(ciphertext)
         decrypted_secret = self._crypto.decrypt_sym(ciphertext, key, iv=iv)
         if encrypted_secret_dict[self.LENGTH_KEY] != len(decrypted_secret):
-            raise Exception("Wrong length of decrypted secret.")
+            raise SecretsException("Wrong length of decrypted secret.")
         return decrypted_secret
 
     def _encrypt_storage_secret(self, decrypted_secret):
@@ -729,8 +744,8 @@ class SoledadSecrets(object):
         :rtype: str
         """
         return scrypt.hash(
-            self._get_local_storage_secret(),  # the password
-            self._get_local_storage_salt(),    # the salt
+            password=self._get_local_storage_secret(),
+            salt=self._get_local_storage_salt(),
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
 
@@ -755,7 +770,7 @@ class SoledadSecrets(object):
         :rtype: str
         """
         return scrypt.hash(
-            self._get_local_storage_secret(),  # the password
-            self._get_sync_db_salt(),    # the salt
+            password=self._get_local_storage_secret(),
+            salt=self._get_sync_db_salt(),
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )

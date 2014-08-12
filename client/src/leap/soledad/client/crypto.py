@@ -863,7 +863,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
         :param encrypted: If not None, only return documents with encrypted
                           field equal to given parameter.
-        :type encrypted: bool
+        :type encrypted: bool or None
 
         :return: list of doc_id, rev, generation, gen, trans_id
         :rtype: list
@@ -878,16 +878,23 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
     def get_insertable_docs_by_gen(self):
         """
-        Return a list of documents ready to be inserted.
+        Return a list of non-encrypted documents ready to be inserted.
         """
+        # here, we compare the list of all available docs with the list of
+        # decrypted docs and find the longest common prefix between these two
+        # lists. Note that the order of lists fetch matters: if instead we
+        # first fetch the list of decrypted docs and then the list of all
+        # docs, then some document might have been decrypted between these two
+        # calls, and if it is just the right doc then it might not be caught
+        # by the next loop.
         all_docs = self.get_docs_by_generation()
         decrypted_docs = self.get_docs_by_generation(encrypted=False)
         insertable = []
         for doc_id, rev, _, gen, trans_id, encrypted in all_docs:
             try:
-                next_decrypted = decrypted_docs.next()
-                if doc_id == next_decrypted[0]:
-                    content = next_decrypted[2]
+                next_doc_id, _, next_content, _, _, _ = decrypted_docs.next()
+                if doc_id == next_doc_id:
+                    content = next_content
                     insertable.append((doc_id, rev, content, gen, trans_id))
                 else:
                     break
@@ -901,7 +908,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
         :param encrypted: If not None, return count of documents with
                           encrypted field equal to given parameter.
-        :type encrypted: bool
+        :type encrypted: bool or None
 
         :return: The count of documents.
         :rtype: int

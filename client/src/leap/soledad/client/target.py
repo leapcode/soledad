@@ -807,12 +807,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_db = sync_db
             self._sync_db_write_lock = sync_db_write_lock
 
-    def _setup_sync_decr_pool(self, last_known_generation):
+    def _setup_sync_decr_pool(self):
         """
         Set up the SyncDecrypterPool for deferred decryption.
-
-        :param last_known_generation: Target's last known generation.
-        :type last_known_generation: int
         """
         if self._sync_decr_pool is None:
             # initialize syncing queue decryption pool
@@ -1133,7 +1130,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         if defer_decryption and self._sync_db is not None:
             self._sync_exchange_lock.acquire()
-            self._setup_sync_decr_pool(last_known_generation)
+            self._setup_sync_decr_pool()
             self._setup_sync_watcher()
             self._defer_decryption = True
         else:
