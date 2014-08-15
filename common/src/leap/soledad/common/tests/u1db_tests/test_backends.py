@@ -363,6 +363,7 @@ class LocalDatabaseTests(tests.DatabaseBaseTests):
         db2 = self.create_database('other-uid')
         doc2 = db2.create_doc_from_json(simple_doc)
         self.assertNotEqual(doc1.doc_id, doc2.doc_id)
+        db2.close()
 
     def test_put_doc_refuses_slashes_picky(self):
         doc = self.make_document('/a', None, simple_doc)

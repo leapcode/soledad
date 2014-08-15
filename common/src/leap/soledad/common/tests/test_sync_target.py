@@ -23,29 +23,15 @@ import os
 import simplejson as json
 import u1db
 
-from uuid import uuid4
-
 from u1db.remote import http_database
 
-from u1db import SyncTarget
-from u1db.sync import Synchronizer
-from u1db.remote import (
-    http_client,
-    http_database,
-    http_target,
-)
-
-from leap.soledad import client
 from leap.soledad.client import (
     target,
     auth,
     crypto,
-    VerifiedHTTPSConnection,
     sync,
 )
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
-
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests import BaseSoledadTest
@@ -58,13 +44,6 @@ from leap.soledad.common.tests.util import (
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_remote_sync_target
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.common.tests.test_couch import (
-    CouchDBTestCase,
-    CouchDBWrapper,
-)
-
-from leap.soledad.server import SoledadApp
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
 #-----------------------------------------------------------------------------
@@ -279,8 +258,9 @@ class TestSoledadSyncTarget(
     def tearDown(self):
         SoledadWithCouchServerMixin.tearDown(self)
         tests.TestCaseWithServer.tearDown(self)
-        db, _ = self.request_state.ensure_database('test2')
-        db.delete_database()
+        db2, _ = self.request_state.ensure_database('test2')
+        db2.delete_database()
+        self.db1.close()
 
     def test_sync_exchange_send(self):
         """
@@ -539,6 +519,10 @@ class TestSoledadDbSync(
     def setUp(self):
         self.main_test_class = test_sync.TestDbSync
         SoledadWithCouchServerMixin.setUp(self)
+
+    def tearDown(self):
+        SoledadWithCouchServerMixin.tearDown(self)
+        self.db.close()
 
     def do_sync(self, target_name):
         """

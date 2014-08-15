@@ -22,17 +22,14 @@ Test Leap backend bits.
 
 import u1db
 import os
-import ssl
 import simplejson as json
 import cStringIO
 
 
-from u1db import SyncTarget
 from u1db.sync import Synchronizer
 from u1db.remote import (
     http_client,
     http_database,
-    http_target,
 )
 
 from leap.soledad import client
@@ -40,7 +37,6 @@ from leap.soledad.client import (
     target,
     auth,
     VerifiedHTTPSConnection,
-    sync,
 )
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
@@ -61,10 +57,6 @@ from leap.soledad.common.tests.u1db_tests import test_document
 from leap.soledad.common.tests.u1db_tests import test_remote_sync_target
 from leap.soledad.common.tests.u1db_tests import test_https
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.common.tests.test_couch import (
-    CouchDBTestCase,
-    CouchDBWrapper,
-)
 
 
 #-----------------------------------------------------------------------------
@@ -391,6 +383,10 @@ class TestSoledadSyncTarget(
         tests.TestCaseWithServer.tearDown(self)
         db, _ = self.request_state.ensure_database('test2')
         db.delete_database()
+        for i in ['db1', 'db2']:
+            if hasattr(self, i):
+                db = getattr(self, i)
+                db.close()
 
     def test_sync_exchange_send(self):
         """
@@ -413,6 +409,7 @@ class TestSoledadSyncTarget(
         self.assertEqual(1, new_gen)
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
+        db.close()
 
     def test_sync_exchange_send_failure_and_retry_scenario(self):
         """
@@ -486,6 +483,7 @@ class TestSoledadSyncTarget(
         self.assertEqual(
             ('doc-here', 'replica:1', '{"value": "here"}', 1),
             other_changes[0][:-1])
+        db.close()
 
     def test_sync_exchange_send_ensure_callback(self):
         """
@@ -515,6 +513,7 @@ class TestSoledadSyncTarget(
         self.assertEqual(db._replica_uid, replica_uid_box[0])
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
+        db.close()
 
     def test_sync_exchange_in_stream_error(self):
         # we bypass this test because our sync_exchange process does not
@@ -746,6 +745,10 @@ class TestSoledadDbSync(
     def setUp(self):
         self.main_test_class = test_sync.TestDbSync
         SoledadWithCouchServerMixin.setUp(self)
+
+    def tearDown(self):
+        SoledadWithCouchServerMixin.tearDown(self)
+        self.db.close()
 
     def do_sync(self, target_name):
         """

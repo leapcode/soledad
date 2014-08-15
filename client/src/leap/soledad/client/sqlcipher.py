@@ -44,7 +44,6 @@ handled by Soledad should be created by SQLCipher >= 2.0.
 import logging
 import multiprocessing
 import os
-import sqlite3
 import string
 import threading
 import time
@@ -63,6 +62,8 @@ from leap.soledad.client.crypto import SyncEncrypterPool, SyncDecrypterPool
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
+from leap.soledad.client.mp_safe_db import MPSafeSQLiteDB
+from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -91,8 +92,17 @@ SQLITE_ISOLATION_LEVEL = None
 
 def open(path, password, create=True, document_factory=None, crypto=None,
          raw_key=False, cipher='aes-256-cbc', kdf_iter=4000,
-         cipher_page_size=1024, defer_encryption=False):
-    """Open a database at the given location.
+         cipher_page_size=1024, defer_encryption=False, sync_db_key=None):
+    """
+    Open a database at the given location.
+
+    *** IMPORTANT ***
+
+    Don't forget to close the database after use by calling the close()
+    method otherwise some resources might not be freed and you may experience
+    several kinds of leakages.
+
+    *** IMPORTANT ***
 
     Will raise u1db.errors.DatabaseDoesNotExist if create=False and the
     database does not already exist.
@@ -127,7 +137,8 @@ def open(path, password, create=True, document_factory=None, crypto=None,
     return SQLCipherDatabase.open_database(
         path, password, create=create, document_factory=document_factory,
         crypto=crypto, raw_key=raw_key, cipher=cipher, kdf_iter=kdf_iter,
-        cipher_page_size=cipher_page_size, defer_encryption=defer_encryption)
+        cipher_page_size=cipher_page_size, defer_encryption=defer_encryption,
+        sync_db_key=sync_db_key)
 
 
 #
@@ -190,10 +201,18 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
-                 kdf_iter=4000, cipher_page_size=1024):
+                 kdf_iter=4000, cipher_page_size=1024, sync_db_key=None):
         """
         Connect to an existing SQLCipher database, creating a new sqlcipher
         database file if needed.
+
+        *** IMPORTANT ***
+
+        Don't forget to close the database after use by calling the close()
+        method otherwise some resources might not be freed and you may
+        experience several kinds of leakages.
+
+        *** IMPORTANT ***
 
         :param sqlcipher_file: The path for the SQLCipher file.
         :type sqlcipher_file: str
@@ -243,19 +262,17 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._ensure_schema()
             self._crypto = crypto
 
+        # define sync-db attrs
+        self._sqlcipher_file = sqlcipher_file
+        self._sync_db_key = sync_db_key
         self._sync_db = None
         self._sync_db_write_lock = None
         self._sync_enc_pool = None
+        self.sync_queue = None
 
         if self.defer_encryption:
-            if sqlcipher_file != ":memory:":
-                self._sync_db_path = "%s-sync" % sqlcipher_file
-            else:
-                self._sync_db_path = ":memory:"
-
             # initialize sync db
             self._init_sync_db()
-
             # initialize syncing queue encryption pool
             self._sync_enc_pool = SyncEncrypterPool(
                 self._crypto, self._sync_db, self._sync_db_write_lock)
@@ -281,7 +298,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
                        crypto=None, raw_key=False, cipher='aes-256-cbc',
                        kdf_iter=4000, cipher_page_size=1024,
-                       defer_encryption=False):
+                       defer_encryption=False, sync_db_key=None):
         """
         Open a SQLCipher database.
 
@@ -351,15 +368,24 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         return SQLCipherDatabase._sqlite_registry[v](
             sqlcipher_file, password, document_factory=document_factory,
             crypto=crypto, raw_key=raw_key, cipher=cipher, kdf_iter=kdf_iter,
-            cipher_page_size=cipher_page_size)
+            cipher_page_size=cipher_page_size, sync_db_key=sync_db_key)
 
     @classmethod
     def open_database(cls, sqlcipher_file, password, create, backend_cls=None,
                       document_factory=None, crypto=None, raw_key=False,
                       cipher='aes-256-cbc', kdf_iter=4000,
-                      cipher_page_size=1024, defer_encryption=False):
+                      cipher_page_size=1024, defer_encryption=False,
+                      sync_db_key=None):
         """
         Open a SQLCipher database.
+
+        *** IMPORTANT ***
+
+        Don't forget to close the database after use by calling the close()
+        method otherwise some resources might not be freed and you may
+        experience several kinds of leakages.
+
+        *** IMPORTANT ***
 
         :param sqlcipher_file: The path for the SQLCipher file.
         :type sqlcipher_file: str
@@ -409,7 +435,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 sqlcipher_file, password, document_factory=document_factory,
                 crypto=crypto, raw_key=raw_key, cipher=cipher,
                 kdf_iter=kdf_iter, cipher_page_size=cipher_page_size,
-                defer_encryption=defer_encryption)
+                defer_encryption=defer_encryption, sync_db_key=sync_db_key)
         except u1db_errors.DatabaseDoesNotExist:
             if not create:
                 raise
@@ -420,7 +446,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             return backend_cls(
                 sqlcipher_file, password, document_factory=document_factory,
                 crypto=crypto, raw_key=raw_key, cipher=cipher,
-                kdf_iter=kdf_iter, cipher_page_size=cipher_page_size)
+                kdf_iter=kdf_iter, cipher_page_size=cipher_page_size,
+                sync_db_key=sync_db_key)
 
     def sync(self, url, creds=None, autocreate=True, defer_decryption=True):
         """
@@ -448,8 +475,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         res = None
         # the following context manager blocks until the syncing lock can be
         # acquired.
+        if defer_decryption:
+            self._init_sync_db()
         with self.syncer(url, creds=creds) as syncer:
-
             # XXX could mark the critical section here...
             try:
                 res = syncer.sync(autocreate=autocreate,
@@ -547,12 +575,22 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         Initialize the Symmetrically-Encrypted document to be synced database,
         and the queue to communicate with subprocess workers.
         """
-        self._sync_db = sqlite3.connect(self._sync_db_path,
-                                        check_same_thread=False)
-
-        self._sync_db_write_lock = threading.Lock()
-        self._create_sync_db_tables()
-        self.sync_queue = multiprocessing.Queue()
+        if self._sync_db is None:
+            soledad_assert(self._sync_db_key is not None)
+            sync_db_path = None
+            if self._sqlcipher_file != ":memory:":
+                sync_db_path = "%s-sync" % self._sqlcipher_file
+            else:
+                sync_db_path = ":memory:"
+            self._sync_db = MPSafeSQLiteDB(sync_db_path)
+            # protect the sync db with a password
+            if self._sync_db_key is not None:
+                self._set_crypto_pragmas(
+                    self._sync_db, self._sync_db_key, False,
+                    'aes-256-cbc', 4000, 1024)
+            self._sync_db_write_lock = threading.Lock()
+            self._create_sync_db_tables()
+            self.sync_queue = multiprocessing.Queue()
 
     def _create_sync_db_tables(self):
         """
@@ -566,9 +604,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             decr.TABLE_NAME, decr.FIELD_NAMES))
 
         with self._sync_db_write_lock:
-            with self._sync_db:
-                self._sync_db.execute(sql_encr)
-                self._sync_db.execute(sql_decr)
+            self._sync_db.execute(sql_encr)
+            self._sync_db.execute(sql_decr)
 
     #
     # Symmetric encryption of syncing docs
@@ -1074,17 +1111,45 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         Close db_handle and close syncer.
         """
-        logger.debug("Sqlcipher backend: closing")
+        if logger is not None:  # logger might be none if called from __del__
+            logger.debug("Sqlcipher backend: closing")
+        # stop the sync watcher for deferred encryption
         if self._sync_watcher is not None:
             self._sync_watcher.stop()
             self._sync_watcher.shutdown()
+            self._sync_watcher = None
+        # close all open syncers
         for url in self._syncers:
             _, syncer = self._syncers[url]
             syncer.close()
+        self._syncers = []
+        # stop the encryption pool
         if self._sync_enc_pool is not None:
             self._sync_enc_pool.close()
+            self._sync_enc_pool = None
+        # close the actual database
         if self._db_handle is not None:
             self._db_handle.close()
+            self._db_handle = None
+        # close the sync database
+        if self._sync_db is not None:
+            self._sync_db.close()
+            self._sync_db = None
+        # close the sync queue
+        if self.sync_queue is not None:
+            self.sync_queue.close()
+            del self.sync_queue
+            self.sync_queue = None
+
+    def __del__(self):
+        """
+        Free resources when deleting or garbage collecting the database.
+
+        This is only here to minimze problems if someone ever forgets to call
+        the close() method after using the database; you should not rely on
+        garbage collecting to free up the database resources.
+        """
+        self.close()
 
     @property
     def replica_uid(self):

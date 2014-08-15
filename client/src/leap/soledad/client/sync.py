@@ -29,8 +29,6 @@ Extend u1db Synchronizer with the ability to:
 """
 
 
-import json
-
 import logging
 import traceback
 from threading import Lock

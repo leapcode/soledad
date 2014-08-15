@@ -26,7 +26,7 @@ from util import ValidateUserHandle
 # create a logger
 logger = logging.getLogger(__name__)
 LOG_FORMAT = '%(asctime)s %(message)s'
-logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
+logging.basicConfig(format=LOG_FORMAT, level=logging.DEBUG)
 
 
 safe_unhexlify = lambda x: binascii.unhexlify(x) if (
@@ -119,7 +119,8 @@ def get_soledad_instance(username, provider, passphrase, basedir):
         local_db_path=local_db_path,
         server_url=server_url,
         cert_file=cert_file,
-        auth_token=token)
+        auth_token=token,
+        defer_encryption=False)
 
 
 # main program
@@ -153,3 +154,4 @@ if __name__ == '__main__':
     # get the soledad instance
     s = get_soledad_instance(
         args.username, args.provider, passphrase, basedir)
+    s.sync()
