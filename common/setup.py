@@ -229,23 +229,6 @@ class cmd_develop(_cmd_develop):
 
 
 # versioneer powered
-old_cmd_sdist = cmdclass["sdist"]
-
-
-class cmd_sdist(old_cmd_sdist):
-    """
-    Generate 'src/leap/soledad/common/ddocs.py' which contains couch design
-    documents scripts.
-    """
-    def run(self):
-        old_cmd_sdist.run(self)
-
-    def make_release_tree(self, base_dir, files):
-        old_cmd_sdist.make_release_tree(self, base_dir, files)
-        build_ddocs_py(basedir=base_dir)
-
-
-# versioneer powered
 old_cmd_build = cmdclass["build"]
 
 
@@ -257,7 +240,6 @@ class cmd_build(old_cmd_build):
 
 cmdclass["freeze_debianver"] = freeze_debianver
 cmdclass["build"] = cmd_build
-cmdclass["sdist"] = cmd_sdist
 cmdclass["develop"] = cmd_develop
 
 
