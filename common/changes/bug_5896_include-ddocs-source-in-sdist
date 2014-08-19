@@ -1,0 +1,2 @@
+  o Include couch design docs source files in source distribution and only
+    compile ddocs.py when building the package (#5896).
