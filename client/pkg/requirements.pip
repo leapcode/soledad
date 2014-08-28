@@ -20,6 +20,3 @@ leap.soledad.common>=0.3.8
 # this is not strictly needed by us, but we need it
 # until u1db adds it to its release as a dep.
 oauth
-
-# pysqlite should not be a dep, see #2945
-pysqlite
