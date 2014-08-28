@@ -37,7 +37,7 @@ Description: Synchronization of locally encrypted data among devices.
 
 Package: soledad-client
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, python-sqlcipher (>= 2.6.3.1), python-pysqlite1.1, 
+Depends: ${misc:Depends}, ${python:Depends}, python-sqlcipher (>= 2.6.3.1)
  python-simplejson, python-oauth, python-u1db, python-scrypt, 
  python-dirspec, python-pycryptopp (>= 0.6.0.20120313-1~), soledad-common,
  python-chardet
