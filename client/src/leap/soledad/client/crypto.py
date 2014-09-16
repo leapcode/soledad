@@ -616,6 +616,9 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         :param content: The encrypted document.
         :type content: str
         """
+        # FIXME --- callback should complete immediately since otherwise the
+        # thread which handles the results will get blocked
+        # Right now we're blocking the dispatcher with the writes to sqlite.
         sql_del = "DELETE FROM '%s' WHERE doc_id=?" % (self.TABLE_NAME,)
         sql_ins = "INSERT INTO '%s' VALUES (?, ?, ?)" % (self.TABLE_NAME,)
 

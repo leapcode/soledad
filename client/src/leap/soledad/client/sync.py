@@ -120,7 +120,7 @@ class SoledadSynchronizer(Synchronizer):
             "  target my gen: %d\n"
             "  target my trans_id: %s"
             % (self.target_replica_uid, target_gen, target_trans_id,
-            target_my_gen, target_my_trans_id))
+               target_my_gen, target_my_trans_id))
 
         # make sure we'll have access to target replica uid once it exists
         if self.target_replica_uid is None:
@@ -138,7 +138,7 @@ class SoledadSynchronizer(Synchronizer):
 
         # what's changed since that generation and this current gen
         my_gen, _, changes = self.source.whats_changed(target_my_gen)
-        logger.debug("Soledad sync: there are %d documents to send." \
+        logger.debug("Soledad sync: there are %d documents to send."
                      % len(changes))
 
         # get source last-seen database generation for the target
