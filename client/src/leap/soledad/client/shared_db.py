@@ -14,19 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 A shared database for storing/retrieving encrypted key material.
 """
-
-import simplejson as json
-
-
 from u1db.remote import http_database
 
-
-from leap.soledad.common import SHARED_DB_LOCK_DOC_ID_PREFIX
 from leap.soledad.client.auth import TokenBasedAuth
 
 
