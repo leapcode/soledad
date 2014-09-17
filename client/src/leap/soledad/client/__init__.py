@@ -374,7 +374,8 @@ class Soledad(object):
             include_deleted=include_deleted)
 
     def get_all_docs(self, include_deleted=False):
-        """Get the JSON content for all documents in the database.
+        """
+        Get the JSON content for all documents in the database.
 
         :param include_deleted: If set to True, deleted documents will be
                                 returned with empty content. Otherwise deleted

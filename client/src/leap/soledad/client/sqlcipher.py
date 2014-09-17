@@ -44,7 +44,6 @@ handled by Soledad should be created by SQLCipher >= 2.0.
 import logging
 import multiprocessing
 import os
-import string
 import threading
 import time
 import json
@@ -64,6 +63,7 @@ from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client.mp_safe_db import MPSafeSQLiteDB
+from leap.soledad.client import pragmas
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 
@@ -91,6 +91,55 @@ SQLITE_CHECK_SAME_THREAD = False
 SQLITE_ISOLATION_LEVEL = None
 
 
+class SQLCipherOptions(object):
+    def __init__(self, path, key, create=True, is_raw_key=False,
+                 cipher='aes-256-cbc', kdf_iter=4000, cipher_page_size=1024,
+                 document_factory=None, defer_encryption=False,
+                 sync_db_key=None):
+        """
+        Options for the initialization of an SQLCipher database.
+
+        :param path: The filesystem path for the database to open.
+        :type path: str
+        :param create:
+            True/False, should the database be created if it doesn't
+            already exist?
+        :param create: bool
+        :param document_factory:
+            A function that will be called with the same parameters as
+            Document.__init__.
+        :type document_factory: callable
+        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
+            document contents when syncing.
+        :type crypto: soledad.crypto.SoledadCrypto
+        :param is_raw_key:
+            Whether ``password`` is a raw 64-char hex string or a passphrase
+            that should be hashed to obtain the encyrption key.
+        :type raw_key: bool
+        :param cipher: The cipher and mode to use.
+        :type cipher: str
+        :param kdf_iter: The number of iterations to use.
+        :type kdf_iter: int
+        :param cipher_page_size: The page size.
+        :type cipher_page_size: int
+        :param defer_encryption:
+            Whether to defer encryption/decryption of documents, or do it
+            inline while syncing.
+        :type defer_encryption: bool
+        """
+        self.path = path
+        self.key = key
+        self.is_raw_key = is_raw_key
+        self.create = create
+        self.cipher = cipher
+        self.kdf_iter = kdf_iter
+        self.cipher_page_size = cipher_page_size
+        self.defer_encryption = defer_encryption
+        self.sync_db_key = sync_db_key
+        self.document_factory = None
+
+
+# XXX Use SQLCIpherOptions instead
 def open(path, password, create=True, document_factory=None, crypto=None,
          raw_key=False, cipher='aes-256-cbc', kdf_iter=4000,
          cipher_page_size=1024, defer_encryption=False, sync_db_key=None):
@@ -108,56 +157,22 @@ def open(path, password, create=True, document_factory=None, crypto=None,
     Will raise u1db.errors.DatabaseDoesNotExist if create=False and the
     database does not already exist.
 
-    :param path: The filesystem path for the database to open.
-    :type path: str
-    :param create: True/False, should the database be created if it doesn't
-        already exist?
-    :param create: bool
-    :param document_factory: A function that will be called with the same
-        parameters as Document.__init__.
-    :type document_factory: callable
-    :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-        document contents when syncing.
-    :type crypto: soledad.crypto.SoledadCrypto
-    :param raw_key: Whether C{password} is a raw 64-char hex string or a
-        passphrase that should be hashed to obtain the encyrption key.
-    :type raw_key: bool
-    :param cipher: The cipher and mode to use.
-    :type cipher: str
-    :param kdf_iter: The number of iterations to use.
-    :type kdf_iter: int
-    :param cipher_page_size: The page size.
-    :type cipher_page_size: int
-    :param defer_encryption: Whether to defer encryption/decryption of
-                             documents, or do it inline while syncing.
-    :type defer_encryption: bool
-
     :return: An instance of Database.
     :rtype SQLCipherDatabase
     """
-    return SQLCipherDatabase.open_database(
-        path, password, create=create, document_factory=document_factory,
-        crypto=crypto, raw_key=raw_key, cipher=cipher, kdf_iter=kdf_iter,
-        cipher_page_size=cipher_page_size, defer_encryption=defer_encryption,
-        sync_db_key=sync_db_key)
-
-
-#
-# Exceptions
-#
-
-class DatabaseIsNotEncrypted(Exception):
-    """
-    Exception raised when trying to open non-encrypted databases.
-    """
-    pass
-
-
-class NotAnHexString(Exception):
-    """
-    Raised when trying to (raw) key the database with a non-hex string.
-    """
-    pass
+    args = (path, password)
+    kwargs = {
+        'create': create,
+        'document_factory': document_factory,
+        'crypto': crypto,
+        'raw_key': raw_key,
+        'cipher': cipher,
+        'kdf_iter': kdf_iter,
+        'cipher_page_size': cipher_page_size,
+        'defer_encryption': defer_encryption,
+        'sync_db_key': sync_db_key}
+    # XXX pass only a CryptoOptions object around
+    return SQLCipherDatabase.open_database(*args, **kwargs)
 
 
 #
@@ -200,6 +215,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     same database replica.
     """
 
+    # XXX Use SQLCIpherOptions instead
     def __init__(self, sqlcipher_file, password, document_factory=None,
                  crypto=None, raw_key=False, cipher='aes-256-cbc',
                  kdf_iter=4000, cipher_page_size=1024, sync_db_key=None):
@@ -214,30 +230,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         experience several kinds of leakages.
 
         *** IMPORTANT ***
-
-        :param sqlcipher_file: The path for the SQLCipher file.
-        :type sqlcipher_file: str
-        :param password: The password that protects the SQLCipher db.
-        :type password: str
-        :param document_factory: A function that will be called with the same
-                                 parameters as Document.__init__.
-        :type document_factory: callable
-        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-                       document contents when syncing.
-        :type crypto: soledad.crypto.SoledadCrypto
-        :param raw_key: Whether password is a raw 64-char hex string or a
-                        passphrase that should be hashed to obtain the
-                        encyrption key.
-        :type raw_key: bool
-        :param cipher: The cipher and mode to use.
-        :type cipher: str
-        :param kdf_iter: The number of iterations to use.
-        :type kdf_iter: int
-        :param cipher_page_size: The page size.
-        :type cipher_page_size: int
         """
         # ensure the db is encrypted if the file already exists
         if os.path.exists(sqlcipher_file):
+            # XXX pass only a CryptoOptions object around
             self.assert_db_is_encrypted(
                 sqlcipher_file, password, raw_key, cipher, kdf_iter,
                 cipher_page_size)
@@ -249,16 +245,19 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 isolation_level=SQLITE_ISOLATION_LEVEL,
                 check_same_thread=SQLITE_CHECK_SAME_THREAD)
             # set SQLCipher cryptographic parameters
-            self._set_crypto_pragmas(
+
+            # XXX allow optiona deferredChain here ?
+            pragmas.set_crypto_pragmas(
                 self._db_handle, password, raw_key, cipher, kdf_iter,
                 cipher_page_size)
             if os.environ.get('LEAP_SQLITE_NOSYNC'):
-                self._pragma_synchronous_off(self._db_handle)
+                pragmas.set_synchronous_off(self._db_handle)
             else:
-                self._pragma_synchronous_normal(self._db_handle)
+                pragmas.set_synchronous_normal(self._db_handle)
             if os.environ.get('LEAP_SQLITE_MEMSTORE'):
-                self._pragma_mem_temp_store(self._db_handle)
-            self._pragma_write_ahead_logging(self._db_handle)
+                pragmas.set_mem_temp_store(self._db_handle)
+            pragmas.set_write_ahead_logging(self._db_handle)
+
             self._real_replica_uid = None
             self._ensure_schema()
             self._crypto = crypto
@@ -296,35 +295,13 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         self._syncers = {}
 
     @classmethod
+    # XXX Use SQLCIpherOptions instead
     def _open_database(cls, sqlcipher_file, password, document_factory=None,
                        crypto=None, raw_key=False, cipher='aes-256-cbc',
                        kdf_iter=4000, cipher_page_size=1024,
                        defer_encryption=False, sync_db_key=None):
         """
         Open a SQLCipher database.
-
-        :param sqlcipher_file: The path for the SQLCipher file.
-        :type sqlcipher_file: str
-        :param password: The password that protects the SQLCipher db.
-        :type password: str
-        :param document_factory: A function that will be called with the same
-            parameters as Document.__init__.
-        :type document_factory: callable
-        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-            document contents when syncing.
-        :type crypto: soledad.crypto.SoledadCrypto
-        :param raw_key: Whether C{password} is a raw 64-char hex string or a
-            passphrase that should be hashed to obtain the encyrption key.
-        :type raw_key: bool
-        :param cipher: The cipher and mode to use.
-        :type cipher: str
-        :param kdf_iter: The number of iterations to use.
-        :type kdf_iter: int
-        :param cipher_page_size: The page size.
-        :type cipher_page_size: int
-        :param defer_encryption: Whether to defer encryption/decryption of
-                                 documents, or do it inline while syncing.
-        :type defer_encryption: bool
 
         :return: The database object.
         :rtype: SQLCipherDatabase
@@ -346,7 +323,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
                 try:
                     # set cryptographic params
-                    cls._set_crypto_pragmas(
+
+                    # XXX pass only a CryptoOptions object around
+                    pragmas.set_crypto_pragmas(
                         db_handle, password, raw_key, cipher, kdf_iter,
                         cipher_page_size)
                     c = db_handle.cursor()
@@ -372,11 +351,12 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             cipher_page_size=cipher_page_size, sync_db_key=sync_db_key)
 
     @classmethod
-    def open_database(cls, sqlcipher_file, password, create, backend_cls=None,
+    def open_database(cls, sqlcipher_file, password, create,
                       document_factory=None, crypto=None, raw_key=False,
                       cipher='aes-256-cbc', kdf_iter=4000,
                       cipher_page_size=1024, defer_encryption=False,
                       sync_db_key=None):
+        # XXX pass only a CryptoOptions object around
         """
         Open a SQLCipher database.
 
@@ -388,67 +368,29 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
         *** IMPORTANT ***
 
-        :param sqlcipher_file: The path for the SQLCipher file.
-        :type sqlcipher_file: str
-
-        :param password: The password that protects the SQLCipher db.
-        :type password: str
-
-        :param create: Should the datbase be created if it does not already
-                       exist?
-        :type create: bool
-
-        :param backend_cls: A class to use as backend.
-        :type backend_cls: type
-
-        :param document_factory: A function that will be called with the same
-                                 parameters as Document.__init__.
-        :type document_factory: callable
-
-        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-                       document contents when syncing.
-        :type crypto: soledad.crypto.SoledadCrypto
-
-        :param raw_key: Whether C{password} is a raw 64-char hex string or a
-                        passphrase that should be hashed to obtain the
-                        encyrption key.
-        :type raw_key: bool
-
-        :param cipher: The cipher and mode to use.
-        :type cipher: str
-
-        :param kdf_iter: The number of iterations to use.
-        :type kdf_iter: int
-
-        :param cipher_page_size: The page size.
-        :type cipher_page_size: int
-
-        :param defer_encryption: Whether to defer encryption/decryption of
-                                 documents, or do it inline while syncing.
-        :type defer_encryption: bool
-
         :return: The database object.
         :rtype: SQLCipherDatabase
         """
         cls.defer_encryption = defer_encryption
+        args = sqlcipher_file, password
+        kwargs = {
+            'crypto': crypto,
+            'raw_key': raw_key,
+            'cipher': cipher,
+            'kdf_iter': kdf_iter,
+            'cipher_page_size': cipher_page_size,
+            'defer_encryption': defer_encryption,
+            'sync_db_key': sync_db_key,
+            'document_factory': document_factory,
+        }
         try:
-            return cls._open_database(
-                sqlcipher_file, password, document_factory=document_factory,
-                crypto=crypto, raw_key=raw_key, cipher=cipher,
-                kdf_iter=kdf_iter, cipher_page_size=cipher_page_size,
-                defer_encryption=defer_encryption, sync_db_key=sync_db_key)
+            return cls._open_database(*args, **kwargs)
         except u1db_errors.DatabaseDoesNotExist:
             if not create:
                 raise
-            # TODO: remove backend class from here.
-            if backend_cls is None:
-                # default is SQLCipherPartialExpandDatabase
-                backend_cls = SQLCipherDatabase
-            return backend_cls(
-                sqlcipher_file, password, document_factory=document_factory,
-                crypto=crypto, raw_key=raw_key, cipher=cipher,
-                kdf_iter=kdf_iter, cipher_page_size=cipher_page_size,
-                sync_db_key=sync_db_key)
+
+            # XXX here we were missing sync_db_key, intentional?
+            return SQLCipherDatabase(*args, **kwargs)
 
     def sync(self, url, creds=None, autocreate=True, defer_decryption=True):
         """
@@ -592,7 +534,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             self._sync_db = MPSafeSQLiteDB(sync_db_path)
             # protect the sync db with a password
             if self._sync_db_key is not None:
-                self._set_crypto_pragmas(
+                # XXX pass only a CryptoOptions object around
+                pragmas.set_crypto_pragmas(
                     self._sync_db, self._sync_db_key, False,
                     'aes-256-cbc', 4000, 1024)
             self._sync_db_write_lock = threading.Lock()
@@ -712,6 +655,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     # SQLCipher API methods
     #
 
+    # XXX Use SQLCIpherOptions instead
     @classmethod
     def assert_db_is_encrypted(cls, sqlcipher_file, key, raw_key, cipher,
                                kdf_iter, cipher_page_size):
@@ -755,313 +699,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                     sqlcipher_file,
                     isolation_level=SQLITE_ISOLATION_LEVEL,
                     check_same_thread=SQLITE_CHECK_SAME_THREAD)
-                cls._set_crypto_pragmas(
+                pragmas.set_crypto_pragmas(
                     db_handle, key, raw_key, cipher,
                     kdf_iter, cipher_page_size)
                 db_handle.cursor().execute(
                     'SELECT count(*) FROM sqlite_master')
-
-    @classmethod
-    def _set_crypto_pragmas(cls, db_handle, key, raw_key, cipher, kdf_iter,
-                            cipher_page_size):
-        """
-        Set cryptographic params (key, cipher, KDF number of iterations and
-        cipher page size).
-        """
-        cls._pragma_key(db_handle, key, raw_key)
-        cls._pragma_cipher(db_handle, cipher)
-        cls._pragma_kdf_iter(db_handle, kdf_iter)
-        cls._pragma_cipher_page_size(db_handle, cipher_page_size)
-
-    @classmethod
-    def _pragma_key(cls, db_handle, key, raw_key):
-        """
-        Set the C{key} for use with the database.
-
-        The process of creating a new, encrypted database is called 'keying'
-        the database. SQLCipher uses just-in-time key derivation at the point
-        it is first needed for an operation. This means that the key (and any
-        options) must be set before the first operation on the database. As
-        soon as the database is touched (e.g. SELECT, CREATE TABLE, UPDATE,
-        etc.) and pages need to be read or written, the key is prepared for
-        use.
-
-        Implementation Notes:
-
-        * PRAGMA key should generally be called as the first operation on a
-          database.
-
-        :param key: The key for use with the database.
-        :type key: str
-        :param raw_key: Whether C{key} is a raw 64-char hex string or a
-            passphrase that should be hashed to obtain the encyrption key.
-        :type raw_key: bool
-        """
-        if raw_key:
-            cls._pragma_key_raw(db_handle, key)
-        else:
-            cls._pragma_key_passphrase(db_handle, key)
-
-    @classmethod
-    def _pragma_key_passphrase(cls, db_handle, passphrase):
-        """
-        Set a passphrase for encryption key derivation.
-
-        The key itself can be a passphrase, which is converted to a key using
-        PBKDF2 key derivation. The result is used as the encryption key for
-        the database. By using this method, there is no way to alter the KDF;
-        if you want to do so you should use a raw key instead and derive the
-        key using your own KDF.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param passphrase: The passphrase used to derive the encryption key.
-        :type passphrase: str
-        """
-        db_handle.cursor().execute("PRAGMA key = '%s'" % passphrase)
-
-    @classmethod
-    def _pragma_key_raw(cls, db_handle, key):
-        """
-        Set a raw hexadecimal encryption key.
-
-        It is possible to specify an exact byte sequence using a blob literal.
-        With this method, it is the calling application's responsibility to
-        ensure that the data provided is a 64 character hex string, which will
-        be converted directly to 32 bytes (256 bits) of key data.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param key: A 64 character hex string.
-        :type key: str
-        """
-        if not all(c in string.hexdigits for c in key):
-            raise NotAnHexString(key)
-        db_handle.cursor().execute('PRAGMA key = "x\'%s"' % key)
-
-    @classmethod
-    def _pragma_cipher(cls, db_handle, cipher='aes-256-cbc'):
-        """
-        Set the cipher and mode to use for symmetric encryption.
-
-        SQLCipher uses aes-256-cbc as the default cipher and mode of
-        operation. It is possible to change this, though not generally
-        recommended, using PRAGMA cipher.
-
-        SQLCipher makes direct use of libssl, so all cipher options available
-        to libssl are also available for use with SQLCipher. See `man enc` for
-        OpenSSL's supported ciphers.
-
-        Implementation Notes:
-
-        * PRAGMA cipher must be called after PRAGMA key and before the first
-          actual database operation or it will have no effect.
-
-        * If a non-default value is used PRAGMA cipher to create a database,
-          it must also be called every time that database is opened.
-
-        * SQLCipher does not implement its own encryption. Instead it uses the
-          widely available and peer-reviewed OpenSSL libcrypto for all
-          cryptographic functions.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param cipher: The cipher and mode to use.
-        :type cipher: str
-        """
-        db_handle.cursor().execute("PRAGMA cipher = '%s'" % cipher)
-
-    @classmethod
-    def _pragma_kdf_iter(cls, db_handle, kdf_iter=4000):
-        """
-        Set the number of iterations for the key derivation function.
-
-        SQLCipher uses PBKDF2 key derivation to strengthen the key and make it
-        resistent to brute force and dictionary attacks. The default
-        configuration uses 4000 PBKDF2 iterations (effectively 16,000 SHA1
-        operations). PRAGMA kdf_iter can be used to increase or decrease the
-        number of iterations used.
-
-        Implementation Notes:
-
-        * PRAGMA kdf_iter must be called after PRAGMA key and before the first
-          actual database operation or it will have no effect.
-
-        * If a non-default value is used PRAGMA kdf_iter to create a database,
-          it must also be called every time that database is opened.
-
-        * It is not recommended to reduce the number of iterations if a
-          passphrase is in use.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param kdf_iter: The number of iterations to use.
-        :type kdf_iter: int
-        """
-        db_handle.cursor().execute("PRAGMA kdf_iter = '%d'" % kdf_iter)
-
-    @classmethod
-    def _pragma_cipher_page_size(cls, db_handle, cipher_page_size=1024):
-        """
-        Set the page size of the encrypted database.
-
-        SQLCipher 2 introduced the new PRAGMA cipher_page_size that can be
-        used to adjust the page size for the encrypted database. The default
-        page size is 1024 bytes, but it can be desirable for some applications
-        to use a larger page size for increased performance. For instance,
-        some recent testing shows that increasing the page size can noticeably
-        improve performance (5-30%) for certain queries that manipulate a
-        large number of pages (e.g. selects without an index, large inserts in
-        a transaction, big deletes).
-
-        To adjust the page size, call the pragma immediately after setting the
-        key for the first time and each subsequent time that you open the
-        database.
-
-        Implementation Notes:
-
-        * PRAGMA cipher_page_size must be called after PRAGMA key and before
-          the first actual database operation or it will have no effect.
-
-        * If a non-default value is used PRAGMA cipher_page_size to create a
-          database, it must also be called every time that database is opened.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param cipher_page_size: The page size.
-        :type cipher_page_size: int
-        """
-        db_handle.cursor().execute(
-            "PRAGMA cipher_page_size = '%d'" % cipher_page_size)
-
-    @classmethod
-    def _pragma_rekey(cls, db_handle, new_key, raw_key):
-        """
-        Change the key of an existing encrypted database.
-
-        To change the key on an existing encrypted database, it must first be
-        unlocked with the current encryption key. Once the database is
-        readable and writeable, PRAGMA rekey can be used to re-encrypt every
-        page in the database with a new key.
-
-        * PRAGMA rekey must be called after PRAGMA key. It can be called at any
-          time once the database is readable.
-
-        * PRAGMA rekey can not be used to encrypted a standard SQLite
-          database! It is only useful for changing the key on an existing
-          database.
-
-        * Previous versions of SQLCipher provided a PRAGMA rekey_cipher and
-          code>PRAGMA rekey_kdf_iter. These are deprecated and should not be
-          used. Instead, use sqlcipher_export().
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param new_key: The new key.
-        :type new_key: str
-        :param raw_key: Whether C{password} is a raw 64-char hex string or a
-            passphrase that should be hashed to obtain the encyrption key.
-        :type raw_key: bool
-        """
-        # XXX change key param!
-        if raw_key:
-            cls._pragma_rekey_raw(db_handle, key)
-        else:
-            cls._pragma_rekey_passphrase(db_handle, key)
-
-    @classmethod
-    def _pragma_rekey_passphrase(cls, db_handle, passphrase):
-        """
-        Change the passphrase for encryption key derivation.
-
-        The key itself can be a passphrase, which is converted to a key using
-        PBKDF2 key derivation. The result is used as the encryption key for
-        the database.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param passphrase: The passphrase used to derive the encryption key.
-        :type passphrase: str
-        """
-        db_handle.cursor().execute("PRAGMA rekey = '%s'" % passphrase)
-
-    @classmethod
-    def _pragma_rekey_raw(cls, db_handle, key):
-        """
-        Change the raw hexadecimal encryption key.
-
-        It is possible to specify an exact byte sequence using a blob literal.
-        With this method, it is the calling application's responsibility to
-        ensure that the data provided is a 64 character hex string, which will
-        be converted directly to 32 bytes (256 bits) of key data.
-
-        :param db_handle: A handle to the SQLCipher database.
-        :type db_handle: pysqlcipher.Connection
-        :param key: A 64 character hex string.
-        :type key: str
-        """
-        if not all(c in string.hexdigits for c in key):
-            raise NotAnHexString(key)
-        # XXX change passphrase param!
-        db_handle.cursor().execute('PRAGMA rekey = "x\'%s"' % passphrase)
-
-    @classmethod
-    def _pragma_synchronous_off(cls, db_handle):
-        """
-        Change the setting of the "synchronous" flag to OFF.
-        """
-        logger.debug("SQLCIPHER: SETTING SYNCHRONOUS OFF")
-        db_handle.cursor().execute('PRAGMA synchronous=OFF')
-
-    @classmethod
-    def _pragma_synchronous_normal(cls, db_handle):
-        """
-        Change the setting of the "synchronous" flag to NORMAL.
-        """
-        logger.debug("SQLCIPHER: SETTING SYNCHRONOUS NORMAL")
-        db_handle.cursor().execute('PRAGMA synchronous=NORMAL')
-
-    @classmethod
-    def _pragma_mem_temp_store(cls, db_handle):
-        """
-        Use a in-memory store for temporary tables.
-        """
-        logger.debug("SQLCIPHER: SETTING TEMP_STORE MEMORY")
-        db_handle.cursor().execute('PRAGMA temp_store=MEMORY')
-
-    @classmethod
-    def _pragma_write_ahead_logging(cls, db_handle):
-        """
-        Enable write-ahead logging, and set the autocheckpoint to 50 pages.
-
-        Setting the autocheckpoint to a small value, we make the reads not
-        suffer too much performance degradation.
-
-        From the sqlite docs:
-
-        "There is a tradeoff between average read performance and average write
-        performance. To maximize the read performance, one wants to keep the
-        WAL as small as possible and hence run checkpoints frequently, perhaps
-        as often as every COMMIT. To maximize write performance, one wants to
-        amortize the cost of each checkpoint over as many writes as possible,
-        meaning that one wants to run checkpoints infrequently and let the WAL
-        grow as large as possible before each checkpoint. The decision of how
-        often to run checkpoints may therefore vary from one application to
-        another depending on the relative read and write performance
-        requirements of the application. The default strategy is to run a
-        checkpoint once the WAL reaches 1000 pages"
-        """
-        logger.debug("SQLCIPHER: SETTING WRITE-AHEAD LOGGING")
-        db_handle.cursor().execute('PRAGMA journal_mode=WAL')
-        # The optimum value can still use a little bit of tuning, but we favor
-        # small sizes of the WAL file to get fast reads, since we assume that
-        # the writes will be quick enough to not block too much.
-
-        # TODO
-        # As a further improvement, we might want to set autocheckpoint to 0
-        # here and do the checkpoints manually in a separate thread, to avoid
-        # any blocks in the main thread (we should run a loopingcall from here)
-        db_handle.cursor().execute('PRAGMA wal_autocheckpoint=50')
 
     # Extra query methods: extensions to the base sqlite implmentation.
 
@@ -1161,6 +803,17 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     @property
     def replica_uid(self):
         return self._get_replica_uid()
+
+#
+# Exceptions
+#
+
+
+class DatabaseIsNotEncrypted(Exception):
+    """
+    Exception raised when trying to open non-encrypted databases.
+    """
+    pass
 
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)

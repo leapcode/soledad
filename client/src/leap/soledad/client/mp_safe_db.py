@@ -88,7 +88,7 @@ class MPSafeSQLiteDB(Thread):
         res = Queue()
         self.execute(req, arg, res)
         while True:
-            rec=res.get()
+            rec = res.get()
             if rec == self.NO_MORE:
                 break
             yield rec
