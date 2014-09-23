@@ -34,7 +34,6 @@ import socket
 import ssl
 import urlparse
 
-
 try:
     import cchardet as chardet
 except ImportError:
@@ -47,15 +46,14 @@ from leap.common.config import get_path_prefix
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
-from leap.soledad.common.document import SoledadDocument
 
+from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
 from leap.soledad.client.crypto import SoledadCrypto
 from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client.sqlcipher import SQLCipherDatabase
 from leap.soledad.client.target import SoledadSyncTarget
-from leap.soledad.client.sqlcipher import SQLCipherDB, SQLCipherOptions
+from leap.soledad.client.sqlcipher import SQLCipherOptions
 
 logger = logging.getLogger(name=__name__)
 
@@ -200,18 +198,19 @@ class Soledad(object):
         Initialize configuration using default values for missing params.
         """
         soledad_assert_type(self._passphrase, unicode)
+        initialize = lambda attr, val: attr is None and setattr(attr, val)
+
         # initialize secrets_path
-        if self._secrets_path is None:
-            self._secrets_path = os.path.join(
-                self.DEFAULT_PREFIX, self.STORAGE_SECRETS_FILE_NAME)
+        initialize(self._secrets_path, os.path.join(
+            self.DEFAULT_PREFIX, self.STORAGE_SECRETS_FILE_NAME))
+
         # initialize local_db_path
-        if self._local_db_path is None:
-            self._local_db_path = os.path.join(
-                self.DEFAULT_PREFIX, self.LOCAL_DATABASE_FILE_NAME)
+        initialize(self._local_db_path, os.path.join(
+            self.DEFAULT_PREFIX, self.LOCAL_DATABASE_FILE_NAME))
+
         # initialize server_url
-        soledad_assert(
-            self._server_url is not None,
-            'Missing URL for Soledad server.')
+        soledad_assert(self._server_url is not None,
+                       'Missing URL for Soledad server.')
 
     #
     # initialization/destruction methods
@@ -221,14 +220,13 @@ class Soledad(object):
         """
         Bootstrap local Soledad instance.
 
-        :raise BootstrapSequenceError: Raised when the secret generation and
-            storage on server sequence has failed for some reason.
+        :raise BootstrapSequenceError:
+            Raised when the secret generation and storage on server sequence
+            has failed for some reason.
         """
-        try:
-            self._secrets.bootstrap()
-            self._init_db()
-        except:
-            raise
+        self._secrets.bootstrap()
+        self._init_db()
+        # XXX initialize syncers?
 
     def _init_dirs(self):
         """
@@ -255,8 +253,9 @@ class Soledad(object):
         Initialize the U1DB SQLCipher database for local storage.
 
         Currently, Soledad uses the default SQLCipher cipher, i.e.
-        'aes-256-cbc'. We use scrypt to derive a 256-bit encryption key and
-        uses the 'raw PRAGMA key' format to handle the key to SQLCipher.
+        'aes-256-cbc'. We use scrypt to derive a 256-bit encryption key,
+        and internally the SQLCipherDatabase initialization uses the 'raw
+        PRAGMA key' format to handle the key to SQLCipher.
         """
         tohex = binascii.b2a_hex
         # sqlcipher only accepts the hex version
@@ -265,25 +264,28 @@ class Soledad(object):
 
         opts = SQLCipherOptions(
             self._local_db_path, key,
-            is_raw_key=True,
-            create=True,
+            is_raw_key=True, create=True,
             defer_encryption=self._defer_encryption,
             sync_db_key=sync_db_key,
-            crypto=self._crypto,  # XXX add this
-            document_factory=SoledadDocument,
         )
-        self._db = SQLCipherDB(opts)
+        self._dbpool = adbapi.getConnectionPool(opts)
 
     def close(self):
         """
         Close underlying U1DB database.
         """
         logger.debug("Closing soledad")
-        if hasattr(self, '_db') and isinstance(
-                self._db,
-                SQLCipherDatabase):
-            self._db.stop_sync()
-            self._db.close()
+        self._dbpool.close()
+
+        # TODO close syncers >>>>>>
+
+        #if hasattr(self, '_db') and isinstance(
+                #self._db,
+                #SQLCipherDatabase):
+            #self._db.close()
+#
+            # XXX stop syncers
+            # self._db.stop_sync()
 
     @property
     def _shared_db(self):
@@ -306,24 +308,29 @@ class Soledad(object):
     #
 
     def put_doc(self, doc):
+        # TODO what happens with this warning during the deferred life cycle?
+        # Isn't it better to defend ourselves from the mutability, to avoid
+        # nasty surprises?
         """
         Update a document in the local encrypted database.
 
         ============================== WARNING ==============================
         This method converts the document's contents to unicode in-place. This
-        means that after calling C{put_doc(doc)}, the contents of the
-        document, i.e. C{doc.content}, might be different from before the
+        means that after calling `put_doc(doc)`, the contents of the
+        document, i.e. `doc.content`, might be different from before the
         call.
         ============================== WARNING ==============================
 
         :param doc: the document to update
         :type doc: SoledadDocument
 
-        :return: the new revision identifier for the document
-        :rtype: str
+        :return:
+            a deferred that will fire with the new revision identifier for
+            the document
+        :rtype: Deferred
         """
         doc.content = self._convert_to_unicode(doc.content)
-        return self._db.put_doc(doc)
+        return self._dbpool.put_doc(doc)
 
     def delete_doc(self, doc):
         """
@@ -332,10 +339,12 @@ class Soledad(object):
         :param doc: the document to delete
         :type doc: SoledadDocument
 
-        :return: the new revision identifier for the document
-        :rtype: str
+        :return:
+            a deferred that will fire with ...
+        :rtype: Deferred
         """
-        return self._db.delete_doc(doc)
+        # XXX what does this do when fired???
+        return self._dbpool.delete_doc(doc)
 
     def get_doc(self, doc_id, include_deleted=False):
         """
@@ -343,15 +352,17 @@ class Soledad(object):
 
         :param doc_id: the unique document identifier
         :type doc_id: str
-        :param include_deleted: if True, deleted documents will be
-                                returned with empty content; otherwise asking
-                                for a deleted document will return None
+        :param include_deleted:
+            if True, deleted documents will be returned with empty content;
+            otherwise asking for a deleted document will return None
         :type include_deleted: bool
 
-        :return: the document object or None
-        :rtype: SoledadDocument
+        :return:
+            A deferred that will fire with the document object, containing a
+            SoledadDocument, or None if it could not be found
+        :rtype: Deferred
         """
-        return self._db.get_doc(doc_id, include_deleted=include_deleted)
+        return self._dbpool.get_doc(doc_id, include_deleted=include_deleted)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
                  include_deleted=False):
@@ -364,11 +375,12 @@ class Soledad(object):
             be skipped, and 'None' will be returned instead of True/False
         :type check_for_conflicts: bool
 
-        :return: iterable giving the Document object for each document id
-            in matching doc_ids order.
-        :rtype: generator
+        :return:
+            A deferred that will fire with an iterable giving the Document
+            object for each document id in matching doc_ids order.
+        :rtype: Deferred
         """
-        return self._db.get_docs(
+        return self._dbpool.get_docs(
             doc_ids, check_for_conflicts=check_for_conflicts,
             include_deleted=include_deleted)
 
@@ -379,43 +391,13 @@ class Soledad(object):
         :param include_deleted: If set to True, deleted documents will be
                                 returned with empty content. Otherwise deleted
                                 documents will not be included in the results.
-        :return: (generation, [Document])
-                 The current generation of the database, followed by a list of
-                 all the documents in the database.
+        :return:
+            A deferred that will fire with (generation, [Document]): that is,
+            the current generation of the database, followed by a list of all
+            the documents in the database.
+        :rtype: Deferred
         """
-        return self._db.get_all_docs(include_deleted)
-
-    def _convert_to_unicode(self, content):
-        """
-        Converts content to unicode (or all the strings in content)
-
-        NOTE: Even though this method supports any type, it will
-        currently ignore contents of lists, tuple or any other
-        iterable than dict. We don't need support for these at the
-        moment
-
-        :param content: content to convert
-        :type content: object
-
-        :rtype: object
-        """
-        if isinstance(content, unicode):
-            return content
-        elif isinstance(content, str):
-            result = chardet.detect(content)
-            default = "utf-8"
-            encoding = result["encoding"] or default
-            try:
-                content = content.decode(encoding)
-            except UnicodeError as e:
-                logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
-                content = content.decode(encoding, 'replace')
-            return content
-        else:
-            if isinstance(content, dict):
-                for key in content.keys():
-                    content[key] = self._convert_to_unicode(content[key])
-        return content
+        return self._dbpool.get_all_docs(include_deleted)
 
     def create_doc(self, content, doc_id=None):
         """
@@ -426,11 +408,13 @@ class Soledad(object):
         :param doc_id: an optional identifier specifying the document id
         :type doc_id: str
 
-        :return: the new document
-        :rtype: SoledadDocument
+        :return:
+            A deferred tht will fire with the new document (SoledadDocument
+            instance).
+        :rtype: Deferred
         """
-        return self._db.create_doc(
-            self._convert_to_unicode(content), doc_id=doc_id)
+        return self._dbpool.create_doc(
+            _convert_to_unicode(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -446,10 +430,12 @@ class Soledad(object):
         :type json: str
         :param doc_id: An optional identifier specifying the document id.
         :type doc_id:
-        :return: The new document
-        :rtype: SoledadDocument
+        :return:
+            A deferred that will fire with the new document (A SoledadDocument
+            instance)
+        :rtype: Deferred
         """
-        return self._db.create_doc_from_json(json, doc_id=doc_id)
+        return self._dbpool.create_doc_from_json(json, doc_id=doc_id)
 
     def create_index(self, index_name, *index_expressions):
         """
@@ -462,8 +448,8 @@ class Soledad(object):
 
         :param index_name: A unique name which can be used as a key prefix
         :type index_name: str
-        :param index_expressions: index expressions defining the index
-                                  information.
+        :param index_expressions:
+            index expressions defining the index information.
         :type index_expressions: dict
 
             Examples:
@@ -473,9 +459,7 @@ class Soledad(object):
 
             "number(fieldname, width)", "lower(fieldname)"
         """
-        if self._db:
-            return self._db.create_index(
-                index_name, *index_expressions)
+        return self._dbpool.create_index(index_name, *index_expressions)
 
     def delete_index(self, index_name):
         """
@@ -484,8 +468,7 @@ class Soledad(object):
         :param index_name: The name of the index we are removing
         :type index_name: str
         """
-        if self._db:
-            return self._db.delete_index(index_name)
+        return self._dbpool.delete_index(index_name)
 
     def list_indexes(self):
         """
@@ -494,8 +477,7 @@ class Soledad(object):
         :return: A list of [('index-name', ['field', 'field2'])] definitions.
         :rtype: list
         """
-        if self._db:
-            return self._db.list_indexes()
+        return self._dbpool.list_indexes()
 
     def get_from_index(self, index_name, *key_values):
         """
@@ -517,8 +499,7 @@ class Soledad(object):
         :return: List of [Document]
         :rtype: list
         """
-        if self._db:
-            return self._db.get_from_index(index_name, *key_values)
+        return self._dbpool.get_from_index(index_name, *key_values)
 
     def get_count_from_index(self, index_name, *key_values):
         """
@@ -534,8 +515,7 @@ class Soledad(object):
         :return: count.
         :rtype: int
         """
-        if self._db:
-            return self._db.get_count_from_index(index_name, *key_values)
+        return self._dbpool.get_count_from_index(index_name, *key_values)
 
     def get_range_from_index(self, index_name, start_value, end_value):
         """
@@ -561,12 +541,11 @@ class Soledad(object):
             range. eg, if you have an index with 3 fields then you would have:
             (val1, val2, val3)
         :type end_values: tuple
-        :return: List of [Document]
-        :rtype: list
+        :return: A deferred that will fire with a list of [Document]
+        :rtype: Deferred
         """
-        if self._db:
-            return self._db.get_range_from_index(
-                index_name, start_value, end_value)
+        return self._dbpool.get_range_from_index(
+            index_name, start_value, end_value)
 
     def get_index_keys(self, index_name):
         """
@@ -574,11 +553,11 @@ class Soledad(object):
 
         :param index_name: The index to query
         :type index_name: str
-        :return: [] A list of tuples of indexed keys.
-        :rtype: list
+        :return:
+            A deferred that will fire with a list of tuples of indexed keys.
+        :rtype: Deferred
         """
-        if self._db:
-            return self._db.get_index_keys(index_name)
+        return self._dbpool.get_index_keys(index_name)
 
     def get_doc_conflicts(self, doc_id):
         """
@@ -587,11 +566,12 @@ class Soledad(object):
         :param doc_id: the document id
         :type doc_id: str
 
-        :return: a list of the document entries that are conflicted
-        :rtype: list
+        :return:
+            A deferred that will fire with a list of the document entries that
+            are conflicted.
+        :rtype: Deferred
         """
-        if self._db:
-            return self._db.get_doc_conflicts(doc_id)
+        return self._dbpool.get_doc_conflicts(doc_id)
 
     def resolve_doc(self, doc, conflicted_doc_revs):
         """
@@ -599,12 +579,18 @@ class Soledad(object):
 
         :param doc: a document with the new content to be inserted.
         :type doc: SoledadDocument
-        :param conflicted_doc_revs: a list of revisions that the new content
-                                    supersedes.
+        :param conflicted_doc_revs:
+            A deferred that will fire with a list of revisions that the new
+            content supersedes.
         :type conflicted_doc_revs: list
         """
-        if self._db:
-            return self._db.resolve_doc(doc, conflicted_doc_revs)
+        return self._dbpool.resolve_doc(doc, conflicted_doc_revs)
+
+    #
+    # Sync API
+    #
+
+    # TODO have interfaces, and let it implement it.
 
     def sync(self, defer_decryption=True):
         """
@@ -616,33 +602,38 @@ class Soledad(object):
         :param url: the url of the target replica to sync with
         :type url: str
 
-        :param defer_decryption: Whether to defer the decryption process using
-                                 the intermediate database. If False,
-                                 decryption will be done inline.
+        :param defer_decryption:
+            Whether to defer the decryption process using the intermediate
+            database. If False, decryption will be done inline.
         :type defer_decryption: bool
 
-        :return: The local generation before the synchronisation was
-                 performed.
+        :return:
+            A deferred that will fire with the local generation before the
+            synchronisation was performed.
         :rtype: str
         """
-        if self._db:
-            try:
-                local_gen = self._db.sync(
-                    urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                    creds=self._creds, autocreate=False,
-                    defer_decryption=defer_decryption)
-                soledad_events.signal(
-                    soledad_events.SOLEDAD_DONE_DATA_SYNC, self._uuid)
-                return local_gen
-            except Exception as e:
-                logger.error("Soledad exception when syncing: %s" % str(e))
+        # TODO this needs work.
+        # Should:
+        # (1) Defer to the syncer pool
+        # (2) Return a deferred (the deferToThreadpool can be good)
+        # (3) Add the callback for signaling the event
+        # (4) Let the local gen be returned from the thread
+        try:
+            local_gen = self._dbsyncer.sync(
+                urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
+                creds=self._creds, autocreate=False,
+                defer_decryption=defer_decryption)
+            soledad_events.signal(
+                soledad_events.SOLEDAD_DONE_DATA_SYNC, self._uuid)
+            return local_gen
+        except Exception as e:
+            logger.error("Soledad exception when syncing: %s" % str(e))
 
     def stop_sync(self):
         """
         Stop the current syncing process.
         """
-        if self._db:
-            self._db.stop_sync()
+        self._dbsyncer.stop_sync()
 
     def need_sync(self, url):
         """
@@ -654,12 +645,18 @@ class Soledad(object):
         :return: Whether remote replica and local replica differ.
         :rtype: bool
         """
+        # XXX pass the get_replica_uid ------------------------
+        # From where? initialize with that?
+        replica_uid = self._db._get_replica_uid()
         target = SoledadSyncTarget(
-            url, self._db._get_replica_uid(), creds=self._creds,
-            crypto=self._crypto)
-        info = target.get_sync_info(self._db._get_replica_uid())
+            url, replica_uid, creds=self._creds, crypto=self._crypto)
+
+        generation = self._db._get_generation()
+        # XXX better unpack it?
+        info = target.get_sync_info(replica_uid)
+
         # compare source generation with target's last known source generation
-        if self._db._get_generation() != info[4]:
+        if generation != info[4]:
             soledad_events.signal(
                 soledad_events.SOLEDAD_NEW_DATA_TO_SYNC, self._uuid)
             return True
@@ -670,7 +667,7 @@ class Soledad(object):
         """
         Property, True if the syncer is syncing.
         """
-        return self._db.syncing
+        return self._dbsyncer.syncing
 
     def _set_token(self, token):
         """
@@ -781,6 +778,39 @@ class Soledad(object):
         self._secrets.change_passphrase(new_passphrase)
 
 
+def _convert_to_unicode(content):
+    """
+    Convert content to unicode (or all the strings in content)
+
+    NOTE: Even though this method supports any type, it will
+    currently ignore contents of lists, tuple or any other
+    iterable than dict. We don't need support for these at the
+    moment
+
+    :param content: content to convert
+    :type content: object
+
+    :rtype: object
+    """
+    if isinstance(content, unicode):
+        return content
+    elif isinstance(content, str):
+        result = chardet.detect(content)
+        default = "utf-8"
+        encoding = result["encoding"] or default
+        try:
+            content = content.decode(encoding)
+        except UnicodeError as e:
+            logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
+            content = content.decode(encoding, 'replace')
+        return content
+    else:
+        if isinstance(content, dict):
+            for key in content.keys():
+                content[key] = _convert_to_unicode(content[key])
+    return content
+
+
 # ----------------------------------------------------------------------------
 # Monkey patching u1db to be able to provide a custom SSL cert
 # ----------------------------------------------------------------------------
@@ -819,4 +849,3 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
 
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
 http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection
-

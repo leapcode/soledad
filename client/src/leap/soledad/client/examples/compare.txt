@@ -1,0 +1,8 @@
+TIMES=100 TMPDIR=/media/sdb5/leap python use_adbapi.py  1.34s user 0.16s system 53% cpu 2.832 total
+TIMES=100 TMPDIR=/media/sdb5/leap python use_api.py  1.22s user 0.14s system 62% cpu 2.181 total
+
+TIMES=1000 TMPDIR=/media/sdb5/leap python use_api.py  2.18s user 0.34s system 27% cpu 9.213 total
+TIMES=1000 TMPDIR=/media/sdb5/leap python use_adbapi.py  2.40s user 0.34s system 39% cpu 7.004 total
+
+TIMES=5000 TMPDIR=/media/sdb5/leap python use_api.py  6.63s user 1.27s system 13% cpu 57.882 total
+TIMES=5000 TMPDIR=/media/sdb5/leap python use_adbapi.py  6.84s user 1.26s system 36% cpu 22.367 total

@@ -15,18 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Different pragmas used in the SQLCIPHER database.
+Different pragmas used in the initialization of the SQLCipher database.
 """
-# TODO ---------------------------------------------------------------
-# Work In Progress.
-# We need to reduce the impedance mismatch between the current soledad
-# implementation and the eventually asynchronous api.
-# So... how to plug it in, allowing for an optional sync / async coexistence?
-# One of the first things is to isolate all the pragmas work that has to be
-# done during initialization.
-# And, instead of having all of them passed the db_handle and executing that,
-# we could have just a string returned, that can be chained to a deferred.
-# ---------------------------------------------------------------------
 import logging
 import string
 
@@ -81,7 +71,7 @@ def _set_key(db_handle, key, is_raw_key):
         _set_key_passphrase(db_handle, key)
 
 
-def _set_key_passphrase(cls, db_handle, passphrase):
+def _set_key_passphrase(db_handle, passphrase):
     """
     Set a passphrase for encryption key derivation.
 
@@ -265,7 +255,7 @@ def _set_rekey_passphrase(db_handle, passphrase):
     db_handle.cursor().execute("PRAGMA rekey = '%s'" % passphrase)
 
 
-def _set_rekey_raw(cls, db_handle, key):
+def _set_rekey_raw(db_handle, key):
     """
     Change the raw hexadecimal encryption key.
 
@@ -300,7 +290,7 @@ def set_synchronous_normal(db_handle):
     db_handle.cursor().execute('PRAGMA synchronous=NORMAL')
 
 
-def set_mem_temp_store(cls, db_handle):
+def set_mem_temp_store(db_handle):
     """
     Use a in-memory store for temporary tables.
     """
@@ -308,7 +298,7 @@ def set_mem_temp_store(cls, db_handle):
     db_handle.cursor().execute('PRAGMA temp_store=MEMORY')
 
 
-def set_write_ahead_logging(cls, db_handle):
+def set_write_ahead_logging(db_handle):
     """
     Enable write-ahead logging, and set the autocheckpoint to 50 pages.
 

@@ -10,3 +10,4 @@ MANIFEST
 *.pyc
 *.log
 *.*~
+*.csv
