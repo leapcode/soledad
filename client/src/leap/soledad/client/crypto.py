@@ -521,7 +521,7 @@ class SyncEncryptDecryptPool(object):
     """
     Base class for encrypter/decrypter pools.
     """
-    WORKERS = 5
+    WORKERS = multiprocessing.cpu_count()
 
     def __init__(self, crypto, sync_db, write_lock):
         """
@@ -590,7 +590,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
     of documents to be synced.
     """
     # TODO implement throttling to reduce cpu usage??
-    WORKERS = 5
+    WORKERS = multiprocessing.cpu_count()
     TABLE_NAME = "docs_tosync"
     FIELD_NAMES = "doc_id, rev, content"
 
