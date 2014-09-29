@@ -1176,6 +1176,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         synced = []
         number_of_docs = len(docs_by_generations)
 
+        last_request_lock = None
         for doc, gen, trans_id in docs_by_generations:
             # allow for interrupting the sync process
             if self.stopped is True:
@@ -1212,7 +1213,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             # end of symmetric encryption
             # -------------------------------------------------------------
             t = syncer_pool.new_syncer_thread(
-                sent + 1, total, last_request_lock=None,
+                sent + 1, total, last_request_lock=last_request_lock,
                 last_callback_lock=last_callback_lock)
 
             # bail out if any thread failed
@@ -1249,7 +1250,12 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             # save thread and append
             t.start()
             threads.append((t, doc))
+
+            # update lock references so they can be used in next call to
+            # syncer_pool.new_syncer_thread() above
             last_callback_lock = t.callback_lock
+            last_request_lock = t.request_lock
+
             sent += 1
 
         # make sure all threads finished and we have up-to-date info
