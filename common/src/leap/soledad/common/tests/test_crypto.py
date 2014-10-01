@@ -14,37 +14,17 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Tests for cryptographic related stuff.
 """
-
 import os
-import shutil
-import tempfile
-import simplejson as json
 import hashlib
 import binascii
 
-
-from leap.common.testing.basetest import BaseLeapTest
-from leap.soledad.client import (
-    Soledad,
-    crypto,
-    target,
-)
+from leap.soledad.client import crypto
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.tests import (
-    BaseSoledadTest,
-    KEY_FINGERPRINT,
-    PRIVATE_KEY,
-)
+from leap.soledad.common.tests import BaseSoledadTest
 from leap.soledad.common.crypto import WrongMac, UnknownMacMethod
-from leap.soledad.common.tests.u1db_tests import (
-    simple_doc,
-    nested_doc,
-)
 
 
 class EncryptedSyncTestCase(BaseSoledadTest):
@@ -59,16 +39,17 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         simpledoc = {'key': 'val'}
         doc1 = SoledadDocument(doc_id='id')
         doc1.content = simpledoc
+
         # encrypt doc
-        doc1.set_json(target.encrypt_doc(self._soledad._crypto, doc1))
+        doc1.set_json(crypto.encrypt_doc(self._soledad._crypto, doc1))
         # assert content is different and includes keys
         self.assertNotEqual(
             simpledoc, doc1.content,
             'incorrect document encryption')
-        self.assertTrue(target.ENC_JSON_KEY in doc1.content)
-        self.assertTrue(target.ENC_SCHEME_KEY in doc1.content)
+        self.assertTrue(crypto.ENC_JSON_KEY in doc1.content)
+        self.assertTrue(crypto.ENC_SCHEME_KEY in doc1.content)
         # decrypt doc
-        doc1.set_json(target.decrypt_doc(self._soledad._crypto, doc1))
+        doc1.set_json(crypto.decrypt_doc(self._soledad._crypto, doc1))
         self.assertEqual(
             simpledoc, doc1.content, 'incorrect document encryption')
 
@@ -159,15 +140,15 @@ class MacAuthTestCase(BaseSoledadTest):
         doc = SoledadDocument(doc_id='id')
         doc.content = simpledoc
         # encrypt doc
-        doc.set_json(target.encrypt_doc(self._soledad._crypto, doc))
-        self.assertTrue(target.MAC_KEY in doc.content)
-        self.assertTrue(target.MAC_METHOD_KEY in doc.content)
+        doc.set_json(crypto.encrypt_doc(self._soledad._crypto, doc))
+        self.assertTrue(crypto.MAC_KEY in doc.content)
+        self.assertTrue(crypto.MAC_METHOD_KEY in doc.content)
         # mess with MAC
-        doc.content[target.MAC_KEY] = '1234567890ABCDEF'
+        doc.content[crypto.MAC_KEY] = '1234567890ABCDEF'
         # try to decrypt doc
         self.assertRaises(
             WrongMac,
-            target.decrypt_doc, self._soledad._crypto, doc)
+            crypto.decrypt_doc, self._soledad._crypto, doc)
 
     def test_decrypt_with_unknown_mac_method_raises(self):
         """
@@ -177,15 +158,15 @@ class MacAuthTestCase(BaseSoledadTest):
         doc = SoledadDocument(doc_id='id')
         doc.content = simpledoc
         # encrypt doc
-        doc.set_json(target.encrypt_doc(self._soledad._crypto, doc))
-        self.assertTrue(target.MAC_KEY in doc.content)
-        self.assertTrue(target.MAC_METHOD_KEY in doc.content)
+        doc.set_json(crypto.encrypt_doc(self._soledad._crypto, doc))
+        self.assertTrue(crypto.MAC_KEY in doc.content)
+        self.assertTrue(crypto.MAC_METHOD_KEY in doc.content)
         # mess with MAC method
-        doc.content[target.MAC_METHOD_KEY] = 'mymac'
+        doc.content[crypto.MAC_METHOD_KEY] = 'mymac'
         # try to decrypt doc
         self.assertRaises(
             UnknownMacMethod,
-            target.decrypt_doc, self._soledad._crypto, doc)
+            crypto.decrypt_doc, self._soledad._crypto, doc)
 
 
 class SoledadCryptoAESTestCase(BaseSoledadTest):

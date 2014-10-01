@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# test_target.py
-# Copyright (C) 2013 LEAP
+# test_sync_target.py
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,18 +14,18 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
-Test Leap backend bits.
+Test Leap backend bits: sync target
 """
-
-import u1db
-import os
-import ssl
-import simplejson as json
 import cStringIO
+import os
 
+import simplejson as json
+import u1db
+
+from uuid import uuid4
+
+from u1db.remote import http_database
 
 from u1db import SyncTarget
 from u1db.sync import Synchronizer
@@ -39,6 +39,7 @@ from leap.soledad import client
 from leap.soledad.client import (
     target,
     auth,
+    crypto,
     VerifiedHTTPSConnection,
     sync,
 )
@@ -55,16 +56,15 @@ from leap.soledad.common.tests.util import (
     SoledadWithCouchServerMixin,
 )
 from leap.soledad.common.tests.u1db_tests import test_backends
-from leap.soledad.common.tests.u1db_tests import test_http_database
-from leap.soledad.common.tests.u1db_tests import test_http_client
-from leap.soledad.common.tests.u1db_tests import test_document
 from leap.soledad.common.tests.u1db_tests import test_remote_sync_target
-from leap.soledad.common.tests.u1db_tests import test_https
 from leap.soledad.common.tests.u1db_tests import test_sync
 from leap.soledad.common.tests.test_couch import (
     CouchDBTestCase,
     CouchDBWrapper,
 )
+
+from leap.soledad.server import SoledadApp
+from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
 #-----------------------------------------------------------------------------
@@ -116,122 +116,6 @@ def copy_token_http_database_for_test(test, db):
     return http_db
 
 
-class SoledadTests(test_backends.AllDatabaseTests, BaseSoledadTest):
-
-    scenarios = LEAP_SCENARIOS + [
-        ('token_http', {'make_database_for_test':
-                        make_token_http_database_for_test,
-                        'copy_database_for_test':
-                        copy_token_http_database_for_test,
-                        'make_document_for_test': make_leap_document_for_test,
-                        'make_app_with_state': make_token_soledad_app,
-                        })
-    ]
-
-
-#-----------------------------------------------------------------------------
-# The following tests come from `u1db.tests.test_http_client`.
-#-----------------------------------------------------------------------------
-
-class TestSoledadClientBase(test_http_client.TestHTTPClientBase):
-    """
-    This class should be used to test Token auth.
-    """
-
-    def getClientWithToken(self, **kwds):
-        self.startServer()
-
-        class _HTTPClientWithToken(
-                http_client.HTTPClientBase, auth.TokenBasedAuth):
-
-            def set_token_credentials(self, uuid, token):
-                auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
-
-            def _sign_request(self, method, url_query, params):
-                return auth.TokenBasedAuth._sign_request(
-                    self, method, url_query, params)
-
-        return _HTTPClientWithToken(self.getURL('dbase'), **kwds)
-
-    def test_oauth(self):
-        """
-        Suppress oauth test (we test for token auth here).
-        """
-        pass
-
-    def test_oauth_ctr_creds(self):
-        """
-        Suppress oauth test (we test for token auth here).
-        """
-        pass
-
-    def test_oauth_Unauthorized(self):
-        """
-        Suppress oauth test (we test for token auth here).
-        """
-        pass
-
-    def app(self, environ, start_response):
-        res = test_http_client.TestHTTPClientBase.app(
-            self, environ, start_response)
-        if res is not None:
-            return res
-        # mime solead application here.
-        if '/token' in environ['PATH_INFO']:
-            auth = environ.get(SoledadTokenAuthMiddleware.HTTP_AUTH_KEY)
-            if not auth:
-                start_response("401 Unauthorized",
-                               [('Content-Type', 'application/json')])
-                return [json.dumps({"error": "unauthorized",
-                                    "message": e.message})]
-            scheme, encoded = auth.split(None, 1)
-            if scheme.lower() != 'token':
-                start_response("401 Unauthorized",
-                               [('Content-Type', 'application/json')])
-                return [json.dumps({"error": "unauthorized",
-                                    "message": e.message})]
-            uuid, token = encoded.decode('base64').split(':', 1)
-            if uuid != 'user-uuid' and token != 'auth-token':
-                return unauth_err("Incorrect address or token.")
-            start_response("200 OK", [('Content-Type', 'application/json')])
-            return [json.dumps([environ['PATH_INFO'], uuid, token])]
-
-    def test_token(self):
-        """
-        Test if token is sent correctly.
-        """
-        cli = self.getClientWithToken()
-        cli.set_token_credentials('user-uuid', 'auth-token')
-        res, headers = cli._request('GET', ['doc', 'token'])
-        self.assertEqual(
-            ['/dbase/doc/token', 'user-uuid', 'auth-token'], json.loads(res))
-
-    def test_token_ctr_creds(self):
-        cli = self.getClientWithToken(creds={'token': {
-            'uuid': 'user-uuid',
-            'token': 'auth-token',
-        }})
-        res, headers = cli._request('GET', ['doc', 'token'])
-        self.assertEqual(
-            ['/dbase/doc/token', 'user-uuid', 'auth-token'], json.loads(res))
-
-
-#-----------------------------------------------------------------------------
-# The following tests come from `u1db.tests.test_document`.
-#-----------------------------------------------------------------------------
-
-class TestSoledadDocument(test_document.TestDocument, BaseSoledadTest):
-
-    scenarios = ([(
-        'leap', {'make_document_for_test': make_leap_document_for_test})])
-
-
-class TestSoledadPyDocument(test_document.TestPyDocument, BaseSoledadTest):
-
-    scenarios = ([(
-        'leap', {'make_document_for_test': make_leap_document_for_test})])
-
-
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 #-----------------------------------------------------------------------------
@@ -271,7 +155,13 @@ class TestSoledadParsingSyncStream(
         """
         doc = SoledadDocument('i', rev='r')
         doc.content = {}
-        enc_json = target.encrypt_doc(self._soledad._crypto, doc)
+        _crypto = self._soledad._crypto
+        key = _crypto.doc_passphrase(doc.doc_id)
+        secret = _crypto.secret
+
+        enc_json = crypto.encrypt_docstr(
+            doc.get_json(), doc.doc_id, doc.rev,
+            key, secret)
         tgt = target.SoledadSyncTarget(
             "http://foo/foo", crypto=self._soledad._crypto)
 
@@ -409,7 +299,8 @@ class TestSoledadSyncTarget(
         doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
         new_gen, trans_id = remote_target.sync_exchange(
             [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, return_doc_cb=receive_doc)
+            last_known_trans_id=None, return_doc_cb=receive_doc,
+            defer_decryption=False)
         self.assertEqual(1, new_gen)
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
@@ -446,8 +337,7 @@ class TestSoledadSyncTarget(
                                      replica_gen=replica_gen,
                                      replica_trans_id=replica_trans_id,
                                      number_of_docs=number_of_docs,
-                                     doc_idx=doc_idx,
-                                     sync_id=sync_id)
+                                     doc_idx=doc_idx, sync_id=sync_id)
         from leap.soledad.common.tests.test_couch import IndexedCouchDatabase
         self.patch(
             IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
@@ -461,7 +351,8 @@ class TestSoledadSyncTarget(
         doc1 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
         doc2 = self.make_document('doc-here2', 'replica:1',
                                   '{"value": "here2"}')
-        # We do not expect an exception here because the sync fails gracefully
+
+        # we do not expect an HTTPError because soledad sync fails gracefully
         remote_target.sync_exchange(
             [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
             'replica', last_known_generation=0, last_known_trans_id=None,
@@ -508,7 +399,7 @@ class TestSoledadSyncTarget(
         new_gen, trans_id = remote_target.sync_exchange(
             [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
             last_known_trans_id=None, return_doc_cb=receive_doc,
-            ensure_callback=ensure_cb)
+            ensure_callback=ensure_cb, defer_decryption=False)
         self.assertEqual(1, new_gen)
         db = self.request_state.open_database('test')
         self.assertEqual(1, len(replica_uid_box))
@@ -520,107 +411,6 @@ class TestSoledadSyncTarget(
         # we bypass this test because our sync_exchange process does not
         # return u1db error 503 "unavailable" for now.
         pass
-
-
-#-----------------------------------------------------------------------------
-# The following tests come from `u1db.tests.test_https`.
-#-----------------------------------------------------------------------------
-
-def token_leap_https_sync_target(test, host, path):
-    _, port = test.server.server_address
-    st = target.SoledadSyncTarget(
-        'https://%s:%d/%s' % (host, port, path),
-        crypto=test._soledad._crypto)
-    st.set_token_credentials('user-uuid', 'auth-token')
-    return st
-
-
-class TestSoledadSyncTargetHttpsSupport(
-        test_https.TestHttpSyncTargetHttpsSupport,
-        BaseSoledadTest):
-
-    scenarios = [
-        ('token_soledad_https',
-            {'server_def': test_https.https_server_def,
-             'make_app_with_state': make_token_soledad_app,
-             'make_document_for_test': make_leap_document_for_test,
-             'sync_target': token_leap_https_sync_target}),
-    ]
-
-    def setUp(self):
-        # the parent constructor undoes our SSL monkey patch to ensure tests
-        # run smoothly with standard u1db.
-        test_https.TestHttpSyncTargetHttpsSupport.setUp(self)
-        # so here monkey patch again to test our functionality.
-        http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection
-        client.SOLEDAD_CERT = http_client.CA_CERTS
-
-    def test_working(self):
-        """
-        Test that SSL connections work well.
-
-        This test was adapted to patch Soledad's HTTPS connection custom class
-        with the intended CA certificates.
-        """
-        self.startServer()
-        db = self.request_state._create_database('test')
-        self.patch(client, 'SOLEDAD_CERT', self.cacert_pem)
-        remote_target = self.getSyncTarget('localhost', 'test')
-        remote_target.record_sync_info('other-id', 2, 'T-id')
-        self.assertEqual(
-            (2, 'T-id'), db._get_replica_gen_and_trans_id('other-id'))
-
-    def test_host_mismatch(self):
-        """
-        Test that SSL connections to a hostname different than the one in the
-        certificate raise CertificateError.
-
-        This test was adapted to patch Soledad's HTTPS connection custom class
-        with the intended CA certificates.
-        """
-        self.startServer()
-        self.request_state._create_database('test')
-        self.patch(client, 'SOLEDAD_CERT', self.cacert_pem)
-        remote_target = self.getSyncTarget('127.0.0.1', 'test')
-        self.assertRaises(
-            http_client.CertificateError, remote_target.record_sync_info,
-            'other-id', 2, 'T-id')
-
-
-#-----------------------------------------------------------------------------
-# The following tests come from `u1db.tests.test_http_database`.
-#-----------------------------------------------------------------------------
-
-class _HTTPDatabase(http_database.HTTPDatabase, auth.TokenBasedAuth):
-    """
-    Wraps our token auth implementation.
-    """
-
-    def set_token_credentials(self, uuid, token):
-        auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
-
-    def _sign_request(self, method, url_query, params):
-        return auth.TokenBasedAuth._sign_request(
-            self, method, url_query, params)
-
-
-class TestHTTPDatabaseWithCreds(
-        test_http_database.TestHTTPDatabaseCtrWithCreds):
-
-    def test_get_sync_target_inherits_token_credentials(self):
-        # this test was from TestDatabaseSimpleOperations but we put it here
-        # for convenience.
-        self.db = _HTTPDatabase('dbase')
-        self.db.set_token_credentials('user-uuid', 'auth-token')
-        st = self.db.get_sync_target()
-        self.assertEqual(self.db._creds, st._creds)
-
-    def test_ctr_with_creds(self):
-        db1 = _HTTPDatabase('http://dbs/db', creds={'token': {
-            'uuid': 'user-uuid',
-            'token': 'auth-token',
-        }})
-        self.assertIn('token', db1._creds)
 
 
 #-----------------------------------------------------------------------------
@@ -660,7 +450,8 @@ class SoledadDatabaseSyncTargetTests(
              'T-sid')]
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, return_doc_cb=self.receive_doc)
+            last_known_trans_id=None, return_doc_cb=self.receive_doc,
+            defer_decryption=False)
         self.assertGetEncryptedDoc(
             self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertTransactionLog(['doc-id'], self.db)
@@ -683,7 +474,8 @@ class SoledadDatabaseSyncTargetTests(
                 'doc-id2', 'replica:1', tests.nested_doc), 11, 'T-2')]
         new_gen, trans_id = self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, return_doc_cb=self.receive_doc)
+            last_known_trans_id=None, return_doc_cb=self.receive_doc,
+            defer_decryption=False)
         self.assertGetEncryptedDoc(
             self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertGetEncryptedDoc(
@@ -707,7 +499,8 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
         new_gen, _ = self.st.sync_exchange(
             [], 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, return_doc_cb=self.receive_doc)
+            last_known_trans_id=None, return_doc_cb=self.receive_doc,
+            defer_decryption=False)
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
         self.assertEqual(2, new_gen)
         self.assertEqual(
@@ -749,7 +542,8 @@ class TestSoledadDbSync(
 
     def do_sync(self, target_name):
         """
-        Perform sync using SoledadSyncTarget and Token auth.
+        Perform sync using SoledadSynchronizer, SoledadSyncTarget
+        and Token auth.
         """
         if self.token:
             extra = dict(creds={'token': {
@@ -757,12 +551,13 @@ class TestSoledadDbSync(
                 'token': 'auth-token',
             }})
             target_url = self.getURL(target_name)
-            return Synchronizer(
+            return sync.SoledadSynchronizer(
                 self.db,
                 target.SoledadSyncTarget(
                     target_url,
                     crypto=self._soledad._crypto,
-                    **extra)).sync(autocreate=True)
+                    **extra)).sync(autocreate=True,
+                                   defer_decryption=False)
         else:
             return test_sync.TestDbSync.do_sync(self, target_name)
 

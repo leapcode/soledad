@@ -223,33 +223,48 @@ class Soledad(object):
     """
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
-                 server_url, cert_file, auth_token=None, secret_id=None):
+                 server_url, cert_file,
+                 auth_token=None, secret_id=None, defer_encryption=False):
         """
         Initialize configuration, cryptographic keys and dbs.
 
         :param uuid: User's uuid.
         :type uuid: str
+
         :param passphrase: The passphrase for locking and unlocking encryption
                            secrets for local and remote storage.
         :type passphrase: unicode
+
         :param secrets_path: Path for storing encrypted key used for
                              symmetric encryption.
         :type secrets_path: str
+
         :param local_db_path: Path for local encrypted storage db.
         :type local_db_path: str
+
         :param server_url: URL for Soledad server. This is used either to sync
-            with the user's remote db and to interact with the shared recovery
-            database.
+                           with the user's remote db and to interact with the
+                           shared recovery database.
         :type server_url: str
+
         :param cert_file: Path to the certificate of the ca used
                           to validate the SSL certificate used by the remote
                           soledad server.
         :type cert_file: str
+
         :param auth_token: Authorization token for accessing remote databases.
         :type auth_token: str
 
+        :param secret_id: The id of the storage secret to be used.
+        :type secret_id: str
+
+        :param defer_encryption: Whether to defer encryption/decryption of
+                                 documents, or do it inline while syncing.
+        :type defer_encryption: bool
+
         :raise BootstrapSequenceError: Raised when the secret generation and
-            storage on server sequence has failed for some reason.
+                                       storage on server sequence has failed
+                                       for some reason.
         """
         # get config params
         self._uuid = uuid
@@ -258,8 +273,10 @@ class Soledad(object):
         # init crypto variables
         self._secrets = {}
         self._secret_id = secret_id
-        # init config (possibly with default values)
+        self._defer_encryption = defer_encryption
+
         self._init_config(secrets_path, local_db_path, server_url)
+
         self._set_token(auth_token)
         self._shared_db_instance = None
         # configure SSL certificate
@@ -390,6 +407,7 @@ class Soledad(object):
             # release the lock on shared db
             try:
                 self._shared_db.unlock(token)
+                self._shared_db.close()
             except NotLockedError:
                 # for some reason the lock expired. Despite that, secret
                 # loading or generation/storage must have been executed
@@ -469,23 +487,19 @@ class Soledad(object):
             create=True,
             document_factory=SoledadDocument,
             crypto=self._crypto,
-            raw_key=True)
+            raw_key=True,
+            defer_encryption=self._defer_encryption)
 
     def close(self):
         """
         Close underlying U1DB database.
         """
+        logger.debug("Closing soledad")
         if hasattr(self, '_db') and isinstance(
                 self._db,
                 SQLCipherDatabase):
+            self._db.stop_sync()
             self._db.close()
-
-    def __del__(self):
-        """
-        Make sure local database is closed when object is destroyed.
-        """
-        # Watch out! We have no guarantees  that this is properly called.
-        self.close()
 
     #
     # Management of secret for symmetric encryption.
@@ -520,6 +534,9 @@ class Soledad(object):
         Define the id of the storage secret to be used.
 
         This method will also replace the secret in the crypto object.
+
+        :param secret_id: The id of the storage secret to be used.
+        :type secret_id: str
         """
         self._secret_id = secret_id
 
@@ -881,7 +898,7 @@ class Soledad(object):
         :type json: str
         :param doc_id: An optional identifier specifying the document id.
         :type doc_id:
-        :return: The new cocument
+        :return: The new document
         :rtype: SoledadDocument
         """
         return self._db.create_doc_from_json(json, doc_id=doc_id)
@@ -1041,7 +1058,7 @@ class Soledad(object):
         if self._db:
             return self._db.resolve_doc(doc, conflicted_doc_revs)
 
-    def sync(self):
+    def sync(self, defer_decryption=True):
         """
         Synchronize the local encrypted replica with a remote replica.
 
@@ -1051,16 +1068,25 @@ class Soledad(object):
         :param url: the url of the target replica to sync with
         :type url: str
 
-        :return: the local generation before the synchronisation was
-            performed.
+        :param defer_decryption: Whether to defer the decryption process using
+                                 the intermediate database. If False,
+                                 decryption will be done inline.
+        :type defer_decryption: bool
+
+        :return: The local generation before the synchronisation was
+                 performed.
         :rtype: str
         """
         if self._db:
+            try:
                 local_gen = self._db.sync(
                     urlparse.urljoin(self.server_url, 'user-%s' % self._uuid),
-                    creds=self._creds, autocreate=False)
+                    creds=self._creds, autocreate=False,
+                    defer_decryption=defer_decryption)
                 signal(SOLEDAD_DONE_DATA_SYNC, self._uuid)
                 return local_gen
+            except Exception as e:
+                logger.error("Soledad exception when syncing: %s" % str(e))
 
     def stop_sync(self):
         """
@@ -1079,13 +1105,22 @@ class Soledad(object):
         :return: Whether remote replica and local replica differ.
         :rtype: bool
         """
-        target = SoledadSyncTarget(url, creds=self._creds, crypto=self._crypto)
+        target = SoledadSyncTarget(
+            url, self._db._get_replica_uid(), creds=self._creds,
+            crypto=self._crypto)
         info = target.get_sync_info(self._db._get_replica_uid())
         # compare source generation with target's last known source generation
         if self._db._get_generation() != info[4]:
             signal(SOLEDAD_NEW_DATA_TO_SYNC, self._uuid)
             return True
         return False
+
+    @property
+    def syncing(self):
+        """
+        Property, True if the syncer is syncing.
+        """
+        return self._db.syncing
 
     def _set_token(self, token):
         """

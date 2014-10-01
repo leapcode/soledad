@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# test_soledad.py
-# Copyright (C) 2013 LEAP
+# test_couch_operations_atomicity.py
+# Copyright (C) 2013, 2014 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,11 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
+Test atomocity for couch operations.
 """
-
 import os
 import mock
 import tempfile
@@ -32,7 +30,7 @@ from leap.soledad.client import Soledad
 from leap.soledad.common.couch import CouchDatabase, CouchServerState
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
-from leap.soledad.common.tests.test_target import (
+from leap.soledad.common.tests.test_sync_target import (
     make_token_soledad_app,
     make_leap_document_for_test,
     token_leap_sync_target,
@@ -224,9 +222,9 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
     #
     # Concurrency tests
     #
-    
+
     class _WorkerThread(threading.Thread):
-        
+
         def __init__(self, params, run_method):
             threading.Thread.__init__(self)
             self._params = params
@@ -260,7 +258,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
         for thread in threads:
             thread.join()
-        
+
         # assert length of transaction_log
         transaction_log = self.db._get_transaction_log()
         self.assertEqual(
@@ -341,7 +339,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         # wait for threads to finish
         for thread in threads:
             thread.join()
-        
+
         # do the sync!
         sol.sync()
 

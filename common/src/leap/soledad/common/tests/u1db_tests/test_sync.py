@@ -1151,6 +1151,9 @@ class TestDbSync(tests.TestCaseWithServer):
         target_url = self.getURL(path)
         return self.db.sync(target_url, **extra)
 
+    def sync(self, callback=None, autocreate=False, defer_decryption=False):
+        return super(TestDbSync, self).sync(callback, autocreate)
+
     def setUp(self):
         super(TestDbSync, self).setUp()
         self.startServer()
