@@ -144,8 +144,7 @@ class SoledadSecrets(object):
     Keys used to access storage secrets in recovery documents.
     """
 
-    def __init__(self, uuid, passphrase, secrets_path, shared_db, crypto,
-                 secret_id=None):
+    def __init__(self, uuid, passphrase, secrets_path, shared_db, crypto):
         """
         Initialize the secrets manager.
 
@@ -161,16 +160,19 @@ class SoledadSecrets(object):
         :type shared_db: leap.soledad.client.shared_db.SoledadSharedDatabase
         :param crypto: A soledad crypto object.
         :type crypto: SoledadCrypto
-        :param secret_id: The id of the storage secret to be used.
-        :type secret_id: str
         """
+        # XXX removed since not in use
+        # We will pick the first secret available.
+        # param secret_id: The id of the storage secret to be used.
+
         self._uuid = uuid
         self._passphrase = passphrase
         self._secrets_path = secrets_path
         self._shared_db = shared_db
         self._crypto = crypto
-        self._secret_id = secret_id
         self._secrets = {}
+
+        self._secret_id = None
 
     def bootstrap(self):
         """
@@ -247,7 +249,8 @@ class SoledadSecrets(object):
             try:
                 self._load_secrets()  # try to load from disk
             except IOError as e:
-                logger.warning('IOError while loading secrets from disk: %s' % str(e))
+                logger.warning(
+                    'IOError while loading secrets from disk: %s' % str(e))
                 return False
         return self.storage_secret is not None
 

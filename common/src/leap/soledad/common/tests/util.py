@@ -47,7 +47,8 @@ PASSWORD = '123456'
 
 
 def make_sqlcipher_database_for_test(test, replica_uid):
-    db = SQLCipherDatabase(':memory:', PASSWORD)
+    db = SQLCipherDatabase(
+        SQLCipherOptions(':memory:', PASSWORD))
     db._set_replica_uid(replica_uid)
     return db
 

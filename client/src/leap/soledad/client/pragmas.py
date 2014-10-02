@@ -43,7 +43,7 @@ def set_crypto_pragmas(db_handle, sqlcipher_opts):
 
 def _set_key(db_handle, key, is_raw_key):
     """
-    Set the C{key} for use with the database.
+    Set the ``key`` for use with the database.
 
     The process of creating a new, encrypted database is called 'keying'
     the database. SQLCipher uses just-in-time key derivation at the point
@@ -60,9 +60,9 @@ def _set_key(db_handle, key, is_raw_key):
 
     :param key: The key for use with the database.
     :type key: str
-    :param is_raw_key: Whether C{key} is a raw 64-char hex string or a
-                       passphrase that should be hashed to obtain the
-                       encyrption key.
+    :param is_raw_key:
+        Whether C{key} is a raw 64-char hex string or a passphrase that should
+        be hashed to obtain the encyrption key.
     :type is_raw_key: bool
     """
     if is_raw_key:
@@ -321,14 +321,11 @@ def set_write_ahead_logging(db_handle):
     """
     logger.debug("SQLCIPHER: SETTING WRITE-AHEAD LOGGING")
     db_handle.cursor().execute('PRAGMA journal_mode=WAL')
+
     # The optimum value can still use a little bit of tuning, but we favor
     # small sizes of the WAL file to get fast reads, since we assume that
     # the writes will be quick enough to not block too much.
 
-    # TODO
-    # As a further improvement, we might want to set autocheckpoint to 0
-    # here and do the checkpoints manually in a separate thread, to avoid
-    # any blocks in the main thread (we should run a loopingcall from here)
     db_handle.cursor().execute('PRAGMA wal_autocheckpoint=50')
 
 

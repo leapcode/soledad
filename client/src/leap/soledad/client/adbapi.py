@@ -30,7 +30,7 @@ from u1db.backends import sqlite_backend
 from twisted.enterprise import adbapi
 from twisted.python import log
 
-from leap.soledad.client.sqlcipher import set_init_pragmas
+from leap.soledad.client import sqlcipher as soledad_sqlcipher
 
 
 DEBUG_SQL = os.environ.get("LEAP_DEBUG_SQL")
@@ -40,18 +40,15 @@ if DEBUG_SQL:
 
 def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
     if openfun is None and driver == "pysqlcipher":
-        openfun = partial(set_init_pragmas, opts=opts)
+        openfun = partial(soledad_sqlcipher.set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
         "%s.dbapi2" % driver, database=opts.path,
         check_same_thread=False, cp_openfun=openfun)
 
 
-# XXX work in progress --------------------------------------------
-
-
-class U1DBSqliteWrapper(sqlite_backend.SQLitePartialExpandDatabase):
+class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
     """
-    A very simple wrapper around sqlcipher backend.
+    A very simple wrapper for u1db around sqlcipher backend.
 
     Instead of initializing the database on the fly, it just uses an existing
     connection that is passed to it in the initializer.
@@ -64,9 +61,24 @@ class U1DBSqliteWrapper(sqlite_backend.SQLitePartialExpandDatabase):
         self._factory = u1db.Document
 
 
+class SoledadSQLCipherWrapper(soledad_sqlcipher.SQLCipherDatabase):
+    """
+    A wrapper for u1db that uses the Soledad-extended sqlcipher backend.
+
+    Instead of initializing the database on the fly, it just uses an existing
+    connection that is passed to it in the initializer.
+    """
+    def __init__(self, conn):
+        self._db_handle = conn
+        self._real_replica_uid = None
+        self._ensure_schema()
+        self.set_document_factory(soledad_sqlcipher.soledad_doc_factory)
+        self._prime_replica_uid()
+
+
 class U1DBConnection(adbapi.Connection):
 
-    u1db_wrapper = U1DBSqliteWrapper
+    u1db_wrapper = SoledadSQLCipherWrapper
 
     def __init__(self, pool, init_u1db=False):
         self.init_u1db = init_u1db

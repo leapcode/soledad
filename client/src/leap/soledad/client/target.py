@@ -14,14 +14,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 A U1DB backend for encrypting data before sending to server and decrypting
 after receiving.
 """
-
-
 import cStringIO
 import gzip
 import logging
@@ -34,13 +30,15 @@ from time import sleep
 from uuid import uuid4
 
 import simplejson as json
-from taskthread import TimerTask
+
 from u1db import errors
 from u1db.remote import utils, http_errors
 from u1db.remote.http_target import HTTPSyncTarget
 from u1db.remote.http_client import _encode_query_parameter, HTTPClientBase
 from zope.proxy import ProxyBase
 from zope.proxy import sameProxiedObjects, setProxiedObject
+
+from twisted.internet.task import LoopingCall
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.auth import TokenBasedAuth
@@ -755,7 +753,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
     """
     Period of recurrence of the periodic decrypting task, in seconds.
     """
-    DECRYPT_TASK_PERIOD = 0.5
+    DECRYPT_LOOP_PERIOD = 0.5
 
     #
     # Modified HTTPSyncTarget methods.
@@ -802,7 +800,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         self._sync_db_write_lock = None
         self._decryption_callback = None
         self._sync_decr_pool = None
-        self._sync_watcher = None
+        self._sync_loop = None
         if sync_db and sync_db_write_lock is not None:
             self._sync_db = sync_db
             self._sync_db_write_lock = sync_db_write_lock
@@ -828,23 +826,22 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             self._sync_decr_pool.close()
             self._sync_decr_pool = None
 
-    def _setup_sync_watcher(self):
+    def _setup_sync_loop(self):
         """
-        Set up the sync watcher for deferred decryption.
+        Set up the sync loop for deferred decryption.
         """
-        if self._sync_watcher is None:
-            self._sync_watcher = TimerTask(
-                self._decrypt_syncing_received_docs,
-                delay=self.DECRYPT_TASK_PERIOD)
+        if self._sync_loop is None:
+            self._sync_loop = LoopingCall(
+                self._decrypt_syncing_received_docs)
+            self._sync_loop.start(self.DECRYPT_LOOP_PERIOD)
 
-    def _teardown_sync_watcher(self):
+    def _teardown_sync_loop(self):
         """
-        Tear down the sync watcher.
+        Tear down the sync loop.
         """
-        if self._sync_watcher is not None:
-            self._sync_watcher.stop()
-            self._sync_watcher.shutdown()
-            self._sync_watcher = None
+        if self._sync_loop is not None:
+            self._sync_loop.stop()
+            self._sync_loop = None
 
     def _get_replica_uid(self, url):
         """
@@ -1131,7 +1128,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         if defer_decryption and self._sync_db is not None:
             self._sync_exchange_lock.acquire()
             self._setup_sync_decr_pool()
-            self._setup_sync_watcher()
+            self._setup_sync_loop()
             self._defer_decryption = True
         else:
             # fall back
@@ -1292,10 +1289,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         # decrypt docs in case of deferred decryption
         if defer_decryption:
-            self._sync_watcher.start()
+            self._sync_loop.start()
             while self.clear_to_sync() is False:
-                sleep(self.DECRYPT_TASK_PERIOD)
-            self._teardown_sync_watcher()
+                sleep(self.DECRYPT_LOOP_PERIOD)
+            self._teardown_sync_loop()
             self._teardown_sync_decr_pool()
             self._sync_exchange_lock.release()
 
@@ -1460,7 +1457,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         Decrypt the documents received from remote replica and insert them
         into the local one.
 
-        Called periodically from TimerTask self._sync_watcher.
+        Called periodically from LoopingCall self._sync_loop.
         """
         if sameProxiedObjects(
                 self._insert_doc_cb.get(self.source_replica_uid),

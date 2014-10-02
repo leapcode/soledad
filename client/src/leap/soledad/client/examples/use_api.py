@@ -46,7 +46,7 @@ if os.path.isfile(tmpdb):
 start_time = datetime.datetime.now()
 
 opts = SQLCipherOptions(tmpdb, "secret", create=True)
-db = sqlcipher.SQLCipherDatabase(None, opts)
+db = sqlcipher.SQLCipherDatabase(opts)
 
 
 def allDone():
