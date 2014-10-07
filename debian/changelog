@@ -1,6 +1,7 @@
 soledad (0.6.0) unstable; urgency=low
 
   * Update to 0.6.0 release.
+  * Do not depend on pysqlite (closes #2945)
 
  -- db <db@leap.se>  Wed, 01 Oct 2014 15:39:38 -0300
 
