@@ -3,12 +3,14 @@ simplejson
 u1db
 scrypt
 pycryptopp
+cchardet
+zope.proxy
 
 #
 # leap deps
 #
 
-leap.soledad.common>=0.3.0
+leap.soledad.common>=0.6.0
 
 #
 # XXX things to fix yet:
@@ -20,5 +22,3 @@ oauth
 
 # pysqlite should not be a dep, see #2945
 pysqlite
-
-chardet

@@ -3,13 +3,13 @@ couchdb
 simplejson
 u1db
 routes
-PyOpenSSL
+PyOpenSSL<0.14
 
 # TODO: maybe we just want twisted-web?
 twisted>=12.0.0
 
 # leap deps -- bump me!
-leap.soledad.common>=0.3.0
+leap.soledad.common>=0.6.0
 
 #
 # Things yet to fix:

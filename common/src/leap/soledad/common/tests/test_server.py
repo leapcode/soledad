@@ -14,12 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Tests for server-related functionality.
 """
-
 import os
 import tempfile
 import simplejson as json
@@ -39,16 +36,13 @@ from leap.soledad.common.tests.u1db_tests import (
     simple_doc,
 )
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
-from leap.soledad.common.tests.test_target import (
+from leap.soledad.common.tests.test_target_soledad import (
     make_token_soledad_app,
     make_leap_document_for_test,
-    token_leap_sync_target,
 )
-from leap.soledad.client import (
-    Soledad,
-    target,
-)
-from leap.soledad.server import SoledadApp, LockResource
+from leap.soledad.common.tests.test_sync_target import token_leap_sync_target
+from leap.soledad.client import Soledad, crypto
+from leap.soledad.server import LockResource
 from leap.soledad.server.auth import URLToAuthorization
 
 
@@ -369,12 +363,12 @@ class EncryptedSyncTestCase(
         self.assertEqual(doc1.doc_id, couchdoc.doc_id)
         self.assertEqual(doc1.rev, couchdoc.rev)
         self.assertEqual(6, len(couchdoc.content))
-        self.assertTrue(target.ENC_JSON_KEY in couchdoc.content)
-        self.assertTrue(target.ENC_SCHEME_KEY in couchdoc.content)
-        self.assertTrue(target.ENC_METHOD_KEY in couchdoc.content)
-        self.assertTrue(target.ENC_IV_KEY in couchdoc.content)
-        self.assertTrue(target.MAC_KEY in couchdoc.content)
-        self.assertTrue(target.MAC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_JSON_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_SCHEME_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_IV_KEY in couchdoc.content)
+        self.assertTrue(crypto.MAC_KEY in couchdoc.content)
+        self.assertTrue(crypto.MAC_METHOD_KEY in couchdoc.content)
         # instantiate soledad with empty db, but with same secrets path
         sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
         _, doclist = sol2.get_all_docs()
@@ -427,12 +421,12 @@ class EncryptedSyncTestCase(
         self.assertEqual(doc1.doc_id, couchdoc.doc_id)
         self.assertEqual(doc1.rev, couchdoc.rev)
         self.assertEqual(6, len(couchdoc.content))
-        self.assertTrue(target.ENC_JSON_KEY in couchdoc.content)
-        self.assertTrue(target.ENC_SCHEME_KEY in couchdoc.content)
-        self.assertTrue(target.ENC_METHOD_KEY in couchdoc.content)
-        self.assertTrue(target.ENC_IV_KEY in couchdoc.content)
-        self.assertTrue(target.MAC_KEY in couchdoc.content)
-        self.assertTrue(target.MAC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_JSON_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_SCHEME_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_METHOD_KEY in couchdoc.content)
+        self.assertTrue(crypto.ENC_IV_KEY in couchdoc.content)
+        self.assertTrue(crypto.MAC_KEY in couchdoc.content)
+        self.assertTrue(crypto.MAC_METHOD_KEY in couchdoc.content)
         # instantiate soledad with empty db, but with same secrets path
         sol2 = self._soledad_instance(
             prefix='x',
@@ -502,7 +496,6 @@ class EncryptedSyncTestCase(
         sol1.close()
         sol2.close()
 
-
     def test_sync_many_small_files(self):
         """
         Test if Soledad can sync many smallfiles.
@@ -547,6 +540,7 @@ class EncryptedSyncTestCase(
         db.close()
         sol1.close()
         sol2.close()
+
 
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):

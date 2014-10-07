@@ -91,14 +91,19 @@ class CouchDBWrapper(object):
         logPath = os.path.join(self.tempdir, 'log', 'couch.log')
         while not os.path.exists(logPath):
             if self.process.poll() is not None:
+                got_stdout, got_stderr = "", ""
+                if self.process.stdout is not None:
+                    got_stdout = self.process.stdout.read()
+
+                if self.process.stderr is not None:
+                    got_stderr = self.process.stderr.read()
                 raise Exception("""
 couchdb exited with code %d.
 stdout:
 %s
 stderr:
 %s""" % (
-                    self.process.returncode, self.process.stdout.read(),
-                    self.process.stderr.read()))
+                    self.process.returncode, got_stdout, got_stderr))
             time.sleep(0.01)
         while os.stat(logPath).st_size == 0:
             time.sleep(0.01)

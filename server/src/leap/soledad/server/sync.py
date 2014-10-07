@@ -210,6 +210,8 @@ class SyncExchange(sync.SyncExchange):
         :param last_known_generation: The last target replica generation the
                                       source replica knows about.
         :type last_known_generation: int
+        :param sync_id: The id of the current sync session.
+        :type sync_id: str
         """
         self._db = db
         self.source_replica_uid = source_replica_uid
@@ -284,7 +286,8 @@ class SyncExchange(sync.SyncExchange):
             doc = self._db.get_doc(changed_doc_id, include_deleted=True)
             return_doc_cb(doc, gen, trans_id)
 
-    def insert_doc_from_source(self, doc, source_gen, trans_id):
+    def insert_doc_from_source(self, doc, source_gen, trans_id,
+            number_of_docs=None, doc_idx=None, sync_id=None):
         """Try to insert synced document from source.
 
         Conflicting documents are not inserted but will be sent over
@@ -302,10 +305,18 @@ class SyncExchange(sync.SyncExchange):
         :type source_gen: int
         :param trans_id: The transaction id of that document change.
         :type trans_id: str
+        :param number_of_docs: The total amount of documents sent on this sync
+                               session.
+        :type number_of_docs: int
+        :param doc_idx: The index of the current document.
+        :type doc_idx: int
+        :param sync_id: The id of the current sync session.
+        :type sync_id: str
         """
         state, at_gen = self._db._put_doc_if_newer(
             doc, save_conflict=False, replica_uid=self.source_replica_uid,
-            replica_gen=source_gen, replica_trans_id=trans_id)
+            replica_gen=source_gen, replica_trans_id=trans_id,
+            number_of_docs=number_of_docs, doc_idx=doc_idx, sync_id=sync_id)
         if state == 'inserted':
             self._sync_state.put_seen_id(doc.doc_id, at_gen)
         elif state == 'converged':
@@ -340,6 +351,8 @@ class SyncResource(http_app.SyncResource):
         :param last_known_trans_id: The last server replica transaction_id the
                                     client knows about.
         :type last_known_trans_id: str
+        :param sync_id: The id of the current sync session.
+        :type sync_id: str
         :param ensure: Whether the server replica should be created if it does
                        not already exist.
         :type ensure: bool
@@ -355,9 +368,11 @@ class SyncResource(http_app.SyncResource):
         # get a sync exchange object
         self.sync_exch = self.sync_exchange_class(
             db, self.source_replica_uid, last_known_generation, sync_id)
+        self._sync_id = sync_id
 
     @http_app.http_method(content_as_args=True)
-    def post_put(self, id, rev, content, gen, trans_id):
+    def post_put(self, id, rev, content, gen, trans_id, number_of_docs,
+            doc_idx):
         """
         Put one incoming document into the server replica.
 
@@ -373,9 +388,16 @@ class SyncResource(http_app.SyncResource):
         :param trans_id: The source replica transaction id corresponding to
                          the revision of the incoming document.
         :type trans_id: str
+        :param number_of_docs: The total amount of documents sent on this sync
+                               session.
+        :type number_of_docs: int
+        :param doc_idx: The index of the current document.
+        :type doc_idx: int
         """
         doc = Document(id, rev, content)
-        self.sync_exch.insert_doc_from_source(doc, gen, trans_id)
+        self.sync_exch.insert_doc_from_source(
+            doc, gen, trans_id, number_of_docs=number_of_docs,
+            doc_idx=doc_idx, sync_id=self._sync_id)
 
     @http_app.http_method(received=int, content_as_args=True)
     def post_get(self, received):
