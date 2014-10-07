@@ -36,11 +36,14 @@ from leap.soledad.server import SoledadApp
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
-from leap.soledad.common.tests import u1db_tests as tests, BaseSoledadTest
+from leap.soledad.common.tests import BaseSoledadTest
 from leap.soledad.common.tests.test_couch import CouchDBWrapper, CouchDBTestCase
 
 
-from leap.soledad.client.sqlcipher import SQLCipherDatabase
+from leap.soledad.client.sqlcipher import (
+    SQLCipherDatabase,
+    SQLCipherOptions,
+)
 
 
 PASSWORD = '123456'

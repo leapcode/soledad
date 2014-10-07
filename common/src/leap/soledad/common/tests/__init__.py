@@ -92,7 +92,7 @@ class BaseSoledadTest(BaseLeapTest):
 
     def _soledad_instance(self, user=ADDRESS, passphrase=u'123',
                           prefix='',
-                          secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
+                          secrets_path='secrets.json',
                           local_db_path='soledad.u1db', server_url='',
                           cert_file=None, secret_id=None,
                           shared_db_class=None):

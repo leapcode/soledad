@@ -502,9 +502,10 @@ class SQLCipherU1DBSync(object):
         else:
             sync_db_path = ":memory:"
 
-        # ---------------------------------------------------------
-        # TODO use a separate adbapi for this (sqlcipher only, no u1db)
-        # We could control that it only has 1 or 2 threads.
+        # XXX use initialize_sqlcipher_db here too
+        # TODO pass on_init queries to initialize_sqlcipher_db
+        self._sync_db = None#MPSafeSQLiteDB(sync_db_path)
+        pragmas.set_crypto_pragmas(self._sync_db, opts)
 
         opts.path = sync_db_path
 
