@@ -55,10 +55,14 @@ from httplib import CannotSendRequest
 from pysqlcipher import dbapi2 as sqlcipher_dbapi2
 from u1db.backends import sqlite_backend
 from u1db import errors as u1db_errors
+import u1db
 
+
+from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 from twisted.internet.threads import deferToThreadPool
 from twisted.python.threadpool import ThreadPool
+from twisted.python import log
 
 from leap.soledad.client import crypto
 from leap.soledad.client.target import SoledadSyncTarget
@@ -77,7 +81,7 @@ logger = logging.getLogger(__name__)
 sqlite_backend.dbapi2 = sqlcipher_dbapi2
 
 
-def initialize_sqlcipher_db(opts, on_init=None):
+def initialize_sqlcipher_db(opts, on_init=None, check_same_thread=True):
     """
     Initialize a SQLCipher database.
 
@@ -97,7 +101,7 @@ def initialize_sqlcipher_db(opts, on_init=None):
         raise u1db_errors.DatabaseDoesNotExist()
 
     conn = sqlcipher_dbapi2.connect(
-        opts.path)
+        opts.path, check_same_thread=check_same_thread)
     set_init_pragmas(conn, opts, extra_queries=on_init)
     return conn
 
@@ -241,7 +245,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         self._real_replica_uid = None
         self._get_replica_uid()
-        print "REPLICA UID --->", self._real_replica_uid
 
     def _extra_schema_init(self, c):
         """
@@ -402,7 +405,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         self.close()
 
 
-class SQLCipherU1DBSync(object):
+class SQLCipherU1DBSync(SQLCipherDatabase):
 
     _sync_loop = None
     _sync_enc_pool = None
@@ -435,7 +438,13 @@ class SQLCipherU1DBSync(object):
     def __init__(self, opts, soledad_crypto, replica_uid,
                  defer_encryption=False):
 
+        self._opts = opts
+        self._path = opts.path
         self._crypto = soledad_crypto
+        self.__replica_uid = replica_uid
+
+        print "REPLICA UID (u1dbsync init)", replica_uid
+
         self._sync_db_key = opts.sync_db_key
         self._sync_db = None
         self._sync_db_write_lock = None
@@ -453,8 +462,16 @@ class SQLCipherU1DBSync(object):
         self._sync_db_write_lock = threading.Lock()
         self.sync_queue = multiprocessing.Queue()
 
+        self.running = False
         self._sync_threadpool = None
         self._initialize_sync_threadpool()
+
+        self._reactor = reactor
+        self._reactor.callWhenRunning(self._start)
+
+        self.ready = False
+        self._db_handle = None
+        self._initialize_syncer_main_db()
 
         if defer_encryption:
             self._initialize_sync_db()
@@ -475,6 +492,40 @@ class SQLCipherU1DBSync(object):
             # XXX this was called sync_watcher --- trace any remnants
             self._sync_loop = LoopingCall(self._encrypt_syncing_docs),
             self._sync_loop.start(self.ENCRYPT_LOOP_PERIOD)
+
+        self.shutdownID = None
+
+    @property
+    def _replica_uid(self):
+        return str(self.__replica_uid)
+
+    def _start(self):
+        if not self.running:
+            self._sync_threadpool.start()
+            self.shutdownID = self._reactor.addSystemEventTrigger(
+                'during', 'shutdown', self.finalClose)
+            self.running = True
+
+    def _defer_to_sync_threadpool(self, meth, *args, **kwargs):
+        return deferToThreadPool(
+            self._reactor, self._sync_threadpool, meth, *args, **kwargs)
+
+    def _initialize_syncer_main_db(self):
+
+        def init_db():
+
+            # XXX DEBUG ---------------------------------------------
+            import thread
+            print "initializing in thread", thread.get_ident()
+            # XXX DEBUG ---------------------------------------------
+
+            self._db_handle = initialize_sqlcipher_db(
+                self._opts, check_same_thread=False)
+            self._real_replica_uid = None
+            self._ensure_schema()
+            self.set_document_factory(soledad_doc_factory)
+
+        return self._defer_to_sync_threadpool(init_db)
 
     def _initialize_sync_threadpool(self):
         """
@@ -556,9 +607,19 @@ class SQLCipherU1DBSync(object):
             before the synchronisation was performed.
         :rtype: deferred
         """
+        if not self.ready:
+            print "not ready yet..."
+            # XXX ---------------------------------------------------------
+            # This might happen because the database has not yet been
+            # initialized (it's deferred to the theadpool).
+            # A good strategy might involve to return a deferred that will
+            # callLater this same function after a timeout (deferLater)
+            # Might want to keep track of retries and cancel too.
+            # --------------------------------------------------------------
+        print "Syncing to...", url
         kwargs = {'creds': creds, 'autocreate': autocreate,
                   'defer_decryption': defer_decryption}
-        return deferToThreadPool(self._sync, url, **kwargs)
+        return self._defer_to_sync_threadpool(self._sync, url, **kwargs)
 
     def _sync(self, url, creds=None, autocreate=True, defer_decryption=True):
         res = None
@@ -568,9 +629,11 @@ class SQLCipherU1DBSync(object):
         # TODO review, I think this is no longer needed with a 1-thread
         # threadpool.
 
+        log.msg("in _sync")
         with self._syncer(url, creds=creds) as syncer:
             # XXX could mark the critical section here...
             try:
+                log.msg('syncer sync...')
                 res = syncer.sync(autocreate=autocreate,
                                   defer_decryption=defer_decryption)
 
@@ -590,6 +653,9 @@ class SQLCipherU1DBSync(object):
         """
         Interrupt all ongoing syncs.
         """
+        self._defer_to_sync_threadpool(self._stop_sync)
+
+    def _stop_sync(self):
         for url in self._syncers:
             _, syncer = self._syncers[url]
             syncer.stop()
@@ -604,13 +670,13 @@ class SQLCipherU1DBSync(object):
         Because of that, this method blocks until the syncing lock can be
         acquired.
         """
-        with self.syncing_lock[self.replica_uid]:
+        with self.syncing_lock[self._path]:
             syncer = self._get_syncer(url, creds=creds)
             yield syncer
 
     @property
     def syncing(self):
-        lock = self.syncing_lock[self.replica_uid]
+        lock = self.syncing_lock[self._path]
         acquired_lock = lock.acquire(False)
         if acquired_lock is False:
             return True
@@ -640,7 +706,8 @@ class SQLCipherU1DBSync(object):
             syncer = SoledadSynchronizer(
                 self,
                 SoledadSyncTarget(url,
-                                  self.replica_uid,
+                                  # XXX is the replica_uid ready?
+                                  self._replica_uid,
                                   creds=creds,
                                   crypto=self._crypto,
                                   sync_db=self._sync_db,
@@ -689,6 +756,14 @@ class SQLCipherU1DBSync(object):
         # XXX this SHOULD BE a callback
         return self._get_generation()
 
+    def finalClose(self):
+        """
+        This should only be called by the shutdown trigger.
+        """
+        self.shutdownID = None
+        self._sync_threadpool.stop()
+        self.running = False
+
     def close(self):
         """
         Close the syncer and syncdb orderly
@@ -716,6 +791,36 @@ class SQLCipherU1DBSync(object):
             self.sync_queue.close()
             del self.sync_queue
             self.sync_queue = None
+
+
+class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
+    """
+    A very simple wrapper for u1db around sqlcipher backend.
+
+    Instead of initializing the database on the fly, it just uses an existing
+    connection that is passed to it in the initializer.
+    """
+
+    def __init__(self, conn):
+        self._db_handle = conn
+        self._real_replica_uid = None
+        self._ensure_schema()
+        self._factory = u1db.Document
+
+
+class SoledadSQLCipherWrapper(SQLCipherDatabase):
+    """
+    A wrapper for u1db that uses the Soledad-extended sqlcipher backend.
+
+    Instead of initializing the database on the fly, it just uses an existing
+    connection that is passed to it in the initializer.
+    """
+    def __init__(self, conn):
+        self._db_handle = conn
+        self._real_replica_uid = None
+        self._ensure_schema()
+        self.set_document_factory(soledad_doc_factory)
+        self._prime_replica_uid()
 
 
 def _assert_db_is_encrypted(opts):

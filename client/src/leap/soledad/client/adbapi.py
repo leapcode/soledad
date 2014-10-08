@@ -24,11 +24,9 @@ import sys
 
 from functools import partial
 
-import u1db
-from u1db.backends import sqlite_backend
-
 from twisted.enterprise import adbapi
 from twisted.python import log
+from zope.proxy import ProxyBase, setProxiedObject
 
 from leap.soledad.client import sqlcipher as soledad_sqlcipher
 
@@ -46,39 +44,9 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
         check_same_thread=False, cp_openfun=openfun)
 
 
-class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
-    """
-    A very simple wrapper for u1db around sqlcipher backend.
-
-    Instead of initializing the database on the fly, it just uses an existing
-    connection that is passed to it in the initializer.
-    """
-
-    def __init__(self, conn):
-        self._db_handle = conn
-        self._real_replica_uid = None
-        self._ensure_schema()
-        self._factory = u1db.Document
-
-
-class SoledadSQLCipherWrapper(soledad_sqlcipher.SQLCipherDatabase):
-    """
-    A wrapper for u1db that uses the Soledad-extended sqlcipher backend.
-
-    Instead of initializing the database on the fly, it just uses an existing
-    connection that is passed to it in the initializer.
-    """
-    def __init__(self, conn):
-        self._db_handle = conn
-        self._real_replica_uid = None
-        self._ensure_schema()
-        self.set_document_factory(soledad_sqlcipher.soledad_doc_factory)
-        self._prime_replica_uid()
-
-
 class U1DBConnection(adbapi.Connection):
 
-    u1db_wrapper = SoledadSQLCipherWrapper
+    u1db_wrapper = soledad_sqlcipher.SoledadSQLCipherWrapper
 
     def __init__(self, pool, init_u1db=False):
         self.init_u1db = init_u1db
@@ -120,6 +88,9 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         # all u1db connections, hashed by thread-id
         self.u1dbconnections = {}
 
+        # The replica uid, primed by the connections on init.
+        self.replica_uid = ProxyBase(None)
+
     def runU1DBQuery(self, meth, *args, **kw):
         meth = "u1db_%s" % meth
         return self.runInteraction(self._runU1DBQuery, meth, *args, **kw)
@@ -132,6 +103,11 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         tid = self.threadID()
         u1db = self.u1dbconnections.get(tid)
         conn = self.connectionFactory(self, init_u1db=not bool(u1db))
+
+        if self.replica_uid is None:
+            replica_uid = conn._u1db._real_replica_uid
+            setProxiedObject(self.replica_uid, replica_uid)
+            print "GOT REPLICA UID IN DBPOOL", self.replica_uid
 
         if u1db is None:
             self.u1dbconnections[tid] = conn._u1db

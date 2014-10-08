@@ -158,10 +158,10 @@ class Soledad(object):
         # store config params
         self._uuid = uuid
         self._passphrase = passphrase
-        self._secrets_path = secrets_path
         self._local_db_path = local_db_path
         self._server_url = server_url
         self._defer_encryption = defer_encryption
+        self._secrets_path = None
 
         self.shared_db = None
 
@@ -175,6 +175,8 @@ class Soledad(object):
 
         self._init_config_with_defaults()
         self._init_working_dirs()
+
+        self._secrets_path = secrets_path
 
         # Initialize shared recovery database
         self.init_shared_db(server_url, uuid, self._creds)
@@ -193,13 +195,12 @@ class Soledad(object):
         Initialize configuration using default values for missing params.
         """
         soledad_assert_type(self._passphrase, unicode)
-        initialize = lambda attr, val: attr is None and setattr(attr, val)
+        initialize = lambda attr, val: getattr(
+            self, attr, None) is None and setattr(self, attr, val)
 
-        # initialize secrets_path
-        initialize(self._secrets_path, os.path.join(
+        initialize("_secrets_path", os.path.join(
             self.default_prefix, self.secrets_file_name))
-        # initialize local_db_path
-        initialize(self._local_db_path, os.path.join(
+        initialize("_local_db_path", os.path.join(
             self.default_prefix, self.local_db_file_name))
         # initialize server_url
         soledad_assert(self._server_url is not None,
@@ -218,8 +219,8 @@ class Soledad(object):
 
     def _init_secrets(self):
         self._secrets = SoledadSecrets(
-            self.uuid, self.passphrase, self.secrets_path,
-            self._shared_db, self._crypto)
+            self.uuid, self._passphrase, self._secrets_path,
+            self.shared_db, self._crypto)
         self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):
@@ -249,8 +250,11 @@ class Soledad(object):
         self._dbpool = adbapi.getConnectionPool(opts)
 
     def _init_u1db_syncer(self):
+        replica_uid = self._dbpool.replica_uid
+        print "replica UID (syncer init)", replica_uid
         self._dbsyncer = SQLCipherU1DBSync(
-            self._soledad_opts, self._crypto, self._defer_encryption)
+            self._soledad_opts, self._crypto, replica_uid,
+            self._defer_encryption)
 
     #
     # Closing methods
@@ -269,6 +273,9 @@ class Soledad(object):
     # ILocalStorage
     #
 
+    def _defer(self, meth, *args, **kw):
+        return self._dbpool.runU1DBQuery(meth, *args, **kw)
+
     def put_doc(self, doc):
         """
         ============================== WARNING ==============================
@@ -282,58 +289,59 @@ class Soledad(object):
         # Isn't it better to defend ourselves from the mutability, to avoid
         # nasty surprises?
         doc.content = self._convert_to_unicode(doc.content)
-        return self._dbpool.put_doc(doc)
+        return self._defer("put_doc", doc)
 
     def delete_doc(self, doc):
         # XXX what does this do when fired???
-        return self._dbpool.delete_doc(doc)
+        return self._defer("delete_doc", doc)
 
     def get_doc(self, doc_id, include_deleted=False):
-        return self._dbpool.get_doc(doc_id, include_deleted=include_deleted)
+        return self._defer(
+            "get_doc", doc_id, include_deleted=include_deleted)
 
-    def get_docs(self, doc_ids, check_for_conflicts=True,
-                 include_deleted=False):
-        return self._dbpool.get_docs(doc_ids,
-                                     check_for_conflicts=check_for_conflicts,
-                                     include_deleted=include_deleted)
+    def get_docs(
+            self, doc_ids, check_for_conflicts=True, include_deleted=False):
+        return self._defer(
+            "get_docs", doc_ids, check_for_conflicts=check_for_conflicts,
+            include_deleted=include_deleted)
 
     def get_all_docs(self, include_deleted=False):
-        return self._dbpool.get_all_docs(include_deleted)
+        return self._defer("get_all_docs", include_deleted)
 
     def create_doc(self, content, doc_id=None):
-        return self._dbpool.create_doc(
-            _convert_to_unicode(content), doc_id=doc_id)
+        return self._defer(
+            "create_doc", _convert_to_unicode(content), doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
-        return self._dbpool.create_doc_from_json(json, doc_id=doc_id)
+        return self._defer("create_doc_from_json", json, doc_id=doc_id)
 
     def create_index(self, index_name, *index_expressions):
-        return self._dbpool.create_index(index_name, *index_expressions)
+        return self._defer("create_index", index_name, *index_expressions)
 
     def delete_index(self, index_name):
-        return self._dbpool.delete_index(index_name)
+        return self._defer("delete_index", index_name)
 
     def list_indexes(self):
-        return self._dbpool.list_indexes()
+        return self._defer("list_indexes")
 
     def get_from_index(self, index_name, *key_values):
-        return self._dbpool.get_from_index(index_name, *key_values)
+        return self._defer("get_from_index", index_name, *key_values)
 
     def get_count_from_index(self, index_name, *key_values):
-        return self._dbpool.get_count_from_index(index_name, *key_values)
+        return self._defer("get_count_from_index", index_name, *key_values)
 
     def get_range_from_index(self, index_name, start_value, end_value):
-        return self._dbpool.get_range_from_index(
-            index_name, start_value, end_value)
+        return self._defer(
+            "get_range_from_index", index_name, start_value, end_value)
 
     def get_index_keys(self, index_name):
-        return self._dbpool.get_index_keys(index_name)
+        return self._defer("get_index_keys", index_name)
 
     def get_doc_conflicts(self, doc_id):
-        return self._dbpool.get_doc_conflicts(doc_id)
+        return self._defer("get_doc_conflicts", doc_id)
 
     def resolve_doc(self, doc, conflicted_doc_revs):
-        return self._dbpool.resolve_doc(doc, conflicted_doc_revs)
+        return self._defer("resolve_doc", doc, conflicted_doc_revs)
 
     def _get_local_db_path(self):
         return self._local_db_path
@@ -460,6 +468,8 @@ class Soledad(object):
     #
 
     def init_shared_db(self, server_url, uuid, creds):
+        # XXX should assert that server_url begins with https
+        # Otherwise u1db target will fail.
         shared_db_url = urlparse.urljoin(server_url, SHARED_DB_NAME)
         self.shared_db = SoledadSharedDatabase.open_database(
             shared_db_url,
