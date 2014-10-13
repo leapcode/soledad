@@ -27,11 +27,6 @@ repository:
         :target: https://crate.io/packages/leap.soledad.server
 
 
-Library dependencies
---------------------
-
-* ``libsqlite3-dev``
-
 Tests
 -----
 
