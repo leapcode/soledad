@@ -113,7 +113,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file,
-                 auth_token=None, defer_encryption=False):
+                 auth_token=None, defer_encryption=False, syncable=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -151,6 +151,11 @@ class Soledad(object):
             inline while syncing.
         :type defer_encryption: bool
 
+        :param syncable:
+            If set to ``False``, this database will not attempt to synchronize
+            with remote replicas (default is ``True``)
+        :type syncable: bool
+
         :raise BootstrapSequenceError:
             Raised when the secret generation and storage on server sequence
             has failed for some reason.
@@ -179,13 +184,15 @@ class Soledad(object):
         self._secrets_path = secrets_path
 
         # Initialize shared recovery database
-        self.init_shared_db(server_url, uuid, self._creds)
+        self.init_shared_db(server_url, uuid, self._creds, syncable=syncable)
 
         # The following can raise BootstrapSequenceError, that will be
         # propagated upwards.
         self._init_secrets()
         self._init_u1db_sqlcipher_backend()
-        self._init_u1db_syncer()
+
+        if syncable:
+            self._init_u1db_syncer()
 
     #
     # initialization/destruction methods
@@ -467,15 +474,14 @@ class Soledad(object):
     # ISharedSecretsStorage
     #
 
-    def init_shared_db(self, server_url, uuid, creds):
-        # XXX should assert that server_url begins with https
-        # Otherwise u1db target will fail.
+    def init_shared_db(self, server_url, uuid, creds, syncable=True):
         shared_db_url = urlparse.urljoin(server_url, SHARED_DB_NAME)
         self.shared_db = SoledadSharedDatabase.open_database(
             shared_db_url,
             uuid,
             creds=creds,
-            create=False)  # db should exist at this point.
+            create=False,  # db should exist at this point.
+            syncable=syncable)
 
     def _set_secrets_path(self, secrets_path):
         self._secrets.secrets_path = secrets_path

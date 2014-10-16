@@ -289,9 +289,12 @@ class SoledadSecrets(object):
         :raises BootstrapSequenceError: Raised when unable to store secrets in
                                         shared database.
         """
-        doc = self._get_secrets_from_shared_db()
+        if self._shared_db.syncable:
+            doc = self._get_secrets_from_shared_db()
+        else:
+            doc = None
 
-        if doc:
+        if doc is not None:
             logger.info(
                 'Found cryptographic secrets in shared recovery '
                 'database.')
@@ -308,21 +311,24 @@ class SoledadSecrets(object):
                 'No cryptographic secrets found, creating new '
                 ' secrets...')
             self.set_secret_id(self._gen_secret())
-            try:
-                self._put_secrets_in_shared_db()
-            except Exception as ex:
-                # storing generated secret in shared db failed for
-                # some reason, so we erase the generated secret and
-                # raise.
+
+            if self._shared_db.syncable:
                 try:
-                    os.unlink(self._secrets_path)
-                except OSError as e:
-                    if e.errno != errno.ENOENT:  # no such file or directory
-                        logger.exception(e)
-                logger.exception(ex)
-                raise BootstrapSequenceError(
-                    'Could not store generated secret in the shared '
-                    'database, bailing out...')
+                    self._put_secrets_in_shared_db()
+                except Exception as ex:
+                    # storing generated secret in shared db failed for
+                    # some reason, so we erase the generated secret and
+                    # raise.
+                    try:
+                        os.unlink(self._secrets_path)
+                    except OSError as e:
+                        if e.errno != errno.ENOENT:
+                            # no such file or directory
+                            logger.exception(e)
+                    logger.exception(ex)
+                    raise BootstrapSequenceError(
+                        'Could not store generated secret in the shared '
+                        'database, bailing out...')
 
     #
     # Shared DB related methods
@@ -434,7 +440,8 @@ class SoledadSecrets(object):
                                'contents.')
         # include secrets in the secret pool.
         secret_count = 0
-        for secret_id, encrypted_secret in data[self.STORAGE_SECRETS_KEY].items():
+        secrets = data[self.STORAGE_SECRETS_KEY].items()
+        for secret_id, encrypted_secret in secrets:
             if secret_id not in self._secrets:
                 try:
                     self._secrets[secret_id] = \
@@ -664,8 +671,8 @@ class SoledadSecrets(object):
         self._secrets_path = secrets_path
 
     secrets_path = property(
-         _get_secrets_path,
-         _set_secrets_path,
+        _get_secrets_path,
+        _set_secrets_path,
         doc='The path for the file containing the encrypted symmetric secret.')
 
     @property
@@ -689,7 +696,7 @@ class SoledadSecrets(object):
         Return the secret for remote storage.
         """
         key_start = 0
-        key_end =  self.REMOTE_STORAGE_SECRET_LENGTH
+        key_end = self.REMOTE_STORAGE_SECRET_LENGTH
         return self.storage_secret[key_start:key_end]
 
     #
@@ -703,8 +710,10 @@ class SoledadSecrets(object):
         :return: The local storage secret.
         :rtype: str
         """
-        pwd_start = self.REMOTE_STORAGE_SECRET_LENGTH + self.SALT_LENGTH
-        pwd_end = self.REMOTE_STORAGE_SECRET_LENGTH + self.LOCAL_STORAGE_SECRET_LENGTH
+        secret_len = self.REMOTE_STORAGE_SECRET_LENGTH
+        lsecret_len = self.LOCAL_STORAGE_SECRET_LENGTH
+        pwd_start = secret_len + self.SALT_LENGTH
+        pwd_end = secret_len + lsecret_len
         return self.storage_secret[pwd_start:pwd_end]
 
     def _get_local_storage_salt(self):
@@ -731,9 +740,9 @@ class SoledadSecrets(object):
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
 
-   #
-   # sync db key
-   #
+    #
+    # sync db key
+    #
 
     def _get_sync_db_salt(self):
         """

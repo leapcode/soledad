@@ -26,6 +26,9 @@ from leap.soledad.client.auth import TokenBasedAuth
 # Soledad shared database
 # ----------------------------------------------------------------------------
 
+# TODO could have a hierarchy of soledad exceptions.
+
+
 class NoTokenForAuth(Exception):
     """
     No token was found for token-based authentication.
@@ -38,6 +41,12 @@ class Unauthorized(Exception):
     """
 
 
+class ImproperlyConfiguredError(Exception):
+    """
+    Wrong parameters in the database configuration.
+    """
+
+
 class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     """
     This is a shared recovery database that enables users to store their
@@ -45,6 +54,8 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     """
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
+
+    syncable = True
 
     #
     # Token auth methods.
@@ -82,7 +93,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     #
 
     @staticmethod
-    def open_database(url, uuid, create, creds=None):
+    def open_database(url, uuid, create, creds=None, syncable=True):
         # TODO: users should not be able to create the shared database, so we
         # have to remove this from here in the future.
         """
@@ -101,8 +112,13 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
+        if syncable and not url.startswith('https://'):
+            raise ImproperlyConfiguredError(
+                "Remote soledad server must be an https URI")
         db = SoledadSharedDatabase(url, uuid, creds=creds)
-        db.open(create)
+        db.syncable = syncable
+        if syncable:
+            db.open(create)
         return db
 
     @staticmethod
@@ -145,9 +161,14 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
 
         :raise HTTPError: Raised if any HTTP error occurs.
         """
-        res, headers = self._request_json('PUT', ['lock', self._uuid],
-                                          body={})
-        return res['token'], res['timeout']
+        # TODO ----- if the shared_db is not syncable, should not
+        # attempt to resolve.
+        if self.syncable:
+            res, headers = self._request_json(
+                'PUT', ['lock', self._uuid], body={})
+            return res['token'], res['timeout']
+        else:
+            return None, None
 
     def unlock(self, token):
         """
