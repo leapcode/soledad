@@ -88,10 +88,10 @@ def allDone(_):
     reactor.stop()
 
 deferreds = []
+payload = open('manifest.phk').read()
 
 for i in range(times):
-    doc = {"number": i,
-           "payload": open('manifest.phk').read()}
+    doc = {"number": i, "payload": payload}
     d = createDoc(doc)
     d.addCallbacks(printResult, lambda e: e.printTraceback())
     deferreds.append(d)

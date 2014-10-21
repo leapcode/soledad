@@ -22,7 +22,8 @@ from zope.interface import Interface, Attribute
 
 class ILocalStorage(Interface):
     """
-    I implement core methods for the u1db local storage.
+    I implement core methods for the u1db local storage of documents and
+    indexes.
     """
     local_db_path = Attribute(
         "The path for the local database replica")
@@ -285,7 +286,6 @@ class ISyncableStorage(Interface):
     I implement methods to synchronize with a remote replica.
     """
     replica_uid = Attribute("The uid of the local replica")
-    server_url = Attribute("The URL of the Soledad server.")
     syncing = Attribute(
         "Property, True if the syncer is syncing.")
     token = Attribute("The authentication Token.")
@@ -317,12 +317,11 @@ class ISyncableStorage(Interface):
         """
 
 
-class ISharedSecretsStorage(Interface):
+class ISecretsStorage(Interface):
     """
-    I implement methods needed for the Shared Recovery Database.
+    I implement methods needed for initializing and accessing secrets, that are
+    synced against the Shared Recovery Database.
     """
-    secrets_path = Attribute(
-        "Path for storing encrypted key used for symmetric encryption.")
     secrets_file_name = Attribute(
         "The name of the file where the storage secrets will be stored")
 
@@ -332,7 +331,9 @@ class ISharedSecretsStorage(Interface):
 
     # XXX this used internally from secrets, so it might be good to preserve
     # as a public boundary with other components.
-    secrets = Attribute("")
+
+    # We should also probably document its interface.
+    secrets = Attribute("A SoledadSecrets object containing access to secrets")
 
     def init_shared_db(self, server_url, uuid, creds):
         """

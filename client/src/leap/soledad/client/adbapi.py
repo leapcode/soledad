@@ -86,7 +86,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
     def __init__(self, *args, **kwargs):
         adbapi.ConnectionPool.__init__(self, *args, **kwargs)
         # all u1db connections, hashed by thread-id
-        self.u1dbconnections = {}
+        self._u1dbconnections = {}
 
         # The replica uid, primed by the connections on init.
         self.replica_uid = ProxyBase(None)
@@ -101,7 +101,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
 
     def _runInteraction(self, interaction, *args, **kw):
         tid = self.threadID()
-        u1db = self.u1dbconnections.get(tid)
+        u1db = self._u1dbconnections.get(tid)
         conn = self.connectionFactory(self, init_u1db=not bool(u1db))
 
         if self.replica_uid is None:
@@ -110,7 +110,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
             print "GOT REPLICA UID IN DBPOOL", self.replica_uid
 
         if u1db is None:
-            self.u1dbconnections[tid] = conn._u1db
+            self._u1dbconnections[tid] = conn._u1db
         else:
             conn._u1db = u1db
 
@@ -134,6 +134,6 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         self.running = False
         for conn in self.connections.values():
             self._close(conn)
-        for u1db in self.u1dbconnections.values():
+        for u1db in self._u1dbconnections.values():
             self._close(u1db)
         self.connections.clear()

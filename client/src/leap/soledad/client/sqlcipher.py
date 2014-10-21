@@ -69,7 +69,6 @@ from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
 
-# TODO use adbapi too
 from leap.soledad.client import pragmas
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
@@ -115,7 +114,7 @@ def set_init_pragmas(conn, opts=None, extra_queries=None):
     This includes the crypto pragmas, and any other options that must
     be passed early to sqlcipher db.
     """
-    assert opts is not None
+    soledad_assert(opts is not None)
     extra_queries = [] if extra_queries is None else extra_queries
     with _db_init_lock:
         # only one execution path should initialize the db
@@ -196,8 +195,8 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     """
     defer_encryption = False
 
-    # The attribute _index_storage_value will be used as the lookup key.
-    # Here we extend it with `encrypted`
+    # The attribute _index_storage_value will be used as the lookup key for the
+    # implementation of the SQLCipher storage backend.
     _index_storage_value = 'expand referenced encrypted'
 
     def __init__(self, opts):
@@ -227,7 +226,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
         # TODO ---------------------------------------------------
         # Everything else in this initialization has to be factored
-        # out, so it can be used from U1DBSqlcipherWrapper __init__
+        # out, so it can be used from SoledadSQLCipherWrapper.__init__
         # too.
         # ---------------------------------------------------------
 
@@ -406,6 +405,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
 
 class SQLCipherU1DBSync(SQLCipherDatabase):
+    """
+    Soledad syncer implementation.
+    """
 
     _sync_loop = None
     _sync_enc_pool = None
@@ -454,7 +456,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # we store syncers in a dictionary indexed by the target URL. We also
         # store a hash of the auth info in case auth info expires and we need
         # to rebuild the syncer for that target. The final self._syncers
-        # format is the following::
+        # format is the following:
         #
         #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
 
@@ -514,10 +516,12 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         def init_db():
 
-            # XXX DEBUG ---------------------------------------------
-            import thread
-            print "initializing in thread", thread.get_ident()
-            # XXX DEBUG ---------------------------------------------
+            # XXX DEBUG -----------------------------------------
+            # REMOVE ME when merging.
+
+            #import thread
+            #print "initializing in thread", thread.get_ident()
+            # ---------------------------------------------------
 
             self._db_handle = initialize_sqlcipher_db(
                 self._opts, check_same_thread=False)
@@ -552,11 +556,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             sync_db_path = "%s-sync" % opts.path
         else:
             sync_db_path = ":memory:"
-
-        # XXX use initialize_sqlcipher_db here too
-        # TODO pass on_init queries to initialize_sqlcipher_db
-        self._sync_db = None#MPSafeSQLiteDB(sync_db_path)
-        pragmas.set_crypto_pragmas(self._sync_db, opts)
 
         opts.path = sync_db_path
 
@@ -799,6 +798,9 @@ class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
 
     Instead of initializing the database on the fly, it just uses an existing
     connection that is passed to it in the initializer.
+
+    It can be used in tests and debug runs to initialize the adbapi with plain
+    sqlite connections, decoupled from the sqlcipher layer.
     """
 
     def __init__(self, conn):
@@ -814,6 +816,9 @@ class SoledadSQLCipherWrapper(SQLCipherDatabase):
 
     Instead of initializing the database on the fly, it just uses an existing
     connection that is passed to it in the initializer.
+
+    It can be used from adbapi to initialize a soledad database after
+    getting a regular connection to a sqlcipher database.
     """
     def __init__(self, conn):
         self._db_handle = conn

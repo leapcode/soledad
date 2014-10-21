@@ -105,7 +105,7 @@ class Soledad(object):
     """
     implements(soledad_interfaces.ILocalStorage,
                soledad_interfaces.ISyncableStorage,
-               soledad_interfaces.ISharedSecretsStorage)
+               soledad_interfaces.ISecretsStorage)
 
     local_db_file_name = 'soledad.u1db'
     secrets_file_name = "soledad.json"
@@ -292,10 +292,7 @@ class Soledad(object):
         call.
         ============================== WARNING ==============================
         """
-        # TODO what happens with this warning during the deferred life cycle?
-        # Isn't it better to defend ourselves from the mutability, to avoid
-        # nasty surprises?
-        doc.content = self._convert_to_unicode(doc.content)
+        doc.content = _convert_to_unicode(doc.content)
         return self._defer("put_doc", doc)
 
     def delete_doc(self, doc):
@@ -388,7 +385,7 @@ class Soledad(object):
                 soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
             return local_gen
 
-        sync_url = urlparse.urljoin(self.server_url, 'user-%s' % self.uuid)
+        sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
         try:
             d = self._dbsyncer.sync(
                 sync_url,
@@ -404,29 +401,6 @@ class Soledad(object):
 
     def stop_sync(self):
         self._dbsyncer.stop_sync()
-
-    # FIXME -------------------------------------------------------
-    # review if we really need this. I think that we can the sync
-    # fail silently if nothing is to be synced.
-    #def need_sync(self, url):
-        # XXX dispatch this method in the dbpool .................
-        #replica_uid = self._dbpool.replica_uid
-        #target = SoledadSyncTarget(
-            #url, replica_uid, creds=self._creds, crypto=self._crypto)
-#
-        # XXX does it matter if we get this from the general dbpool or the
-        # syncer pool?
-        #generation = self._dbpool.get_generation()
-#
-        # XXX better unpack it?
-        #info = target.get_sync_info(replica_uid)
-#
-        # compare source generation with target's last known source generation
-        #if generation != info[4]:
-            #soledad_events.signal(
-                #soledad_events.SOLEDAD_NEW_DATA_TO_SYNC, self.uuid)
-            #return True
-        #return False
 
     @property
     def syncing(self):
@@ -463,15 +437,8 @@ class Soledad(object):
 
     token = property(_get_token, _set_token, doc='The authentication Token.')
 
-    def _get_server_url(self):
-        return self._server_url
-
-    server_url = property(
-        _get_server_url,
-        doc='The URL of the Soledad server.')
-
     #
-    # ISharedSecretsStorage
+    # ISecretsStorage
     #
 
     def init_shared_db(self, server_url, uuid, creds, syncable=True):
@@ -482,17 +449,6 @@ class Soledad(object):
             creds=creds,
             create=False,  # db should exist at this point.
             syncable=syncable)
-
-    def _set_secrets_path(self, secrets_path):
-        self._secrets.secrets_path = secrets_path
-
-    def _get_secrets_path(self):
-        return self._secrets.secrets_path
-
-    secrets_path = property(
-        _get_secrets_path,
-        _set_secrets_path,
-        doc='The path for the file containing the encrypted symmetric secret.')
 
     @property
     def storage_secret(self):

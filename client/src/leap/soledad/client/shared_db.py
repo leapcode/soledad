@@ -55,6 +55,8 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
 
+    # If syncable is False, the database will not attempt to sync against
+    # a remote replica. Default is True.
     syncable = True
 
     #
@@ -109,6 +111,11 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         :param token: An authentication token for accessing the shared db.
         :type token: str
 
+        :param syncable:
+            If syncable is False, the database will not attempt to sync against
+            a remote replica.
+        :type syncable: bool
+
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
@@ -161,8 +168,6 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
 
         :raise HTTPError: Raised if any HTTP error occurs.
         """
-        # TODO ----- if the shared_db is not syncable, should not
-        # attempt to resolve.
         if self.syncable:
             res, headers = self._request_json(
                 'PUT', ['lock', self._uuid], body={})

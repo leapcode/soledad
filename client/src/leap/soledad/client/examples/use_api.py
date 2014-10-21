@@ -52,10 +52,10 @@ db = sqlcipher.SQLCipherDatabase(opts)
 def allDone():
     debug("ALL DONE!")
 
+payload = open('manifest.phk').read()
 
 for i in range(times):
-    doc = {"number": i,
-           "payload": open('manifest.phk').read()}
+    doc = {"number": i, "payload": payload}
     d = db.create_doc(doc)
     debug(d.doc_id, d.content['number'])
 
