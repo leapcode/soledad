@@ -3,7 +3,10 @@ simplejson
 u1db
 scrypt
 pycryptopp
-cchardet
+
+# cchardet not packaged, we need python-chardet from the
+# repos instead.
+chardet
 zope.proxy
 
 #
