@@ -1,5 +1,10 @@
 soledad (0.6.0) unstable; urgency=low
 
+  [ Ben Carrillo ]
+  * Disable WAL (workaround for #5562)
+  * Use python-chardet
+
+  [ db ]
   * Update to 0.6.0 release.
   * Do not depend on pysqlite (closes #2945)
 
