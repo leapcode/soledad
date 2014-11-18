@@ -132,6 +132,7 @@ class SoledadSecrets(object):
 
     UUID_KEY = 'uuid'
     STORAGE_SECRETS_KEY = 'storage_secrets'
+    ACTIVE_SECRET_KEY = 'active_secret'
     SECRET_KEY = 'secret'
     CIPHER_KEY = 'cipher'
     LENGTH_KEY = 'length'
@@ -265,10 +266,13 @@ class SoledadSecrets(object):
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        _, mac = self._import_recovery_document(content)
+        _, mac, active_secret = self._import_recovery_document(content)
         # choose first secret if no secret_id was given
         if self._secret_id is None:
-            self.set_secret_id(self._secrets.items()[0][0])
+            if active_secret is None:
+                self.set_secret_id(self._secrets.items()[0][0])
+            else:
+                self.set_secret_id(active_secret)
         # enlarge secret if needed
         enlarged = False
         if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
@@ -298,12 +302,15 @@ class SoledadSecrets(object):
             logger.info(
                 'Found cryptographic secrets in shared recovery '
                 'database.')
-            _, mac = self._import_recovery_document(doc.content)
+            _, mac, active_secret = self._import_recovery_document(doc.content)
             if mac is False:
                 self.put_secrets_in_shared_db()
             self._store_secrets()  # save new secrets in local file
             if self._secret_id is None:
-                self.set_secret_id(self._secrets.items()[0][0])
+                if active_secret is None:
+                    self.set_secret_id(self._secrets.items()[0][0])
+                else:
+                    self.set_secret_id(active_secret)
         else:
             # STAGE 3 - there are no secrets in server also, so
             # generate a secret and store it in remote db.
@@ -363,6 +370,7 @@ class SoledadSecrets(object):
                         'secret': '<encrypted storage_secret>',
                     },
                 },
+                'active_secret': '<secret_id>',
                 'kdf': 'scrypt',
                 'kdf_salt': '<b64 repr of salt>',
                 'kdf_length: <key length>,
@@ -388,6 +396,7 @@ class SoledadSecrets(object):
         # create the recovery document
         data = {
             self.STORAGE_SECRETS_KEY: encrypted_secrets,
+            self.ACTIVE_SECRET_KEY: self._secret_id,
             self.KDF_KEY: self.KDF_SCRYPT,
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
@@ -410,8 +419,9 @@ class SoledadSecrets(object):
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets and whether
-                 there was MAC informationa available for authenticating.
+        :return: A tuple containing the number of imported secrets, whether
+                 there was MAC information available for authenticating, and
+                 the secret_id of the last active secret.
         :rtype: (int, bool)
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
@@ -441,6 +451,11 @@ class SoledadSecrets(object):
         # include secrets in the secret pool.
         secret_count = 0
         secrets = data[self.STORAGE_SECRETS_KEY].items()
+        active_secret = None
+        # XXX remove check for existence of key (included for backwards
+        # compatibility)
+        if self.ACTIVE_SECRET_KEY in data:
+            active_secret = data[self.ACTIVE_SECRET_KEY]
         for secret_id, encrypted_secret in secrets:
             if secret_id not in self._secrets:
                 try:
@@ -450,7 +465,7 @@ class SoledadSecrets(object):
                 except SecretsException as e:
                     logger.error("Failed to decrypt storage secret: %s"
                                  % str(e))
-        return secret_count, mac
+        return secret_count, mac, active_secret
 
     def _get_secrets_from_shared_db(self):
         """
