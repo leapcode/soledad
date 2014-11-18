@@ -403,7 +403,7 @@ class SoledadSecrets(object):
             crypto.MAC_METHOD_KEY: crypto.MacMethods.HMAC,
             crypto.MAC_KEY: hmac.new(
                 key,
-                json.dumps(encrypted_secrets),
+                json.dumps(encrypted_secrets, sort_keys=True),
                 sha256).hexdigest(),
         }
         return data
@@ -440,7 +440,8 @@ class SoledadSecrets(object):
                     buflen=32)
                 mac = hmac.new(
                     key,
-                    json.dumps(data[self.STORAGE_SECRETS_KEY]),
+                    json.dumps(
+                        data[self.STORAGE_SECRETS_KEY], sort_keys=True),
                     sha256).hexdigest()
             else:
                 raise crypto.UnknownMacMethodError('Unknown MAC method: %s.' %
