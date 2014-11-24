@@ -238,7 +238,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 self._pragma_synchronous_normal(self._db_handle)
             if os.environ.get('LEAP_SQLITE_MEMSTORE'):
                 self._pragma_mem_temp_store(self._db_handle)
-            self._pragma_write_ahead_logging(self._db_handle)
+
+            # Disabled for 0.6.x branch. See #5562
+            # self._pragma_write_ahead_logging(self._db_handle)
+
             self._real_replica_uid = None
             self._ensure_schema()
             self._crypto = crypto
