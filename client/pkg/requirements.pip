@@ -3,7 +3,7 @@ simplejson
 u1db
 scrypt
 pycryptopp
-cchardet
+chardet
 zope.proxy
 
 #
