@@ -37,6 +37,23 @@ if DEBUG_SQL:
 
 
 def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
+    """
+    Return a connection pool.
+
+    :param opts:
+        Options for the SQLCipher connection.
+    :type opts: SQLCipherOptions
+    :param openfun:
+        Callback invoked after every connect() on the underlying DB-API
+        object.
+    :type openfun: callable
+    :param driver:
+        The connection driver.
+    :type driver: str
+
+    :return: A U1DB connection pool.
+    :rtype: U1DBConnectionPool
+    """
     if openfun is None and driver == "pysqlcipher":
         openfun = partial(soledad_sqlcipher.set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
@@ -45,14 +62,29 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
 
 
 class U1DBConnection(adbapi.Connection):
+    """
+    A wrapper for a U1DB connection instance.
+    """
 
     u1db_wrapper = soledad_sqlcipher.SoledadSQLCipherWrapper
+    """
+    The U1DB wrapper to use.
+    """
 
     def __init__(self, pool, init_u1db=False):
+        """
+        :param pool: The pool of connections to that owns this connection.
+        :type pool: adbapi.ConnectionPool
+        :param init_u1db: Wether the u1db database should be initialized.
+        :type init_u1db: bool
+        """
         self.init_u1db = init_u1db
         adbapi.Connection.__init__(self, pool)
 
     def reconnect(self):
+        """
+        Reconnect to the U1DB database.
+        """
         if self._connection is not None:
             self._pool.disconnect(self._connection)
         self._connection = self._pool.connect()
@@ -61,29 +93,51 @@ class U1DBConnection(adbapi.Connection):
             self._u1db = self.u1db_wrapper(self._connection)
 
     def __getattr__(self, name):
+        """
+        Route the requested attribute either to the U1DB wrapper or to the
+        connection.
+
+        :param name: The name of the attribute.
+        :type name: str
+        """
         if name.startswith('u1db_'):
-            meth = re.sub('^u1db_', '', name)
-            return getattr(self._u1db, meth)
+            attr = re.sub('^u1db_', '', name)
+            return getattr(self._u1db, attr)
         else:
             return getattr(self._connection, name)
 
-
 class U1DBTransaction(adbapi.Transaction):
+    """
+    A wrapper for a U1DB 'cursor' object.
+    """
 
     def __getattr__(self, name):
+        """
+        Route the requested attribute either to the U1DB wrapper of the
+        connection or to the actual connection cursor.
+
+        :param name: The name of the attribute.
+        :type name: str
+        """
         if name.startswith('u1db_'):
-            meth = re.sub('^u1db_', '', name)
-            return getattr(self._connection._u1db, meth)
+            attr = re.sub('^u1db_', '', name)
+            return getattr(self._connection._u1db, attr)
         else:
             return getattr(self._cursor, name)
 
 
 class U1DBConnectionPool(adbapi.ConnectionPool):
+    """
+    Represent a pool of connections to an U1DB database.
+    """
 
     connectionFactory = U1DBConnection
     transactionFactory = U1DBTransaction
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the connection pool.
+        """
         adbapi.ConnectionPool.__init__(self, *args, **kwargs)
         # all u1db connections, hashed by thread-id
         self._u1dbconnections = {}
@@ -91,15 +145,48 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         # The replica uid, primed by the connections on init.
         self.replica_uid = ProxyBase(None)
 
+        conn = self.connectionFactory(self, init_u1db=True)
+        replica_uid = conn._u1db._real_replica_uid
+        setProxiedObject(self.replica_uid, replica_uid)
+
     def runU1DBQuery(self, meth, *args, **kw):
+        """
+        Execute a U1DB query in a thread, using a pooled connection.
+
+        :param meth: The U1DB wrapper method name.
+        :type meth: str
+
+        :return: a Deferred which will fire the return value of
+            'self._runU1DBQuery(Transaction(...), *args, **kw)', or a Failure.
+        :rtype: twisted.internet.defer.Deferred
+        """
         meth = "u1db_%s" % meth
         return self.runInteraction(self._runU1DBQuery, meth, *args, **kw)
 
     def _runU1DBQuery(self, trans, meth, *args, **kw):
+        """
+        Execute a U1DB query.
+
+        :param trans: An U1DB transaction.
+        :type trans: adbapi.Transaction
+        :param meth: the U1DB wrapper method name.
+        :type meth: str
+        """
         meth = getattr(trans, meth)
         return meth(*args, **kw)
 
     def _runInteraction(self, interaction, *args, **kw):
+        """
+        Interact with the database and return the result.
+
+        :param interaction:
+            A callable object whose first argument is an
+            L{adbapi.Transaction}.
+        :type interaction: callable
+        :return: a Deferred which will fire the return value of
+            'interaction(Transaction(...), *args, **kw)', or a Failure.
+        :rtype: twisted.internet.defer.Deferred
+        """
         tid = self.threadID()
         u1db = self._u1dbconnections.get(tid)
         conn = self.connectionFactory(self, init_u1db=not bool(u1db))
@@ -107,7 +194,6 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         if self.replica_uid is None:
             replica_uid = conn._u1db._real_replica_uid
             setProxiedObject(self.replica_uid, replica_uid)
-            print "GOT REPLICA UID IN DBPOOL", self.replica_uid
 
         if u1db is None:
             self._u1dbconnections[tid] = conn._u1db
@@ -129,6 +215,9 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
             raise excType, excValue, excTraceback
 
     def finalClose(self):
+        """
+        A final close, only called by the shutdown trigger.
+        """
         self.shutdownID = None
         self.threadpool.stop()
         self.running = False
