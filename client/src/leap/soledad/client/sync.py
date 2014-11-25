@@ -115,9 +115,10 @@ class SoledadSynchronizer(Synchronizer):
             "  target generation: %d\n"
             "  target trans id: %s\n"
             "  target my gen: %d\n"
-            "  target my trans_id: %s"
+            "  target my trans_id: %s\n"
+            "  source replica_uid: %s\n"
             % (self.target_replica_uid, target_gen, target_trans_id,
-               target_my_gen, target_my_trans_id))
+               target_my_gen, target_my_trans_id, self.source._replica_uid))
 
         # make sure we'll have access to target replica uid once it exists
         if self.target_replica_uid is None:
