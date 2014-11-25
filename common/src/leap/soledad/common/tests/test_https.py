@@ -14,30 +14,35 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+
 """
 Test Leap backend bits: https
 """
-from leap.soledad.common.tests import BaseSoledadTest
-from leap.soledad.common.tests import test_sync_target as test_st
-from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests.u1db_tests import test_backends
-from leap.soledad.common.tests.u1db_tests import test_https
 
-from leap.soledad import client
-from leap.soledad.server import SoledadApp
 
 from u1db.remote import http_client
 
+from leap.soledad import client
 
-def make_soledad_app(state):
-    return SoledadApp(state)
+from testscenarios import TestWithScenarios
+
+from leap.soledad.common.tests.u1db_tests import test_backends
+from leap.soledad.common.tests.u1db_tests import test_https
+from leap.soledad.common.tests.util import (
+    BaseSoledadTest,
+    make_soledad_document_for_test,
+    make_soledad_app,
+    make_token_soledad_app,
+)
+
 
 LEAP_SCENARIOS = [
     ('http', {
         'make_database_for_test': test_backends.make_http_database_for_test,
         'copy_database_for_test': test_backends.copy_http_database_for_test,
-        'make_document_for_test': test_st.make_leap_document_for_test,
-        'make_app_with_state': test_st.make_soledad_app}),
+        'make_document_for_test': make_soledad_document_for_test,
+        'make_app_with_state': make_soledad_app}),
 ]
 
 
@@ -55,14 +60,15 @@ def token_leap_https_sync_target(test, host, path):
 
 
 class TestSoledadSyncTargetHttpsSupport(
+        TestWithScenarios,
         test_https.TestHttpSyncTargetHttpsSupport,
         BaseSoledadTest):
 
     scenarios = [
         ('token_soledad_https',
             {'server_def': test_https.https_server_def,
-             'make_app_with_state': test_st.make_token_soledad_app,
-             'make_document_for_test': test_st.make_leap_document_for_test,
+             'make_app_with_state': make_token_soledad_app,
+             'make_document_for_test': make_soledad_document_for_test,
              'sync_target': token_leap_https_sync_target}),
     ]
 
@@ -71,8 +77,8 @@ class TestSoledadSyncTargetHttpsSupport(
         # run smoothly with standard u1db.
         test_https.TestHttpSyncTargetHttpsSupport.setUp(self)
         # so here monkey patch again to test our functionality.
-        http_client._VerifiedHTTPSConnection = client.VerifiedHTTPSConnection
-        client.SOLEDAD_CERT = http_client.CA_CERTS
+        http_client._VerifiedHTTPSConnection = client.api.VerifiedHTTPSConnection
+        client.api.SOLEDAD_CERT = http_client.CA_CERTS
 
     def test_working(self):
         """
@@ -83,7 +89,7 @@ class TestSoledadSyncTargetHttpsSupport(
         """
         self.startServer()
         db = self.request_state._create_database('test')
-        self.patch(client, 'SOLEDAD_CERT', self.cacert_pem)
+        self.patch(client.api, 'SOLEDAD_CERT', self.cacert_pem)
         remote_target = self.getSyncTarget('localhost', 'test')
         remote_target.record_sync_info('other-id', 2, 'T-id')
         self.assertEqual(
@@ -99,10 +105,8 @@ class TestSoledadSyncTargetHttpsSupport(
         """
         self.startServer()
         self.request_state._create_database('test')
-        self.patch(client, 'SOLEDAD_CERT', self.cacert_pem)
+        self.patch(client.api, 'SOLEDAD_CERT', self.cacert_pem)
         remote_target = self.getSyncTarget('127.0.0.1', 'test')
         self.assertRaises(
             http_client.CertificateError, remote_target.record_sync_info,
             'other-id', 2, 'T-id')
-
-load_tests = tests.load_with_scenarios

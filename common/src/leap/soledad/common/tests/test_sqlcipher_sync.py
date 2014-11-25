@@ -19,12 +19,14 @@ Test sqlcipher backend sync.
 """
 
 
+import os
 import simplejson as json
 from u1db import (
     sync,
     vectorclock,
 )
 
+from testscenarios import TestWithScenarios
 
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.client.target import SoledadSyncTarget
@@ -33,15 +35,12 @@ from leap.soledad.client.sqlcipher import (
     SQLCipherDatabase,
 )
 
-
-from leap.soledad.common.tests import u1db_tests as tests, BaseSoledadTest
+from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.common.tests.test_sqlcipher import (
-    SQLCIPHER_SCENARIOS,
-    make_document_for_test,
-)
+from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS
 from leap.soledad.common.tests.util import (
     make_soledad_app,
+    BaseSoledadTest,
     SoledadWithCouchServerMixin,
 )
 
@@ -50,15 +49,7 @@ from leap.soledad.common.tests.util import (
 # The following tests come from `u1db.tests.test_sync`.
 #-----------------------------------------------------------------------------
 
-sync_scenarios = []
-for name, scenario in SQLCIPHER_SCENARIOS:
-    scenario = dict(scenario)
-    scenario['do_sync'] = test_sync.sync_via_synchronizer
-    sync_scenarios.append((name, scenario))
-    scenario = dict(scenario)
-
-
-def sync_via_synchronizer_and_leap(test, db_source, db_target,
+def sync_via_synchronizer_and_soledad(test, db_source, db_target,
                                    trace_hook=None, trace_hook_shallow=None):
     if trace_hook:
         test.skipTest("full trace hook unsupported over http")
@@ -71,17 +62,16 @@ def sync_via_synchronizer_and_leap(test, db_source, db_target,
     return sync.Synchronizer(db_source, target).sync()
 
 
-sync_scenarios.append(('pyleap', {
-    'make_database_for_test': test_sync.make_database_for_http_test,
-    'copy_database_for_test': test_sync.copy_database_for_http_test,
-    'make_document_for_test': make_document_for_test,
-    'make_app_with_state': tests.test_remote_sync_target.make_http_app,
-    'do_sync': test_sync.sync_via_synchronizer,
-}))
+sync_scenarios = []
+for name, scenario in SQLCIPHER_SCENARIOS:
+    scenario['do_sync'] = test_sync.sync_via_synchronizer
+    sync_scenarios.append((name, scenario))
 
 
 class SQLCipherDatabaseSyncTests(
-        test_sync.DatabaseSyncTests, BaseSoledadTest):
+        TestWithScenarios,
+        test_sync.DatabaseSyncTests,
+        BaseSoledadTest):
     """
     Test for succesfull sync between SQLCipher and LeapBackend.
 
@@ -92,8 +82,8 @@ class SQLCipherDatabaseSyncTests(
 
     scenarios = sync_scenarios
 
-    def setUp(self):
-        test_sync.DatabaseSyncTests.setUp(self)
+    #def setUp(self):
+    #    test_sync.DatabaseSyncTests.setUp(self)
 
     def tearDown(self):
         test_sync.DatabaseSyncTests.tearDown(self)
@@ -111,8 +101,6 @@ class SQLCipherDatabaseSyncTests(
         if hasattr(self, 'db3') \
                 and isinstance(self.db3, SQLCipherDatabase):
             self.db3.close()
-
-
 
     def test_sync_autoresolves(self):
         """
@@ -321,12 +309,14 @@ target_scenarios = [
         'create_db_and_target': _make_local_db_and_token_http_target,
 #        'make_app_with_state': tests.test_remote_sync_target.make_http_app,
         'make_app_with_state': make_soledad_app,
-        'do_sync': test_sync.sync_via_synchronizer}),
+        'do_sync': sync_via_synchronizer_and_soledad}),
 ]
 
 
 class SQLCipherSyncTargetTests(
-        SoledadWithCouchServerMixin, test_sync.DatabaseSyncTargetTests):
+        TestWithScenarios,
+        SoledadWithCouchServerMixin,
+        test_sync.DatabaseSyncTargetTests):
 
     scenarios = (tests.multiply_scenarios(SQLCIPHER_SCENARIOS,
                                           target_scenarios))
@@ -406,4 +396,3 @@ class SQLCipherSyncTargetTests(
                 self.db._last_exchange_log['return'],
                 {'last_gen': 2, 'docs':
                  [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
-

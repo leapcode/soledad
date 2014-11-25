@@ -75,7 +75,7 @@ class TestHttpSyncTargetHttpsSupport(tests.TestCaseWithServer):
         # order to maintain the compatibility with u1db default tests, we undo
         # that replacement here.
         http_client._VerifiedHTTPSConnection = \
-            soledad.client.old__VerifiedHTTPSConnection
+            soledad.client.api.old__VerifiedHTTPSConnection
         super(TestHttpSyncTargetHttpsSupport, self).setUp()
 
     def getSyncTarget(self, host, path=None):

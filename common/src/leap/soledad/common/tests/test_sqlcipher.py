@@ -20,10 +20,11 @@ Test sqlcipher backend internals.
 import os
 import time
 import threading
-
+import tempfile
+import shutil
 
 from pysqlcipher import dbapi2
-
+from testscenarios import TestWithScenarios
 
 # u1db stuff.
 from u1db import (
@@ -34,17 +35,16 @@ from u1db.backends.sqlite_backend import SQLitePartialExpandDatabase
 
 
 # soledad stuff.
+from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.sqlcipher import (
     SQLCipherDatabase,
     SQLCipherOptions,
     DatabaseIsNotEncrypted,
-    initialize_sqlcipher_db,
 )
 
 
 # u1db tests stuff.
-from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_sqlite_backend
 from leap.soledad.common.tests.u1db_tests import test_backends
@@ -53,12 +53,12 @@ from leap.soledad.common.tests.util import (
     make_sqlcipher_database_for_test,
     copy_sqlcipher_database_for_test,
     PASSWORD,
+    BaseSoledadTest,
 )
 
 
 def sqlcipher_open(path, passphrase, create=True, document_factory=None):
     return SQLCipherDatabase(
-        None,
         SQLCipherOptions(path, passphrase, create=create))
 
 
@@ -93,30 +93,34 @@ SQLCIPHER_SCENARIOS = [
 ]
 
 
-class SQLCipherTests(test_backends.AllDatabaseTests):
+class SQLCipherTests(TestWithScenarios, test_backends.AllDatabaseTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
-class SQLCipherDatabaseTests(test_backends.LocalDatabaseTests):
+class SQLCipherDatabaseTests(TestWithScenarios, test_backends.LocalDatabaseTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
 class SQLCipherValidateGenNTransIdTests(
+        TestWithScenarios, 
         test_backends.LocalDatabaseValidateGenNTransIdTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
 class SQLCipherValidateSourceGenTests(
+        TestWithScenarios, 
         test_backends.LocalDatabaseValidateSourceGenTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
 class SQLCipherWithConflictsTests(
+        TestWithScenarios, 
         test_backends.LocalDatabaseWithConflictsTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
-class SQLCipherIndexTests(test_backends.DatabaseIndexTests):
+class SQLCipherIndexTests(
+        TestWithScenarios, test_backends.DatabaseIndexTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
@@ -124,7 +128,7 @@ class SQLCipherIndexTests(test_backends.DatabaseIndexTests):
 # The following tests come from `u1db.tests.test_sqlite_backend`.
 #-----------------------------------------------------------------------------
 
-class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
+class TestSQLCipherDatabase(TestWithScenarios, test_sqlite_backend.TestSQLiteDatabase):
 
     def test_atomic_initialize(self):
         # This test was modified to ensure that db2.close() is called within
@@ -137,11 +141,11 @@ class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
         class SQLCipherDatabaseTesting(SQLCipherDatabase):
             _index_storage_value = "testing"
 
-            def __init__(self, soledad_crypto, dbname, ntry):
+            def __init__(self, dbname, ntry):
                 self._try = ntry
                 self._is_initialized_invocations = 0
                 SQLCipherDatabase.__init__(
-                    self, soledad_crypto,
+                    self,
                     SQLCipherOptions(dbname, PASSWORD))
 
             def _is_initialized(self, c):
@@ -161,15 +165,14 @@ class TestSQLCipherDatabase(test_sqlite_backend.TestSQLiteDatabase):
 
             def run(self):
                 try:
-                    db2 = SQLCipherDatabaseTesting(None, dbname, 2)
+                    db2 = SQLCipherDatabaseTesting(dbname, 2)
                 except Exception, e:
                     SecondTry.outcome2.append(e)
                 else:
                     SecondTry.outcome2.append(db2)
-                self.close()
 
         t2 = SecondTry()
-        db1 = SQLCipherDatabaseTesting(None, dbname, 1)
+        db1 = SQLCipherDatabaseTesting(dbname, 1)
         t2.join()
 
         self.assertIsInstance(SecondTry.outcome2[0], SQLCipherDatabaseTesting)
@@ -368,7 +371,7 @@ class SQLCipherOpen(test_open.TestU1DBOpen):
 # Tests for actual encryption of the database
 #-----------------------------------------------------------------------------
 
-class SQLCipherEncryptionTest(BaseLeapTest):
+class SQLCipherEncryptionTest(BaseSoledadTest):
     """
     Tests to guarantee SQLCipher is indeed encrypting data when storing.
     """
@@ -379,11 +382,37 @@ class SQLCipherEncryptionTest(BaseLeapTest):
                 os.unlink(dbfile)
 
     def setUp(self):
+        # the following come from BaseLeapTest.setUpClass, because
+        # twisted.trial doesn't support such class methods for setting up
+        # test classes.
+        self.old_path = os.environ['PATH']
+        self.old_home = os.environ['HOME']
+        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
+        self.home = self.tempdir
+        bin_tdir = os.path.join(
+            self.tempdir,
+            'bin')
+        os.environ["PATH"] = bin_tdir
+        os.environ["HOME"] = self.tempdir
+        # this is our own stuff
         self.DB_FILE = os.path.join(self.tempdir, 'test.db')
         self._delete_dbfiles()
 
     def tearDown(self):
         self._delete_dbfiles()
+        # the following come from BaseLeapTest.tearDownClass, because
+        # twisted.trial doesn't support such class methods for tearing down
+        # test classes.
+        os.environ["PATH"] = self.old_path
+        os.environ["HOME"] = self.old_home
+        # safety check! please do not wipe my home...
+        # XXX needs to adapt to non-linuces
+        soledad_assert(
+            self.tempdir.startswith('/tmp/leap_tests-') or
+            self.tempdir.startswith('/var/folder'),
+            "beware! tried to remove a dir which does not "
+            "live in temporal folder!")
+        shutil.rmtree(self.tempdir)
 
     def test_try_to_open_encrypted_db_with_sqlite_backend(self):
         """
@@ -426,6 +455,3 @@ class SQLCipherEncryptionTest(BaseLeapTest):
                 "dbs.")
         except DatabaseIsNotEncrypted:
             pass
-
-
-load_tests = tests.load_with_scenarios
