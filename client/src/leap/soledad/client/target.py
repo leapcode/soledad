@@ -188,7 +188,7 @@ class DocumentSyncerThread(threading.Thread):
                 self._doc_syncer.failure_callback(
                     self._idx, self._total, self._exception)
 
-                self._failed_method(self)
+                self._failed_method()
                 # we do not release the callback lock here because we
                 # failed and so we don't want other threads to succeed.
 
@@ -1296,7 +1296,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         # decrypt docs in case of deferred decryption
         if defer_decryption:
-            self._sync_loop.start()
             while self.clear_to_sync() is False:
                 sleep(self.DECRYPT_LOOP_PERIOD)
             self._teardown_sync_loop()
@@ -1362,11 +1361,11 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         encr = SyncEncrypterPool
         sql = ("SELECT content FROM %s WHERE doc_id=? and rev=?" % (
             encr.TABLE_NAME,))
-        res = self._sync_db.select(sql, (doc_id, doc_rev))
-        try:
-            val = res.next()
+        res = self._fetchall(sql, (doc_id, doc_rev))
+        if res:
+            val = res.pop()
             return val[0]
-        except StopIteration:
+        else:
             # no doc found
             return None
 
@@ -1508,3 +1507,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :type token: str
         """
         TokenBasedAuth.set_token_credentials(self, uuid, token)
+
+    def _fetchall(self, *args, **kwargs):
+        with self._sync_db:
+            c = self._sync_db.cursor()
+            c.execute(*args, **kwargs)
+            return c.fetchall()
