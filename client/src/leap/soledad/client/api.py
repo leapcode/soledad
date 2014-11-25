@@ -734,7 +734,6 @@ class Soledad(object):
                 shared_db_url,
                 uuid,
                 creds=creds,
-                create=False,  # db should exist at this point.
                 syncable=syncable)
 
     @property
