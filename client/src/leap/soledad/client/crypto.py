@@ -530,8 +530,8 @@ class SyncEncryptDecryptPool(object):
         :param crypto: A SoledadCryto instance to perform the encryption.
         :type crypto: leap.soledad.crypto.SoledadCrypto
 
-        :param sync_db: a database connection handle
-        :type sync_db: handle
+        :param sync_db: A database connection handle
+        :type sync_db: pysqlcipher.dbapi2.Connection
 
         :param write_lock: a write lock for controlling concurrent access
                            to the sync_db
@@ -909,8 +909,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         if encrypted is not None:
             sql += " WHERE encrypted = %d" % int(encrypted)
         sql += " ORDER BY gen ASC"
-        docs = self._sync_db.select(sql)
-        return docs
+        return self._fetchall(sql)
 
     def get_insertable_docs_by_gen(self):
         """
@@ -927,15 +926,12 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         decrypted_docs = self.get_docs_by_generation(encrypted=False)
         insertable = []
         for doc_id, rev, _, gen, trans_id, encrypted in all_docs:
-            try:
-                next_doc_id, _, next_content, _, _, _ = decrypted_docs.next()
+            for next_doc_id, _, next_content, _, _, _ in decrypted_docs:
                 if doc_id == next_doc_id:
                     content = next_content
                     insertable.append((doc_id, rev, content, gen, trans_id))
                 else:
                     break
-            except StopIteration:
-                break
         return insertable
 
     def count_docs_in_sync_db(self, encrypted=None):
@@ -955,9 +951,9 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         sql = "SELECT COUNT(*) FROM %s" % (self.TABLE_NAME,)
         if encrypted is not None:
             sql += " WHERE encrypted = %d" % int(encrypted)
-        res = self._sync_db.select(sql)
-        if res is not None:
-            val = res.next()
+        res = self._fetchall(sql)
+        if res:
+            val = res.pop()
             return val[0]
         else:
             return 0
@@ -1035,4 +1031,10 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         Empty the received docs table of the sync database.
         """
         sql = "DELETE FROM %s WHERE 1" % (self.TABLE_NAME,)
-        res = self._sync_db.execute(sql)
+        self._sync_db.execute(sql)
+
+    def _fetchall(self, *args, **kwargs):
+        with self._sync_db:
+            c = self._sync_db.cursor()
+            c.execute(*args, **kwargs)
+            return c.fetchall()
