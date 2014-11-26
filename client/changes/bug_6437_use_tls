@@ -1,0 +1,1 @@
+  o Use TLS v1 in soledad client. Fixes partially #6437
