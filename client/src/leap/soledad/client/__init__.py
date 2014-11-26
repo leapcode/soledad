@@ -811,7 +811,8 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
 
         self.sock = ssl.wrap_socket(sock,
                                     ca_certs=SOLEDAD_CERT,
-                                    cert_reqs=ssl.CERT_REQUIRED)
+                                    cert_reqs=ssl.CERT_REQUIRED,
+                                    ssl_version=ssl.PROTOCOL_TLSv1)
         match_hostname(self.sock.getpeercert(), self.host)
 
 
