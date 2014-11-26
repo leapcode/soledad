@@ -19,6 +19,7 @@ CERT_PATH=/etc/leap/soledad-server.pem
 PRIVKEY_PATH=/etc/leap/soledad-server.key
 TWISTD_PATH=/usr/bin/twistd
 HOME=/var/lib/soledad/
+SSL_METHOD=TLSv1_METHOD
 
 [ -r /etc/default/soledad ] && . /etc/default/soledad
 
@@ -35,7 +36,7 @@ case "$1" in
             --logfile=$LOGFILE \
             web \
             --wsgi=$OBJ \
-            --port=ssl:$HTTPS_PORT:privateKey=$PRIVKEY_PATH:certKey=$CERT_PATH
+            --port=ssl:${HTTPS_PORT}:privateKey=${PRIVKEY_PATH}:certKey=${CERT_PATH}:sslmethod=${SSL_METHOD}
         echo "."
     ;;
 
