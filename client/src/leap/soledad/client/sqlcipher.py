@@ -52,6 +52,7 @@ import json
 from hashlib import sha256
 from contextlib import contextmanager
 from collections import defaultdict
+from httplib import CannotSendRequest
 
 from pysqlcipher import dbapi2
 from u1db.backends import sqlite_backend
@@ -485,6 +486,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
             except PendingReceivedDocsSyncError:
                 logger.warning("Local sync db is not clear, skipping sync...")
+                return
+            except CannotSendRequest:
+                logger.warning("Connection with sync target couldn't be established. Resetting connection...")
+                # closing the connection it will get it recreated in the next try
+                syncer.sync_target.close()
                 return
 
         return res
