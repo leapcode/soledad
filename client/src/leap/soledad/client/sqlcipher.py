@@ -488,8 +488,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
                 logger.warning("Local sync db is not clear, skipping sync...")
                 return
             except CannotSendRequest:
-                logger.warning("Connection with sync target couldn't be established. Resetting connection...")
-                # closing the connection it will get it recreated in the next try
+                logger.warning("Connection with sync target couldn't be "
+                               "established. Resetting connection...")
+                # closing the connection it will be recreated in the next try
                 syncer.sync_target.close()
                 return
 
