@@ -1,0 +1,1 @@
+  o Reset syncer connection when getting HTTP error during sync (#5855).
