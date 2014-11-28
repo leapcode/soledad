@@ -35,7 +35,7 @@ class EncryptionSchemes(object):
     PUBKEY = 'pubkey'
 
 
-class UnknownEncryptionScheme(Exception):
+class UnknownEncryptionSchemeError(Exception):
     """
     Raised when trying to decrypt from unknown encryption schemes.
     """
@@ -51,7 +51,7 @@ class EncryptionMethods(object):
     XSALSA20 = 'xsalsa20'
 
 
-class UnknownEncryptionMethod(Exception):
+class UnknownEncryptionMethodError(Exception):
     """
     Raised when trying to encrypt/decrypt with unknown method.
     """
@@ -66,7 +66,7 @@ class MacMethods(object):
     HMAC = 'hmac'
 
 
-class UnknownMacMethod(Exception):
+class UnknownMacMethodError(Exception):
     """
     Raised when trying to authenticate document's content with unknown MAC
     mehtod.
@@ -74,7 +74,7 @@ class UnknownMacMethod(Exception):
     pass
 
 
-class WrongMac(Exception):
+class WrongMacError(Exception):
     """
     Raised when failing to authenticate document's contents based on MAC.
     """

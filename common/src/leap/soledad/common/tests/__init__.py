@@ -27,9 +27,9 @@ from mock import Mock
 
 
 from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.client import Soledad
 from leap.soledad.client.crypto import decrypt_doc_dict
-from leap.soledad.client.crypto import ENC_SCHEME_KEY
 from leap.common.testing.basetest import BaseLeapTest
 
 

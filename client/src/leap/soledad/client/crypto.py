@@ -32,18 +32,8 @@ from zope.proxy import sameProxiedObjects
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
+from leap.soledad.common import crypto
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.crypto import EncryptionSchemes
-from leap.soledad.common.crypto import EncryptionMethods
-from leap.soledad.common.crypto import MacMethods
-from leap.soledad.common.crypto import UnknownMacMethod
-from leap.soledad.common.crypto import WrongMac
-from leap.soledad.common.crypto import ENC_JSON_KEY
-from leap.soledad.common.crypto import ENC_SCHEME_KEY
-from leap.soledad.common.crypto import ENC_METHOD_KEY
-from leap.soledad.common.crypto import ENC_IV_KEY
-from leap.soledad.common.crypto import MAC_KEY
-from leap.soledad.common.crypto import MAC_METHOD_KEY
 
 
 logger = logging.getLogger(__name__)
@@ -59,13 +49,16 @@ def _assert_known_encryption_method(method):
     :param method: The encryption method to assert.
     :type method: str
 
-    :raise AssertionError: Raised if C{method} is unknown.
+    :raise UnknownEncryptionMethodError: Raised when C{method} is unknown.
     """
     valid_methods = [
-        EncryptionMethods.AES_256_CTR,
-        EncryptionMethods.XSALSA20,
+        crypto.EncryptionMethods.AES_256_CTR,
+        crypto.EncryptionMethods.XSALSA20,
     ]
-    soledad_assert(method in valid_methods)
+    try:
+        soledad_assert(method in valid_methods)
+    except AssertionError:
+        raise crypto.UnknownEncryptionMethodError
 
 
 def encrypt_sym(data, key, method):
@@ -96,11 +89,11 @@ def encrypt_sym(data, key, method):
 
     iv = None
     # AES-256 in CTR mode
-    if method == EncryptionMethods.AES_256_CTR:
+    if method == crypto.EncryptionMethods.AES_256_CTR:
         iv = os.urandom(16)
         ciphertext = AES(key=key, iv=iv).process(data)
     # XSalsa20
-    elif method == EncryptionMethods.XSALSA20:
+    elif method == crypto.EncryptionMethods.XSALSA20:
         iv = os.urandom(24)
         ciphertext = XSalsa20(key=key, iv=iv).process(data)
 
@@ -125,7 +118,7 @@ def decrypt_sym(data, key, method, **kwargs):
     :return: The decrypted data.
     :rtype: str
 
-    :raise AssertionError: Raised if C{method} is unknown.
+    :raise UnknownEncryptionMethodError: Raised when C{method} is unknown.
     """
     soledad_assert_type(key, str)
     # assert params
@@ -137,10 +130,10 @@ def decrypt_sym(data, key, method, **kwargs):
         '%s needs an initial value.' % method)
     _assert_known_encryption_method(method)
     # AES-256 in CTR mode
-    if method == EncryptionMethods.AES_256_CTR:
+    if method == crypto.EncryptionMethods.AES_256_CTR:
         return AES(
             key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
-    elif method == EncryptionMethods.XSALSA20:
+    elif method == crypto.EncryptionMethods.XSALSA20:
         return XSalsa20(
             key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
 
@@ -185,11 +178,11 @@ class SoledadCrypto(object):
         self._soledad = soledad
 
     def encrypt_sym(self, data, key,
-                    method=EncryptionMethods.AES_256_CTR):
+                    method=crypto.EncryptionMethods.AES_256_CTR):
         return encrypt_sym(data, key, method)
 
     def decrypt_sym(self, data, key,
-                    method=EncryptionMethods.AES_256_CTR, **kwargs):
+                    method=crypto.EncryptionMethods.AES_256_CTR, **kwargs):
         return decrypt_sym(data, key, method, **kwargs)
 
     def doc_mac_key(self, doc_id, secret):
@@ -233,7 +226,8 @@ class SoledadCrypto(object):
 # Crypto utilities for a SoledadDocument.
 #
 
-def mac_doc(doc_id, doc_rev, ciphertext, mac_method, secret):
+def mac_doc(doc_id, doc_rev, ciphertext, enc_scheme, enc_method, enc_iv,
+        mac_method, secret):
     """
     Calculate a MAC for C{doc} using C{ciphertext}.
 
@@ -249,6 +243,12 @@ def mac_doc(doc_id, doc_rev, ciphertext, mac_method, secret):
     :type doc_rev: str
     :param ciphertext: The content of the document.
     :type ciphertext: str
+    :param enc_scheme: The encryption scheme.
+    :type enc_scheme: str
+    :param enc_method: The encryption method.
+    :type enc_method: str
+    :param enc_iv: The encryption initialization vector.
+    :type enc_iv: str
     :param mac_method: The MAC method to use.
     :type mac_method: str
     :param secret: The Soledad storage secret
@@ -257,15 +257,20 @@ def mac_doc(doc_id, doc_rev, ciphertext, mac_method, secret):
     :return: The calculated MAC.
     :rtype: str
 
-    :raise UnknownMacMethod: Raised when C{mac_method} is unknown.
+    :raise crypto.UnknownMacMethodError: Raised when C{mac_method} is unknown.
     """
     try:
-        soledad_assert(mac_method == MacMethods.HMAC)
+        soledad_assert(mac_method == crypto.MacMethods.HMAC)
     except AssertionError:
-        raise UnknownMacMethod
-    content = str(doc_id) \
-        + str(doc_rev) \
-        + ciphertext
+        raise crypto.UnknownMacMethodError
+    template = "{doc_id}{doc_rev}{ciphertext}{enc_scheme}{enc_method}{enc_iv}"
+    content = template.format(
+        doc_id=doc_id,
+        doc_rev=doc_rev,
+        ciphertext=ciphertext,
+        enc_scheme=enc_scheme,
+        enc_method=enc_method,
+        enc_iv=enc_iv)
     return hmac.new(
         doc_mac_key(doc_id, secret),
         content,
@@ -297,12 +302,12 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     string representing the following:
 
         {
-            ENC_JSON_KEY: '<encrypted doc JSON string>',
-            ENC_SCHEME_KEY: 'symkey',
-            ENC_METHOD_KEY: EncryptionMethods.AES_256_CTR,
-            ENC_IV_KEY: '<the initial value used to encrypt>',
+            crypto.ENC_JSON_KEY: '<encrypted doc JSON string>',
+            crypto.ENC_SCHEME_KEY: 'symkey',
+            crypto.ENC_METHOD_KEY: crypto.EncryptionMethods.AES_256_CTR,
+            crypto.ENC_IV_KEY: '<the initial value used to encrypt>',
             MAC_KEY: '<mac>'
-            MAC_METHOD_KEY: 'hmac'
+            crypto.MAC_METHOD_KEY: 'hmac'
         }
 
     :param docstr: A representation of the document to be encrypted.
@@ -324,10 +329,10 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
              content.
     :rtype: str
     """
-    enc_scheme = EncryptionSchemes.SYMKEY
-    enc_method = EncryptionMethods.AES_256_CTR
-    mac_method = MacMethods.HMAC
-    iv, ciphertext = encrypt_sym(
+    enc_scheme = crypto.EncryptionSchemes.SYMKEY
+    enc_method = crypto.EncryptionMethods.AES_256_CTR
+    mac_method = crypto.MacMethods.HMAC
+    enc_iv, ciphertext = encrypt_sym(
         str(docstr),  # encryption/decryption routines expect str
         key, method=enc_method)
     mac = binascii.b2a_hex(  # store the mac as hex.
@@ -335,6 +340,9 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
             doc_id,
             doc_rev,
             ciphertext,
+            enc_scheme,
+            enc_method,
+            enc_iv,
             mac_method,
             secret))
     # Return a representation for the encrypted content. In the following, we
@@ -342,12 +350,12 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     # serialization does not complain about what it tries to serialize.
     hex_ciphertext = binascii.b2a_hex(ciphertext)
     return json.dumps({
-        ENC_JSON_KEY: hex_ciphertext,
-        ENC_SCHEME_KEY: enc_scheme,
-        ENC_METHOD_KEY: enc_method,
-        ENC_IV_KEY: iv,
-        MAC_KEY: mac,
-        MAC_METHOD_KEY: mac_method,
+        crypto.ENC_JSON_KEY: hex_ciphertext,
+        crypto.ENC_SCHEME_KEY: enc_scheme,
+        crypto.ENC_METHOD_KEY: enc_method,
+        crypto.ENC_IV_KEY: enc_iv,
+        crypto.MAC_KEY: mac,
+        crypto.MAC_METHOD_KEY: mac_method,
     })
 
 
@@ -369,7 +377,8 @@ def decrypt_doc(crypto, doc):
     return decrypt_doc_dict(doc.content, doc.doc_id, doc.rev, key, secret)
 
 
-def _verify_doc_mac(doc_id, doc_rev, ciphertext, mac_method, secret, doc_mac):
+def _verify_doc_mac(doc_id, doc_rev, ciphertext, enc_scheme, enc_method,
+        enc_iv, mac_method, secret, doc_mac):
     """
     Verify that C{doc_mac} is a correct MAC for the given document.
 
@@ -379,6 +388,12 @@ def _verify_doc_mac(doc_id, doc_rev, ciphertext, mac_method, secret, doc_mac):
     :type doc_rev: str
     :param ciphertext: The content of the document.
     :type ciphertext: str
+    :param enc_scheme: The encryption scheme.
+    :type enc_scheme: str
+    :param enc_method: The encryption method.
+    :type enc_method: str
+    :param enc_iv: The encryption initialization vector.
+    :type enc_iv: str
     :param mac_method: The MAC method to use.
     :type mac_method: str
     :param secret: The Soledad storage secret
@@ -386,12 +401,16 @@ def _verify_doc_mac(doc_id, doc_rev, ciphertext, mac_method, secret, doc_mac):
     :param doc_mac: The MAC to be verified against.
     :type doc_mac: str
 
-    :raise UnknownMacMethod: Raised when C{mac_method} is unknown.
+    :raise crypto.UnknownMacMethodError: Raised when C{mac_method} is unknown.
+    :raise crypto.WrongMacError: Raised when MAC could not be verified.
     """
     calculated_mac = mac_doc(
         doc_id,
         doc_rev,
         ciphertext,
+        enc_scheme,
+        enc_method,
+        enc_iv,
         mac_method,
         secret)
     # we compare mac's hashes to avoid possible timing attacks that might
@@ -404,7 +423,8 @@ def _verify_doc_mac(doc_id, doc_rev, ciphertext, mac_method, secret, doc_mac):
 
     if doc_mac_hash != calculated_mac_hash:
         logger.warning("Wrong MAC while decrypting doc...")
-        raise WrongMac('Could not authenticate document\'s contents.')
+        raise crypto.WrongMacError("Could not authenticate document's "
+                                   "contents.")
 
 
 def decrypt_doc_dict(doc_dict, doc_id, doc_rev, key, secret):
@@ -416,18 +436,18 @@ def decrypt_doc_dict(doc_dict, doc_id, doc_rev, key, secret):
     The passed doc_dict argument should have the following structure:
 
         {
-            ENC_JSON_KEY: '<enc_blob>',
-            ENC_SCHEME_KEY: '<enc_scheme>',
-            ENC_METHOD_KEY: '<enc_method>',
-            ENC_IV_KEY: '<initial value used to encrypt>',  # (optional)
+            crypto.ENC_JSON_KEY: '<enc_blob>',
+            crypto.ENC_SCHEME_KEY: '<enc_scheme>',
+            crypto.ENC_METHOD_KEY: '<enc_method>',
+            crypto.ENC_IV_KEY: '<initial value used to encrypt>',  # (optional)
             MAC_KEY: '<mac>'
-            MAC_METHOD_KEY: 'hmac'
+            crypto.MAC_METHOD_KEY: 'hmac'
         }
 
     C{enc_blob} is the encryption of the JSON serialization of the document's
     content. For now Soledad just deals with documents whose C{enc_scheme} is
-    EncryptionSchemes.SYMKEY and C{enc_method} is
-    EncryptionMethods.AES_256_CTR.
+    crypto.EncryptionSchemes.SYMKEY and C{enc_method} is
+    crypto.EncryptionMethods.AES_256_CTR.
 
     :param doc_dict: The content of the document to be decrypted.
     :type doc_dict: dict
@@ -447,27 +467,32 @@ def decrypt_doc_dict(doc_dict, doc_id, doc_rev, key, secret):
     :return: The JSON serialization of the decrypted content.
     :rtype: str
 
-    :raise UnknownEncryptionMethod: Raised when trying to decrypt from an
+    :raise UnknownEncryptionMethodError: Raised when trying to decrypt from an
         unknown encryption method.
     """
     # assert document dictionary structure
-    soledad_assert(ENC_JSON_KEY in doc_dict)
-    soledad_assert(ENC_SCHEME_KEY in doc_dict)
-    soledad_assert(ENC_METHOD_KEY in doc_dict)
-    soledad_assert(ENC_IV_KEY in doc_dict)
-    soledad_assert(MAC_KEY in doc_dict)
-    soledad_assert(MAC_METHOD_KEY in doc_dict)
+    expected_keys = set([
+        crypto.ENC_JSON_KEY,
+        crypto.ENC_SCHEME_KEY,
+        crypto.ENC_METHOD_KEY,
+        crypto.ENC_IV_KEY,
+        crypto.MAC_KEY,
+        crypto.MAC_METHOD_KEY,
+    ])
+    soledad_assert(expected_keys.issubset(set(doc_dict.keys())))
 
-    ciphertext = binascii.a2b_hex(doc_dict[ENC_JSON_KEY])
-    enc_scheme = doc_dict[ENC_SCHEME_KEY]
-    enc_method = doc_dict[ENC_METHOD_KEY]
-    enc_iv = doc_dict[ENC_IV_KEY]
-    doc_mac = doc_dict[MAC_KEY]
-    mac_method = doc_dict[MAC_METHOD_KEY]
+    ciphertext = binascii.a2b_hex(doc_dict[crypto.ENC_JSON_KEY])
+    enc_scheme = doc_dict[crypto.ENC_SCHEME_KEY]
+    enc_method = doc_dict[crypto.ENC_METHOD_KEY]
+    enc_iv = doc_dict[crypto.ENC_IV_KEY]
+    doc_mac = doc_dict[crypto.MAC_KEY]
+    mac_method = doc_dict[crypto.MAC_METHOD_KEY]
 
-    soledad_assert(enc_scheme == EncryptionSchemes.SYMKEY)
+    soledad_assert(enc_scheme == crypto.EncryptionSchemes.SYMKEY)
 
-    _verify_doc_mac(doc_id, doc_rev, ciphertext, mac_method, secret, doc_mac)
+    _verify_doc_mac(
+        doc_id, doc_rev, ciphertext, enc_scheme, enc_method,
+        enc_iv, mac_method, secret, doc_mac)
 
     return decrypt_sym(ciphertext, key, method=enc_method, iv=enc_iv)
 
@@ -481,8 +506,9 @@ def is_symmetrically_encrypted(doc):
 
     :rtype: bool
     """
-    if doc.content and ENC_SCHEME_KEY in doc.content:
-        if doc.content[ENC_SCHEME_KEY] == EncryptionSchemes.SYMKEY:
+    if doc.content and crypto.ENC_SCHEME_KEY in doc.content:
+        if doc.content[crypto.ENC_SCHEME_KEY] \
+                == crypto.EncryptionSchemes.SYMKEY:
             return True
     return False
 

@@ -33,33 +33,12 @@ from hashlib import sha256
 import simplejson as json
 
 
-from leap.soledad.common import (
-    soledad_assert,
-    soledad_assert_type
-)
-from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.crypto import (
-    MacMethods,
-    UnknownMacMethod,
-    WrongMac,
-    MAC_KEY,
-    MAC_METHOD_KEY,
-)
-from leap.soledad.common.errors import (
-    InvalidTokenError,
-    NotLockedError,
-    AlreadyLockedError,
-    LockTimedOutError,
-)
-from leap.soledad.client.events import (
-    SOLEDAD_CREATING_KEYS,
-    SOLEDAD_DONE_CREATING_KEYS,
-    SOLEDAD_DOWNLOADING_KEYS,
-    SOLEDAD_DONE_DOWNLOADING_KEYS,
-    SOLEDAD_UPLOADING_KEYS,
-    SOLEDAD_DONE_UPLOADING_KEYS,
-    signal,
-)
+from leap.soledad.common import soledad_assert
+from leap.soledad.common import soledad_assert_type
+from leap.soledad.common import document
+from leap.soledad.common import errors
+from leap.soledad.common import crypto
+from leap.soledad.client import events
 
 
 logger = logging.getLogger(name=__name__)
@@ -227,9 +206,9 @@ class SoledadSecrets(object):
             token = timeout = None
             try:
                 token, timeout = self._shared_db.lock()
-            except AlreadyLockedError:
+            except errors.AlreadyLockedError:
                 raise BootstrapSequenceError('Database is already locked.')
-            except LockTimedOutError:
+            except errors.LockTimedOutError:
                 raise BootstrapSequenceError('Lock operation timed out.')
 
             self._get_or_gen_crypto_secrets()
@@ -238,12 +217,12 @@ class SoledadSecrets(object):
             try:
                 self._shared_db.unlock(token)
                 self._shared_db.close()
-            except NotLockedError:
+            except errors.NotLockedError:
                 # for some reason the lock expired. Despite that, secret
                 # loading or generation/storage must have been executed
                 # successfully, so we pass.
                 pass
-            except InvalidTokenError:
+            except errors.InvalidTokenError:
                 # here, our lock has not only expired but also some other
                 # client application has obtained a new lock and is currently
                 # doing its thing in the shared database. Using the same
@@ -403,8 +382,8 @@ class SoledadSecrets(object):
             self.KDF_KEY: self.KDF_SCRYPT,
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
-            MAC_METHOD_KEY: MacMethods.HMAC,
-            MAC_KEY: hmac.new(
+            crypto.MAC_METHOD_KEY: crypto.MacMethods.HMAC,
+            crypto.MAC_KEY: hmac.new(
                 key,
                 json.dumps(encrypted_secrets),
                 sha256).hexdigest(),
@@ -429,13 +408,13 @@ class SoledadSecrets(object):
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # check mac of the recovery document
         mac = None
-        if MAC_KEY in data:
-            soledad_assert(data[MAC_KEY] is not None)
-            soledad_assert(MAC_METHOD_KEY in data)
+        if crypto.MAC_KEY in data:
+            soledad_assert(data[crypto.MAC_KEY] is not None)
+            soledad_assert(crypto.MAC_METHOD_KEY in data)
             soledad_assert(self.KDF_KEY in data)
             soledad_assert(self.KDF_SALT_KEY in data)
             soledad_assert(self.KDF_LENGTH_KEY in data)
-            if data[MAC_METHOD_KEY] == MacMethods.HMAC:
+            if data[crypto.MAC_METHOD_KEY] == crypto.MacMethods.HMAC:
                 key = scrypt.hash(
                     self._passphrase_as_string(),
                     binascii.a2b_base64(data[self.KDF_SALT_KEY]),
@@ -445,10 +424,10 @@ class SoledadSecrets(object):
                     json.dumps(data[self.STORAGE_SECRETS_KEY]),
                     sha256).hexdigest()
             else:
-                raise UnknownMacMethod('Unknown MAC method: %s.' %
-                                       data[MAC_METHOD_KEY])
-            if mac != data[MAC_KEY]:
-                raise WrongMac('Could not authenticate recovery document\'s '
+                raise crypto.UnknownMacMethodError('Unknown MAC method: %s.' %
+                                       data[crypto.MAC_METHOD_KEY])
+            if mac != data[crypto.MAC_KEY]:
+                raise crypto.WrongMacError('Could not authenticate recovery document\'s '
                                'contents.')
         # include secrets in the secret pool.
         secret_count = 0
@@ -469,15 +448,15 @@ class SoledadSecrets(object):
         database.
 
         :return: a document with encrypted key material in its contents
-        :rtype: SoledadDocument
+        :rtype: document.SoledadDocument
         """
-        signal(SOLEDAD_DOWNLOADING_KEYS, self._uuid)
+        events.signal(events.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         doc = db.get_doc(self._shared_db_doc_id())
-        signal(SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
+        events.signal(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
 
     def _put_secrets_in_shared_db(self):
@@ -495,18 +474,18 @@ class SoledadSecrets(object):
         # try to get secrets doc from server, otherwise create it
         doc = self._get_secrets_from_shared_db()
         if doc is None:
-            doc = SoledadDocument(
+            doc = document.SoledadDocument(
                 doc_id=self._shared_db_doc_id())
         # fill doc with encrypted secrets
         doc.content = self._export_recovery_document()
         # upload secrets to server
-        signal(SOLEDAD_UPLOADING_KEYS, self._uuid)
+        events.signal(events.SOLEDAD_UPLOADING_KEYS, self._uuid)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         db.put_doc(doc)
-        signal(SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
+        events.signal(events.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
     #
     # Management of secret for symmetric encryption.
@@ -618,7 +597,7 @@ class SoledadSecrets(object):
         Generate a secret for symmetric encryption and store in a local
         encrypted file.
 
-        This method emits the following signals:
+        This method emits the following events.signals:
 
             * SOLEDAD_CREATING_KEYS
             * SOLEDAD_DONE_CREATING_KEYS
@@ -626,13 +605,13 @@ class SoledadSecrets(object):
         :return: The id of the generated secret.
         :rtype: str
         """
-        signal(SOLEDAD_CREATING_KEYS, self._uuid)
+        events.signal(events.SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
         secret = os.urandom(self.GEN_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         self._secrets[secret_id] = secret
         self._store_secrets()
-        signal(SOLEDAD_DONE_CREATING_KEYS, self._uuid)
+        events.signal(events.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
         return secret_id
 
     def _store_secrets(self):

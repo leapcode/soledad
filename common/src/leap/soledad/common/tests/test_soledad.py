@@ -28,7 +28,7 @@ from leap.soledad.common.tests import (
 )
 from leap import soledad
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.crypto import WrongMac
+from leap.soledad.common.crypto import WrongMacError
 from leap.soledad.client import Soledad
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
 from leap.soledad.client.secrets import PassphraseTooShort
@@ -117,7 +117,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol.close()
 
         self.assertRaises(
-            WrongMac,
+            WrongMacError,
             self._soledad_instance, 'leap@leap.se',
             passphrase=u'123',
             prefix=self.rand_prefix)
@@ -208,7 +208,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
     def setUp(self):
         # mock signaling
         soledad.client.signal = Mock()
-        soledad.client.secrets.signal = Mock()
+        soledad.client.secrets.events.signal = Mock()
         # run parent's setUp
         BaseSoledadTest.setUp(self)
 
@@ -230,57 +230,57 @@ class SoledadSignalingTestCase(BaseSoledadTest):
           - downloading keys / done downloading keys.
           - uploading keys / done uploading keys.
         """
-        soledad.client.secrets.signal.reset_mock()
+        soledad.client.secrets.events.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage3.json',
             local_db_path='alternative_stage3.u1db')
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.secrets.signal.mock_calls.reverse()
-        soledad.client.secrets.signal.call_args = \
-            soledad.client.secrets.signal.call_args_list[0]
-        soledad.client.secrets.signal.call_args_list.reverse()
+        soledad.client.secrets.events.signal.mock_calls.reverse()
+        soledad.client.secrets.events.signal.call_args = \
+            soledad.client.secrets.events.signal.call_args_list[0]
+        soledad.client.secrets.events.signal.call_args_list.reverse()
         # downloading keys signals
-        soledad.client.secrets.signal.assert_called_with(
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         # creating keys signals
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_CREATING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DONE_CREATING_KEYS,
             ADDRESS,
         )
         # downloading once more (inside _put_keys_in_shared_db)
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         # uploading keys signals
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_UPLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DONE_UPLOADING_KEYS,
             ADDRESS,
         )
@@ -312,7 +312,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
 
         sol.close()
         # reset mock
-        soledad.client.secrets.signal.reset_mock()
+        soledad.client.secrets.events.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage2.json',
@@ -320,17 +320,17 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             shared_db_class=Stage2MockSharedDB)
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.secrets.signal.mock_calls.reverse()
-        soledad.client.secrets.signal.call_args = \
-            soledad.client.secrets.signal.call_args_list[0]
-        soledad.client.secrets.signal.call_args_list.reverse()
+        soledad.client.secrets.events.signal.mock_calls.reverse()
+        soledad.client.secrets.events.signal.call_args = \
+            soledad.client.secrets.events.signal.call_args_list[0]
+        soledad.client.secrets.events.signal.call_args_list.reverse()
         # assert download keys signals
-        soledad.client.secrets.signal.assert_called_with(
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.signal)
-        soledad.client.secrets.signal.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.signal)
+        soledad.client.secrets.events.signal.assert_called_with(
             proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
