@@ -42,6 +42,22 @@ class UnknownEncryptionScheme(Exception):
     pass
 
 
+class EncryptionMethods(object):
+    """
+    Representation of encryption methods that can be used.
+    """
+
+    AES_256_CTR = 'aes-256-ctr'
+    XSALSA20 = 'xsalsa20'
+
+
+class UnknownEncryptionMethod(Exception):
+    """
+    Raised when trying to encrypt/decrypt with unknown method.
+    """
+    pass
+
+
 class MacMethods(object):
     """
     Representation of MAC methods used to authenticate document's contents.
