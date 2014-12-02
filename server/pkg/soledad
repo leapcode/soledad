@@ -19,7 +19,7 @@ CERT_PATH=/etc/leap/soledad-server.pem
 PRIVKEY_PATH=/etc/leap/soledad-server.key
 TWISTD_PATH=/usr/bin/twistd
 HOME=/var/lib/soledad/
-SSL_METHOD=TLSv1_METHOD
+SSL_METHOD=SSLv23_METHOD
 USER=soledad
 GROUP=soledad
 
