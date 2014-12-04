@@ -1333,22 +1333,25 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
             self.sock = sock
             self._tunnel()
 
-        # negotiate the best availabe version...
-        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        highest_supported = ssl.PROTOCOL_SSLv23
 
-        # but if possible, we want to disable bad ones
-        # needs python 2.7.9+
         try:
+            # needs python 2.7.9+
+            # negotiate the best available version,
+            # but explicitely disabled bad ones.
+            ctx = ssl.SSLContext(highest_supported)
             ctx.options |= ssl.OP_NO_SSLv2
             ctx.options |= ssl.OP_NO_SSLv3
+
+            ctx.load_cert_chain(certfile=SOLEDAD_CERT)
+            ctx.verify_mode = ssl.CERT_REQUIRED
+            self.sock = ctx.wrap_socket(
+                sock, server_side=True, server_hostname=self.host)
+
         except AttributeError:
-            pass
-
-        ctx.load_cert_chain(certfile=SOLEDAD_CERT)
-        ctx.verify_mode = ssl.CERT_REQUIRED
-
-        self.sock = ctx.wrap_socket(
-            sock, server_side=True, server_hostname=self.host)
+            self.sock = ssl.wrap_socket(
+                sock, ca_certs=SOLEDAD_CERT, cert_reqs=ssl.CERT_REQUIRED,
+                ssl_version=highest_supported)
 
         match_hostname(self.sock.getpeercert(), self.host)
 
