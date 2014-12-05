@@ -2,23 +2,17 @@
 
 # This script gives client-side access to one Soledad user database.
 
-
-import sys
 import os
 import argparse
-import re
 import tempfile
 import getpass
 import requests
-import json
 import srp._pysrp as srp
 import binascii
 import logging
 
-
-from leap.common.config import get_path_prefix
 from leap.soledad.client import Soledad
-
+from leap.keymanager import KeyManager
 
 from util import ValidateUserHandle
 
@@ -33,30 +27,30 @@ safe_unhexlify = lambda x: binascii.unhexlify(x) if (
     len(x) % 2 == 0) else binascii.unhexlify('0' + x)
 
 
-def fail(reason):
+def _fail(reason):
     logger.error('Fail: ' + reason)
     exit(2)
 
 
-def get_api_info(provider):
+def _get_api_info(provider):
     info = requests.get(
         'https://'+provider+'/provider.json', verify=False).json()
     return info['api_uri'], info['api_version']
 
 
-def login(username, passphrase, provider, api_uri, api_version):
+def _login(username, passphrase, provider, api_uri, api_version):
     usr = srp.User(username, passphrase, srp.SHA256, srp.NG_1024)
     auth = None
     try:
-        auth = authenticate(api_uri, api_version, usr).json()
+        auth = _authenticate(api_uri, api_version, usr).json()
     except requests.exceptions.ConnectionError:
-        fail('Could not connect to server.')
+        _fail('Could not connect to server.')
     if 'errors' in auth:
-        fail(str(auth['errors']))
+        _fail(str(auth['errors']))
     return api_uri, api_version, auth
 
 
-def authenticate(api_uri, api_version, usr):
+def _authenticate(api_uri, api_version, usr):
     api_url = "%s/%s" % (api_uri, api_version)
     session = requests.session()
     uname, A = usr.start_authentication()
@@ -64,16 +58,16 @@ def authenticate(api_uri, api_version, usr):
     init = session.post(
         api_url + '/sessions', data=params, verify=False).json()
     if 'errors' in init:
-        fail('test user not found')
+        _fail('test user not found')
     M = usr.process_challenge(
         safe_unhexlify(init['salt']), safe_unhexlify(init['B']))
     return session.put(api_url + '/sessions/' + uname, verify=False,
                        data={'client_auth': binascii.hexlify(M)})
 
 
-def get_soledad_info(username, provider, passphrase, basedir):
-    api_uri, api_version = get_api_info(provider)
-    auth = login(username, passphrase, provider, api_uri, api_version)
+def _get_soledad_info(username, provider, passphrase, basedir):
+    api_uri, api_version = _get_api_info(provider)
+    auth = _login(username, passphrase, provider, api_uri, api_version)
     # get soledad server url
     service_url = '%s/%s/config/soledad-service.json' % \
                   (api_uri, api_version)
@@ -101,10 +95,9 @@ def get_soledad_info(username, provider, passphrase, basedir):
     return auth[2]['id'], server_url, cert_file, auth[2]['token']
 
 
-def get_soledad_instance(username, provider, passphrase, basedir):
+def _get_soledad_instance(uuid, passphrase, basedir, server_url, cert_file,
+        token):
     # setup soledad info
-    uuid, server_url, cert_file, token = \
-        get_soledad_info(username, provider, passphrase, basedir)
     logger.info('UUID is %s' % uuid)
     logger.info('Server URL is %s' % server_url)
     secrets_path = os.path.join(
@@ -123,10 +116,22 @@ def get_soledad_instance(username, provider, passphrase, basedir):
         defer_encryption=False)
 
 
-# main program
+def _get_keymanager_instance(username, provider, soledad, token,
+        ca_cert_path=None, api_uri=None, api_version=None, uid=None,
+        gpgbinary=None):
+    return KeyManager(
+        "{username}@{provider}".format(username=username, provider=provider),
+        "http://uri",
+        soledad,
+        token=token,
+        ca_cert_path=ca_cert_path,
+        api_uri=api_uri,
+        api_version=api_version,
+        uid=uid,
+        gpgbinary=gpgbinary)
 
-if __name__ == '__main__':
 
+def _parse_args():
     # parse command line
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -137,21 +142,42 @@ if __name__ == '__main__':
     parser.add_argument(
         '-p', dest='passphrase', required=False, default=None,
         help='the user passphrase')
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    # get the password
+
+def _get_passphrase(args):
     passphrase = args.passphrase
     if passphrase is None:
         passphrase = getpass.getpass(
             'Password for %s@%s: ' % (args.username, args.provider))
+    return passphrase
 
-    # get the basedir
+
+def _get_basedir(args):
     basedir = args.basedir
     if basedir is None:
         basedir = tempfile.mkdtemp()
     logger.info('Using %s as base directory.' % basedir)
+    return basedir
 
-    # get the soledad instance
-    s = get_soledad_instance(
-        args.username, args.provider, passphrase, basedir)
-    s.sync()
+
+# main program
+
+if __name__ == '__main__':
+    args = _parse_args()
+    passphrase = _get_passphrase(args)
+    basedir = _get_basedir(args)
+    uuid, server_url, cert_file, token = \
+        _get_soledad_info(args.username, args.provider, passphrase, basedir)
+
+    soledad = _get_soledad_instance(
+        uuid, passphrase, basedir, server_url, cert_file, token)
+    soledad.sync()
+
+    km = _get_keymanager_instance(
+        args.username,
+        args.provider,
+        soledad,
+        token,
+        uid=uuid)
+
