@@ -6,7 +6,7 @@ How to repackage latest code
 
 Enter debian branch::
 
- git checkout debian
+ git checkout debian/experimental
 
 Merge your latest and greatest::
 
