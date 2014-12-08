@@ -1,3 +1,11 @@
+0.6.1 Dec 08 2014:
+Client:
+  o Use TLS v1 in soledad client. Fixes partially #6437
+
+Server:
+  o Run daemon as user soledad (#6436).
+  o Avoid use of SSLv3 (#6437).
+
 0.6.0 Jul 18, 2014:
 Client:
   o Close all connections after syncing. Fixes #5518.
