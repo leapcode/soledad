@@ -19,6 +19,9 @@ CERT_PATH=/etc/leap/soledad-server.pem
 PRIVKEY_PATH=/etc/leap/soledad-server.key
 TWISTD_PATH=/usr/bin/twistd
 HOME=/var/lib/soledad/
+SSL_METHOD=SSLv23_METHOD
+USER=soledad
+GROUP=soledad
 
 [ -r /etc/default/soledad ] && . /etc/default/soledad
 
@@ -27,36 +30,38 @@ test -r /etc/leap/ || exit 0
 . /lib/lsb/init-functions
 
 
-case "$1" in
+case "${1}" in
     start)
         echo -n "Starting soledad: twistd"
-          start-stop-daemon --start --quiet --exec $TWISTD_PATH -- \
-            --pidfile=$PIDFILE \
-            --logfile=$LOGFILE \
+          start-stop-daemon --start --quiet \
+            --user=${USER} --group=${GROUP} \
+            --exec ${TWISTD_PATH} -- \
+            --pidfile=${PIDFILE} \
+            --logfile=${LOGFILE} \
             web \
-            --wsgi=$OBJ \
-            --port=ssl:$HTTPS_PORT:privateKey=$PRIVKEY_PATH:certKey=$CERT_PATH
+            --wsgi=${OBJ} \
+            --port=ssl:${HTTPS_PORT}:privateKey=${PRIVKEY_PATH}:certKey=${CERT_PATH}:sslmethod=${SSL_METHOD}
         echo "."
     ;;
 
     stop)
         echo -n "Stopping soledad: twistd"
         start-stop-daemon --stop --quiet  \
-            --pidfile $PIDFILE
+            --pidfile ${PIDFILE}
         echo "."
     ;;
 
     restart)
-        $0 stop
-        $0 start
+        ${0} stop
+        ${0} start
     ;;
 
     force-reload)
-        $0 restart
+        ${0} restart
     ;;
 
     status)
-        status_of_proc -p $PIDFILE $TWISTD_PATH soledad && exit 0 || exit $?
+        status_of_proc -p ${PIDFILE} ${TWISTD_PATH} soledad && exit 0 || exit ${?}
     ;;
 
     *)
