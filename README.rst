@@ -27,6 +27,13 @@ repository:
         :target: https://crate.io/packages/leap.soledad.server
 
 
+Compatibility
+-------------
+
+* Server 0.7.x is incompatible with client < 0.7.0 because of modifications on
+  encrypted document MAC calculation.
+
+
 Tests
 -----
 
