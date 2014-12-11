@@ -1343,10 +1343,9 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
             ctx.options |= ssl.OP_NO_SSLv2
             ctx.options |= ssl.OP_NO_SSLv3
 
-            ctx.load_cert_chain(certfile=SOLEDAD_CERT)
+            ctx.load_verify_locations(cafile=SOLEDAD_CERT)
             ctx.verify_mode = ssl.CERT_REQUIRED
-            self.sock = ctx.wrap_socket(
-                sock, server_side=True, server_hostname=self.host)
+            self.sock = ctx.wrap_socket(sock)
 
         except AttributeError:
             self.sock = ssl.wrap_socket(
