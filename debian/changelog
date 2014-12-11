@@ -2,7 +2,7 @@ soledad (0.6.2) unstable; urgency=medium
 
   * Update to 0.6.2 release
 
- -- db <db@leap.se> Thu, 11 Dec 2014 13:07:05 -0600
+ -- db <db@leap.se>  Thu, 11 Dec 2014 13:07:05 -0600
 
 soledad (0.6.0) unstable; urgency=low
 
