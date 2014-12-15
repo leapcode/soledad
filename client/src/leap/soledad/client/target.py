@@ -28,12 +28,10 @@ import logging
 import re
 import urllib
 import threading
-import urlparse
 
 from collections import defaultdict
 from time import sleep
 from uuid import uuid4
-from contextlib import contextmanager
 
 import simplejson as json
 from taskthread import TimerTask
@@ -44,7 +42,6 @@ from u1db.remote.http_client import _encode_query_parameter, HTTPClientBase
 from zope.proxy import ProxyBase
 from zope.proxy import sameProxiedObjects, setProxiedObject
 
-from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.auth import TokenBasedAuth
 from leap.soledad.client.crypto import is_symmetrically_encrypted
