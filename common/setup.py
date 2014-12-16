@@ -267,7 +267,7 @@ setup(
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src', exclude=['leap.soledad.common.tests']),
     package_dir={'': 'src'},
-    test_suite='leap.soledad.common.tests.load_tests',
+    test_suite='leap.soledad.common.tests',
     install_requires=utils.parse_requirements(),
     tests_require=utils.parse_requirements(
         reqfiles=['pkg/requirements-testing.pip']),

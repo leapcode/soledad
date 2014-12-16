@@ -3,3 +3,4 @@ testscenarios
 leap.common
 leap.soledad.server
 leap.soledad.client
+setuptools-trial

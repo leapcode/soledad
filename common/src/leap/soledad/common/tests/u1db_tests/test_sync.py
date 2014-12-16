@@ -26,6 +26,8 @@ from u1db import (
     SyncTarget,
 )
 
+from unittest import skip
+
 from leap.soledad.common.tests import u1db_tests as tests
 
 from u1db.backends import (
@@ -74,6 +76,7 @@ target_scenarios = [
 ]
 
 
+@skip("Skiping tests imported from U1DB.")
 class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
                               tests.TestCaseWithServer):
 
@@ -462,6 +465,7 @@ sync_scenarios.append(('pyhttp', {
 }))
 
 
+@skip("Skiping tests imported from U1DB.")
 class DatabaseSyncTests(tests.DatabaseBaseTests,
                         tests.TestCaseWithServer):
 
@@ -1118,6 +1122,7 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
             errors.InvalidTransactionId, self.sync, self.db1, self.db2_copy)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestDbSync(tests.TestCaseWithServer):
 
     """Test db.sync remote sync shortcut"""
@@ -1190,6 +1195,7 @@ class TestDbSync(tests.TestCaseWithServer):
         self.assertEqual(1, s_gen)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestRemoteSyncIntegration(tests.TestCaseWithServer):
 
     """Integration tests for the most common sync scenario local -> remote"""

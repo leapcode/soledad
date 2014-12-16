@@ -5,6 +5,7 @@ import ssl
 import sys
 
 from paste import httpserver
+from unittest import skip
 
 from u1db.remote import (
     http_client,
@@ -51,6 +52,7 @@ def oauth_https_sync_target(test, host, path):
     return st
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHttpSyncTargetHttpsSupport(tests.TestCaseWithServer):
 
     scenarios = [

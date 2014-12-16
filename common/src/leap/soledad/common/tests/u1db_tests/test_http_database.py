@@ -27,6 +27,8 @@ from u1db import (
     Document,
 )
 
+from unittest import skip
+
 from leap.soledad.common.tests import u1db_tests as tests
 
 from u1db.remote import (
@@ -38,6 +40,7 @@ from leap.soledad.common.tests.u1db_tests.test_remote_sync_target import (
 )
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPDatabaseSimpleOperations(tests.TestCase):
 
     def setUp(self):
@@ -190,6 +193,7 @@ class TestHTTPDatabaseSimpleOperations(tests.TestCase):
         self.assertEqual(self.db._creds, st._creds)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPDatabaseCtrWithCreds(tests.TestCase):
 
     def test_ctr_with_creds(self):
@@ -202,6 +206,7 @@ class TestHTTPDatabaseCtrWithCreds(tests.TestCase):
         self.assertIn('oauth', db1._creds)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPDatabaseIntegration(tests.TestCaseWithServer):
 
     make_app_with_state = staticmethod(make_http_app)
