@@ -224,7 +224,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file,
-                 auth_token=None, secret_id=None, defer_encryption=False):
+                 auth_token=None, secret_id=None, defer_encryption=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
