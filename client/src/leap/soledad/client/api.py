@@ -285,7 +285,8 @@ class Soledad(object):
         """
         logger.debug("Closing soledad")
         self._dbpool.close()
-        self._dbsyncer.close()
+        if getattr(self, '_dbsyncer', None):
+            self._dbsyncer.close()
 
     #
     # ILocalStorage
