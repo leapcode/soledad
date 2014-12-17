@@ -178,5 +178,6 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
 
         :raise HTTPError:
         """
-        res, headers = self._request_json('DELETE', ['lock', self._uuid],
-                                          params={'token': token})
+        if self.syncable:
+            _, _ = self._request_json(
+                'DELETE', ['lock', self._uuid], params={'token': token})
