@@ -778,6 +778,16 @@ class Soledad(object):
         """
         self._secrets.change_passphrase(new_passphrase)
 
+    #
+    # Raw SQLCIPHER Queries
+    #
+
+    def raw_sqlcipher_query(self, *args, **kw):
+        """
+        Run a raw sqlcipher query in the local database.
+        """
+        return self._dbpool.runQuery(*args, **kw)
+
 
 def _convert_to_unicode(content):
     """

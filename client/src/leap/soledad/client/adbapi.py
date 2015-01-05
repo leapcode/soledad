@@ -106,6 +106,7 @@ class U1DBConnection(adbapi.Connection):
         else:
             return getattr(self._connection, name)
 
+
 class U1DBTransaction(adbapi.Transaction):
     """
     A wrapper for a U1DB 'cursor' object.
