@@ -21,19 +21,36 @@ It uses twisted.enterprise.adbapi.
 import re
 import os
 import sys
+import logging
 
 from functools import partial
+from threading import BoundedSemaphore
 
 from twisted.enterprise import adbapi
 from twisted.python import log
 from zope.proxy import ProxyBase, setProxiedObject
+from pysqlcipher.dbapi2 import OperationalError
 
 from leap.soledad.client import sqlcipher as soledad_sqlcipher
+
+
+logger = logging.getLogger(name=__name__)
 
 
 DEBUG_SQL = os.environ.get("LEAP_DEBUG_SQL")
 if DEBUG_SQL:
     log.startLogging(sys.stdout)
+
+"""
+How long the SQLCipher connection should wait for the lock to go away until
+raising an exception.
+"""
+SQLCIPHER_CONNECTION_TIMEOUT = 10
+
+"""
+How many times a SQLCipher query should be retried in case of timeout.
+"""
+SQLCIPHER_MAX_RETRIES = 10
 
 
 def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
@@ -58,7 +75,8 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
         openfun = partial(soledad_sqlcipher.set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
         "%s.dbapi2" % driver, database=opts.path,
-        check_same_thread=False, cp_openfun=openfun)
+        check_same_thread=False, cp_openfun=openfun,
+        timeout=SQLCIPHER_CONNECTION_TIMEOUT)
 
 
 class U1DBConnection(adbapi.Connection):
@@ -154,6 +172,10 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         """
         Execute a U1DB query in a thread, using a pooled connection.
 
+        Concurrent threads trying to update the same database may timeout
+        because of other threads holding the database lock. Because of this,
+        we will retry SQLCIPHER_MAX_RETRIES times and fail after that.
+
         :param meth: The U1DB wrapper method name.
         :type meth: str
 
@@ -162,7 +184,26 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         :rtype: twisted.internet.defer.Deferred
         """
         meth = "u1db_%s" % meth
-        return self.runInteraction(self._runU1DBQuery, meth, *args, **kw)
+        semaphore = BoundedSemaphore(SQLCIPHER_MAX_RETRIES - 1)
+
+        def _run_interaction():
+            return self.runInteraction(
+                self._runU1DBQuery, meth, *args, **kw)
+
+        def _errback(failure):
+            failure.trap(OperationalError)
+            if failure.getErrorMessage() == "database is locked":
+                should_retry = semaphore.acquire(False)
+                if should_retry:
+                    logger.warning(
+                        "Database operation timed out while waiting for "
+                        "lock, trying again...")
+                    return _run_interaction()
+            return failure
+
+        d = _run_interaction()
+        d.addErrback(_errback)
+        return d
 
     def _runU1DBQuery(self, trans, meth, *args, **kw):
         """
