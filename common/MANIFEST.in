@@ -2,4 +2,7 @@ include pkg/*
 include versioneer.py
 include LICENSE
 include CHANGELOG
+
+# What do we want the ddocs folder in the source package for? -- kali
+# it should be enough with having the compiled stuff.
 recursive-include src/leap/soledad/common/ddocs *
