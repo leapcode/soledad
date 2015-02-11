@@ -20,134 +20,21 @@
 Test ObjectStore and Couch backend bits.
 """
 
-import re
-import copy
-import shutil
-from base64 import b64decode
-from mock import Mock
-from urlparse import urljoin
 
+import simplejson as json
+
+from urlparse import urljoin
 from u1db import errors as u1db_errors
 from couchdb.client import Server
 
-from leap.common.files import mkdir_p
+from testscenarios import TestWithScenarios
+
+from leap.soledad.common import couch, errors
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.common import couch, errors
-import simplejson as json
-
-
-#-----------------------------------------------------------------------------
-# A wrapper for running couchdb locally.
-#-----------------------------------------------------------------------------
-
-import re
-import os
-import tempfile
-import subprocess
-import time
-import unittest
-
-
-# from: https://github.com/smcq/paisley/blob/master/paisley/test/util.py
-# TODO: include license of above project.
-class CouchDBWrapper(object):
-    """
-    Wrapper for external CouchDB instance which is started and stopped for
-    testing.
-    """
-
-    def start(self):
-        """
-        Start a CouchDB instance for a test.
-        """
-        self.tempdir = tempfile.mkdtemp(suffix='.couch.test')
-
-        path = os.path.join(os.path.dirname(__file__),
-                            'couchdb.ini.template')
-        handle = open(path)
-        conf = handle.read() % {
-            'tempdir': self.tempdir,
-        }
-        handle.close()
-
-        confPath = os.path.join(self.tempdir, 'test.ini')
-        handle = open(confPath, 'w')
-        handle.write(conf)
-        handle.close()
-
-        # create the dirs from the template
-        mkdir_p(os.path.join(self.tempdir, 'lib'))
-        mkdir_p(os.path.join(self.tempdir, 'log'))
-        args = ['couchdb', '-n', '-a', confPath]
-        null = open('/dev/null', 'w')
-
-        self.process = subprocess.Popen(
-            args, env=None, stdout=null.fileno(), stderr=null.fileno(),
-            close_fds=True)
-        # find port
-        logPath = os.path.join(self.tempdir, 'log', 'couch.log')
-        while not os.path.exists(logPath):
-            if self.process.poll() is not None:
-                got_stdout, got_stderr = "", ""
-                if self.process.stdout is not None:
-                    got_stdout = self.process.stdout.read()
-
-                if self.process.stderr is not None:
-                    got_stderr = self.process.stderr.read()
-                raise Exception("""
-couchdb exited with code %d.
-stdout:
-%s
-stderr:
-%s""" % (
-                    self.process.returncode, got_stdout, got_stderr))
-            time.sleep(0.01)
-        while os.stat(logPath).st_size == 0:
-            time.sleep(0.01)
-        PORT_RE = re.compile(
-            'Apache CouchDB has started on http://127.0.0.1:(?P<port>\d+)')
-
-        handle = open(logPath)
-        line = handle.read()
-        handle.close()
-        m = PORT_RE.search(line)
-        if not m:
-            self.stop()
-            raise Exception("Cannot find port in line %s" % line)
-        self.port = int(m.group('port'))
-
-    def stop(self):
-        """
-        Terminate the CouchDB instance.
-        """
-        self.process.terminate()
-        self.process.communicate()
-        shutil.rmtree(self.tempdir)
-
-
-class CouchDBTestCase(unittest.TestCase):
-    """
-    TestCase base class for tests against a real CouchDB server.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Make sure we have a CouchDB instance for a test.
-        """
-        cls.wrapper = CouchDBWrapper()
-        cls.wrapper.start()
-        #self.db = self.wrapper.db
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Stop CouchDB instance for test.
-        """
-        cls.wrapper.stop()
+from leap.soledad.common.tests.util import CouchDBTestCase
 
 
 #-----------------------------------------------------------------------------
@@ -239,7 +126,8 @@ COUCH_SCENARIOS = [
 ]
 
 
-class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
+class CouchTests(
+        TestWithScenarios, test_backends.AllDatabaseTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
@@ -262,7 +150,8 @@ class CouchTests(test_backends.AllDatabaseTests, CouchDBTestCase):
         test_backends.AllDatabaseTests.tearDown(self)
 
 
-class CouchDatabaseTests(test_backends.LocalDatabaseTests, CouchDBTestCase):
+class CouchDatabaseTests(
+        TestWithScenarios, test_backends.LocalDatabaseTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
@@ -271,7 +160,7 @@ class CouchDatabaseTests(test_backends.LocalDatabaseTests, CouchDBTestCase):
         test_backends.LocalDatabaseTests.tearDown(self)
 
 
-class CouchValidateGenNTransIdTests(
+class CouchValidateGenNTransIdTests(TestWithScenarios,
         test_backends.LocalDatabaseValidateGenNTransIdTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
@@ -281,7 +170,7 @@ class CouchValidateGenNTransIdTests(
         test_backends.LocalDatabaseValidateGenNTransIdTests.tearDown(self)
 
 
-class CouchValidateSourceGenTests(
+class CouchValidateSourceGenTests(TestWithScenarios,
         test_backends.LocalDatabaseValidateSourceGenTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
@@ -291,7 +180,7 @@ class CouchValidateSourceGenTests(
         test_backends.LocalDatabaseValidateSourceGenTests.tearDown(self)
 
 
-class CouchWithConflictsTests(
+class CouchWithConflictsTests(TestWithScenarios,
         test_backends.LocalDatabaseWithConflictsTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
@@ -325,22 +214,10 @@ simple_doc = tests.simple_doc
 nested_doc = tests.nested_doc
 
 
-class CouchDatabaseSyncTargetTests(test_sync.DatabaseSyncTargetTests,
-                                   CouchDBTestCase):
+class CouchDatabaseSyncTargetTests(
+        TestWithScenarios, test_sync.DatabaseSyncTargetTests, CouchDBTestCase):
 
     scenarios = (tests.multiply_scenarios(COUCH_SCENARIOS, target_scenarios))
-
-    def setUp(self):
-        # we implement parents' setUp methods here to prevent from launching
-        # more couch instances then needed.
-        tests.TestCase.setUp(self)
-        self.server = self.server_thread = None
-        self.db, self.st = self.create_db_and_target(self)
-        self.other_changes = []
-
-    def tearDown(self):
-        self.db.delete_database()
-        test_sync.DatabaseSyncTargetTests.tearDown(self)
 
     def test_sync_exchange_returns_many_new_docs(self):
         # This test was replicated to allow dictionaries to be compared after
@@ -372,7 +249,7 @@ from u1db.backends.inmemory import InMemoryIndex
 class IndexedCouchDatabase(couch.CouchDatabase):
 
     def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
-        old_class.__init__(self, url, dbname, replica_uid=replica_uid, 
+        old_class.__init__(self, url, dbname, replica_uid=replica_uid,
                            ensure_ddocs=ensure_ddocs)
         self._indexes = {}
 
@@ -458,7 +335,8 @@ for name, scenario in COUCH_SCENARIOS:
     scenario = dict(scenario)
 
 
-class CouchDatabaseSyncTests(test_sync.DatabaseSyncTests, CouchDBTestCase):
+class CouchDatabaseSyncTests(
+        TestWithScenarios, test_sync.DatabaseSyncTests, CouchDBTestCase):
 
     scenarios = sync_scenarios
 
@@ -498,6 +376,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
     def tearDown(self):
         self.db.delete_database()
         self.db.close()
+        CouchDBTestCase.tearDown(self)
 
     def test_missing_design_doc_raises(self):
         """
@@ -670,6 +549,3 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
             self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
-
-
-load_tests = tests.load_with_scenarios

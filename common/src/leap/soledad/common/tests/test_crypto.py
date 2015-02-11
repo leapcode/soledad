@@ -23,7 +23,7 @@ import binascii
 
 from leap.soledad.client import crypto
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.tests import BaseSoledadTest
+from leap.soledad.common.tests.util import BaseSoledadTest
 from leap.soledad.common.crypto import WrongMacError
 from leap.soledad.common.crypto import UnknownMacMethodError
 from leap.soledad.common.crypto import EncryptionMethods
@@ -82,7 +82,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         rd = self._soledad.secrets._export_recovery_document()
         s = self._soledad_instance()
         s.secrets._import_recovery_document(rd)
-        s.set_secret_id(self._soledad.secrets._secret_id)
+        s.secrets.set_secret_id(self._soledad.secrets._secret_id)
         self.assertEqual(self._soledad.storage_secret,
                          s.storage_secret,
                          'Failed settinng secret for symmetric encryption.')
@@ -95,7 +95,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         # instantiate and save secret_id
         sol = self._soledad_instance(user='user@leap.se')
         self.assertTrue(len(sol.secrets._secrets) == 1)
-        secret_id_1 = sol.secret_id
+        secret_id_1 = sol.secrets.secret_id
         # assert id is hash of secret
         self.assertTrue(
             secret_id_1 == hashlib.sha256(sol.storage_secret).hexdigest())
@@ -104,9 +104,8 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         self.assertTrue(secret_id_1 != secret_id_2)
         sol.close()
         # re-instantiate
-        sol = self._soledad_instance(
-            user='user@leap.se',
-            secret_id=secret_id_1)
+        sol = self._soledad_instance(user='user@leap.se')
+        sol.secrets.set_secret_id(secret_id_1)
         # assert ids are valid
         self.assertTrue(len(sol.secrets._secrets) == 2)
         self.assertTrue(secret_id_1 in sol.secrets._secrets)
@@ -117,7 +116,7 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         secret_length = sol.secrets.GEN_SECRET_LENGTH
         self.assertTrue(len(sol.storage_secret) == secret_length)
         # assert format of secret 2
-        sol.set_secret_id(secret_id_2)
+        sol.secrets.set_secret_id(secret_id_2)
         self.assertTrue(sol.storage_secret is not None)
         self.assertIsInstance(sol.storage_secret, str)
         self.assertTrue(len(sol.storage_secret) == secret_length)
@@ -134,12 +133,12 @@ class SoledadSecretsTestCase(BaseSoledadTest):
             "Should have a secret at this point")
         # setting secret id to None should not interfere in the fact we have a
         # secret.
-        sol.set_secret_id(None)
+        sol.secrets.set_secret_id(None)
         self.assertTrue(
             sol.secrets._has_secret(),
             "Should have a secret at this point")
         # but not being able to decrypt correctly should
-        sol.secrets._secrets[sol.secret_id] = None
+        sol.secrets._secrets[sol.secrets.secret_id] = None
         self.assertFalse(sol.secrets._has_secret())
         sol.close()
 

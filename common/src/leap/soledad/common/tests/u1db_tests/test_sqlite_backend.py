@@ -27,6 +27,8 @@ from u1db import (
     query_parser,
 )
 
+from unittest import skip
+
 from leap.soledad.common.tests import u1db_tests as tests
 
 from u1db.backends import sqlite_backend
@@ -38,6 +40,7 @@ simple_doc = '{"key": "value"}'
 nested_doc = '{"key": "value", "sub": {"doc": "underneath"}}'
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestSQLiteDatabase(tests.TestCase):
 
     def test_atomic_initialize(self):
@@ -83,6 +86,7 @@ class TestSQLiteDatabase(tests.TestCase):
         self.assertTrue(db2._is_initialized(db1._get_sqlite_handle().cursor()))
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestSQLitePartialExpandDatabase(tests.TestCase):
 
     def setUp(self):

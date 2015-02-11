@@ -155,6 +155,11 @@ def build_ddocs_py(basedir=None, with_src=True):
         dest_prefix = join(basedir, *dest_common_path)
 
     ddocs_prefix = join(prefix, 'ddocs')
+
+    if not isdir(ddocs_prefix):
+        print "No ddocs/ folder, bailing out..."
+        return
+
     ddocs = {}
 
     # design docs are represented by subdirectories of `ddocs_prefix`
@@ -267,7 +272,7 @@ setup(
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src', exclude=['leap.soledad.common.tests']),
     package_dir={'': 'src'},
-    test_suite='leap.soledad.common.tests.load_tests',
+    test_suite='leap.soledad.common.tests',
     install_requires=utils.parse_requirements(),
     tests_require=utils.parse_requirements(
         reqfiles=['pkg/requirements-testing.pip']),

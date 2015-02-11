@@ -132,6 +132,7 @@ class SoledadSecrets(object):
 
     UUID_KEY = 'uuid'
     STORAGE_SECRETS_KEY = 'storage_secrets'
+    ACTIVE_SECRET_KEY = 'active_secret'
     SECRET_KEY = 'secret'
     CIPHER_KEY = 'cipher'
     LENGTH_KEY = 'length'
@@ -144,8 +145,7 @@ class SoledadSecrets(object):
     Keys used to access storage secrets in recovery documents.
     """
 
-    def __init__(self, uuid, passphrase, secrets_path, shared_db, crypto,
-                 secret_id=None):
+    def __init__(self, uuid, passphrase, secrets_path, shared_db, crypto):
         """
         Initialize the secrets manager.
 
@@ -161,16 +161,19 @@ class SoledadSecrets(object):
         :type shared_db: leap.soledad.client.shared_db.SoledadSharedDatabase
         :param crypto: A soledad crypto object.
         :type crypto: SoledadCrypto
-        :param secret_id: The id of the storage secret to be used.
-        :type secret_id: str
         """
+        # XXX removed since not in use
+        # We will pick the first secret available.
+        # param secret_id: The id of the storage secret to be used.
+
         self._uuid = uuid
         self._passphrase = passphrase
         self._secrets_path = secrets_path
         self._shared_db = shared_db
         self._crypto = crypto
-        self._secret_id = secret_id
         self._secrets = {}
+
+        self._secret_id = None
 
     def bootstrap(self):
         """
@@ -247,7 +250,8 @@ class SoledadSecrets(object):
             try:
                 self._load_secrets()  # try to load from disk
             except IOError as e:
-                logger.warning('IOError while loading secrets from disk: %s' % str(e))
+                logger.warning(
+                    'IOError while loading secrets from disk: %s' % str(e))
                 return False
         return self.storage_secret is not None
 
@@ -262,10 +266,13 @@ class SoledadSecrets(object):
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        _, mac = self._import_recovery_document(content)
+        _, mac, active_secret = self._import_recovery_document(content)
         # choose first secret if no secret_id was given
         if self._secret_id is None:
-            self.set_secret_id(self._secrets.items()[0][0])
+            if active_secret is None:
+                self.set_secret_id(self._secrets.items()[0][0])
+            else:
+                self.set_secret_id(active_secret)
         # enlarge secret if needed
         enlarged = False
         if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
@@ -286,18 +293,24 @@ class SoledadSecrets(object):
         :raises BootstrapSequenceError: Raised when unable to store secrets in
                                         shared database.
         """
-        doc = self._get_secrets_from_shared_db()
+        if self._shared_db.syncable:
+            doc = self._get_secrets_from_shared_db()
+        else:
+            doc = None
 
-        if doc:
+        if doc is not None:
             logger.info(
                 'Found cryptographic secrets in shared recovery '
                 'database.')
-            _, mac = self._import_recovery_document(doc.content)
+            _, mac, active_secret = self._import_recovery_document(doc.content)
             if mac is False:
                 self.put_secrets_in_shared_db()
             self._store_secrets()  # save new secrets in local file
             if self._secret_id is None:
-                self.set_secret_id(self._secrets.items()[0][0])
+                if active_secret is None:
+                    self.set_secret_id(self._secrets.items()[0][0])
+                else:
+                    self.set_secret_id(active_secret)
         else:
             # STAGE 3 - there are no secrets in server also, so
             # generate a secret and store it in remote db.
@@ -305,21 +318,24 @@ class SoledadSecrets(object):
                 'No cryptographic secrets found, creating new '
                 ' secrets...')
             self.set_secret_id(self._gen_secret())
-            try:
-                self._put_secrets_in_shared_db()
-            except Exception as ex:
-                # storing generated secret in shared db failed for
-                # some reason, so we erase the generated secret and
-                # raise.
+
+            if self._shared_db.syncable:
                 try:
-                    os.unlink(self._secrets_path)
-                except OSError as e:
-                    if e.errno != errno.ENOENT:  # no such file or directory
-                        logger.exception(e)
-                logger.exception(ex)
-                raise BootstrapSequenceError(
-                    'Could not store generated secret in the shared '
-                    'database, bailing out...')
+                    self._put_secrets_in_shared_db()
+                except Exception as ex:
+                    # storing generated secret in shared db failed for
+                    # some reason, so we erase the generated secret and
+                    # raise.
+                    try:
+                        os.unlink(self._secrets_path)
+                    except OSError as e:
+                        if e.errno != errno.ENOENT:
+                            # no such file or directory
+                            logger.exception(e)
+                    logger.exception(ex)
+                    raise BootstrapSequenceError(
+                        'Could not store generated secret in the shared '
+                        'database, bailing out...')
 
     #
     # Shared DB related methods
@@ -354,6 +370,7 @@ class SoledadSecrets(object):
                         'secret': '<encrypted storage_secret>',
                     },
                 },
+                'active_secret': '<secret_id>',
                 'kdf': 'scrypt',
                 'kdf_salt': '<b64 repr of salt>',
                 'kdf_length: <key length>,
@@ -379,13 +396,14 @@ class SoledadSecrets(object):
         # create the recovery document
         data = {
             self.STORAGE_SECRETS_KEY: encrypted_secrets,
+            self.ACTIVE_SECRET_KEY: self._secret_id,
             self.KDF_KEY: self.KDF_SCRYPT,
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
             crypto.MAC_METHOD_KEY: crypto.MacMethods.HMAC,
             crypto.MAC_KEY: hmac.new(
                 key,
-                json.dumps(encrypted_secrets),
+                json.dumps(encrypted_secrets, sort_keys=True),
                 sha256).hexdigest(),
         }
         return data
@@ -401,8 +419,9 @@ class SoledadSecrets(object):
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets and whether
-                 there was MAC informationa available for authenticating.
+        :return: A tuple containing the number of imported secrets, whether
+                 there was MAC information available for authenticating, and
+                 the secret_id of the last active secret.
         :rtype: (int, bool)
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
@@ -421,7 +440,8 @@ class SoledadSecrets(object):
                     buflen=32)
                 mac = hmac.new(
                     key,
-                    json.dumps(data[self.STORAGE_SECRETS_KEY]),
+                    json.dumps(
+                        data[self.STORAGE_SECRETS_KEY], sort_keys=True),
                     sha256).hexdigest()
             else:
                 raise crypto.UnknownMacMethodError('Unknown MAC method: %s.' %
@@ -431,7 +451,13 @@ class SoledadSecrets(object):
                                'contents.')
         # include secrets in the secret pool.
         secret_count = 0
-        for secret_id, encrypted_secret in data[self.STORAGE_SECRETS_KEY].items():
+        secrets = data[self.STORAGE_SECRETS_KEY].items()
+        active_secret = None
+        # XXX remove check for existence of key (included for backwards
+        # compatibility)
+        if self.ACTIVE_SECRET_KEY in data:
+            active_secret = data[self.ACTIVE_SECRET_KEY]
+        for secret_id, encrypted_secret in secrets:
             if secret_id not in self._secrets:
                 try:
                     self._secrets[secret_id] = \
@@ -440,7 +466,7 @@ class SoledadSecrets(object):
                 except SecretsException as e:
                     logger.error("Failed to decrypt storage secret: %s"
                                  % str(e))
-        return secret_count, mac
+        return secret_count, mac, active_secret
 
     def _get_secrets_from_shared_db(self):
         """
@@ -661,8 +687,8 @@ class SoledadSecrets(object):
         self._secrets_path = secrets_path
 
     secrets_path = property(
-         _get_secrets_path,
-         _set_secrets_path,
+        _get_secrets_path,
+        _set_secrets_path,
         doc='The path for the file containing the encrypted symmetric secret.')
 
     @property
@@ -686,7 +712,7 @@ class SoledadSecrets(object):
         Return the secret for remote storage.
         """
         key_start = 0
-        key_end =  self.REMOTE_STORAGE_SECRET_LENGTH
+        key_end = self.REMOTE_STORAGE_SECRET_LENGTH
         return self.storage_secret[key_start:key_end]
 
     #
@@ -700,8 +726,10 @@ class SoledadSecrets(object):
         :return: The local storage secret.
         :rtype: str
         """
-        pwd_start = self.REMOTE_STORAGE_SECRET_LENGTH + self.SALT_LENGTH
-        pwd_end = self.REMOTE_STORAGE_SECRET_LENGTH + self.LOCAL_STORAGE_SECRET_LENGTH
+        secret_len = self.REMOTE_STORAGE_SECRET_LENGTH
+        lsecret_len = self.LOCAL_STORAGE_SECRET_LENGTH
+        pwd_start = secret_len + self.SALT_LENGTH
+        pwd_end = secret_len + lsecret_len
         return self.storage_secret[pwd_start:pwd_end]
 
     def _get_local_storage_salt(self):
@@ -728,9 +756,9 @@ class SoledadSecrets(object):
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
 
-   #
-   # sync db key
-   #
+    #
+    # sync db key
+    #
 
     def _get_sync_db_salt(self):
         """

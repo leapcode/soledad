@@ -24,6 +24,8 @@ except ImportError:
     import json  # noqa
 import StringIO
 
+from unittest import skip 
+
 from u1db import (
     __version__ as _u1db_version,
     errors,
@@ -38,6 +40,7 @@ from u1db.remote import (
 )
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestFencedReader(tests.TestCase):
 
     def test_init(self):
@@ -145,6 +148,7 @@ class TestFencedReader(tests.TestCase):
         self.assertRaises(http_app.BadRequest, reader.getline)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPMethodDecorator(tests.TestCase):
 
     def test_args(self):
@@ -253,6 +257,7 @@ class parameters:
     max_entry_size = 100000
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPInvocationByMethodWithBody(tests.TestCase):
 
     def test_get(self):
@@ -433,6 +438,7 @@ class TestHTTPInvocationByMethodWithBody(tests.TestCase):
         self.assertRaises(http_app.BadRequest, invoke)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPResponder(tests.TestCase):
 
     def start_response(self, status, headers):
@@ -521,6 +527,7 @@ class TestHTTPResponder(tests.TestCase):
                          responder.content)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPApp(tests.TestCase):
 
     def setUp(self):
@@ -949,6 +956,7 @@ class TestHTTPApp(tests.TestCase):
         self.assertEqual({'error': 'unavailable'}, json.loads(parts[2]))
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestRequestHooks(tests.TestCase):
 
     def setUp(self):
@@ -1000,12 +1008,14 @@ class TestRequestHooks(tests.TestCase):
         self.assertEqual(['begin', 'bad-request'], calls)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPErrors(tests.TestCase):
 
     def test_wire_description_to_status(self):
         self.assertNotIn("error", http_errors.wire_description_to_status)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPAppErrorHandling(tests.TestCase):
 
     def setUp(self):
@@ -1113,6 +1123,7 @@ class TestHTTPAppErrorHandling(tests.TestCase):
         self.assertEqual(self.exc, exc)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestPluggableSyncExchange(tests.TestCase):
 
     def setUp(self):

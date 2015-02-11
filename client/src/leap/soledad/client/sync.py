@@ -14,21 +14,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Soledad synchronization utilities.
 
-
 Extend u1db Synchronizer with the ability to:
 
-    * Defer the update of the known replica uid until all the decryption of
+    * Postpone the update of the known replica uid until all the decryption of
       the incoming messages has been processed.
 
     * Be interrupted and recovered.
 """
-
-
 import logging
 import traceback
 from threading import Lock
@@ -52,6 +47,8 @@ class SoledadSynchronizer(Synchronizer):
     Also modified to allow for interrupting the synchronization process.
     """
 
+    # TODO can delegate the syncing to the api object, living in the reactor
+    # thread, and use a simple flag.
     syncing_lock = Lock()
 
     def stop(self):
@@ -118,9 +115,10 @@ class SoledadSynchronizer(Synchronizer):
             "  target generation: %d\n"
             "  target trans id: %s\n"
             "  target my gen: %d\n"
-            "  target my trans_id: %s"
+            "  target my trans_id: %s\n"
+            "  source replica_uid: %s\n"
             % (self.target_replica_uid, target_gen, target_trans_id,
-               target_my_gen, target_my_trans_id))
+               target_my_gen, target_my_trans_id, self.source._replica_uid))
 
         # make sure we'll have access to target replica uid once it exists
         if self.target_replica_uid is None:
@@ -236,6 +234,8 @@ class SoledadSynchronizer(Synchronizer):
         # release if something in the syncdb-decrypt goes wrong. we could keep
         # track of the release date and cleanup unrealistic sync entries after
         # some time.
+
+        # TODO use cancellable deferreds instead
         locked = self.syncing_lock.locked()
         return locked
 

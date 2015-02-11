@@ -21,13 +21,9 @@ Soledad routines common to client and server.
 """
 
 
-from hashlib import sha256
-
-
 #
 # Global constants
 #
-
 
 SHARED_DB_NAME = 'shared'
 SHARED_DB_LOCK_DOC_ID_PREFIX = 'lock-'

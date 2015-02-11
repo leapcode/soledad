@@ -40,6 +40,8 @@ from u1db.remote import (
     http_database,
 )
 
+from unittest import skip
+
 
 def make_http_database_for_test(test, replica_uid, path='test', *args):
     test.startServer()
@@ -79,6 +81,7 @@ class TestAlternativeDocument(DocumentBase):
     """A (not very) alternative implementation of Document."""
 
 
+@skip("Skiping tests imported from U1DB.")
 class AllDatabaseTests(tests.DatabaseBaseTests, tests.TestCaseWithServer):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS + [
@@ -327,6 +330,7 @@ class AllDatabaseTests(tests.DatabaseBaseTests, tests.TestCaseWithServer):
         self.assertGetDoc(self.db, doc.doc_id, doc.rev, nested_doc, False)
 
 
+@skip("Skiping tests imported from U1DB.")
 class DocumentSizeTests(tests.DatabaseBaseTests):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS
@@ -351,6 +355,7 @@ class DocumentSizeTests(tests.DatabaseBaseTests):
         self.assertEqual(1000000, self.db.document_size_limit)
 
 
+@skip("Skiping tests imported from U1DB.")
 class LocalDatabaseTests(tests.DatabaseBaseTests):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS
@@ -609,6 +614,7 @@ class LocalDatabaseTests(tests.DatabaseBaseTests):
                          self.db.whats_changed(2))
 
 
+@skip("Skiping tests imported from U1DB.")
 class LocalDatabaseValidateGenNTransIdTests(tests.DatabaseBaseTests):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS
@@ -633,6 +639,7 @@ class LocalDatabaseValidateGenNTransIdTests(tests.DatabaseBaseTests):
             self.db.validate_gen_and_trans_id, gen + 1, trans_id)
 
 
+@skip("Skiping tests imported from U1DB.")
 class LocalDatabaseValidateSourceGenTests(tests.DatabaseBaseTests):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS
@@ -652,6 +659,7 @@ class LocalDatabaseValidateSourceGenTests(tests.DatabaseBaseTests):
             self.db._validate_source, 'other', 1, 'T-sad')
 
 
+@skip("Skiping tests imported from U1DB.")
 class LocalDatabaseWithConflictsTests(tests.DatabaseBaseTests):
     # test supporting/functionality around storing conflicts
 
@@ -1028,6 +1036,7 @@ class LocalDatabaseWithConflictsTests(tests.DatabaseBaseTests):
         self.assertRaises(errors.ConflictedDoc, self.db.delete_doc, doc2)
 
 
+@skip("Skiping tests imported from U1DB.")
 class DatabaseIndexTests(tests.DatabaseBaseTests):
 
     scenarios = tests.LOCAL_DATABASES_SCENARIOS
@@ -1834,6 +1843,7 @@ class DatabaseIndexTests(tests.DatabaseBaseTests):
         self.assertParseError('combine(lower(x)x,foo)')
 
 
+@skip("Skiping tests imported from U1DB.")
 class PythonBackendTests(tests.DatabaseBaseTests):
 
     def setUp(self):
