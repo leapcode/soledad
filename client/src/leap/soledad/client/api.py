@@ -416,6 +416,10 @@ class Soledad(object):
         :return: A deferred whose callback will be invoked with a document.
         :rtype: twisted.internet.defer.Deferred
         """
+        # TODO we probably should pass an optional "encoding" parameter to
+        # create_doc (and probably to put_doc too). There are cases (mail
+        # payloads for example) in which we already have the encoding in the
+        # headers, so we don't need to guess it.
         return self._defer(
             "create_doc", _convert_to_unicode(content), doc_id=doc_id)
 
@@ -803,12 +807,17 @@ def _convert_to_unicode(content):
 
     :rtype: object
     """
+    # Chardet doesn't guess very well with some smallish payloads.
+    # This parameter might need some empirical tweaking.
+    CUTOFF_CONFIDENCE = 0.90
+
     if isinstance(content, unicode):
         return content
     elif isinstance(content, str):
+        encoding = "utf-8"
         result = chardet.detect(content)
-        default = "utf-8"
-        encoding = result["encoding"] or default
+        if result["confidence"] > CUTOFF_CONFIDENCE:
+            encoding = result["encoding"]
         try:
             content = content.decode(encoding)
         except UnicodeError as e:
