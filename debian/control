@@ -9,13 +9,7 @@ Package: soledad-server
 Architecture: all
 Depends: ${misc:Depends}, ${python:Depends}, python-configparser, python-couchdb, 
  python-simplejson, python-oauth, python-u1db, python-routes, python-openssl, 
- soledad-common (>= 0.5.0), 
- python-six, python-twisted (>= 13.0.0-1~bpo70+1), python-twisted-bin (>= 13.0.0-1~bpo70+1), 
- python-twisted-conch (>= 1:13.0.0-1~bpo70+1), python-twisted-core (>= 13.0.0-1~bpo70+1), 
- python-twisted-lore (>= 13.0.0-1~bpo70+1), python-twisted-mail (>= 13.0.0-1~bpo70+1), 
- python-twisted-names (>= 13.0.0-1~bpo70+1), python-twisted-news (>= 13.0.0-1~bpo70+1), 
- python-twisted-runner (>= 13.0.0-1~bpo70+1), python-twisted-words (>= 13.0.0-1~bpo70+1), 
- python-twisted-web (>= 13.0.0-1~bpo70+1)
+ soledad-common (>= 0.5.0), python-six, python-twisted-web (>= 13.0.0-1~bpo70+1)
 Description: Synchronization of locally encrypted data among devices.
  Soledad is the part of LEAP that allows application data to be securely 
  shared among devices. It provides, to other parts of the LEAP client, an 
@@ -40,7 +34,7 @@ Architecture: all
 Depends: ${misc:Depends}, ${python:Depends}, python-sqlcipher (>= 2.6.3.1),
  python-simplejson, python-oauth, python-u1db, python-scrypt, 
  python-dirspec, python-pycryptopp (>= 0.6.0.20120313-1~), soledad-common,
- python-chardet
+ python-chardet, python-twisted-core
 Description: Synchronization of locally encrypted data among devices.
  Soledad is the part of LEAP that allows application data to be securely 
  shared among devices. It provides, to other parts of the LEAP client, an 
