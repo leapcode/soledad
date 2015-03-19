@@ -5,6 +5,7 @@ scrypt
 pycryptopp
 cchardet
 zope.proxy
+twisted
 
 #
 # leap deps
