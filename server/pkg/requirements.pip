@@ -9,12 +9,7 @@ twisted
 # leap deps -- bump me!
 leap.soledad.common>=0.6.0
 
-#
-# Things yet to fix:
-#
-
-# oauth is not strictly needed by us, but we need it
-# until u1db adds it to its release as a dep.
-
+# XXX -- fix me!
+# oauth is not strictly needed by us, but we need it until u1db adds it to its
+# release as a dep.
 oauth
-
