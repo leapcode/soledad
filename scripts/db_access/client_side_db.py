@@ -11,8 +11,12 @@ import srp._pysrp as srp
 import binascii
 import logging
 
+from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
+
 from leap.soledad.client import Soledad
 from leap.keymanager import KeyManager
+from leap.keymanager.openpgp import OpenPGPKey
 
 from util import ValidateUserHandle
 
@@ -137,11 +141,21 @@ def _parse_args():
     parser.add_argument(
         'user@provider', action=ValidateUserHandle, help='the user handle')
     parser.add_argument(
-        '-b', dest='basedir', required=False, default=None,
+        '--basedir', '-b', default=None,
         help='soledad base directory')
     parser.add_argument(
-        '-p', dest='passphrase', required=False, default=None,
+        '--passphrase', '-p', default=None,
         help='the user passphrase')
+    parser.add_argument(
+        '--sync', '-s', action='store_true',
+        help='synchronize with the server replica')
+    parser.add_argument(
+        '--export-public-key', help="export the public key to a file")
+    parser.add_argument(
+        '--export-private-key', help="export the private key to a file")
+    parser.add_argument(
+        '--export-incoming-messages',
+        help="export incoming messages to a directory")
     return parser.parse_args()
 
 
@@ -161,7 +175,39 @@ def _get_basedir(args):
     return basedir
 
 
+@inlineCallbacks
+def _export_key(args, km, fname, private=False):
+    address = args.username + "@" + args.provider
+    pkey = yield km.get_key(address, OpenPGPKey, private=private, fetch_remote=False)
+    with open(args.export_private_key, "w") as f:
+        f.write(pkey.key_data)
+
+
+@inlineCallbacks
+def _export_incoming_messages(soledad, directory):
+    yield soledad.create_index("by-incoming", "bool(incoming)")
+    docs = yield soledad.get_from_index("by-incoming", '1')
+    i = 1
+    for doc in docs:
+        with open(os.path.join(directory, "message_%d.gpg" % i), "w") as f:
+            f.write(doc.content["_enc_json"])
+        i += 1
+
+
 # main program
+
+@inlineCallbacks
+def _main(soledad, km, args):
+    if args.sync:
+        yield soledad.sync()
+    if args.export_private_key:
+        yield _export_key(args, km, args.export_private_key, private=True)
+    if args.export_public_key:
+        yield _export_key(args, km, args.expoert_public_key, private=False)
+    if args.export_incoming_messages:
+        yield _export_incoming_messages(soledad, args.export_incoming_messages)
+    reactor.stop()
+
 
 if __name__ == '__main__':
     args = _parse_args()
@@ -169,15 +215,13 @@ if __name__ == '__main__':
     basedir = _get_basedir(args)
     uuid, server_url, cert_file, token = \
         _get_soledad_info(args.username, args.provider, passphrase, basedir)
-
     soledad = _get_soledad_instance(
         uuid, passphrase, basedir, server_url, cert_file, token)
-    soledad.sync()
-
     km = _get_keymanager_instance(
         args.username,
         args.provider,
         soledad,
         token,
         uid=uuid)
-
+    _main(soledad, km, args)
+    reactor.run()
