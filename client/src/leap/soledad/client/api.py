@@ -44,6 +44,7 @@ from u1db.remote.ssl_match_hostname import match_hostname
 from zope.interface import implements
 
 from twisted.python import log
+from twisted.internet import defer
 
 from leap.common.config import get_path_prefix
 
@@ -654,18 +655,20 @@ class Soledad(object):
             return local_gen
 
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
-        try:
-            d = self._dbsyncer.sync(
-                sync_url,
-                creds=self._creds, autocreate=False,
-                defer_decryption=defer_decryption)
+        d = self._dbsyncer.sync(
+            sync_url,
+            creds=self._creds, autocreate=False,
+            defer_decryption=defer_decryption)
 
-            d.addCallbacks(on_sync_done, lambda err: log.err(err))
-            return d
+        # prevent sync failures from crashing the app by adding an errback
+        # that logs the failure and does not propagate it down the callback
+        # chain
+        def _errback(failure):
+            log.err(failure)
+            logger.error("Soledad exception when syncing: %s" % str(failure))
 
-        # TODO catch the exception by adding an Errback
-        except Exception as e:
-            logger.error("Soledad exception when syncing: %s" % str(e))
+        d.addCallbacks(on_sync_done, _errback)
+        return d
 
     def stop_sync(self):
         self._dbsyncer.stop_sync()
