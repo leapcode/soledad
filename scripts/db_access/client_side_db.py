@@ -171,6 +171,8 @@ def _get_basedir(args):
     basedir = args.basedir
     if basedir is None:
         basedir = tempfile.mkdtemp()
+    elif not os.path.isdir(basedir):
+        os.mkdir(basedir)
     logger.info('Using %s as base directory.' % basedir)
     return basedir
 
