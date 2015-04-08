@@ -44,7 +44,6 @@ from u1db.remote.ssl_match_hostname import match_hostname
 from zope.interface import implements
 
 from twisted.python import log
-from twisted.internet import defer
 
 from leap.common.config import get_path_prefix
 

@@ -1296,7 +1296,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         # decrypt docs in case of deferred decryption
         if defer_decryption:
-            while self.clear_to_sync() is False:
+            while not self.clear_to_sync():
                 sleep(self.DECRYPT_LOOP_PERIOD)
             self._teardown_sync_loop()
             self._teardown_sync_decr_pool()
@@ -1435,13 +1435,14 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
     def clear_to_sync(self):
         """
-        Return True if sync can proceed (ie, the received db table is empty).
+        Return whether sync can proceed (ie, the received db table is empty).
+
+        :return: Whether sync can proceed.
         :rtype: bool
         """
-        if self._sync_decr_pool is not None:
+        if self._sync_decr_pool:
             return self._sync_decr_pool.count_docs_in_sync_db() == 0
-        else:
-            return True
+        return True
 
     def set_decryption_callback(self, cb):
         """
@@ -1478,6 +1479,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             return
 
         decrypter = self._sync_decr_pool
+        decrypter.raise_in_case_of_failed_async_calls()
         decrypter.decrypt_received_docs()
         decrypter.process_decrypted()
 
