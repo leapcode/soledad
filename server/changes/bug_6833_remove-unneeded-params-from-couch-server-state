@@ -1,0 +1,2 @@
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
