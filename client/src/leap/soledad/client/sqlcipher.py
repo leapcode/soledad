@@ -500,9 +500,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         self._reactor = reactor
         self._reactor.callWhenRunning(self._start)
 
-        self.ready = True
         self._db_handle = None
-        self._initialize_syncer_main_db()
+        self._initialize_main_db()
 
         if defer_encryption:
             self._initialize_sync_db(opts)
@@ -541,23 +540,16 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         return deferToThreadPool(
             self._reactor, self._sync_threadpool, meth, *args, **kwargs)
 
-    def _initialize_syncer_main_db(self):
+    def _initialize_main_db(self):
 
-        def init_db():
-
-            # XXX DEBUG -----------------------------------------
-            # REMOVE ME when merging.
-
-            #import thread
-            #print "initializing in thread", thread.get_ident()
-            # ---------------------------------------------------
+        def _init_db():
             self._db_handle = initialize_sqlcipher_db(
                 self._opts, check_same_thread=False)
             self._real_replica_uid = None
             self._ensure_schema()
             self.set_document_factory(soledad_doc_factory)
 
-        return self._defer_to_sync_threadpool(init_db)
+        return self._defer_to_sync_threadpool(_init_db)
 
     def _initialize_sync_threadpool(self):
         """
@@ -568,6 +560,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         calls, and then we can ditch this syncing thread and reintegrate into
         the main reactor.
         """
+        # XXX if the number of threads in this thread pool is ever changed, we
+        #     should make sure that no operations on the database shuold occur
+        #     before the database has been initialized.
         self._sync_threadpool = ThreadPool(0, 1)
 
     def _initialize_sync_db(self, opts):
@@ -616,9 +611,13 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         """
         Synchronize documents with remote replica exposed at url.
 
-        There can be at most one instance syncing the same database replica at
-        the same time, so this method will block until the syncing lock can be
-        acquired.
+        This method defers a sync to a 1-threaded threadpool. The main
+        database initialziation was deferred to that thread during this
+        object's initialization. As there's currently only one thread in that
+        threadpool, the db init was queued before this method was called, so
+        we don't need to actually wait for the db to be ready. If this ever
+        changes, we should add a thread-safe condition to ensure the db is
+        ready before using it.
 
         :param url: The url of the target replica to sync with.
         :type url: str
@@ -636,17 +635,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :return:
             A Deferred, that will fire with the local generation (type `int`)
             before the synchronisation was performed.
-        :rtype: deferred
+        :rtype: Deferred
         """
-        if not self.ready:
-            print "not ready yet..."
-            # XXX ---------------------------------------------------------
-            # This might happen because the database has not yet been
-            # initialized (it's deferred to the theadpool).
-            # A good strategy might involve to return a deferred that will
-            # callLater this same function after a timeout (deferLater)
-            # Might want to keep track of retries and cancel too.
-            # --------------------------------------------------------------
         kwargs = {'creds': creds, 'autocreate': autocreate,
                   'defer_decryption': defer_decryption}
         return self._defer_to_sync_threadpool(self._sync, url, **kwargs)
