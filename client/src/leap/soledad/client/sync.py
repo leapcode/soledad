@@ -81,10 +81,13 @@ class SoledadSynchronizer(Synchronizer):
             return self._sync(autocreate=autocreate,
                               defer_decryption=defer_decryption)
         except Exception:
-            # re-raising the exceptions to let syqlcipher.sync catch them
-            # (and re-create the syncer instance if needed)
+            # we want this exception to reach either SQLCipherU1DBSync.sync or
+            # the Solead api object itself, so it is poperly handled and/or
+            # logged...
             raise
         finally:
+            # ... but we also want to release the syncing lock so this
+            # Synchronizer may be reused later.
             self.release_syncing_lock()
 
     def _sync(self, autocreate=False, defer_decryption=True):
