@@ -39,11 +39,10 @@ try:
 except ImportError:
     import chardet
 
+from StringIO import StringIO
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
 from zope.interface import implements
-
-from twisted.python import log
 
 from leap.common.config import get_path_prefix
 
@@ -663,8 +662,10 @@ class Soledad(object):
         # that logs the failure and does not propagate it down the callback
         # chain
         def _errback(failure):
-            log.err(failure)
-            logger.error("Soledad exception when syncing: %s" % str(failure))
+            s = StringIO()
+            failure.printDetailedTraceback(file=s)
+            msg = "Soledad exception when syncing!\n" + s.getvalue()
+            logger.error(msg)
 
         d.addCallbacks(on_sync_done, _errback)
         return d
