@@ -647,27 +647,27 @@ class Soledad(object):
 
         # -----------------------------------------------------------------
 
-        def on_sync_done(local_gen):
-            soledad_events.signal(
-                soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
-            return local_gen
-
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
         d = self._dbsyncer.sync(
             sync_url,
             creds=self._creds, autocreate=False,
             defer_decryption=defer_decryption)
 
+        def _sync_callback(local_gen):
+            soledad_events.signal(
+                soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
+            return local_gen
+
         # prevent sync failures from crashing the app by adding an errback
         # that logs the failure and does not propagate it down the callback
         # chain
-        def _errback(failure):
+        def _sync_errback(failure):
             s = StringIO()
             failure.printDetailedTraceback(file=s)
             msg = "Soledad exception when syncing!\n" + s.getvalue()
             logger.error(msg)
 
-        d.addCallbacks(on_sync_done, _errback)
+        d.addCallbacks(_sync_callback, _sync_errback)
         return d
 
     def stop_sync(self):
