@@ -503,8 +503,12 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         self._db_handle = None
         self._initialize_main_db()
 
+        # the sync_db is used both for deferred encryption and decryption, so
+        # we want to initialize it anyway to allow for all combinations of
+        # deferred encryption and decryption configurations.
+        self._initialize_sync_db(opts)
+
         if defer_encryption:
-            self._initialize_sync_db(opts)
 
             # initialize syncing queue encryption pool
             self._sync_enc_pool = crypto.SyncEncrypterPool(
