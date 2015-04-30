@@ -300,7 +300,7 @@ class DocumentSyncerPool(object):
             # we rely on DocumentSyncerThread.run() to release the lock using
             # self.release_syncer so we can launch a new thread.
             t = DocumentSyncerThread(
-                doc_syncer, self.release_syncer, self.cancel_threads,
+                doc_syncer, self.release_syncer, self.stop_threads,
                 idx, total,
                 last_request_lock=last_request_lock,
                 last_callback_lock=last_callback_lock)
@@ -348,17 +348,21 @@ class DocumentSyncerPool(object):
                 self._threads.remove(syncer_thread)
             self._semaphore_pool.release()
 
-    def cancel_threads(self):
+    def stop_threads(self, fail=True):
         """
         Stop all threads in the pool.
+
+        :param fail: Whether we are stopping because of a failure.
+        :type fail: bool
         """
         # stop sync
         self._stop_method()
         stopped = []
         # stop all threads
-        logger.warning("Soledad sync: cancelling sync threads...")
         with self._pool_access_lock:
-            self._failures = True
+            if fail:
+                self._failures = True
+                logger.error("sync failed: cancelling sync threads...")
             while self._threads:
                 t = self._threads.pop(0)
                 t.stop()
@@ -377,7 +381,8 @@ class DocumentSyncerPool(object):
                 self._semaphore_pool.release()
             except ValueError:
                 break
-        logger.warning("Soledad sync: cancelled sync threads.")
+        if fail:
+            logger.error("Soledad sync: cancelled sync threads.")
 
     def cleanup(self):
         """
@@ -1020,7 +1025,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
             # bail out if any thread failed
             if t is None:
-                self.stop()
+                self.stop(fail=True)
                 break
 
             t.doc_syncer.set_request_method(
@@ -1220,7 +1225,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
             # bail out if any thread failed
             if t is None:
-                self.stop()
+                self.stop(fail=True)
                 break
 
             # set the request method
@@ -1308,7 +1313,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
             cur_target_gen = gen_after_send
             cur_target_trans_id = trans_id_after_send
 
-        self.stop()
+        self.stop(fail=False)
         self._syncer_pool = None
         return cur_target_gen, cur_target_trans_id
 
@@ -1324,17 +1329,20 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         with self._stop_lock:
             self._stopped = True
 
-    def stop(self):
+    def stop(self, fail=False):
         """
         Mark current sync session as stopped.
 
         This will eventually interrupt the sync_exchange() method and return
         enough information to the synchronizer so the sync session can be
         recovered afterwards.
+
+        :param fail: Whether we are stopping because of a failure.
+        :type fail: bool
         """
         self.stop_syncer()
         if self._syncer_pool:
-            self._syncer_pool.cancel_threads()
+            self._syncer_pool.stop_threads(fail=fail)
 
     @property
     def stopped(self):
