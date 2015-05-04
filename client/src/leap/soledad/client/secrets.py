@@ -246,22 +246,26 @@ class SoledadSecrets(object):
         :return: Whether there's a storage secret for symmetric encryption.
         :rtype: bool
         """
-        if self._secret_id is None or self._secret_id not in self._secrets:
+        logger.info("Checking if there's a secret in local storage...")
+        if (self._secret_id is None or self._secret_id not in self._secrets) \
+                and os.path.isfile(self._secrets_path):
             try:
                 self._load_secrets()  # try to load from disk
             except IOError as e:
                 logger.warning(
                     'IOError while loading secrets from disk: %s' % str(e))
-                return False
-        return self.storage_secret is not None
+
+        if self.storage_secret is not None:
+            logger.info("Found a secret in local storage.")
+            return True
+
+        logger.info("Could not find a secret in local storage.")
+        return False
 
     def _load_secrets(self):
         """
         Load storage secrets from local file.
         """
-        # does the file exist in disk?
-        if not os.path.isfile(self._secrets_path):
-            raise IOError('File does not exist: %s' % self._secrets_path)
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
