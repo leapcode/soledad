@@ -36,9 +36,8 @@ from u1db.remote import utils, http_errors
 from u1db.remote.http_target import HTTPSyncTarget
 from u1db.remote.http_client import _encode_query_parameter, HTTPClientBase
 from zope.proxy import ProxyBase
-from zope.proxy import sameProxiedObjects, setProxiedObject
+from zope.proxy import setProxiedObject
 
-from twisted.internet.task import LoopingCall
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.auth import TokenBasedAuth
@@ -755,17 +754,12 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
     # passed to sync_exchange
     _insert_doc_cb = defaultdict(lambda: ProxyBase(None))
 
-    """
-    Period of recurrence of the periodic decrypting task, in seconds.
-    """
-    DECRYPT_LOOP_PERIOD = 0.5
-
     #
     # Modified HTTPSyncTarget methods.
     #
 
     def __init__(self, url, source_replica_uid=None, creds=None, crypto=None,
-                 sync_db=None, sync_db_write_lock=None):
+                 sync_db=None):
         """
         Initialize the SoledadSyncTarget.
 
@@ -786,9 +780,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
                         instead of retreiving it from the dedicated
                         database.
         :type sync_db: Sqlite handler
-        :param sync_db_write_lock: a write lock for controlling concurrent
-                                   access to the sync_db
-        :type sync_db_write_lock: threading.Lock
         """
         HTTPSyncTarget.__init__(self, url, creds)
         self._raw_url = url
@@ -802,14 +793,9 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         self._syncer_pool = None
 
         # deferred decryption attributes
-        self._sync_db = None
-        self._sync_db_write_lock = None
+        self._sync_db = sync_db
         self._decryption_callback = None
         self._sync_decr_pool = None
-        self._sync_loop = None
-        if sync_db and sync_db_write_lock is not None:
-            self._sync_db = sync_db
-            self._sync_db_write_lock = sync_db_write_lock
 
     def _setup_sync_decr_pool(self):
         """
@@ -818,11 +804,10 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         if self._sync_decr_pool is None:
             # initialize syncing queue decryption pool
             self._sync_decr_pool = SyncDecrypterPool(
-                self._crypto, self._sync_db,
-                self._sync_db_write_lock,
-                insert_doc_cb=self._insert_doc_cb)
-            self._sync_decr_pool.set_source_replica_uid(
-                self.source_replica_uid)
+                self._crypto,
+                self._sync_db,
+                insert_doc_cb=self._insert_doc_cb,
+                source_replica_uid=self.source_replica_uid)
 
     def _teardown_sync_decr_pool(self):
         """
@@ -831,23 +816,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         if self._sync_decr_pool is not None:
             self._sync_decr_pool.close()
             self._sync_decr_pool = None
-
-    def _setup_sync_loop(self):
-        """
-        Set up the sync loop for deferred decryption.
-        """
-        if self._sync_loop is None:
-            self._sync_loop = LoopingCall(
-                self._decrypt_syncing_received_docs)
-            self._sync_loop.start(self.DECRYPT_LOOP_PERIOD)
-
-    def _teardown_sync_loop(self):
-        """
-        Tear down the sync loop.
-        """
-        if self._sync_loop is not None:
-            self._sync_loop.stop()
-            self._sync_loop = None
 
     def _get_replica_uid(self, url):
         """
@@ -1138,7 +1106,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         if defer_decryption and self._sync_db is not None:
             self._sync_exchange_lock.acquire()
             self._setup_sync_decr_pool()
-            self._setup_sync_loop()
             self._defer_decryption = True
         else:
             # fall back
@@ -1301,9 +1268,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
 
         # decrypt docs in case of deferred decryption
         if defer_decryption:
-            while not self.clear_to_sync():
-                sleep(self.DECRYPT_LOOP_PERIOD)
-            self._teardown_sync_loop()
+            self._sync_decr_pool.wait()
             self._teardown_sync_decr_pool()
             self._sync_exchange_lock.release()
 
@@ -1323,7 +1288,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         """
         with self._stop_lock:
             self._stopped = False
-
 
     def stop_syncer(self):
         with self._stop_lock:
@@ -1449,7 +1413,7 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         :rtype: bool
         """
         if self._sync_decr_pool:
-            return self._sync_decr_pool.count_docs_in_sync_db() == 0
+            return self._sync_decr_pool.clear_to_sync()
         return True
 
     def set_decryption_callback(self, cb):
@@ -1473,23 +1437,6 @@ class SoledadSyncTarget(HTTPSyncTarget, TokenBasedAuth):
         Return True if we have an initialized syncdb.
         """
         return self._sync_db is not None
-
-    def _decrypt_syncing_received_docs(self):
-        """
-        Decrypt the documents received from remote replica and insert them
-        into the local one.
-
-        Called periodically from LoopingCall self._sync_loop.
-        """
-        if sameProxiedObjects(
-                self._insert_doc_cb.get(self.source_replica_uid),
-                None):
-            return
-
-        decrypter = self._sync_decr_pool
-        decrypter.raise_in_case_of_failed_async_calls()
-        decrypter.decrypt_received_docs()
-        decrypter.process_decrypted()
 
     def _sign_request(self, method, url_query, params):
         """

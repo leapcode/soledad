@@ -55,6 +55,7 @@ from hashlib import sha256
 from contextlib import contextmanager
 from collections import defaultdict
 from httplib import CannotSendRequest
+from functools import partial
 
 from pysqlcipher import dbapi2 as sqlcipher_dbapi2
 
@@ -63,6 +64,7 @@ from twisted.internet.task import LoopingCall
 from twisted.internet.threads import deferToThreadPool
 from twisted.python.threadpool import ThreadPool
 from twisted.python import log
+from twisted.enterprise import adbapi
 
 from leap.soledad.client import crypto
 from leap.soledad.client.target import SoledadSyncTarget
@@ -102,46 +104,14 @@ def initialize_sqlcipher_db(opts, on_init=None, check_same_thread=True):
 
     conn = sqlcipher_dbapi2.connect(
         opts.path, check_same_thread=check_same_thread)
-    set_init_pragmas(conn, opts, extra_queries=on_init)
+    pragmas.set_init_pragmas(conn, opts, extra_queries=on_init)
     return conn
 
 
-_db_init_lock = threading.Lock()
-
-
-def set_init_pragmas(conn, opts=None, extra_queries=None):
-    """
-    Set the initialization pragmas.
-
-    This includes the crypto pragmas, and any other options that must
-    be passed early to sqlcipher db.
-    """
-    soledad_assert(opts is not None)
-    extra_queries = [] if extra_queries is None else extra_queries
-    with _db_init_lock:
-        # only one execution path should initialize the db
-        _set_init_pragmas(conn, opts, extra_queries)
-
-
-def _set_init_pragmas(conn, opts, extra_queries):
-
-    sync_off = os.environ.get('LEAP_SQLITE_NOSYNC')
-    memstore = os.environ.get('LEAP_SQLITE_MEMSTORE')
-    nowal = os.environ.get('LEAP_SQLITE_NOWAL')
-
-    pragmas.set_crypto_pragmas(conn, opts)
-
-    if not nowal:
-        pragmas.set_write_ahead_logging(conn)
-    if sync_off:
-        pragmas.set_synchronous_off(conn)
-    else:
-        pragmas.set_synchronous_normal(conn)
-    if memstore:
-        pragmas.set_mem_temp_store(conn)
-
-    for query in extra_queries:
-        conn.cursor().execute(query)
+def initialize_sqlcipher_adbapi_db(opts, extra_queries=None):
+    from leap.soledad.client import sqlcipher_adbapi
+    return sqlcipher_adbapi.getConnectionPool(
+        opts, extra_queries=extra_queries)
 
 
 class SQLCipherOptions(object):
@@ -151,22 +121,32 @@ class SQLCipherOptions(object):
 
     @classmethod
     def copy(cls, source, path=None, key=None, create=None,
-            is_raw_key=None, cipher=None, kdf_iter=None, cipher_page_size=None,
-            defer_encryption=None, sync_db_key=None):
+             is_raw_key=None, cipher=None, kdf_iter=None,
+             cipher_page_size=None, defer_encryption=None, sync_db_key=None):
         """
         Return a copy of C{source} with parameters different than None
         replaced by new values.
         """
-        return SQLCipherOptions(
-            path if path else source.path,
-            key if key else source.key,
-            create=create if create else source.create,
-            is_raw_key=is_raw_key if is_raw_key else source.is_raw_key,
-            cipher=cipher if cipher else source.cipher,
-            kdf_iter=kdf_iter if kdf_iter else source.kdf_iter,
-            cipher_page_size=cipher_page_size if cipher_page_size else source.cipher_page_size,
-            defer_encryption=defer_encryption if defer_encryption else source.defer_encryption,
-            sync_db_key=sync_db_key if sync_db_key else source.sync_db_key)
+        local_vars = locals()
+        args = []
+        kwargs = {}
+
+        for name in ["path", "key"]:
+            val = local_vars[name]
+            if val is not None:
+                args.append(val)
+            else:
+                args.append(getattr(source, name))
+
+        for name in ["create", "is_raw_key", "cipher", "kdf_iter",
+                     "cipher_page_size", "defer_encryption", "sync_db_key"]:
+            val = local_vars[name]
+            if val is not None:
+                kwargs[name] = val
+            else:
+                kwargs[name] = getattr(source, name)
+
+        return SQLCipherOptions(*args, **kwargs)
 
     def __init__(self, path, key, create=True, is_raw_key=False,
                  cipher='aes-256-cbc', kdf_iter=4000, cipher_page_size=1024,
@@ -478,7 +458,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         self._sync_db_key = opts.sync_db_key
         self._sync_db = None
-        self._sync_db_write_lock = None
         self._sync_enc_pool = None
         self.sync_queue = None
 
@@ -490,7 +469,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
 
         self._syncers = {}
-        self._sync_db_write_lock = threading.Lock()
         self.sync_queue = multiprocessing.Queue()
 
         self.running = False
@@ -512,7 +490,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
             # initialize syncing queue encryption pool
             self._sync_enc_pool = crypto.SyncEncrypterPool(
-                self._crypto, self._sync_db, self._sync_db_write_lock)
+                self._crypto, self._sync_db)
 
             # -----------------------------------------------------------------
             # From the documentation: If f returns a deferred, rescheduling
@@ -588,11 +566,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # somewhere else
         sync_opts = SQLCipherOptions.copy(
             opts, path=sync_db_path, create=True)
-        self._sync_db = initialize_sqlcipher_db(
-            sync_opts, on_init=self._sync_db_extra_init,
-            check_same_thread=False)
-        pragmas.set_crypto_pragmas(self._sync_db, opts)
-        # ---------------------------------------------------------
+        self._sync_db = getConnectionPool(
+            sync_opts, extra_queries=self._sync_db_extra_init)
 
     @property
     def _sync_db_extra_init(self):
@@ -727,7 +702,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         h = sha256(json.dumps([url, creds])).hexdigest()
         cur_h, syncer = self._syncers.get(url, (None, None))
         if syncer is None or h != cur_h:
-            wlock = self._sync_db_write_lock
             syncer = SoledadSynchronizer(
                 self,
                 SoledadSyncTarget(url,
@@ -735,8 +709,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                                   self._replica_uid,
                                   creds=creds,
                                   crypto=self._crypto,
-                                  sync_db=self._sync_db,
-                                  sync_db_write_lock=wlock))
+                                  sync_db=self._sync_db))
             self._syncers[url] = (h, syncer)
         # in order to reuse the same synchronizer multiple times we have to
         # reset its state (i.e. the number of documents received from target
@@ -907,3 +880,40 @@ def soledad_doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
                            has_conflicts=has_conflicts, syncable=syncable)
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)
+
+
+#
+# twisted.enterprise.adbapi SQLCipher implementation
+#
+
+SQLCIPHER_CONNECTION_TIMEOUT = 10
+
+
+def getConnectionPool(opts, extra_queries=None):
+    openfun = partial(
+        pragmas.set_init_pragmas,
+        opts=opts,
+        extra_queries=extra_queries)
+    return SQLCipherConnectionPool(
+        database=opts.path,
+        check_same_thread=False,
+        cp_openfun=openfun,
+        timeout=SQLCIPHER_CONNECTION_TIMEOUT)
+
+
+class SQLCipherConnection(adbapi.Connection):
+    pass
+
+
+class SQLCipherTransaction(adbapi.Transaction):
+    pass
+
+
+class SQLCipherConnectionPool(adbapi.ConnectionPool):
+
+    connectionFactory = SQLCipherConnection
+    transactionFactory = SQLCipherTransaction
+
+    def __init__(self, *args, **kwargs):
+        adbapi.ConnectionPool.__init__(
+            self, "pysqlcipher.dbapi2", *args, **kwargs)
