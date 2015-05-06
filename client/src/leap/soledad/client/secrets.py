@@ -480,13 +480,13 @@ class SoledadSecrets(object):
         :return: a document with encrypted key material in its contents
         :rtype: document.SoledadDocument
         """
-        events.signal(events.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
+        events.emit(events.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         doc = db.get_doc(self._shared_db_doc_id())
-        events.signal(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
+        events.emit(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
 
     def _put_secrets_in_shared_db(self):
@@ -509,13 +509,13 @@ class SoledadSecrets(object):
         # fill doc with encrypted secrets
         doc.content = self._export_recovery_document()
         # upload secrets to server
-        events.signal(events.SOLEDAD_UPLOADING_KEYS, self._uuid)
+        events.emit(events.SOLEDAD_UPLOADING_KEYS, self._uuid)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         db.put_doc(doc)
-        events.signal(events.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
+        events.emit(events.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
     #
     # Management of secret for symmetric encryption.
@@ -635,13 +635,13 @@ class SoledadSecrets(object):
         :return: The id of the generated secret.
         :rtype: str
         """
-        events.signal(events.SOLEDAD_CREATING_KEYS, self._uuid)
+        events.emit(events.SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
         secret = os.urandom(self.GEN_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         self._secrets[secret_id] = secret
         self._store_secrets()
-        events.signal(events.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
+        events.emit(events.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
         return secret_id
 
     def _store_secrets(self):

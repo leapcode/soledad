@@ -656,7 +656,7 @@ class Soledad(object):
             defer_decryption=defer_decryption)
 
         def _sync_callback(local_gen):
-            soledad_events.signal(
+            soledad_events.emit(
                 soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
             return local_gen
 

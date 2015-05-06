@@ -47,7 +47,7 @@ from leap.soledad.client.crypto import encrypt_doc
 from leap.soledad.client.crypto import decrypt_doc
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
-from leap.soledad.client.events import signal
+from leap.soledad.client.events import emit
 from leap.soledad.client.encdecpool import SyncDecrypterPool
 
 
@@ -311,7 +311,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             if self._defer_encryption:
                 self._sync_enc_pool.delete_encrypted_doc(
                     doc.doc_id, doc.rev)
-            signal(SOLEDAD_SYNC_SEND_STATUS,
+            emit(SOLEDAD_SYNC_SEND_STATUS,
                    "Soledad sync send status: %d/%d"
                    % (idx, total))
         response_dict = json.loads(result)[0]
@@ -535,7 +535,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             # end of symmetric decryption
             # -------------------------------------------------------------
         msg = "%d/%d" % (idx, total)
-        signal(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
+        emit(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
         logger.debug("Soledad sync receive status: %s" % msg)
         return number_of_changes, new_generation, new_transaction_id
 
