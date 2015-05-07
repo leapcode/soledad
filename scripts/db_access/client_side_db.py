@@ -10,6 +10,7 @@ import requests
 import srp._pysrp as srp
 import binascii
 import logging
+import json
 
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
@@ -147,6 +148,9 @@ def _parse_args():
         '--passphrase', '-p', default=None,
         help='the user passphrase')
     parser.add_argument(
+        '--get-all-docs', '-a', action='store_true',
+        help='get all documents from the local database')
+    parser.add_argument(
         '--sync', '-s', action='store_true',
         help='synchronize with the server replica')
     parser.add_argument(
@@ -196,12 +200,21 @@ def _export_incoming_messages(soledad, directory):
         i += 1
 
 
+@inlineCallbacks
+def _get_all_docs(soledad):
+    _, docs = yield soledad.get_all_docs()
+    for doc in docs:
+        print json.dumps(doc.content, indent=4)
+
+
 # main program
 
 @inlineCallbacks
 def _main(soledad, km, args):
     if args.sync:
         yield soledad.sync()
+    if args.get_all_docs:
+        yield _get_all_docs(soledad)
     if args.export_private_key:
         yield _export_key(args, km, args.export_private_key, private=True)
     if args.export_public_key:

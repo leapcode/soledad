@@ -66,7 +66,7 @@ from twisted.python.threadpool import ThreadPool
 from twisted.python import log
 from twisted.enterprise import adbapi
 
-from leap.soledad.client import crypto
+from leap.soledad.client import encdecpool
 from leap.soledad.client.target import SoledadSyncTarget
 from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
@@ -489,7 +489,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         if defer_encryption:
 
             # initialize syncing queue encryption pool
-            self._sync_enc_pool = crypto.SyncEncrypterPool(
+            self._sync_enc_pool = encdecpool.SyncEncrypterPool(
                 self._crypto, self._sync_db)
 
             # -----------------------------------------------------------------
@@ -578,8 +578,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :rtype: tuple of strings
         """
         maybe_create = "CREATE TABLE IF NOT EXISTS %s (%s)"
-        encr = crypto.SyncEncrypterPool
-        decr = crypto.SyncDecrypterPool
+        encr = encdecpool.SyncEncrypterPool
+        decr = encdecpool.SyncDecrypterPool
         sql_encr_table_query = (maybe_create % (
             encr.TABLE_NAME, encr.FIELD_NAMES))
         sql_decr_table_query = (maybe_create % (
