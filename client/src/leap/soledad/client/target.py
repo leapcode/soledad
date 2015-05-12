@@ -71,10 +71,6 @@ def _gunzip(data):
     return data
 
 
-class PendingReceivedDocsSyncError(Exception):
-    pass
-
-
 class DocumentSyncerThread(threading.Thread):
     """
     A thread that knowns how to either send or receive a document during the

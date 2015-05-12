@@ -68,7 +68,6 @@ from twisted.enterprise import adbapi
 
 from leap.soledad.client import encdecpool
 from leap.soledad.client.target import SoledadSyncTarget
-from leap.soledad.client.target import PendingReceivedDocsSyncError
 from leap.soledad.client.sync import SoledadSynchronizer
 
 from leap.soledad.client import pragmas
@@ -636,17 +635,12 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                 log.msg('syncer sync...')
                 res = syncer.sync(autocreate=autocreate,
                                   defer_decryption=defer_decryption)
-
-            except PendingReceivedDocsSyncError:
-                logger.warning("Local sync db is not clear, skipping sync...")
-                return
             except CannotSendRequest:
                 logger.warning("Connection with sync target couldn't be "
                                "established. Resetting connection...")
                 # closing the connection it will be recreated in the next try
                 syncer.sync_target.close()
                 return
-
         return res
 
     def stop_sync(self):
