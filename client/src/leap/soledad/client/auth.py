@@ -14,15 +14,13 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Methods for token-based authentication.
 
 These methods have to be included in all classes that extend HTTPClient so
 they can do token-based auth requests to the Soledad server.
 """
-
+import base64
 
 from u1db import errors
 
@@ -49,7 +47,7 @@ class TokenBasedAuth(object):
         Return an authorization header to be included in the HTTP request, in
         the form:
 
-            [('Authorization', 'Token <base64 encoded creds')]
+            [('Authorization', 'Token <(base64 encoded) uuid:token>')]
 
         :param method: The HTTP method.
         :type method: str
@@ -64,7 +62,8 @@ class TokenBasedAuth(object):
         if 'token' in self._creds:
             uuid, token = self._creds['token']
             auth = '%s:%s' % (uuid, token)
-            return [('Authorization', 'Token %s' % auth.encode('base64')[:-1])]
+            b64_token = base64.b64encode(auth)
+            return [('Authorization', 'Token %s' % b64_token)]
         else:
             raise errors.UnknownAuthMethod(
                 'Wrong credentials: %s' % self._creds)
