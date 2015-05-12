@@ -1529,20 +1529,14 @@ class CouchServerState(ServerState):
     Inteface of the WSGI server with the CouchDB backend.
     """
 
-    def __init__(self, couch_url, shared_db_name, tokens_db_name):
+    def __init__(self, couch_url):
         """
         Initialize the couch server state.
 
         :param couch_url: The URL for the couch database.
         :type couch_url: str
-        :param shared_db_name: The name of the shared database.
-        :type shared_db_name: str
-        :param tokens_db_name: The name of the tokens database.
-        :type tokens_db_name: str
         """
         self._couch_url = couch_url
-        self._shared_db_name = shared_db_name
-        self._tokens_db_name = tokens_db_name
 
     def open_database(self, dbname):
         """

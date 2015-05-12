@@ -155,6 +155,11 @@ def build_ddocs_py(basedir=None, with_src=True):
         dest_prefix = join(basedir, *dest_common_path)
 
     ddocs_prefix = join(prefix, 'ddocs')
+
+    if not isdir(ddocs_prefix):
+        print "No ddocs/ folder, bailing out..."
+        return
+
     ddocs = {}
 
     # design docs are represented by subdirectories of `ddocs_prefix`

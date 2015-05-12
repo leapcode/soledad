@@ -224,7 +224,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file,
-                 auth_token=None, secret_id=None, defer_encryption=False):
+                 auth_token=None, secret_id=None, defer_encryption=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -1333,9 +1333,25 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
             self.sock = sock
             self._tunnel()
 
-        self.sock = ssl.wrap_socket(sock,
-                                    ca_certs=SOLEDAD_CERT,
-                                    cert_reqs=ssl.CERT_REQUIRED)
+        highest_supported = ssl.PROTOCOL_SSLv23
+
+        try:
+            # needs python 2.7.9+
+            # negotiate the best available version,
+            # but explicitely disabled bad ones.
+            ctx = ssl.SSLContext(highest_supported)
+            ctx.options |= ssl.OP_NO_SSLv2
+            ctx.options |= ssl.OP_NO_SSLv3
+
+            ctx.load_verify_locations(cafile=SOLEDAD_CERT)
+            ctx.verify_mode = ssl.CERT_REQUIRED
+            self.sock = ctx.wrap_socket(sock)
+
+        except AttributeError:
+            self.sock = ssl.wrap_socket(
+                sock, ca_certs=SOLEDAD_CERT, cert_reqs=ssl.CERT_REQUIRED,
+                ssl_version=highest_supported)
+
         match_hostname(self.sock.getpeercert(), self.host)
 
 

@@ -296,10 +296,7 @@ def load_configuration(file_path):
 
 def application(environ, start_response):
     conf = load_configuration('/etc/leap/soledad-server.conf')
-    state = CouchServerState(
-        conf['couch_url'],
-        SoledadApp.SHARED_DB_NAME,
-        SoledadTokenAuthMiddleware.TOKENS_DB)
+    state = CouchServerState(conf['couch_url'])
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(
         SoledadTokenAuthMiddleware(SoledadApp(state)))

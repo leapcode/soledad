@@ -452,6 +452,11 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
 
             # XXX could mark the critical section here...
             try:
+                if defer_decryption and not self.defer_encryption:
+                    logger.warning("Can't defer decryption without first having "
+                                   "created a sync db. Falling back to normal "
+                                   "syncing mode.")
+                    defer_decryption = False
                 res = syncer.sync(autocreate=autocreate,
                                   defer_decryption=defer_decryption)
 

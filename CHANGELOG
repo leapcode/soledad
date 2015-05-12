@@ -1,3 +1,28 @@
+0.6.5 Apr 09 2015:
+Server:
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+
+0.6.4 Jan 23 2015:
+Common:
+  o Bail out if cdocs/ dir does not exist. Closes: #6671
+
+0.6.3 Dec 16 2014:
+Client:
+  o Fix deferred encryption/decryption parameters (#6500).
+
+0.6.2 Dec 11 2014:
+Client:
+  o Fix incorrect ssl context setup.
+
+0.6.1 Dec 08 2014:
+Client:
+  o Use TLS v1 in soledad client. Fixes partially #6437
+
+Server:
+  o Run daemon as user soledad (#6436).
+  o Avoid use of SSLv3 (#6437).
+
 0.6.0 Jul 18, 2014:
 Client:
   o Close all connections after syncing. Fixes #5518.
