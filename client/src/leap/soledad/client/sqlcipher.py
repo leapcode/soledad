@@ -42,7 +42,6 @@ SQLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
 import logging
-import multiprocessing
 import os
 import threading
 import json
@@ -286,10 +285,9 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :rtype: str
         """
         doc_rev = sqlite_backend.SQLitePartialExpandDatabase.put_doc(self, doc)
-
-        # TODO XXX move to API XXX
         if self.defer_encryption:
-            self.sync_queue.put_nowait(doc)
+            # TODO move to api?
+            self._sync_enc_pool.enqueue_doc_for_encryption(doc)
         return doc_rev
 
     #
@@ -429,13 +427,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     LOCAL_SYMMETRIC_SYNC_FILE_NAME = 'sync.u1db'
 
     """
-    A dictionary that hold locks which avoid multiple sync attempts from the
-    same database replica.
-    """
-    # XXX We do not need the lock here now. Remove.
-    encrypting_lock = threading.Lock()
-
-    """
     Period or recurrence of the Looping Call that will do the encryption to the
     syncdb (in seconds).
     """
@@ -458,7 +449,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         self._sync_db_key = opts.sync_db_key
         self._sync_db = None
         self._sync_enc_pool = None
-        self.sync_queue = None
 
         # we store syncers in a dictionary indexed by the target URL. We also
         # store a hash of the auth info in case auth info expires and we need
@@ -468,7 +458,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
 
         self._syncers = {}
-        self.sync_queue = multiprocessing.Queue()
 
         self.running = False
         self._sync_threadpool = None
@@ -486,23 +475,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         self._initialize_sync_db(opts)
 
         if defer_encryption:
-
             # initialize syncing queue encryption pool
             self._sync_enc_pool = encdecpool.SyncEncrypterPool(
                 self._crypto, self._sync_db)
-
-            # -----------------------------------------------------------------
-            # From the documentation: If f returns a deferred, rescheduling
-            # will not take place until the deferred has fired. The result
-            # value is ignored.
-
-            # TODO use this to avoid multiple sync attempts if the sync has not
-            # finished!
-            # -----------------------------------------------------------------
-
-            # XXX this was called sync_watcher --- trace any remnants
-            self._sync_loop = LoopingCall(self._encrypt_syncing_docs)
-            self._sync_loop.start(self.ENCRYPT_LOOP_PERIOD)
 
         self.shutdownID = None
 
@@ -703,7 +678,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                                   self._replica_uid,
                                   creds=creds,
                                   crypto=self._crypto,
-                                  sync_db=self._sync_db))
+                                  sync_db=self._sync_db,
+                                  sync_enc_pool=self._sync_enc_pool))
             self._syncers[url] = (h, syncer)
         # in order to reuse the same synchronizer multiple times we have to
         # reset its state (i.e. the number of documents received from target
@@ -715,33 +691,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     # Symmetric encryption of syncing docs
     #
 
-    def _encrypt_syncing_docs(self):
-        """
-        Process the syncing queue and send the documents there
-        to be encrypted in the sync db. They will be read by the
-        SoledadSyncTarget during the sync_exchange.
-
-        Called periodically from the LoopingCall self._sync_loop.
-        """
-        # TODO should return a deferred that would firewhen the encryption is
-        # done. See note on __init__
-
-        lock = self.encrypting_lock
-        # optional wait flag used to avoid blocking
-        if not lock.acquire(False):
-            return
-        else:
-            queue = self.sync_queue
-            try:
-                while not queue.empty():
-                    doc = queue.get_nowait()
-                    self._sync_enc_pool.encrypt_doc(doc)
-
-            except Exception as exc:
-                logger.error("Error while  encrypting docs to sync")
-                logger.exception(exc)
-            finally:
-                lock.release()
 
     def get_generation(self):
         # FIXME
@@ -779,11 +728,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         if self._sync_db is not None:
             self._sync_db.close()
             self._sync_db = None
-        # close the sync queue
-        if self.sync_queue is not None:
-            self.sync_queue.close()
-            del self.sync_queue
-            self.sync_queue = None
 
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):

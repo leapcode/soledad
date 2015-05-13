@@ -195,10 +195,6 @@ class SoledadSynchronizer(Synchronizer):
                 "my_gen": my_gen
             }
             self._syncing_info = info
-            if defer_decryption and not sync_target.has_syncdb():
-                logger.debug("Sync target has no valid sync db, "
-                             "aborting defer_decryption")
-                defer_decryption = False
             self.complete_sync()
         except Exception as e:
             logger.error("Soledad sync error: %s" % str(e))
