@@ -151,6 +151,9 @@ def _parse_args():
         '--get-all-docs', '-a', action='store_true',
         help='get all documents from the local database')
     parser.add_argument(
+        '--create-doc', '-c', default=None,
+        help='create a document with give content')
+    parser.add_argument(
         '--sync', '-s', action='store_true',
         help='synchronize with the server replica')
     parser.add_argument(
@@ -211,6 +214,8 @@ def _get_all_docs(soledad):
 
 @inlineCallbacks
 def _main(soledad, km, args):
+    if args.create_doc:
+        yield soledad.create_doc({'content': args.create_doc})
     if args.sync:
         yield soledad.sync()
     if args.get_all_docs:
