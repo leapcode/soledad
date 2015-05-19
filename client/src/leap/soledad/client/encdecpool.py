@@ -789,12 +789,5 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             self._exception = e
         self._finished.set()
 
-    def wait(self):
-        """
-        Wait for the decrypt-and-process loop to finish.
-        """
-        logger.debug("Waiting for asynchronous decryption of incoming documents...")
-        self._finished.wait()
-        logger.debug("Asynchronous decryption of incoming documents finished.")
-        if self._exception:
-            raise self._exception
+    def has_finished(self):
+        return self._finished.is_set()

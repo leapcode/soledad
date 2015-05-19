@@ -53,20 +53,17 @@ from u1db.backends import sqlite_backend
 from hashlib import sha256
 from contextlib import contextmanager
 from collections import defaultdict
-from httplib import CannotSendRequest
 from functools import partial
 
 from pysqlcipher import dbapi2 as sqlcipher_dbapi2
 
 from twisted.internet import reactor
-from twisted.internet.task import LoopingCall
 from twisted.internet.threads import deferToThreadPool
 from twisted.python.threadpool import ThreadPool
-from twisted.python import log
 from twisted.enterprise import adbapi
 
 from leap.soledad.client import encdecpool
-from leap.soledad.client.target import SoledadSyncTarget
+from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
 
 from leap.soledad.client import pragmas
@@ -590,33 +587,13 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             before the synchronisation was performed.
         :rtype: Deferred
         """
-        kwargs = {'creds': creds, 'autocreate': autocreate,
-                  'defer_decryption': defer_decryption}
-        return self._defer_to_sync_threadpool(self._sync, url, **kwargs)
-
-    def _sync(self, url, creds=None, autocreate=True, defer_decryption=True):
-        res = None
-
         # the following context manager blocks until the syncing lock can be
         # acquired.
-        # TODO review, I think this is no longer needed with a 1-thread
-        # threadpool.
-
-        log.msg("in _sync")
-        self.__url = url
         with self._syncer(url, creds=creds) as syncer:
             # XXX could mark the critical section here...
-            try:
-                log.msg('syncer sync...')
-                res = syncer.sync(autocreate=autocreate,
-                                  defer_decryption=defer_decryption)
-            except CannotSendRequest:
-                logger.warning("Connection with sync target couldn't be "
-                               "established. Resetting connection...")
-                # closing the connection it will be recreated in the next try
-                syncer.sync_target.close()
-                return
-        return res
+            return syncer.sync(
+                autocreate=autocreate,
+                defer_decryption=defer_decryption)
 
     def stop_sync(self):
         """
@@ -673,13 +650,14 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         if syncer is None or h != cur_h:
             syncer = SoledadSynchronizer(
                 self,
-                SoledadSyncTarget(url,
-                                  # XXX is the replica_uid ready?
-                                  self._replica_uid,
-                                  creds=creds,
-                                  crypto=self._crypto,
-                                  sync_db=self._sync_db,
-                                  sync_enc_pool=self._sync_enc_pool))
+                SoledadHTTPSyncTarget(
+                    url,
+                    # XXX is the replica_uid ready?
+                    self._replica_uid,
+                    creds=creds,
+                    crypto=self._crypto,
+                    sync_db=self._sync_db,
+                    sync_enc_pool=self._sync_enc_pool))
             self._syncers[url] = (h, syncer)
         # in order to reuse the same synchronizer multiple times we have to
         # reset its state (i.e. the number of documents received from target
