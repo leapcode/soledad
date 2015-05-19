@@ -666,6 +666,7 @@ class Soledad(object):
             failure.printDetailedTraceback(file=s)
             msg = "Soledad exception when syncing!\n" + s.getvalue()
             logger.error(msg)
+            return failure
 
         d.addCallbacks(_sync_callback, _sync_errback)
         return d
