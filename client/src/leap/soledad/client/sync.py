@@ -16,16 +16,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 Soledad synchronization utilities.
-
-Extend u1db Synchronizer with the ability to:
-
-    * Postpone the update of the known replica uid until all the decryption of
-      the incoming messages has been processed.
-
-    * Be interrupted and recovered.
 """
 import logging
-from threading import Lock
 
 from twisted.internet import defer
 
@@ -48,17 +40,8 @@ class SoledadSynchronizer(Synchronizer):
     Also modified to allow for interrupting the synchronization process.
     """
 
-    # TODO can delegate the syncing to the api object, living in the reactor
-    # thread, and use a simple flag.
-    syncing_lock = Lock()
-
-    def stop(self):
-        """
-        Stop the current sync in progress.
-        """
-        self.sync_target.stop()
-
-    def sync(self, autocreate=False, defer_decryption=True):
+    @defer.inlineCallbacks
+    def sync(self, defer_decryption=True):
         """
         Synchronize documents between source and target.
 
@@ -70,49 +53,22 @@ class SoledadSynchronizer(Synchronizer):
         This is done to allow the ongoing parallel decryption of the incoming
         docs to proceed without `InvalidGeneration` conflicts.
 
-        :param autocreate: Whether the target replica should be created or not.
-        :type autocreate: bool
         :param defer_decryption: Whether to defer the decryption process using
                                  the intermediate database. If False,
                                  decryption will be done inline.
         :type defer_decryption: bool
-        """
-        self.syncing_lock.acquire()
-        try:
-            return self._sync(autocreate=autocreate,
-                              defer_decryption=defer_decryption)
-        except Exception:
-            # we want this exception to reach either SQLCipherU1DBSync.sync or
-            # the Solead api object itself, so it is poperly handled and/or
-            # logged...
-            raise
-        finally:
-            # ... but we also want to release the syncing lock so this
-            # Synchronizer may be reused later.
-            self.release_syncing_lock()
 
-    @defer.inlineCallbacks
-    def _sync(self, autocreate=False, defer_decryption=True):
-        """
-        Helper function, called from the main `sync` method.
-        See `sync` docstring.
+        :return: A deferred which will fire after the sync has finished.
+        :rtype: twisted.internet.defer.Deferred
         """
         sync_target = self.sync_target
 
         # get target identifier, its current generation,
         # and its last-seen database generation for this source
         ensure_callback = None
-        try:
-            (self.target_replica_uid, target_gen, target_trans_id,
-             target_my_gen, target_my_trans_id) = yield \
-                sync_target.get_sync_info(self.source._replica_uid)
-        except errors.DatabaseDoesNotExist:
-            if not autocreate:
-                raise
-            # will try to ask sync_exchange() to create the db
-            self.target_replica_uid = None
-            target_gen, target_trans_id = (0, '')
-            target_my_gen, target_my_trans_id = (0, '')
+        (self.target_replica_uid, target_gen, target_trans_id,
+         target_my_gen, target_my_trans_id) = yield \
+            sync_target.get_sync_info(self.source._replica_uid)
 
         logger.debug(
             "Soledad target sync info:\n"
@@ -176,9 +132,6 @@ class SoledadSynchronizer(Synchronizer):
 
         # exchange documents and try to insert the returned ones with
         # the target, return target synced-up-to gen.
-        #
-        # The sync_exchange method may be interrupted, in which case it will
-        # return a tuple of Nones.
         new_gen, new_trans_id = yield sync_target.sync_exchange(
             docs_by_generation, self.source._replica_uid,
             target_last_known_gen, target_last_known_trans_id,
@@ -239,38 +192,3 @@ class SoledadSynchronizer(Synchronizer):
             return self.sync_target.record_sync_info(
                 self.source._replica_uid, cur_gen, trans_id)
         return defer.succeed(None)
-
-    @property
-    def syncing(self):
-        """
-        Return True if a sync is ongoing, False otherwise.
-        :rtype: bool
-        """
-        # XXX FIXME  we need some mechanism for timeout: should cleanup and
-        # release if something in the syncdb-decrypt goes wrong. we could keep
-        # track of the release date and cleanup unrealistic sync entries after
-        # some time.
-
-        # TODO use cancellable deferreds instead
-        locked = self.syncing_lock.locked()
-        return locked
-
-    def release_syncing_lock(self):
-        """
-        Release syncing lock if it's locked.
-        """
-        if self.syncing_lock.locked():
-            self.syncing_lock.release()
-
-    def close(self):
-        """
-        Close sync target pool of workers.
-        """
-        self.release_syncing_lock()
-        self.sync_target.close()
-
-    def __del__(self):
-        """
-        Cleanup: release lock.
-        """
-        self.release_syncing_lock()

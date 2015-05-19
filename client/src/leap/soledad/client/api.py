@@ -650,7 +650,7 @@ class Soledad(object):
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
         d = self._dbsyncer.sync(
             sync_url,
-            creds=self._creds, autocreate=False,
+            creds=self._creds,
             defer_decryption=defer_decryption)
 
         def _sync_callback(local_gen):
@@ -669,9 +669,6 @@ class Soledad(object):
 
         d.addCallbacks(_sync_callback, _sync_errback)
         return d
-
-    def stop_sync(self):
-        self._dbsyncer.stop_sync()
 
     @property
     def syncing(self):

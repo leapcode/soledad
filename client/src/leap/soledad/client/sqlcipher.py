@@ -414,7 +414,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     Soledad syncer implementation.
     """
 
-    _sync_loop = None
     _sync_enc_pool = None
 
     """
@@ -557,7 +556,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             decr.TABLE_NAME, decr.FIELD_NAMES))
         return (sql_encr_table_query, sql_decr_table_query)
 
-    def sync(self, url, creds=None, autocreate=True, defer_decryption=True):
+    def sync(self, url, creds=None, defer_decryption=True):
         """
         Synchronize documents with remote replica exposed at url.
 
@@ -575,8 +574,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             optional dictionary giving credentials.
             to authorize the operation with the server.
         :type creds: dict
-        :param autocreate: Ask the target to create the db if non-existent.
-        :type autocreate: bool
         :param defer_decryption:
             Whether to defer the decryption process using the intermediate
             database. If False, decryption will be done inline.
@@ -591,20 +588,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # acquired.
         with self._syncer(url, creds=creds) as syncer:
             # XXX could mark the critical section here...
-            return syncer.sync(
-                autocreate=autocreate,
-                defer_decryption=defer_decryption)
-
-    def stop_sync(self):
-        """
-        Interrupt all ongoing syncs.
-        """
-        self._stop_sync()
-
-    def _stop_sync(self):
-        for url in self._syncers:
-            _, syncer = self._syncers[url]
-            syncer.stop()
+            return syncer.sync(defer_decryption=defer_decryption)
 
     @contextmanager
     def _syncer(self, url, creds=None):
@@ -687,11 +671,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         """
         Close the syncer and syncdb orderly
         """
-        # stop the sync loop for deferred encryption
-        if self._sync_loop is not None:
-            self._sync_loop.reset()
-            self._sync_loop.stop()
-            self._sync_loop = None
         # close all open syncers
         for url in self._syncers:
             _, syncer = self._syncers[url]
