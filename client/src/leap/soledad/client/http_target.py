@@ -396,7 +396,14 @@ class SoledadHTTPSyncTarget(SyncTarget):
         headers = self._auth_header.copy()
         headers.update({'content-type': 'application/x-soledad-sync-get'})
 
-        # maybe get one doc
+        #---------------------------------------------------------------------
+        # maybe receive the first document
+        #---------------------------------------------------------------------
+
+        # we fetch the first document before fetching the rest because we need
+        # to know the total number of documents to be received, and this
+        # information comes as metadata to each request.
+
         d = self._receive_one_doc(
             headers, last_known_generation, last_known_trans_id,
             sync_id, 0)
@@ -406,28 +413,48 @@ class SoledadHTTPSyncTarget(SyncTarget):
         if defer_decryption:
             self._sync_decr_pool.set_docs_to_process(
                 number_of_changes)
-        idx = 1
 
-        # maybe get more documents
+        #---------------------------------------------------------------------
+        # maybe receive the rest of the documents
+        #---------------------------------------------------------------------
+
+        # launch many asynchronous fetches and inserts of received documents
+        # in the temporary sync db. Will wait for all results before
+        # continuing.
+
+        received = 1
         deferreds = []
-        while idx < number_of_changes:
+        while received < number_of_changes:
             d = self._receive_one_doc(
                 headers, last_known_generation,
-                last_known_trans_id, sync_id, idx)
+                last_known_trans_id, sync_id, received)
             d.addCallback(
                 partial(
                     self._insert_received_doc,
-                    idx + 1,
+                    received + 1,  # the index of the current received doc
                     number_of_changes))
             deferreds.append(d)
-            idx += 1
+            received += 1
         results = yield defer.gatherResults(deferreds)
 
-        # get genration and transaction id of target after insertions
+        # get generation and transaction id of target after insertions
         if deferreds:
             _, new_generation, new_transaction_id = results.pop()
 
-        # get current target gen and trans id in case no documents were
+        #---------------------------------------------------------------------
+        # wait for async decryption to finish
+        #---------------------------------------------------------------------
+
+        # below we do a trick so we can wait for the SyncDecrypterPool to
+        # finish its work before finally returning the new generation and
+        # transaction id of the remote replica. To achieve that, we create a
+        # Deferred that will return the results of the sync and, if we are
+        # decrypting asynchronously, we use reactor.callLater() to
+        # periodically poll the decrypter and check if it has finished its
+        # work. When it has finished, we either call the callback or errback
+        # of that deferred. In case we are not asynchronously decrypting, we
+        # just fire the deferred.
+
         def _shutdown_and_finish(res):
             self._sync_decr_pool.close()
             return new_generation, new_transaction_id
@@ -441,9 +468,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
                     SyncDecrypterPool.DECRYPT_LOOP_PERIOD,
                     _wait_or_finish)
             else:
-                d.callback(None)
+                if self._sync_decr_pool.succeeded():
+                    d.callback(None)
+                else:
+                    d.errback(self._sync_decr_pool.failure)
 
-        # decrypt docs in case of deferred decryption
         if defer_decryption:
             _wait_or_finish()
         else:
