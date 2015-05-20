@@ -28,8 +28,6 @@ import time
 import json
 import logging
 
-from zope.proxy import sameProxiedObjects
-
 from twisted.internet import defer
 from twisted.internet.threads import deferToThread
 from twisted.python.failure import Failure
@@ -535,16 +533,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
                  decrypted and inserted in the sync db.
         :rtype: twisted.internet.defer.Deferred
         """
-        # insert_doc_cb is a proxy object that gets updated with the right
-        # insert function only when the sync_target invokes the sync_exchange
-        # method. so, if we don't still have a non-empty callback, we refuse
-        # to proceed.
-        if sameProxiedObjects(
-                self._insert_doc_cb.get(self.source_replica_uid),
-                None):
-            logger.debug("Sync decrypter pool: no insert_doc_cb() yet.")
-            return
-
         soledad_assert(self._crypto is not None, "need a crypto object")
 
         content = json.loads(content)
@@ -713,7 +701,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
                                     gen, trans_id, idx):
         """
         Insert the decrypted document into the local sqlcipher database.
-        Makes use of the passed callback `return_doc_cb` passed to the caller
+        Makes use of the passed callback `insert_doc_cb` passed to the caller
         by u1db sync.
 
         :param doc_id: The document id.
@@ -730,7 +718,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :type trans_id: str
         """
         # could pass source_replica in params for callback chain
-        insert_fun = self._insert_doc_cb[self.source_replica_uid]
         logger.debug("Sync decrypter pool: inserting doc in local db: "
                      "%s:%s %s" % (doc_id, doc_rev, gen))
 
@@ -739,7 +726,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             content = None
         doc = SoledadDocument(doc_id, doc_rev, content)
         gen = int(gen)
-        insert_fun(doc, gen, trans_id)
+        self._insert_doc_cb(doc, gen, trans_id)
 
         # store info about processed docs
         self._last_inserted_idx = idx
@@ -792,11 +779,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         # loop until we have processes as many docs as the number of
         # changes
         while self._processed_docs < self._docs_to_process:
-
-            if sameProxiedObjects(
-                    self._insert_doc_cb.get(self.source_replica_uid),
-                    None):
-                continue
 
             event.clear()
 

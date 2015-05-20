@@ -25,11 +25,8 @@ import json
 import base64
 import logging
 
-from zope.proxy import setProxiedObject
-from zope.proxy import ProxyBase
 from uuid import uuid4
 from functools import partial
-from collections import defaultdict
 
 from twisted.internet import defer
 from twisted.internet import reactor
@@ -79,10 +76,6 @@ class SoledadHTTPSyncTarget(SyncTarget):
     written to the main database.
     """
 
-    # will later keep a reference to the insert-doc callback
-    # passed to sync_exchange
-    _insert_doc_cb = defaultdict(lambda: ProxyBase(None))
-
     def __init__(self, url, source_replica_uid, creds, crypto,
                  sync_db=None, sync_enc_pool=None):
         """
@@ -116,6 +109,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         self._crypto = crypto
         self._sync_db = sync_db
         self._sync_enc_pool = sync_enc_pool
+        self._insert_doc_cb = None
         # asynchronous encryption/decryption attributes
         self._decryption_callback = None
         self._sync_decr_pool = None
@@ -213,7 +207,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
     @defer.inlineCallbacks
     def sync_exchange(self, docs_by_generation, source_replica_uid,
                       last_known_generation, last_known_trans_id,
-                      return_doc_cb, ensure_callback=None,
+                      insert_doc_cb, ensure_callback=None,
                       defer_decryption=True, sync_id=None):
         """
         Find out which documents the remote database does not know about,
@@ -235,11 +229,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
         :param last_known_trans_id: Target's last known transaction id.
         :type last_known_trans_id: str
 
-        :param return_doc_cb: A callback for inserting received documents from
+        :param insert_doc_cb: A callback for inserting received documents from
                               target. If not overriden, this will call u1db
                               insert_doc_from_target in synchronizer, which
                               implements the TAKE OTHER semantics.
-        :type return_doc_cb: function
+        :type insert_doc_cb: function
 
         :param ensure_callback: A callback that ensures we know the target
                                 replica uid if the target replica was just
@@ -262,9 +256,8 @@ class SoledadHTTPSyncTarget(SyncTarget):
             sync_id = str(uuid4())
         self.source_replica_uid = source_replica_uid
 
-        # let the decrypter pool access the passed callback to insert docs
-        setProxiedObject(self._insert_doc_cb[source_replica_uid],
-                         return_doc_cb)
+        # save a reference to the callback so we can use it after decrypting
+        self._insert_doc_cb = insert_doc_cb
 
         gen_after_send, trans_id_after_send = yield self._send_docs(
             docs_by_generation,
@@ -274,7 +267,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
 
         cur_target_gen, cur_target_trans_id = yield self._receive_docs(
             last_known_generation, last_known_trans_id,
-            return_doc_cb, ensure_callback, sync_id,
+            ensure_callback, sync_id,
             defer_decryption=defer_decryption)
 
         # update gen and trans id info in case we just sent and did not
@@ -376,10 +369,8 @@ class SoledadHTTPSyncTarget(SyncTarget):
 
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
-                      return_doc_cb, ensure_callback, sync_id,
-                      defer_decryption):
-        # we keep a reference to the callback in case we defer the decryption
-        self._return_doc_cb = return_doc_cb
+                      ensure_callback, sync_id, defer_decryption):
+
         self._queue_for_decrypt = defer_decryption \
             and self._sync_db is not None
 
@@ -534,7 +525,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 else:
                     # defer_decryption is False or no-sync-db fallback
                     doc.set_json(decrypt_doc(self._crypto, doc))
-                    self._return_doc_cb(doc, gen, trans_id)
+                    self._insert_doc_cb(doc, gen, trans_id)
             else:
                 # not symmetrically encrypted doc, insert it directly
                 # or save it in the decrypted stage.
@@ -543,7 +534,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                         doc.doc_id, doc.rev, doc.content, gen, trans_id,
                         idx)
                 else:
-                    self._return_doc_cb(doc, gen, trans_id)
+                    self._insert_doc_cb(doc, gen, trans_id)
             # -------------------------------------------------------------
             # end of symmetric decryption
             # -------------------------------------------------------------
