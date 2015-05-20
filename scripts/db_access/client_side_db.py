@@ -214,19 +214,23 @@ def _get_all_docs(soledad):
 
 @inlineCallbacks
 def _main(soledad, km, args):
-    if args.create_doc:
-        yield soledad.create_doc({'content': args.create_doc})
-    if args.sync:
-        yield soledad.sync()
-    if args.get_all_docs:
-        yield _get_all_docs(soledad)
-    if args.export_private_key:
-        yield _export_key(args, km, args.export_private_key, private=True)
-    if args.export_public_key:
-        yield _export_key(args, km, args.expoert_public_key, private=False)
-    if args.export_incoming_messages:
-        yield _export_incoming_messages(soledad, args.export_incoming_messages)
-    reactor.stop()
+    try:
+        if args.create_doc:
+            yield soledad.create_doc({'content': args.create_doc})
+        if args.sync:
+            yield soledad.sync()
+        if args.get_all_docs:
+            yield _get_all_docs(soledad)
+        if args.export_private_key:
+            yield _export_key(args, km, args.export_private_key, private=True)
+        if args.export_public_key:
+            yield _export_key(args, km, args.expoert_public_key, private=False)
+        if args.export_incoming_messages:
+            yield _export_incoming_messages(soledad, args.export_incoming_messages)
+    except:
+        pass
+    finally:
+        reactor.stop()
 
 
 if __name__ == '__main__':

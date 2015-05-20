@@ -653,7 +653,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     # Symmetric encryption of syncing docs
     #
 
-
     def get_generation(self):
         # FIXME
         # XXX this SHOULD BE a callback

@@ -766,11 +766,12 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             # wait until we know how many documents we need to process
             while self._docs_to_process is None:
                 time.sleep(self.DECRYPT_LOOP_PERIOD)
-            # because all database operations are asynchronous, we use an event to
-            # make sure we don't start the next loop before the current one has
-            # finished.
+            # because all database operations are asynchronous, we use an
+            # event to make sure we don't start the next loop before the
+            # current one has finished.
             event = threading.Event()
-            # loop until we have processes as many docs as the number of changes
+            # loop until we have processes as many docs as the number of
+            # changes
             while self._processed_docs < self._docs_to_process:
                 if sameProxiedObjects(
                         self._insert_doc_cb.get(self.source_replica_uid),
