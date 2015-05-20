@@ -658,9 +658,6 @@ class Soledad(object):
                 soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
             return local_gen
 
-        # prevent sync failures from crashing the app by adding an errback
-        # that logs the failure and does not propagate it down the callback
-        # chain
         def _sync_errback(failure):
             s = StringIO()
             failure.printDetailedTraceback(file=s)
