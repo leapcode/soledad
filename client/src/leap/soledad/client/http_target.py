@@ -402,8 +402,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         number_of_changes, ngen, ntrans = yield d
 
         if defer_decryption:
-            self._sync_decr_pool.set_docs_to_process(
-                number_of_changes)
+            self._sync_decr_pool.start(number_of_changes)
 
         #---------------------------------------------------------------------
         # maybe receive the rest of the documents
@@ -459,7 +458,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                     SyncDecrypterPool.DECRYPT_LOOP_PERIOD,
                     _wait_or_finish)
             else:
-                if self._sync_decr_pool.succeeded():
+                if not self._sync_decr_pool.failed():
                     d.callback(None)
                 else:
                     d.errback(self._sync_decr_pool.failure)
