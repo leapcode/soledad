@@ -81,8 +81,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             shared_db=self.get_default_shared_mock(_put_doc_side_effect))
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url, 'shared',
-                                              'tokens')
+        self.request_state = CouchServerState(self._couch_url)
         return self.make_app_after_state(self.request_state)
 
     def setUp(self):

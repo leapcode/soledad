@@ -58,8 +58,7 @@ class InterruptableSyncTestCase(
     sync_target = token_soledad_sync_target
 
     def make_app(self):
-        self.request_state = couch.CouchServerState(
-            self._couch_url, 'shared', 'tokens')
+        self.request_state = couch.CouchServerState(self._couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):

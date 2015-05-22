@@ -319,8 +319,7 @@ class EncryptedSyncTestCase(
             shared_db=self.get_default_shared_mock(_put_doc_side_effect))
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url, 'shared',
-                                              'tokens')
+        self.request_state = CouchServerState(self._couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
@@ -493,8 +492,7 @@ class LockResourceTestCase(
             urljoin(self._couch_url, 'tokens'),
             create=True,
             ensure_ddocs=True)
-        self._state = CouchServerState(
-            self._couch_url, 'shared', 'tokens')
+        self._state = CouchServerState(self._couch_url)
 
     def tearDown(self):
         # delete remote database

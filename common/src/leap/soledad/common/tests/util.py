@@ -459,6 +459,5 @@ class SoledadWithCouchServerMixin(
     def make_app(self):
         couch_url = urljoin(
             'http://localhost:' + str(self.wrapper.port), 'tests')
-        self.request_state = CouchServerStateForTests(
-            couch_url, 'shared', 'tokens')
+        self.request_state = CouchServerStateForTests(couch_url)
         return self.make_app_with_state(self.request_state)
