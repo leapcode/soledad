@@ -330,6 +330,9 @@ class CouchDBWrapper(object):
         }
         handle.close()
 
+        shutil.copy('/etc/couchdb/default.ini', self.tempdir)
+        defaultConfPath = os.path.join(self.tempdir, 'default.ini')
+
         confPath = os.path.join(self.tempdir, 'test.ini')
         handle = open(confPath, 'w')
         handle.write(conf)
@@ -338,7 +341,7 @@ class CouchDBWrapper(object):
         # create the dirs from the template
         mkdir_p(os.path.join(self.tempdir, 'lib'))
         mkdir_p(os.path.join(self.tempdir, 'log'))
-        args = ['/usr/bin/couchdb', '-n', '-a', confPath]
+        args = ['/usr/bin/couchdb', '-n', '-a', defaultConfPath, '-a', confPath]
         null = open('/dev/null', 'w')
 
         self.process = subprocess.Popen(
