@@ -315,6 +315,7 @@ class CouchDBWrapper(object):
     Wrapper for external CouchDB instance which is started and stopped for
     testing.
     """
+    BOOT_TIMEOUT_SECONDS = 5
 
     def start(self):
         """
@@ -347,6 +348,7 @@ class CouchDBWrapper(object):
         self.process = subprocess.Popen(
             args, env=None, stdout=null.fileno(), stderr=null.fileno(),
             close_fds=True)
+        boot_time = time.time()
         # find port
         logPath = os.path.join(self.tempdir, 'log', 'couch.log')
         while not os.path.exists(logPath):
@@ -365,8 +367,14 @@ stderr:
 %s""" % (
                     self.process.returncode, got_stdout, got_stderr))
             time.sleep(0.01)
+            if (time.time() - boot_time) > self.BOOT_TIMEOUT_SECONDS:
+                self.stop()
+                raise Exception("Timeout starting couch")
         while os.stat(logPath).st_size == 0:
             time.sleep(0.01)
+            if (time.time() - boot_time) > self.BOOT_TIMEOUT_SECONDS:
+                self.stop()
+                raise Exception("Timeout starting couch")
         PORT_RE = re.compile(
             'Apache CouchDB has started on http://127.0.0.1:(?P<port>\d+)')
 
