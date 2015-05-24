@@ -22,6 +22,7 @@ import tempfile
 import mock
 import time
 import binascii
+from uuid import uuid4
 
 from urlparse import urljoin
 from twisted.internet import defer
@@ -93,7 +94,7 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
             /user-db/doc/{id}             | -
             /user-db/sync-from/{source}   | GET, PUT, POST
         """
-        uuid = 'myuuid'
+        uuid = uuid4().hex
         authmap = URLToAuthorization(uuid,)
         dbname = authmap._user_db_name
         # test global auth
@@ -208,7 +209,7 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
         """
         Test if authorization fails for a wrong dbname.
         """
-        uuid = 'myuuid'
+        uuid = uuid4().hex
         authmap = URLToAuthorization(uuid)
         dbname = 'somedb'
         # test wrong-db database resource auth
@@ -283,7 +284,7 @@ class EncryptedSyncTestCase(
 
     sync_target = token_soledad_sync_target
 
-    def _soledad_instance(self, user='user-uuid', passphrase=u'123',
+    def _soledad_instance(self, user=None, passphrase=u'123',
                           prefix='',
                           secrets_path='secrets.json',
                           local_db_path='soledad.u1db',
@@ -336,15 +337,17 @@ class EncryptedSyncTestCase(
         TestCaseWithServer.tearDown(self)
 
     def _test_encrypted_sym_sync(self, passphrase=u'123', doc_size=2,
-            number_of_docs=1):
+                                 number_of_docs=1):
         """
         Test the complete syncing chain between two soledad dbs using a
         Soledad server backed by a couch database.
         """
         self.startServer()
+        user = 'user-' + uuid4().hex
 
         # instantiate soledad and create a document
         sol1 = self._soledad_instance(
+            user=user,
             # token is verified in test_target.make_token_soledad_app
             auth_token='auth-token',
             passphrase=passphrase)
@@ -352,6 +355,7 @@ class EncryptedSyncTestCase(
         # instantiate another soledad using the same secret as the previous
         # one (so we can correctly verify the mac of the synced document)
         sol2 = self._soledad_instance(
+            user=user,
             prefix='x',
             auth_token='auth-token',
             secrets_path=sol1._secrets_path,
@@ -359,7 +363,7 @@ class EncryptedSyncTestCase(
 
         # ensure remote db exists before syncing
         db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
+            urljoin(self._couch_url, 'user-' + user),
             create=True,
             ensure_ddocs=True)
 
@@ -370,7 +374,7 @@ class EncryptedSyncTestCase(
         def _db1CreateDocs(results):
             deferreds = []
             for i in xrange(number_of_docs):
-                content = binascii.hexlify(os.urandom(doc_size/2))  
+                content = binascii.hexlify(os.urandom(doc_size/2))
                 deferreds.append(sol1.create_doc({'data': content}))
             return defer.DeferredList(deferreds)
 
@@ -461,6 +465,7 @@ class EncryptedSyncTestCase(
         """
         return self._test_encrypted_sym_sync(doc_size=2, number_of_docs=100)
 
+
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):
     """
@@ -506,7 +511,8 @@ class LockResourceTestCase(
 
     def test__try_obtain_filesystem_lock(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         self.assertFalse(lr._lock.locked)
         self.assertTrue(lr._try_obtain_filesystem_lock())
         self.assertTrue(lr._lock.locked)
@@ -514,7 +520,8 @@ class LockResourceTestCase(
 
     def test__try_release_filesystem_lock(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         lr._try_obtain_filesystem_lock()
         self.assertTrue(lr._lock.locked)
         lr._try_release_filesystem_lock()
@@ -522,11 +529,12 @@ class LockResourceTestCase(
 
     def test_put(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         # lock!
         lr.put({}, None)
         # assert lock document was correctly written
-        lock_doc = lr._shared_db.get_doc('lock-uuid')
+        lock_doc = lr._shared_db.get_doc('lock-' + lock_uuid)
         self.assertIsNotNone(lock_doc)
         self.assertTrue(LockResource.TIMESTAMP_KEY in lock_doc.content)
         self.assertTrue(LockResource.LOCK_TOKEN_KEY in lock_doc.content)
@@ -541,20 +549,22 @@ class LockResourceTestCase(
 
     def test_delete(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         # lock!
         lr.put({}, None)
-        lock_doc = lr._shared_db.get_doc('lock-uuid')
+        lock_doc = lr._shared_db.get_doc('lock-' + lock_uuid)
         token = lock_doc.content[LockResource.LOCK_TOKEN_KEY]
         # unlock!
         lr.delete({'token': token}, None)
         self.assertFalse(lr._lock.locked)
-        self.assertIsNone(lr._shared_db.get_doc('lock-uuid'))
+        self.assertIsNone(lr._shared_db.get_doc('lock-' + lock_uuid))
         responder.send_response_json.assert_called_with(200)
 
     def test_put_while_locked_fails(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         # lock!
         lr.put({}, None)
         # try to lock again!
@@ -572,7 +582,8 @@ class LockResourceTestCase(
 
     def test_unlock_unexisting_lock_fails(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         # unlock!
         lr.delete({'token': 'anything'}, None)
         responder.send_response_json.assert_called_with(
@@ -580,11 +591,12 @@ class LockResourceTestCase(
 
     def test_unlock_with_wrong_token_fails(self):
         responder = mock.Mock()
-        lr = LockResource('uuid', self._state, responder)
+        lock_uuid = uuid4().hex
+        lr = LockResource(lock_uuid, self._state, responder)
         # lock!
         lr.put({}, None)
         # unlock!
         lr.delete({'token': 'wrongtoken'}, None)
-        self.assertIsNotNone(lr._shared_db.get_doc('lock-uuid'))
+        self.assertIsNotNone(lr._shared_db.get_doc('lock-' + lock_uuid))
         responder.send_response_json.assert_called_with(
             401, error='unlock unauthorized')

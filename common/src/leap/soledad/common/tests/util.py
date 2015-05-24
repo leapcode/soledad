@@ -102,7 +102,7 @@ def make_token_soledad_app(state):
     app = SoledadApp(state)
 
     def _verify_authentication_data(uuid, auth_data):
-        if uuid == 'user-uuid' and auth_data == 'auth-token':
+        if uuid.startswith('user-') and auth_data == 'auth-token':
             return True
         return False
 
