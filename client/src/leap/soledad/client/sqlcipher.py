@@ -677,9 +677,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         """
         # close all open syncers
         for url in self._syncers:
-            _, syncer = self._syncers[url]
-            syncer.close()
-        self._syncers = []
+            del self._syncers[url]
+
         # stop the encryption pool
         if self._sync_enc_pool is not None:
             self._sync_enc_pool.close()
