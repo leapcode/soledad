@@ -19,8 +19,51 @@ Different pragmas used in the initialization of the SQLCipher database.
 """
 import logging
 import string
+import threading
+import os
+
+from leap.soledad.common import soledad_assert
+
 
 logger = logging.getLogger(__name__)
+
+
+_db_init_lock = threading.Lock()
+
+
+def set_init_pragmas(conn, opts=None, extra_queries=None):
+    """
+    Set the initialization pragmas.
+
+    This includes the crypto pragmas, and any other options that must
+    be passed early to sqlcipher db.
+    """
+    soledad_assert(opts is not None)
+    extra_queries = [] if extra_queries is None else extra_queries
+    with _db_init_lock:
+        # only one execution path should initialize the db
+        _set_init_pragmas(conn, opts, extra_queries)
+
+
+def _set_init_pragmas(conn, opts, extra_queries):
+
+    sync_off = os.environ.get('LEAP_SQLITE_NOSYNC')
+    memstore = os.environ.get('LEAP_SQLITE_MEMSTORE')
+    nowal = os.environ.get('LEAP_SQLITE_NOWAL')
+
+    set_crypto_pragmas(conn, opts)
+
+    if not nowal:
+        set_write_ahead_logging(conn)
+    if sync_off:
+        set_synchronous_off(conn)
+    else:
+        set_synchronous_normal(conn)
+    if memstore:
+        set_mem_temp_store(conn)
+
+    for query in extra_queries:
+        conn.cursor().execute(query)
 
 
 def set_crypto_pragmas(db_handle, sqlcipher_opts):

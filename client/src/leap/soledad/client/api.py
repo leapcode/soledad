@@ -272,7 +272,8 @@ class Soledad(object):
         replica_uid = self._dbpool.replica_uid
         self._dbsyncer = SQLCipherU1DBSync(
             self._sqlcipher_opts, self._crypto, replica_uid,
-            self._defer_encryption)
+            SOLEDAD_CERT,
+            defer_encryption=self._defer_encryption)
 
     #
     # Closing methods
@@ -630,6 +631,7 @@ class Soledad(object):
             Whether to defer decryption of documents, or do it inline while
             syncing.
         :type defer_decryption: bool
+
         :return: A deferred whose callback will be invoked with the local
             generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
@@ -650,7 +652,7 @@ class Soledad(object):
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
         d = self._dbsyncer.sync(
             sync_url,
-            creds=self._creds, autocreate=False,
+            creds=self._creds,
             defer_decryption=defer_decryption)
 
         def _sync_callback(local_gen):
@@ -658,20 +660,15 @@ class Soledad(object):
                 soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
             return local_gen
 
-        # prevent sync failures from crashing the app by adding an errback
-        # that logs the failure and does not propagate it down the callback
-        # chain
         def _sync_errback(failure):
             s = StringIO()
             failure.printDetailedTraceback(file=s)
             msg = "Soledad exception when syncing!\n" + s.getvalue()
             logger.error(msg)
+            return failure
 
         d.addCallbacks(_sync_callback, _sync_errback)
         return d
-
-    def stop_sync(self):
-        self._dbsyncer.stop_sync()
 
     @property
     def syncing(self):

@@ -32,6 +32,7 @@ from zope.proxy import ProxyBase, setProxiedObject
 from pysqlcipher.dbapi2 import OperationalError
 
 from leap.soledad.client import sqlcipher as soledad_sqlcipher
+from leap.soledad.client.pragmas import set_init_pragmas
 
 
 logger = logging.getLogger(name=__name__)
@@ -72,7 +73,7 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
     :rtype: U1DBConnectionPool
     """
     if openfun is None and driver == "pysqlcipher":
-        openfun = partial(soledad_sqlcipher.set_init_pragmas, opts=opts)
+        openfun = partial(set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
         "%s.dbapi2" % driver, database=opts.path,
         check_same_thread=False, cp_openfun=openfun,
