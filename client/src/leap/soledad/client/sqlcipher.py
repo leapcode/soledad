@@ -434,13 +434,14 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     """
     syncing_lock = defaultdict(threading.Lock)
 
-    def __init__(self, opts, soledad_crypto, replica_uid,
+    def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
                  defer_encryption=False):
 
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto
         self.__replica_uid = replica_uid
+        self._cert_file = cert_file
 
         self._sync_db_key = opts.sync_db_key
         self._sync_db = None
@@ -570,9 +571,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         :param url: The url of the target replica to sync with.
         :type url: str
-        :param creds:
-            optional dictionary giving credentials.
-            to authorize the operation with the server.
+        :param creds: optional dictionary giving credentials to authorize the
+                      operation with the server.
         :type creds: dict
         :param defer_decryption:
             Whether to defer the decryption process using the intermediate
@@ -599,6 +599,10 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         one instance synchronizing the same database replica at the same time.
         Because of that, this method blocks until the syncing lock can be
         acquired.
+
+        :param creds: optional dictionary giving credentials to authorize the
+                      operation with the server.
+        :type creds: dict
         """
         with self.syncing_lock[self._path]:
             syncer = self._get_syncer(url, creds=creds)
@@ -640,6 +644,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                     self._replica_uid,
                     creds=creds,
                     crypto=self._crypto,
+                    cert_file=self._cert_file,
                     sync_db=self._sync_db,
                     sync_enc_pool=self._sync_enc_pool))
             self._syncers[url] = (h, syncer)

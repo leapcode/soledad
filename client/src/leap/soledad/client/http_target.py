@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# target.py
+# http_target.py
 # Copyright (C) 2015 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,6 +21,7 @@ A U1DB backend for encrypting data before sending to server and decrypting
 after receiving.
 """
 
+
 import json
 import base64
 import logging
@@ -30,15 +31,12 @@ from functools import partial
 
 from twisted.internet import defer
 from twisted.internet import reactor
-from twisted.web.client import getPage
-from twisted.web.error import Error
 
 from u1db import errors
 from u1db import SyncTarget
 from u1db.remote import utils
 
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.errors import InvalidAuthTokenError
 
 from leap.soledad.client.crypto import is_symmetrically_encrypted
 from leap.soledad.client.crypto import encrypt_doc
@@ -47,22 +45,11 @@ from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import signal
 from leap.soledad.client.encdecpool import SyncDecrypterPool
+from leap.soledad.client.http_client import httpRequest
+from leap.soledad.client.http_client import configure_certificate
 
 
 logger = logging.getLogger(__name__)
-
-
-def _unauth_to_invalid_token_error(failure):
-    failure.trap(Error)
-    if failure.getErrorMessage() == "401 Unauthorized":
-        raise InvalidAuthTokenError
-    return failure
-
-
-def getSoledadPage(*args, **kwargs):
-    d = getPage(*args, **kwargs)
-    d.addErrback(_unauth_to_invalid_token_error)
-    return d
 
 
 class SoledadHTTPSyncTarget(SyncTarget):
@@ -76,7 +63,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
     written to the main database.
     """
 
-    def __init__(self, url, source_replica_uid, creds, crypto,
+    def __init__(self, url, source_replica_uid, creds, crypto, cert_file,
                  sync_db=None, sync_enc_pool=None):
         """
         Initialize the sync target.
@@ -93,12 +80,19 @@ class SoledadHTTPSyncTarget(SyncTarget):
         :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
                         document contents when syncing.
         :type crypto: soledad.crypto.SoledadCrypto
+        :param cert_file: Path to the certificate of the ca used to validate
+                          the SSL certificate used by the remote soledad
+                          server.
+        :type cert_file: str
         :param sync_db: Optional. handler for the db with the symmetric
                         encryption of the syncing documents. If
                         None, encryption will be done in-place,
                         instead of retreiving it from the dedicated
                         database.
         :type sync_db: Sqlite handler
+        :param verify_ssl: Whether we should perform SSL server certificate
+                           verification.
+        :type verify_ssl: bool
         """
         if url.endswith("/"):
             url = url[:-1]
@@ -113,6 +107,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         # asynchronous encryption/decryption attributes
         self._decryption_callback = None
         self._sync_decr_pool = None
+        configure_certificate(cert_file)
 
     def set_creds(self, creds):
         """
@@ -125,7 +120,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         token = creds['token']['token']
         auth = '%s:%s' % (uuid, token)
         b64_token = base64.b64encode(auth)
-        self._auth_header = {'Authorization': 'Token %s' % b64_token}
+        self._auth_header = {'Authorization': ['Token %s' % b64_token]}
 
     @property
     def _defer_encryption(self):
@@ -153,7 +148,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                  source_replica_last_known_transaction_id)
         :rtype: twisted.internet.defer.Deferred
         """
-        raw = yield getSoledadPage(self._url, headers=self._auth_header)
+        raw = yield httpRequest(self._url, headers=self._auth_header)
         res = json.loads(raw)
         defer.returnValue([
             res['target_replica_uid'],
@@ -197,12 +192,12 @@ class SoledadHTTPSyncTarget(SyncTarget):
             'transaction_id': source_replica_transaction_id
         })
         headers = self._auth_header.copy()
-        headers.update({'content-type': 'application/json'})
-        return getSoledadPage(
+        headers.update({'content-type': ['application/json']})
+        return httpRequest(
             self._url,
             method='PUT',
             headers=headers,
-            postdata=data)
+            body=data)
 
     @defer.inlineCallbacks
     def sync_exchange(self, docs_by_generation, source_replica_uid,
@@ -295,7 +290,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             defer.returnValue([None, None])
 
         headers = self._auth_header.copy()
-        headers.update({'content-type': 'application/x-soledad-sync-put'})
+        headers.update({'content-type': ['application/x-soledad-sync-put']})
         # add remote replica metadata to the request
         first_entries = ['[']
         self._prepare(
@@ -335,11 +330,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
             doc_idx=doc_idx)
         entries.append('\r\n]')
         data = ''.join(entries)
-        result = yield getSoledadPage(
+        result = yield httpRequest(
             self._url,
             method='POST',
             headers=headers,
-            postdata=data)
+            body=data)
         defer.returnValue(result)
 
     def _encrypt_doc(self, doc):
@@ -385,7 +380,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             self._setup_sync_decr_pool()
 
         headers = self._auth_header.copy()
-        headers.update({'content-type': 'application/x-soledad-sync-get'})
+        headers.update({'content-type': ['application/x-soledad-sync-get']})
 
         #---------------------------------------------------------------------
         # maybe receive the first document
@@ -486,11 +481,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
             ',', entries, received=received)
         entries.append('\r\n]')
         # send headers
-        return getSoledadPage(
+        return httpRequest(
             self._url,
             method='POST',
             headers=headers,
-            postdata=''.join(entries))
+            body=''.join(entries))
 
     def _insert_received_doc(self, idx, total, response):
         """

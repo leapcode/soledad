@@ -272,7 +272,8 @@ class Soledad(object):
         replica_uid = self._dbpool.replica_uid
         self._dbsyncer = SQLCipherU1DBSync(
             self._sqlcipher_opts, self._crypto, replica_uid,
-            self._defer_encryption)
+            SOLEDAD_CERT,
+            defer_encryption=self._defer_encryption)
 
     #
     # Closing methods
@@ -630,6 +631,7 @@ class Soledad(object):
             Whether to defer decryption of documents, or do it inline while
             syncing.
         :type defer_decryption: bool
+
         :return: A deferred whose callback will be invoked with the local
             generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
