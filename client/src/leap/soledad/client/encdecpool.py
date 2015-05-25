@@ -23,6 +23,7 @@ during synchronization.
 
 
 import multiprocessing
+import Queue
 import json
 import logging
 
@@ -186,7 +187,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
             try:
                 doc = self._sync_queue.get(True, self.ENCRYPT_LOOP_PERIOD)
                 self._encrypt_doc(doc)
-            except multiprocessing.Queue.Empty:
+            except Queue.Empty:
                 pass
 
     def _encrypt_doc(self, doc):
