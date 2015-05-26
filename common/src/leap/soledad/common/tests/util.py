@@ -30,6 +30,7 @@ import u1db
 import subprocess
 import time
 import re
+import traceback
 
 from mock import Mock
 from urlparse import urljoin
@@ -316,8 +317,21 @@ class CouchDBWrapper(object):
     testing.
     """
     BOOT_TIMEOUT_SECONDS = 5
+    RETRY_LIMIT = 3
 
     def start(self):
+        tries = 0
+        while tries < self.RETRY_LIMIT and not hasattr(self, 'port'):
+            try:
+                self._try_start()
+                return
+            except Exception, e:
+                print traceback.format_exc()
+                self.stop()
+                tries += 1
+        raise Exception("Check your couchdb: Tried to start 3 times and failed badly")
+
+    def _try_start(self):
         """
         Start a CouchDB instance for a test.
         """
@@ -391,8 +405,13 @@ stderr:
         """
         Terminate the CouchDB instance.
         """
-        self.process.terminate()
-        self.process.communicate()
+        try:
+            self.process.terminate()
+            self.process.communicate()
+        except:
+            # just to clean up
+            # if it can't, the process wasn't created anyway
+            pass
         shutil.rmtree(self.tempdir)
 
 
