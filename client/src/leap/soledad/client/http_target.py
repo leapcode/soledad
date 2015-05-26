@@ -31,12 +31,16 @@ from functools import partial
 
 from twisted.internet import defer
 from twisted.internet import reactor
+from twisted.web.error import Error
 
 from u1db import errors
 from u1db import SyncTarget
 from u1db.remote import utils
 
+from leap.common.http import HTTPClient
+
 from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.errors import InvalidAuthTokenError
 
 from leap.soledad.client.crypto import is_symmetrically_encrypted
 from leap.soledad.client.crypto import encrypt_doc
@@ -45,8 +49,6 @@ from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import signal
 from leap.soledad.client.encdecpool import SyncDecrypterPool
-from leap.soledad.client.http_client import httpRequest
-from leap.soledad.client.http_client import configure_certificate
 
 
 logger = logging.getLogger(__name__)
@@ -107,7 +109,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         # asynchronous encryption/decryption attributes
         self._decryption_callback = None
         self._sync_decr_pool = None
-        configure_certificate(cert_file)
+        self._http = HTTPClient(cert_file)
 
     def set_creds(self, creds):
         """
@@ -148,7 +150,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                  source_replica_last_known_transaction_id)
         :rtype: twisted.internet.defer.Deferred
         """
-        raw = yield httpRequest(self._url, headers=self._auth_header)
+        raw = yield self._http_request(self._url, headers=self._auth_header)
         res = json.loads(raw)
         defer.returnValue([
             res['target_replica_uid'],
@@ -193,7 +195,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         })
         headers = self._auth_header.copy()
         headers.update({'content-type': ['application/json']})
-        return httpRequest(
+        return self._http_request(
             self._url,
             method='PUT',
             headers=headers,
@@ -330,7 +332,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             doc_idx=doc_idx)
         entries.append('\r\n]')
         data = ''.join(entries)
-        result = yield httpRequest(
+        result = yield self._http_request(
             self._url,
             method='POST',
             headers=headers,
@@ -481,7 +483,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             ',', entries, received=received)
         entries.append('\r\n]')
         # send headers
-        return httpRequest(
+        return self._http_request(
             self._url,
             method='POST',
             headers=headers,
@@ -596,3 +598,25 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 self._sync_db,
                 insert_doc_cb=self._insert_doc_cb,
                 source_replica_uid=self.source_replica_uid)
+
+    def _http_request(self, url, method='GET', body=None, headers={}):
+        d = self._http.request(url, method, body, headers)
+        d.addErrback(_unauth_to_invalid_token_error)
+        return d
+
+
+def _unauth_to_invalid_token_error(failure):
+    """
+    An errback to translate unauthorized errors to our own invalid token
+    class.
+
+    :param failure: The original failure.
+    :type failure: twisted.python.failure.Failure
+
+    :return: Either the original failure or an invalid auth token error.
+    :rtype: twisted.python.failure.Failure
+    """
+    failure.trap(Error)
+    if failure.getErrorMessage() == "401 Unauthorized":
+        raise InvalidAuthTokenError
+    return failure
