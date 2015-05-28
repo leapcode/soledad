@@ -3,7 +3,7 @@ couchdb
 simplejson
 u1db
 routes
-PyOpenSSL<0.14
+PyOpenSSL
 twisted
 
 # leap deps -- bump me!
