@@ -1,4 +1,4 @@
-pysqlcipher
+pysqlcipher>2.6.3
 simplejson
 u1db
 scrypt
@@ -8,8 +8,8 @@ zope.proxy
 twisted
 
 # leap deps -- bump me!
-leap.common
-leap.soledad.common>=0.6.0
+leap.common>=0.4
+leap.soledad.common>=0.6.5
 
 # XXX -- fix me!
 # oauth is not strictly needed by us, but we need it until u1db adds it to its
