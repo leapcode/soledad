@@ -1,6 +1,8 @@
 simplejson
 u1db
 
+# leap deps -- bump me!
+
 # XXX -- fix me!
 # oauth is not strictly needed by us, but we need it until u1db adds it to its
 # release as a dep.
