@@ -1,3 +1,72 @@
+0.7.0 Jun 01 2015:
+Client:
+  o Do not depend on pysqlite2 (#2945).
+  o Reset syncer connection when getting HTTP error during sync (#5855).
+  o Wait for last post request to finish before starting a new one (#5975).
+  o Use TLS v1 in soledad client. Fixes partially #6437
+  o Retry on sqlcipher thread timeouts (#6625).
+  o Fix the order of insertion of documents when using workers for decrypting
+    incoming documents during a sync. Closes #6757.
+  o Add dependency on Twisted. Closes #6797.
+  o Fix the log message when a local secret is not found so it's less
+    confusing. Closes #6892.
+  o Always initialize the sync db to allow for both asynchronous encryption
+    and asynchronous decryption when syncing.
+  o Fallback to utf-8 if confidence on chardet guessing is too low.
+  o Refactor asynchronous encryption/decryption code to its own file.
+  o Fix logging and graceful failing when exceptions are raised during sync.
+  o Improve log messages when concurrently fetching documents from the server.
+  o Store all incoming documents in the sync db (#5895).
+  o Include the IV in the encrypted document MAC (#6400).
+  o Adapt soledad to the new events api on leap.common. Related to #6359.
+  o Add a pool of HTTP/HTTPS connections that is able to verify the server
+    certificate against a given CA certificate.
+  o Use twisted.enterprise.adbapi for access to the sync database.
+  o Use twisted.web.client for client sync.
+
+Common:
+  o Include couch design docs source files in source distribution and only
+    compile ddocs.py when building the package (#5896).
+  o Bail out if cdocs/ dir does not exist. Closes: #6671
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+  o  Adapt soledad to the new events api on leap.common. Related to #6359.
+
+Server:
+  o Run daemon as user soledad (#6436).
+  o Avoid use of SSLv3 (#6437).
+  o Fix server initscript location (#6557).
+  o Add dependency on Twisted. Closes #6797.
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+  o Fix server daemon uid and gid by passing them to twistd on the initscript.
+  o Use monthly token databases. Closes #6785.
+
+0.6.5 Apr 09 2015:
+Server:
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+
+0.6.4 Jan 23 2015:
+Common:
+  o Bail out if cdocs/ dir does not exist. Closes: #6671
+
+0.6.3 Dec 16 2014:
+Client:
+  o Fix deferred encryption/decryption parameters (#6500).
+
+0.6.2 Dec 11 2014:
+Client:
+  o Fix incorrect ssl context setup.
+
+0.6.1 Dec 08 2014:
+Client:
+  o Use TLS v1 in soledad client. Fixes partially #6437
+
+Server:
+  o Run daemon as user soledad (#6436).
+  o Avoid use of SSLv3 (#6437).
+
 0.6.0 Jul 18, 2014:
 Client:
   o Close all connections after syncing. Fixes #5518.

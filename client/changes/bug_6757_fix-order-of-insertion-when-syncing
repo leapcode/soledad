@@ -1,2 +1,0 @@
-  o Fix the order of insertion of documents when using workers for decrypting
-    incoming documents during a sync. Closes #6757.

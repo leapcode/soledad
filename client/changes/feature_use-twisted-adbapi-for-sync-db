@@ -1,1 +1,0 @@
-  o Use twisted.enterprise.adbapi for access to the sync database.

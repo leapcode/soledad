@@ -1,1 +1,0 @@
-- Fallback to utf-8 if confidence on chardet guessing is too low.
