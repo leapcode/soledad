@@ -1,6 +1,6 @@
 mock
 testscenarios
-leap.common
-leap.soledad.server
-leap.soledad.client
+leap.common>=0.4.0
+leap.soledad.server>=0.7.0
+leap.soledad.client>=0.7.0
 setuptools-trial
