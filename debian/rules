@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#DH_VERBOSE=1
+
+%:
+	dh $@ --with python2 --namespace=leap.soledad
+
+override_dh_auto_clean:
+	cd client && python setup.py clean -a 
+	cd common && python setup.py clean -a 
+	cd server && python setup.py clean -a 
+
+override_dh_auto_install: 
+	cd client && python setup.py install --root=../debian/soledad-client
+	cd common && python setup.py install --root=../debian/soledad-common
+	cd server && LEAP_SKIP_INIT=1 python setup.py install --root=../debian/soledad-server
+
+override_dh_install:
+	# leap.soledad provides the leap.soledad namespace __init__.py
+	for pv in $(shell pyversions -vr debian/control); do \
+	    cp common/src/leap/__init__.py debian/soledad-common/usr/local/lib/python$$pv/*-packages/leap/; \
+	    cp common/src/leap/__init__.py debian/soledad-common/usr/local/lib/python$$pv/*-packages/leap/soledad/; \
+	done
+
+override_dh_auto_clean:
+	dh_auto_clean
+	find . -name "*.pyc" -exec rm -rf {} \;

@@ -1,0 +1,10 @@
+pysqlcipher python-sqlcipher
+PyOpenSSL python-openssl
+u1db python-u1db
+scrypt python-scrypt
+zope.proxy python-zope.proxy
+configparser python-configparser
+leap.common python-leap-common
+leap.soledad.common soledad-common
+leap.soledad.server soledad-server
+leap.soledad.client soledad-client
