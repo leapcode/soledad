@@ -171,7 +171,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         :type doc: SoledadDocument
         """
         try:
-            self.sync_queue.put_nowait(doc)
+            self._sync_queue.put_nowait(doc)
         except multiprocessing.Queue.Full:
             # do not asynchronously encrypt this file if the queue is full
             pass
