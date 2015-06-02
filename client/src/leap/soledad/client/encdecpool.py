@@ -172,7 +172,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         """
         try:
             self._sync_queue.put_nowait(doc)
-        except multiprocessing.Queue.Full:
+        except Queue.Full:
             # do not asynchronously encrypt this file if the queue is full
             pass
 
