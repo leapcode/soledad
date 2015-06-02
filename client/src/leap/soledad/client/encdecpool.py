@@ -146,7 +146,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
     TABLE_NAME = "docs_tosync"
     FIELD_NAMES = "doc_id PRIMARY KEY, rev, content"
 
-    ENCRYPT_LOOP_PERIOD = 0.5
+    ENCRYPT_LOOP_PERIOD = 2
 
     def __init__(self, *args, **kwargs):
         """
