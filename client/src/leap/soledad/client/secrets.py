@@ -23,7 +23,6 @@ Soledad secrets handling.
 
 import os
 import scrypt
-import hmac
 import logging
 import binascii
 import errno
@@ -37,7 +36,6 @@ from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
 from leap.soledad.common import errors
-from leap.soledad.common import crypto
 from leap.soledad.client import events
 
 
@@ -104,8 +102,8 @@ class SoledadSecrets(object):
 
     REMOTE_STORAGE_SECRET_LENGTH = 512
     """
-    The length, in bytes, of the secret used to derive an encryption key and a
-    MAC auth key for remote storage.
+    The length, in bytes, of the secret used to derive an encryption key for
+    remote storage.
     """
 
     SALT_LENGTH = 64
@@ -275,7 +273,7 @@ class SoledadSecrets(object):
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        _, mac, active_secret = self._import_recovery_document(content)
+        _, active_secret = self._import_recovery_document(content)
         # choose first secret if no secret_id was given
         if self._secret_id is None:
             if active_secret is None:
@@ -291,7 +289,7 @@ class SoledadSecrets(object):
             self._secrets[self._secret_id] += new_piece
             enlarged = True
         # store and save in shared db if needed
-        if not mac or enlarged:
+        if enlarged:
             self._store_secrets()
             self._put_secrets_in_shared_db()
 
@@ -311,9 +309,7 @@ class SoledadSecrets(object):
             logger.info(
                 'Found cryptographic secrets in shared recovery '
                 'database.')
-            _, mac, active_secret = self._import_recovery_document(doc.content)
-            if mac is False:
-                self.put_secrets_in_shared_db()
+            _, active_secret = self._import_recovery_document(doc.content)
             self._store_secrets()  # save new secrets in local file
             if self._secret_id is None:
                 if active_secret is None:
@@ -371,32 +367,20 @@ class SoledadSecrets(object):
             {
                 'storage_secrets': {
                     '<storage_secret id>': {
-                        'kdf': 'scrypt',
-                        'kdf_salt': '<b64 repr of salt>'
-                        'kdf_length': <key length>
                         'cipher': 'aes256',
                         'length': <secret length>,
                         'secret': '<encrypted storage_secret>',
                     },
                 },
                 'active_secret': '<secret_id>',
-                'kdf': 'scrypt',
-                'kdf_salt': '<b64 repr of salt>',
-                'kdf_length: <key length>,
-                '_mac_method': 'hmac',
-                '_mac': '<mac>'
             }
 
         Note that multiple storage secrets might be stored in one recovery
-        document. This method will also calculate a MAC of a string
-        representation of the secrets dictionary.
+        document.
 
         :return: The recovery document.
         :rtype: dict
         """
-        # create salt and key for calculating MAC
-        salt = os.urandom(self.SALT_LENGTH)
-        key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
         # encrypt secrets
         encrypted_secrets = {}
         for secret_id in self._secrets:
@@ -406,14 +390,6 @@ class SoledadSecrets(object):
         data = {
             self.STORAGE_SECRETS_KEY: encrypted_secrets,
             self.ACTIVE_SECRET_KEY: self._secret_id,
-            self.KDF_KEY: self.KDF_SCRYPT,
-            self.KDF_SALT_KEY: binascii.b2a_base64(salt),
-            self.KDF_LENGTH_KEY: len(key),
-            crypto.MAC_METHOD_KEY: crypto.MacMethods.HMAC,
-            crypto.MAC_KEY: hmac.new(
-                key,
-                json.dumps(encrypted_secrets, sort_keys=True),
-                sha256).hexdigest(),
         }
         return data
 
@@ -428,38 +404,11 @@ class SoledadSecrets(object):
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets, whether
-                 there was MAC information available for authenticating, and
-                 the secret_id of the last active secret.
-        :rtype: (int, bool)
+        :return: A tuple containing the number of imported secrets and the
+                 secret_id of the last active secret.
+        :rtype: (int, str)
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
-        # check mac of the recovery document
-        mac = None
-        if crypto.MAC_KEY in data:
-            soledad_assert(data[crypto.MAC_KEY] is not None)
-            soledad_assert(crypto.MAC_METHOD_KEY in data)
-            soledad_assert(self.KDF_KEY in data)
-            soledad_assert(self.KDF_SALT_KEY in data)
-            soledad_assert(self.KDF_LENGTH_KEY in data)
-            if data[crypto.MAC_METHOD_KEY] == crypto.MacMethods.HMAC:
-                key = scrypt.hash(
-                    self._passphrase_as_string(),
-                    binascii.a2b_base64(data[self.KDF_SALT_KEY]),
-                    buflen=32)
-                mac = hmac.new(
-                    key,
-                    json.dumps(
-                        data[self.STORAGE_SECRETS_KEY], sort_keys=True),
-                    sha256).hexdigest()
-            else:
-                raise crypto.UnknownMacMethodError('Unknown MAC method: %s.' %
-                                                   data[crypto.MAC_METHOD_KEY])
-            if mac != data[crypto.MAC_KEY]:
-                raise crypto.WrongMacError(
-                    'Could not authenticate recovery document\'s '
-                    'contents.')
-
         # include secrets in the secret pool.
         secret_count = 0
         secrets = data[self.STORAGE_SECRETS_KEY].items()
@@ -477,7 +426,7 @@ class SoledadSecrets(object):
                 except SecretsException as e:
                     logger.error("Failed to decrypt storage secret: %s"
                                  % str(e))
-        return secret_count, mac, active_secret
+        return secret_count, active_secret
 
     def _get_secrets_from_shared_db(self):
         """
