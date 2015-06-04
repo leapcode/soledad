@@ -1,4 +1,4 @@
-pysqlcipher
+pysqlcipher>2.6.3
 simplejson
 u1db
 scrypt

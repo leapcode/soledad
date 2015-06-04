@@ -1,2 +1,0 @@
-  o Always initialize the sync db to allow for both asynchronous encryption
-    and asynchronous decryption when syncing.

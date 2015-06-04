@@ -1,1 +1,0 @@
-  o Fix server daemon uid and gid by passing them to twistd on the initscript.

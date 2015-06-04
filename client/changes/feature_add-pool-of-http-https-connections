@@ -1,2 +1,0 @@
-  o Add a pool of HTTP/HTTPS connections that is able to verify the server
-    certificate against a given CA certificate.

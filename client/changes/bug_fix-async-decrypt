@@ -1,2 +1,0 @@
-  o Refactor asynchronous encryption/decryption code to its own file.
-  o Fix logging and graceful failing when exceptions are raised during sync.
