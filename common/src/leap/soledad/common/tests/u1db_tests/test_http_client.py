@@ -26,6 +26,8 @@ from u1db import (
     errors,
 )
 
+from unittest import skip
+
 from leap.soledad.common.tests import u1db_tests as tests
 
 from u1db.remote import (
@@ -33,6 +35,7 @@ from u1db.remote import (
 )
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestEncoder(tests.TestCase):
 
     def test_encode_string(self):
@@ -45,6 +48,7 @@ class TestEncoder(tests.TestCase):
         self.assertEqual("false", http_client._encode_query_parameter(False))
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPClientBase(tests.TestCaseWithServer):
 
     def setUp(self):

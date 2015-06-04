@@ -20,8 +20,6 @@ Test Leap backend bits: test http database
 from u1db.remote import http_database
 
 from leap.soledad.client import auth
-
-from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_http_database
 
 
@@ -59,6 +57,3 @@ class TestHTTPDatabaseWithCreds(
             'token': 'auth-token',
         }})
         self.assertIn('token', db1._creds)
-
-
-load_tests = tests.load_with_scenarios

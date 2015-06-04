@@ -19,29 +19,28 @@ Tests for server-related functionality.
 """
 import os
 import tempfile
-import simplejson as json
 import mock
 import time
 import binascii
 
 from urlparse import urljoin
+from twisted.internet import defer
 
-from leap.common.testing.basetest import BaseLeapTest
 from leap.soledad.common.couch import (
     CouchServerState,
     CouchDatabase,
 )
-from leap.soledad.common.tests.u1db_tests import (
-    TestCaseWithServer,
-    simple_doc,
-)
+from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
-from leap.soledad.common.tests.test_target_soledad import (
+from leap.soledad.common.tests.util import (
     make_token_soledad_app,
-    make_leap_document_for_test,
+    make_soledad_document_for_test,
+    token_soledad_sync_target,
+    BaseSoledadTest,
 )
-from leap.soledad.common.tests.test_sync_target import token_leap_sync_target
-from leap.soledad.client import Soledad, crypto
+
+from leap.soledad.common import crypto
+from leap.soledad.client import Soledad
 from leap.soledad.server import LockResource
 from leap.soledad.server.auth import URLToAuthorization
 
@@ -58,7 +57,7 @@ def _couch_ensure_database(self, dbname):
 CouchServerState.ensure_database = _couch_ensure_database
 
 
-class ServerAuthorizationTestCase(BaseLeapTest):
+class ServerAuthorizationTestCase(BaseSoledadTest):
     """
     Tests related to Soledad server authorization.
     """
@@ -272,19 +271,24 @@ class EncryptedSyncTestCase(
     Tests for encrypted sync using Soledad server backed by a couch database.
     """
 
+    # increase twisted.trial's timeout because large files syncing might take
+    # some time to finish.
+    timeout = 500
+
     @staticmethod
     def make_app_with_state(state):
         return make_token_soledad_app(state)
 
-    make_document_for_test = make_leap_document_for_test
+    make_document_for_test = make_soledad_document_for_test
 
-    sync_target = token_leap_sync_target
+    sync_target = token_soledad_sync_target
 
     def _soledad_instance(self, user='user-uuid', passphrase=u'123',
                           prefix='',
-                          secrets_path=Soledad.STORAGE_SECRETS_FILE_NAME,
-                          local_db_path='soledad.u1db', server_url='',
-                          cert_file=None, auth_token=None, secret_id=None):
+                          secrets_path='secrets.json',
+                          local_db_path='soledad.u1db',
+                          server_url='',
+                          cert_file=None, auth_token=None):
         """
         Instantiate Soledad.
         """
@@ -294,19 +298,15 @@ class EncryptedSyncTestCase(
         def _put_doc_side_effect(doc):
             self._doc_put = doc
 
-        # we need a mocked shared db or else Soledad will try to access the
-        # network to find if there are uploaded secrets.
-        class MockSharedDB(object):
+        if not server_url:
+            # attempt to find the soledad server url
+            server_address = None
+            server = getattr(self, 'server', None)
+            if server:
+                server_address = getattr(self.server, 'server_address', None)
+            if server_address:
+                server_url = 'http://%s:%d' % (server_address)
 
-            get_doc = mock.Mock(return_value=None)
-            put_doc = mock.Mock(side_effect=_put_doc_side_effect)
-            lock = mock.Mock(return_value=('atoken', 300))
-            unlock = mock.Mock()
-
-            def __call__(self):
-                return self
-
-        Soledad._shared_db = MockSharedDB()
         return Soledad(
             user,
             passphrase,
@@ -316,78 +316,129 @@ class EncryptedSyncTestCase(
             server_url=server_url,
             cert_file=cert_file,
             auth_token=auth_token,
-            secret_id=secret_id)
+            shared_db=self.get_default_shared_mock(_put_doc_side_effect))
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url, 'shared',
-                                              'tokens')
+        self.request_state = CouchServerState(self._couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
-        TestCaseWithServer.setUp(self)
+        # the order of the following initializations is crucial because of
+        # dependencies.
+        # XXX explain better
         CouchDBTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
+        TestCaseWithServer.setUp(self)
 
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
 
-    def test_encrypted_sym_sync(self):
+    def _test_encrypted_sym_sync(self, passphrase=u'123', doc_size=2,
+            number_of_docs=1):
         """
         Test the complete syncing chain between two soledad dbs using a
         Soledad server backed by a couch database.
         """
         self.startServer()
+
         # instantiate soledad and create a document
         sol1 = self._soledad_instance(
             # token is verified in test_target.make_token_soledad_app
-            auth_token='auth-token'
-        )
-        _, doclist = sol1.get_all_docs()
-        self.assertEqual([], doclist)
-        doc1 = sol1.create_doc(json.loads(simple_doc))
+            auth_token='auth-token',
+            passphrase=passphrase)
+
+        # instantiate another soledad using the same secret as the previous
+        # one (so we can correctly verify the mac of the synced document)
+        sol2 = self._soledad_instance(
+            prefix='x',
+            auth_token='auth-token',
+            secrets_path=sol1._secrets_path,
+            passphrase=passphrase)
+
         # ensure remote db exists before syncing
         db = CouchDatabase.open_database(
             urljoin(self._couch_url, 'user-user-uuid'),
             create=True,
             ensure_ddocs=True)
-        # sync with server
-        sol1._server_url = self.getURL()
-        sol1.sync()
-        # assert doc was sent to couch db
-        _, doclist = db.get_all_docs()
-        self.assertEqual(1, len(doclist))
-        couchdoc = doclist[0]
-        # assert document structure in couch server
-        self.assertEqual(doc1.doc_id, couchdoc.doc_id)
-        self.assertEqual(doc1.rev, couchdoc.rev)
-        self.assertEqual(6, len(couchdoc.content))
-        self.assertTrue(crypto.ENC_JSON_KEY in couchdoc.content)
-        self.assertTrue(crypto.ENC_SCHEME_KEY in couchdoc.content)
-        self.assertTrue(crypto.ENC_METHOD_KEY in couchdoc.content)
-        self.assertTrue(crypto.ENC_IV_KEY in couchdoc.content)
-        self.assertTrue(crypto.MAC_KEY in couchdoc.content)
-        self.assertTrue(crypto.MAC_METHOD_KEY in couchdoc.content)
-        # instantiate soledad with empty db, but with same secrets path
-        sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
-        # sync the new instance
-        sol2._server_url = self.getURL()
-        sol2.sync()
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual(1, len(doclist))
-        doc2 = doclist[0]
-        # assert incoming doc is equal to the first sent doc
-        self.assertEqual(doc1, doc2)
-        db.delete_database()
-        db.close()
-        sol1.close()
-        sol2.close()
+
+        def _db1AssertEmptyDocList(results):
+            _, doclist = results
+            self.assertEqual([], doclist)
+
+        def _db1CreateDocs(results):
+            deferreds = []
+            for i in xrange(number_of_docs):
+                content = binascii.hexlify(os.urandom(doc_size/2))  
+                deferreds.append(sol1.create_doc({'data': content}))
+            return defer.DeferredList(deferreds)
+
+        def _db1AssertDocsSyncedToServer(results):
+            _, sol_doclist = results
+            self.assertEqual(number_of_docs, len(sol_doclist))
+            # assert doc was sent to couch db
+            _, couch_doclist = db.get_all_docs()
+            self.assertEqual(number_of_docs, len(couch_doclist))
+            for i in xrange(number_of_docs):
+                soldoc = sol_doclist.pop()
+                couchdoc = couch_doclist.pop()
+                # assert document structure in couch server
+                self.assertEqual(soldoc.doc_id, couchdoc.doc_id)
+                self.assertEqual(soldoc.rev, couchdoc.rev)
+                self.assertEqual(6, len(couchdoc.content))
+                self.assertTrue(crypto.ENC_JSON_KEY in couchdoc.content)
+                self.assertTrue(crypto.ENC_SCHEME_KEY in couchdoc.content)
+                self.assertTrue(crypto.ENC_METHOD_KEY in couchdoc.content)
+                self.assertTrue(crypto.ENC_IV_KEY in couchdoc.content)
+                self.assertTrue(crypto.MAC_KEY in couchdoc.content)
+                self.assertTrue(crypto.MAC_METHOD_KEY in couchdoc.content)
+
+        d = sol1.get_all_docs()
+        d.addCallback(_db1AssertEmptyDocList)
+        d.addCallback(_db1CreateDocs)
+        d.addCallback(lambda _: sol1.sync())
+        d.addCallback(lambda _: sol1.get_all_docs())
+        d.addCallback(_db1AssertDocsSyncedToServer)
+
+        def _db2AssertEmptyDocList(results):
+            _, doclist = results
+            self.assertEqual([], doclist)
+
+        def _getAllDocsFromBothDbs(results):
+            d1 = sol1.get_all_docs()
+            d2 = sol2.get_all_docs()
+            return defer.DeferredList([d1, d2])
+
+        d.addCallback(lambda _: sol2.get_all_docs())
+        d.addCallback(_db2AssertEmptyDocList)
+        d.addCallback(lambda _: sol2.sync())
+        d.addCallback(_getAllDocsFromBothDbs)
+
+        def _assertDocSyncedFromDb1ToDb2(results):
+            r1, r2 = results
+            _, (gen1, doclist1) = r1
+            _, (gen2, doclist2) = r2
+            self.assertEqual(number_of_docs, gen1)
+            self.assertEqual(number_of_docs, gen2)
+            self.assertEqual(number_of_docs, len(doclist1))
+            self.assertEqual(number_of_docs, len(doclist2))
+            self.assertEqual(doclist1[0], doclist2[0])
+
+        d.addCallback(_assertDocSyncedFromDb1ToDb2)
+
+        def _cleanUp(results):
+            db.delete_database()
+            db.close()
+            sol1.close()
+            sol2.close()
+
+        d.addCallback(_cleanUp)
+
+        return d
+
+    def test_encrypted_sym_sync(self):
+        return self._test_encrypted_sym_sync()
 
     def test_encrypted_sym_sync_with_unicode_passphrase(self):
         """
@@ -395,152 +446,20 @@ class EncryptedSyncTestCase(
         Soledad server backed by a couch database, using an unicode
         passphrase.
         """
-        self.startServer()
-        # instantiate soledad and create a document
-        sol1 = self._soledad_instance(
-            # token is verified in test_target.make_token_soledad_app
-            auth_token='auth-token',
-            passphrase=u'ãáàäéàëíìïóòöõúùüñç',
-        )
-        _, doclist = sol1.get_all_docs()
-        self.assertEqual([], doclist)
-        doc1 = sol1.create_doc(json.loads(simple_doc))
-        # ensure remote db exists before syncing
-        db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
-            create=True,
-            ensure_ddocs=True)
-        # sync with server
-        sol1._server_url = self.getURL()
-        sol1.sync()
-        # assert doc was sent to couch db
-        _, doclist = db.get_all_docs()
-        self.assertEqual(1, len(doclist))
-        couchdoc = doclist[0]
-        # assert document structure in couch server
-        self.assertEqual(doc1.doc_id, couchdoc.doc_id)
-        self.assertEqual(doc1.rev, couchdoc.rev)
-        self.assertEqual(6, len(couchdoc.content))
-        self.assertTrue(crypto.ENC_JSON_KEY in couchdoc.content)
-        self.assertTrue(crypto.ENC_SCHEME_KEY in couchdoc.content)
-        self.assertTrue(crypto.ENC_METHOD_KEY in couchdoc.content)
-        self.assertTrue(crypto.ENC_IV_KEY in couchdoc.content)
-        self.assertTrue(crypto.MAC_KEY in couchdoc.content)
-        self.assertTrue(crypto.MAC_METHOD_KEY in couchdoc.content)
-        # instantiate soledad with empty db, but with same secrets path
-        sol2 = self._soledad_instance(
-            prefix='x',
-            auth_token='auth-token',
-            passphrase=u'ãáàäéàëíìïóòöõúùüñç',
-        )
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
-        # sync the new instance
-        sol2._server_url = self.getURL()
-        sol2.sync()
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual(1, len(doclist))
-        doc2 = doclist[0]
-        # assert incoming doc is equal to the first sent doc
-        self.assertEqual(doc1, doc2)
-        db.delete_database()
-        db.close()
-        sol1.close()
-        sol2.close()
+        return self._test_encrypted_sym_sync(passphrase=u'ãáàäéàëíìïóòöõúùüñç')
 
     def test_sync_very_large_files(self):
         """
         Test if Soledad can sync very large files.
         """
-        # define the size of the "very large file"
         length = 100*(10**6)  # 100 MB
-        self.startServer()
-        # instantiate soledad and create a document
-        sol1 = self._soledad_instance(
-            # token is verified in test_target.make_token_soledad_app
-            auth_token='auth-token'
-        )
-        _, doclist = sol1.get_all_docs()
-        self.assertEqual([], doclist)
-        content = binascii.hexlify(os.urandom(length/2))  # len() == length
-        doc1 = sol1.create_doc({'data': content})
-        # ensure remote db exists before syncing
-        db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
-            create=True,
-            ensure_ddocs=True)
-        # sync with server
-        sol1._server_url = self.getURL()
-        sol1.sync()
-        # instantiate soledad with empty db, but with same secrets path
-        sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
-        # sync the new instance
-        sol2._server_url = self.getURL()
-        sol2.sync()
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual(1, len(doclist))
-        doc2 = doclist[0]
-        # assert incoming doc is equal to the first sent doc
-        self.assertEqual(doc1, doc2)
-        # delete remote database
-        db.delete_database()
-        db.close()
-        sol1.close()
-        sol2.close()
+        return self._test_encrypted_sym_sync(doc_size=length, number_of_docs=1)
 
     def test_sync_many_small_files(self):
         """
         Test if Soledad can sync many smallfiles.
         """
-        number_of_docs = 100
-        self.startServer()
-        # instantiate soledad and create a document
-        sol1 = self._soledad_instance(
-            # token is verified in test_target.make_token_soledad_app
-            auth_token='auth-token'
-        )
-        _, doclist = sol1.get_all_docs()
-        self.assertEqual([], doclist)
-        # create many small files
-        for i in range(0, number_of_docs):
-            sol1.create_doc(json.loads(simple_doc))
-        # ensure remote db exists before syncing
-        db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
-            create=True,
-            ensure_ddocs=True)
-        # sync with server
-        sol1._server_url = self.getURL()
-        sol1.sync()
-        # instantiate soledad with empty db, but with same secrets path
-        sol2 = self._soledad_instance(prefix='x', auth_token='auth-token')
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual([], doclist)
-        sol2._secrets_path = sol1.secrets_path
-        sol2._load_secrets()
-        sol2._set_secret_id(sol1._secret_id)
-        # sync the new instance
-        sol2._server_url = self.getURL()
-        sol2.sync()
-        _, doclist = sol2.get_all_docs()
-        self.assertEqual(number_of_docs, len(doclist))
-        # assert incoming docs are equal to sent docs
-        for doc in doclist:
-            self.assertEqual(sol1.get_doc(doc.doc_id), doc)
-        # delete remote database
-        db.delete_database()
-        db.close()
-        sol1.close()
-        sol2.close()
-
+        return self._test_encrypted_sym_sync(doc_size=2, number_of_docs=100)
 
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):
@@ -552,15 +471,18 @@ class LockResourceTestCase(
     def make_app_with_state(state):
         return make_token_soledad_app(state)
 
-    make_document_for_test = make_leap_document_for_test
+    make_document_for_test = make_soledad_document_for_test
 
-    sync_target = token_leap_sync_target
+    sync_target = token_soledad_sync_target
 
     def setUp(self):
-        TestCaseWithServer.setUp(self)
+        # the order of the following initializations is crucial because of
+        # dependencies.
+        # XXX explain better
         CouchDBTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
+        TestCaseWithServer.setUp(self)
         # create the databases
         CouchDatabase.open_database(
             urljoin(self._couch_url, 'shared'),
@@ -570,18 +492,17 @@ class LockResourceTestCase(
             urljoin(self._couch_url, 'tokens'),
             create=True,
             ensure_ddocs=True)
-        self._state = CouchServerState(
-            self._couch_url, 'shared', 'tokens')
+        self._state = CouchServerState(self._couch_url)
 
     def tearDown(self):
-        CouchDBTestCase.tearDown(self)
-        TestCaseWithServer.tearDown(self)
         # delete remote database
         db = CouchDatabase.open_database(
             urljoin(self._couch_url, 'shared'),
             create=True,
             ensure_ddocs=True)
         db.delete_database()
+        CouchDBTestCase.tearDown(self)
+        TestCaseWithServer.tearDown(self)
 
     def test__try_obtain_filesystem_lock(self):
         responder = mock.Mock()

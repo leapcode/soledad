@@ -1,7 +1,10 @@
 simplejson
 u1db
 
-#this is not strictly needed by us, but we need it
-#until u1db adds it to its release as a dep.
-oauth
+# leap deps -- bump me!
+leap.common>=0.7.0
 
+# XXX -- fix me!
+# oauth is not strictly needed by us, but we need it until u1db adds it to its
+# release as a dep.
+oauth

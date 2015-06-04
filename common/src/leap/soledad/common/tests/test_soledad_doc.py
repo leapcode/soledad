@@ -17,28 +17,30 @@
 """
 Test Leap backend bits: soledad docs
 """
-from leap.soledad.common.tests import BaseSoledadTest
+from testscenarios import TestWithScenarios
+
 from leap.soledad.common.tests.u1db_tests import test_document
-from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests import test_sync_target as st
+from leap.soledad.common.tests.util import BaseSoledadTest
+from leap.soledad.common.tests.util import make_soledad_document_for_test
+
 
 #-----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_document`.
 #-----------------------------------------------------------------------------
 
-
-class TestSoledadDocument(test_document.TestDocument, BaseSoledadTest):
-
-    scenarios = ([(
-        'leap', {
-            'make_document_for_test': st.make_leap_document_for_test})])
-
-
-class TestSoledadPyDocument(test_document.TestPyDocument, BaseSoledadTest):
+class TestSoledadDocument(
+        TestWithScenarios,
+        test_document.TestDocument, BaseSoledadTest):
 
     scenarios = ([(
         'leap', {
-            'make_document_for_test': st.make_leap_document_for_test})])
+            'make_document_for_test': make_soledad_document_for_test})])
 
 
-load_tests = tests.load_with_scenarios
+class TestSoledadPyDocument(
+        TestWithScenarios,
+        test_document.TestPyDocument, BaseSoledadTest):
+
+    scenarios = ([(
+        'leap', {
+            'make_document_for_test': make_soledad_document_for_test})])

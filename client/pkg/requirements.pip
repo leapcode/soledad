@@ -1,25 +1,17 @@
-pysqlcipher
+pysqlcipher>2.6.3
 simplejson
 u1db
 scrypt
 pycryptopp
 cchardet
-taskthread
 zope.proxy
+twisted
 
-#
-# leap deps
-#
+# leap deps -- bump me!
+leap.common>=0.4
+leap.soledad.common>=0.6.5
 
-leap.soledad.common>=0.3.8
-
-#
-# XXX things to fix yet:
-#
-
-# this is not strictly needed by us, but we need it
-# until u1db adds it to its release as a dep.
+# XXX -- fix me!
+# oauth is not strictly needed by us, but we need it until u1db adds it to its
+# release as a dep.
 oauth
-
-# pysqlite should not be a dep, see #2945
-pysqlite

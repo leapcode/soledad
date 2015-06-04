@@ -2,23 +2,22 @@
 
 # This script gives client-side access to one Soledad user database.
 
-
-import sys
 import os
 import argparse
-import re
 import tempfile
 import getpass
 import requests
-import json
 import srp._pysrp as srp
 import binascii
 import logging
+import json
 
+from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
 
-from leap.common.config import get_path_prefix
 from leap.soledad.client import Soledad
-
+from leap.keymanager import KeyManager
+from leap.keymanager.openpgp import OpenPGPKey
 
 from util import ValidateUserHandle
 
@@ -26,37 +25,37 @@ from util import ValidateUserHandle
 # create a logger
 logger = logging.getLogger(__name__)
 LOG_FORMAT = '%(asctime)s %(message)s'
-logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
+logging.basicConfig(format=LOG_FORMAT, level=logging.DEBUG)
 
 
 safe_unhexlify = lambda x: binascii.unhexlify(x) if (
     len(x) % 2 == 0) else binascii.unhexlify('0' + x)
 
 
-def fail(reason):
+def _fail(reason):
     logger.error('Fail: ' + reason)
     exit(2)
 
 
-def get_api_info(provider):
+def _get_api_info(provider):
     info = requests.get(
         'https://'+provider+'/provider.json', verify=False).json()
     return info['api_uri'], info['api_version']
 
 
-def login(username, passphrase, provider, api_uri, api_version):
+def _login(username, passphrase, provider, api_uri, api_version):
     usr = srp.User(username, passphrase, srp.SHA256, srp.NG_1024)
     auth = None
     try:
-        auth = authenticate(api_uri, api_version, usr).json()
+        auth = _authenticate(api_uri, api_version, usr).json()
     except requests.exceptions.ConnectionError:
-        fail('Could not connect to server.')
+        _fail('Could not connect to server.')
     if 'errors' in auth:
-        fail(str(auth['errors']))
+        _fail(str(auth['errors']))
     return api_uri, api_version, auth
 
 
-def authenticate(api_uri, api_version, usr):
+def _authenticate(api_uri, api_version, usr):
     api_url = "%s/%s" % (api_uri, api_version)
     session = requests.session()
     uname, A = usr.start_authentication()
@@ -64,16 +63,16 @@ def authenticate(api_uri, api_version, usr):
     init = session.post(
         api_url + '/sessions', data=params, verify=False).json()
     if 'errors' in init:
-        fail('test user not found')
+        _fail('test user not found')
     M = usr.process_challenge(
         safe_unhexlify(init['salt']), safe_unhexlify(init['B']))
     return session.put(api_url + '/sessions/' + uname, verify=False,
                        data={'client_auth': binascii.hexlify(M)})
 
 
-def get_soledad_info(username, provider, passphrase, basedir):
-    api_uri, api_version = get_api_info(provider)
-    auth = login(username, passphrase, provider, api_uri, api_version)
+def _get_soledad_info(username, provider, passphrase, basedir):
+    api_uri, api_version = _get_api_info(provider)
+    auth = _login(username, passphrase, provider, api_uri, api_version)
     # get soledad server url
     service_url = '%s/%s/config/soledad-service.json' % \
                   (api_uri, api_version)
@@ -101,10 +100,9 @@ def get_soledad_info(username, provider, passphrase, basedir):
     return auth[2]['id'], server_url, cert_file, auth[2]['token']
 
 
-def get_soledad_instance(username, provider, passphrase, basedir):
+def _get_soledad_instance(uuid, passphrase, basedir, server_url, cert_file,
+        token):
     # setup soledad info
-    uuid, server_url, cert_file, token = \
-        get_soledad_info(username, provider, passphrase, basedir)
     logger.info('UUID is %s' % uuid)
     logger.info('Server URL is %s' % server_url)
     secrets_path = os.path.join(
@@ -119,37 +117,135 @@ def get_soledad_instance(username, provider, passphrase, basedir):
         local_db_path=local_db_path,
         server_url=server_url,
         cert_file=cert_file,
-        auth_token=token)
+        auth_token=token,
+        defer_encryption=False)
 
 
-# main program
+def _get_keymanager_instance(username, provider, soledad, token,
+        ca_cert_path=None, api_uri=None, api_version=None, uid=None,
+        gpgbinary=None):
+    return KeyManager(
+        "{username}@{provider}".format(username=username, provider=provider),
+        "http://uri",
+        soledad,
+        token=token,
+        ca_cert_path=ca_cert_path,
+        api_uri=api_uri,
+        api_version=api_version,
+        uid=uid,
+        gpgbinary=gpgbinary)
 
-if __name__ == '__main__':
 
+def _parse_args():
     # parse command line
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'user@provider', action=ValidateUserHandle, help='the user handle')
     parser.add_argument(
-        '-b', dest='basedir', required=False, default=None,
+        '--basedir', '-b', default=None,
         help='soledad base directory')
     parser.add_argument(
-        '-p', dest='passphrase', required=False, default=None,
+        '--passphrase', '-p', default=None,
         help='the user passphrase')
-    args = parser.parse_args()
+    parser.add_argument(
+        '--get-all-docs', '-a', action='store_true',
+        help='get all documents from the local database')
+    parser.add_argument(
+        '--create-doc', '-c', default=None,
+        help='create a document with give content')
+    parser.add_argument(
+        '--sync', '-s', action='store_true',
+        help='synchronize with the server replica')
+    parser.add_argument(
+        '--export-public-key', help="export the public key to a file")
+    parser.add_argument(
+        '--export-private-key', help="export the private key to a file")
+    parser.add_argument(
+        '--export-incoming-messages',
+        help="export incoming messages to a directory")
+    return parser.parse_args()
 
-    # get the password
+
+def _get_passphrase(args):
     passphrase = args.passphrase
     if passphrase is None:
         passphrase = getpass.getpass(
             'Password for %s@%s: ' % (args.username, args.provider))
+    return passphrase
 
-    # get the basedir
+
+def _get_basedir(args):
     basedir = args.basedir
     if basedir is None:
         basedir = tempfile.mkdtemp()
+    elif not os.path.isdir(basedir):
+        os.mkdir(basedir)
     logger.info('Using %s as base directory.' % basedir)
+    return basedir
 
-    # get the soledad instance
-    s = get_soledad_instance(
-        args.username, args.provider, passphrase, basedir)
+
+@inlineCallbacks
+def _export_key(args, km, fname, private=False):
+    address = args.username + "@" + args.provider
+    pkey = yield km.get_key(address, OpenPGPKey, private=private, fetch_remote=False)
+    with open(args.export_private_key, "w") as f:
+        f.write(pkey.key_data)
+
+
+@inlineCallbacks
+def _export_incoming_messages(soledad, directory):
+    yield soledad.create_index("by-incoming", "bool(incoming)")
+    docs = yield soledad.get_from_index("by-incoming", '1')
+    i = 1
+    for doc in docs:
+        with open(os.path.join(directory, "message_%d.gpg" % i), "w") as f:
+            f.write(doc.content["_enc_json"])
+        i += 1
+
+
+@inlineCallbacks
+def _get_all_docs(soledad):
+    _, docs = yield soledad.get_all_docs()
+    for doc in docs:
+        print json.dumps(doc.content, indent=4)
+
+
+# main program
+
+@inlineCallbacks
+def _main(soledad, km, args):
+    try:
+        if args.create_doc:
+            yield soledad.create_doc({'content': args.create_doc})
+        if args.sync:
+            yield soledad.sync()
+        if args.get_all_docs:
+            yield _get_all_docs(soledad)
+        if args.export_private_key:
+            yield _export_key(args, km, args.export_private_key, private=True)
+        if args.export_public_key:
+            yield _export_key(args, km, args.expoert_public_key, private=False)
+        if args.export_incoming_messages:
+            yield _export_incoming_messages(soledad, args.export_incoming_messages)
+    except:
+        pass
+    finally:
+        reactor.stop()
+
+
+if __name__ == '__main__':
+    args = _parse_args()
+    passphrase = _get_passphrase(args)
+    basedir = _get_basedir(args)
+    uuid, server_url, cert_file, token = \
+        _get_soledad_info(args.username, args.provider, passphrase, basedir)
+    soledad = _get_soledad_instance(
+        uuid, passphrase, basedir, server_url, cert_file, token)
+    km = _get_keymanager_instance(
+        args.username,
+        args.provider,
+        soledad,
+        token,
+        uid=uuid)
+    _main(soledad, km, args)
+    reactor.run()

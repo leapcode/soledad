@@ -34,8 +34,8 @@ case "${1}" in
     start)
         echo -n "Starting soledad: twistd"
           start-stop-daemon --start --quiet \
-            --user=${USER} --group=${GROUP} \
             --exec ${TWISTD_PATH} -- \
+            --uid=${USER} --gid=${GROUP} \
             --pidfile=${PIDFILE} \
             --logfile=${LOGFILE} \
             web \

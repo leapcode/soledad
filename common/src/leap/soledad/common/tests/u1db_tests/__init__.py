@@ -35,7 +35,7 @@ from pysqlcipher import dbapi2
 from StringIO import StringIO
 
 import testscenarios
-import testtools
+from twisted.trial import unittest
 
 from u1db import (
     errors,
@@ -50,7 +50,7 @@ from u1db.remote import (
 )
 
 
-class TestCase(testtools.TestCase):
+class TestCase(unittest.TestCase):
 
     def createTempDir(self, prefix='u1db-tmp-'):
         """Create a temporary directory to do some work in.

@@ -19,101 +19,36 @@ Test Leap backend bits: sync target
 """
 import cStringIO
 import os
-
+import time
 import simplejson as json
 import u1db
+import random
+import string
+import shutil
 
-from uuid import uuid4
+from testscenarios import TestWithScenarios
+from urlparse import urljoin
 
-from u1db.remote import http_database
+from leap.soledad.client import target
+from leap.soledad.client import crypto
+from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
+from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
-from u1db import SyncTarget
-from u1db.sync import Synchronizer
-from u1db.remote import (
-    http_client,
-    http_database,
-    http_target,
-)
-
-from leap.soledad import client
-from leap.soledad.client import (
-    target,
-    auth,
-    crypto,
-    VerifiedHTTPSConnection,
-    sync,
-)
+from leap.soledad.common import couch
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
-
 
 from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests import BaseSoledadTest
-from leap.soledad.common.tests.util import (
-    make_sqlcipher_database_for_test,
-    make_soledad_app,
-    make_token_soledad_app,
-    SoledadWithCouchServerMixin,
-)
-from leap.soledad.common.tests.u1db_tests import test_backends
+from leap.soledad.common.tests.util import make_sqlcipher_database_for_test
+from leap.soledad.common.tests.util import make_soledad_app
+from leap.soledad.common.tests.util import make_token_soledad_app
+from leap.soledad.common.tests.util import make_soledad_document_for_test
+from leap.soledad.common.tests.util import token_soledad_sync_target
+from leap.soledad.common.tests.util import BaseSoledadTest
+from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
+from leap.soledad.common.tests.util import ADDRESS
 from leap.soledad.common.tests.u1db_tests import test_remote_sync_target
 from leap.soledad.common.tests.u1db_tests import test_sync
-from leap.soledad.common.tests.test_couch import (
-    CouchDBTestCase,
-    CouchDBWrapper,
-)
-
-from leap.soledad.server import SoledadApp
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
-
-
-#-----------------------------------------------------------------------------
-# The following tests come from `u1db.tests.test_backends`.
-#-----------------------------------------------------------------------------
-
-def make_leap_document_for_test(test, doc_id, rev, content,
-                                has_conflicts=False):
-    return SoledadDocument(
-        doc_id, rev, content, has_conflicts=has_conflicts)
-
-
-LEAP_SCENARIOS = [
-    ('http', {
-        'make_database_for_test': test_backends.make_http_database_for_test,
-        'copy_database_for_test': test_backends.copy_http_database_for_test,
-        'make_document_for_test': make_leap_document_for_test,
-        'make_app_with_state': make_soledad_app}),
-]
-
-
-def make_token_http_database_for_test(test, replica_uid):
-    test.startServer()
-    test.request_state._create_database(replica_uid)
-
-    class _HTTPDatabaseWithToken(
-            http_database.HTTPDatabase, auth.TokenBasedAuth):
-
-        def set_token_credentials(self, uuid, token):
-            auth.TokenBasedAuth.set_token_credentials(self, uuid, token)
-
-        def _sign_request(self, method, url_query, params):
-            return auth.TokenBasedAuth._sign_request(
-                self, method, url_query, params)
-
-    http_db = _HTTPDatabaseWithToken(test.getURL('test'))
-    http_db.set_token_credentials('user-uuid', 'auth-token')
-    return http_db
-
-
-def copy_token_http_database_for_test(test, db):
-    # DO NOT COPY OR REUSE THIS CODE OUTSIDE TESTS: COPYING U1DB DATABASES IS
-    # THE WRONG THING TO DO, THE ONLY REASON WE DO SO HERE IS TO TEST THAT WE
-    # CORRECTLY DETECT IT HAPPENING SO THAT WE CAN RAISE ERRORS RATHER THAN
-    # CORRUPT USER DATA. USE SYNC INSTEAD, OR WE WILL SEND NINJA TO YOUR
-    # HOUSE.
-    http_db = test.request_state._copy_database(db)
-    http_db.set_token_credentials(http_db, 'user-uuid', 'auth-token')
-    return http_db
 
 
 #-----------------------------------------------------------------------------
@@ -142,12 +77,6 @@ class TestSoledadParsingSyncStream(
     Some tests had to be copied to this class so we can instantiate our own
     target.
     """
-
-    def setUp(self):
-        test_remote_sync_target.TestParsingSyncStream.setUp(self)
-
-    def tearDown(self):
-        test_remote_sync_target.TestParsingSyncStream.tearDown(self)
 
     def test_extra_comma(self):
         """
@@ -230,17 +159,6 @@ class TestSoledadParsingSyncStream(
 # functions for TestRemoteSyncTargets
 #
 
-def leap_sync_target(test, path):
-    return target.SoledadSyncTarget(
-        test.getURL(path), crypto=test._soledad._crypto)
-
-
-def token_leap_sync_target(test, path):
-    st = leap_sync_target(test, path)
-    st.set_token_credentials('user-uuid', 'auth-token')
-    return st
-
-
 def make_local_db_and_soledad_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
@@ -256,31 +174,32 @@ def make_local_db_and_token_soledad_target(test):
 
 
 class TestSoledadSyncTarget(
+        TestWithScenarios,
         SoledadWithCouchServerMixin,
         test_remote_sync_target.TestRemoteSyncTargets):
 
     scenarios = [
         ('token_soledad',
             {'make_app_with_state': make_token_soledad_app,
-             'make_document_for_test': make_leap_document_for_test,
+             'make_document_for_test': make_soledad_document_for_test,
              'create_db_and_target': make_local_db_and_token_soledad_target,
              'make_database_for_test': make_sqlcipher_database_for_test,
-             'sync_target': token_leap_sync_target}),
+             'sync_target': token_soledad_sync_target}),
     ]
 
     def setUp(self):
-        tests.TestCaseWithServer.setUp(self)
-        self.main_test_class = test_remote_sync_target.TestRemoteSyncTargets
+        TestWithScenarios.setUp(self)
         SoledadWithCouchServerMixin.setUp(self)
         self.startServer()
         self.db1 = make_sqlcipher_database_for_test(self, 'test1')
         self.db2 = self.request_state._create_database('test2')
 
     def tearDown(self):
+        #db2, _ = self.request_state.ensure_database('test2')
+        self.db2.delete_database()
+        self.db1.close()
         SoledadWithCouchServerMixin.tearDown(self)
-        tests.TestCaseWithServer.tearDown(self)
-        db, _ = self.request_state.ensure_database('test2')
-        db.delete_database()
+        TestWithScenarios.tearDown(self)
 
     def test_sync_exchange_send(self):
         """
@@ -288,7 +207,6 @@ class TestSoledadSyncTarget(
 
         This test was adapted to decrypt remote content before assert.
         """
-        self.startServer()
         db = self.request_state._create_database('test')
         remote_target = self.getSyncTarget('test')
         other_docs = []
@@ -309,13 +227,8 @@ class TestSoledadSyncTarget(
         """
         Test for sync exchange failure and retry.
 
-        This test was adapted to:
-          - decrypt remote content before assert.
-          - not expect a bounced document because soledad has stateful
-            recoverable sync.
+        This test was adapted to decrypt remote content before assert.
         """
-
-        self.startServer()
 
         def blackhole_getstderr(inst):
             return cStringIO.StringIO()
@@ -352,8 +265,9 @@ class TestSoledadSyncTarget(
         doc2 = self.make_document('doc-here2', 'replica:1',
                                   '{"value": "here2"}')
 
-        # we do not expect an HTTPError because soledad sync fails gracefully
-        remote_target.sync_exchange(
+        self.assertRaises(
+            u1db.errors.HTTPError,
+            remote_target.sync_exchange,
             [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
             'replica', last_known_generation=0, last_known_trans_id=None,
             return_doc_cb=receive_doc)
@@ -384,7 +298,6 @@ class TestSoledadSyncTarget(
 
         This test was adapted to decrypt remote content before assert.
         """
-        self.startServer()
         remote_target = self.getSyncTarget('test')
         other_docs = []
         replica_uid_box = []
@@ -425,7 +338,9 @@ target_scenarios = [
 
 
 class SoledadDatabaseSyncTargetTests(
-        SoledadWithCouchServerMixin, test_sync.DatabaseSyncTargetTests):
+        TestWithScenarios,
+        SoledadWithCouchServerMixin,
+        test_sync.DatabaseSyncTargetTests):
 
     scenarios = (
         tests.multiply_scenarios(
@@ -520,8 +435,25 @@ class SoledadDatabaseSyncTargetTests(
                  [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
 
 
+# Just to make clear how this test is different... :)
+DEFER_DECRYPTION = False
+
+WAIT_STEP = 1
+MAX_WAIT = 10
+DBPASS = "pass"
+
+
+class SyncTimeoutError(Exception):
+    """
+    Dummy exception to notify timeout during sync.
+    """
+    pass
+
+
 class TestSoledadDbSync(
-        SoledadWithCouchServerMixin, test_sync.TestDbSync):
+        TestWithScenarios,
+        SoledadWithCouchServerMixin,
+        test_sync.TestDbSync):
     """Test db.sync remote sync shortcut"""
 
     scenarios = [
@@ -536,9 +468,66 @@ class TestSoledadDbSync(
     oauth = False
     token = False
 
+
+    def make_app(self):
+        self.request_state = couch.CouchServerState(self._couch_url)
+        return self.make_app_with_state(self.request_state)
+
     def setUp(self):
-        self.main_test_class = test_sync.TestDbSync
+        """
+        Need to explicitely invoke inicialization on all bases.
+        """
         SoledadWithCouchServerMixin.setUp(self)
+        self.server = self.server_thread = None
+        self.startServer()
+        self.syncer = None
+
+        # config info
+        self.db1_file = os.path.join(self.tempdir, "db1.u1db")
+        os.unlink(self.db1_file)
+        self.db_pass = DBPASS
+        self.email = ADDRESS
+
+        # get a random prefix for each test, so we do not mess with
+        # concurrency during initialization and shutting down of
+        # each local db.
+        self.rand_prefix = ''.join(
+            map(lambda x: random.choice(string.ascii_letters), range(6)))
+
+        # open test dbs: db1 will be the local sqlcipher db (which
+        # instantiates a syncdb). We use the self._soledad instance that was
+        # already created on some setUp method.
+        import binascii
+        tohex = binascii.b2a_hex
+        key = tohex(self._soledad.secrets.get_local_storage_key())
+        sync_db_key = tohex(self._soledad.secrets.get_sync_db_key())
+        dbpath = self._soledad._local_db_path
+
+        self.opts = SQLCipherOptions(
+            dbpath, key, is_raw_key=True, create=False,
+            defer_encryption=True, sync_db_key=sync_db_key)
+        self.db1 = SQLCipherDatabase(self.opts)
+
+        self.db2 = couch.CouchDatabase.open_database(
+            urljoin(
+                'http://localhost:' + str(self.wrapper.port), 'test'),
+                create=True,
+                ensure_ddocs=True)
+
+    def tearDown(self):
+        """
+        Need to explicitely invoke destruction on all bases.
+        """
+        dbsyncer = getattr(self, 'dbsyncer', None)
+        if dbsyncer:
+            dbsyncer.close()
+        self.db1.close()
+        self.db2.close()
+        self._soledad.close()
+
+        # XXX should not access "private" attrs
+        shutil.rmtree(os.path.dirname(self._soledad._local_db_path))
+        SoledadWithCouchServerMixin.tearDown(self)
 
     def do_sync(self, target_name):
         """
@@ -546,20 +535,35 @@ class TestSoledadDbSync(
         and Token auth.
         """
         if self.token:
-            extra = dict(creds={'token': {
+            creds={'token': {
                 'uuid': 'user-uuid',
                 'token': 'auth-token',
-            }})
+            }}
             target_url = self.getURL(target_name)
-            return sync.SoledadSynchronizer(
-                self.db,
-                target.SoledadSyncTarget(
-                    target_url,
-                    crypto=self._soledad._crypto,
-                    **extra)).sync(autocreate=True,
-                                   defer_decryption=False)
+
+            # get a u1db syncer
+            crypto = self._soledad._crypto
+            replica_uid = self.db1._replica_uid
+            dbsyncer = SQLCipherU1DBSync(self.opts, crypto, replica_uid,
+                defer_encryption=True)
+            self.dbsyncer = dbsyncer
+            return dbsyncer.sync(target_url, creds=creds,
+                autocreate=True,defer_decryption=DEFER_DECRYPTION)
         else:
             return test_sync.TestDbSync.do_sync(self, target_name)
+
+    def wait_for_sync(self):
+        """
+        Wait for sync to finish.
+        """
+        wait = 0
+        syncer = self.syncer
+        if syncer is not None:
+            while syncer.syncing:
+                time.sleep(WAIT_STEP)
+                wait += WAIT_STEP
+                if wait >= MAX_WAIT:
+                    raise SyncTimeoutError
 
     def test_db_sync(self):
         """
@@ -567,23 +571,35 @@ class TestSoledadDbSync(
 
         Adapted to check for encrypted content.
         """
-        doc1 = self.db.create_doc_from_json(tests.simple_doc)
+        doc1 = self.db1.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
-        local_gen_before_sync = self.do_sync('test2')
-        gen, _, changes = self.db.whats_changed(local_gen_before_sync)
-        self.assertEqual(1, len(changes))
-        self.assertEqual(doc2.doc_id, changes[0][0])
-        self.assertEqual(1, gen - local_gen_before_sync)
-        self.assertGetEncryptedDoc(
-            self.db2, doc1.doc_id, doc1.rev, tests.simple_doc, False)
-        self.assertGetEncryptedDoc(
-            self.db, doc2.doc_id, doc2.rev, tests.nested_doc, False)
+        d = self.do_sync('test')
+
+        def _assert_successful_sync(results):
+            import time
+            # need to give time to the encryption to proceed
+            # TODO should implement a defer list to subscribe to the all-decrypted
+            # event
+            time.sleep(2)
+            local_gen_before_sync = results
+            self.wait_for_sync()
+
+            gen, _, changes = self.db1.whats_changed(local_gen_before_sync)
+            self.assertEqual(1, len(changes))
+
+            self.assertEqual(doc2.doc_id, changes[0][0])
+            self.assertEqual(1, gen - local_gen_before_sync)
+
+            self.assertGetEncryptedDoc(
+                self.db2, doc1.doc_id, doc1.rev, tests.simple_doc, False)
+            self.assertGetEncryptedDoc(
+                self.db1, doc2.doc_id, doc2.rev, tests.nested_doc, False)
+
+        d.addCallback(_assert_successful_sync)
+        return d
 
     def test_db_sync_autocreate(self):
         """
         We bypass this test because we never need to autocreate databases.
         """
         pass
-
-
-load_tests = tests.load_with_scenarios

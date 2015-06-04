@@ -18,12 +18,12 @@
 
 """A U1DB backend that uses CouchDB as its persistence layer."""
 
+
 import simplejson as json
 import re
 import uuid
 import logging
 import binascii
-import socket
 import time
 import sys
 import threading
@@ -44,7 +44,7 @@ from couchdb.http import (
     urljoin as couch_urljoin,
     Resource,
 )
-from u1db import query_parser, vectorclock
+from u1db import vectorclock
 from u1db.errors import (
     DatabaseDoesNotExist,
     InvalidGeneration,
@@ -60,7 +60,7 @@ from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
 
 
-from leap.soledad.common import USER_DB_PREFIX, ddocs, errors
+from leap.soledad.common import ddocs, errors
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -160,7 +160,6 @@ class CouchDocument(SoledadDocument):
         """
         if self._conflicts is None:
             raise Exception("Run self._ensure_fetch_conflicts first!")
-        conflicts_len = len(self._conflicts)
         self._conflicts = filter(
             lambda doc: doc.rev not in conflict_revs,
             self._conflicts)
@@ -1181,7 +1180,7 @@ class CouchDatabase(CommonBackend):
         res = self._database.resource(*ddoc_path)
         try:
             with CouchDatabase.update_handler_lock[self._get_replica_uid()]:
-                body={
+                body = {
                     'other_replica_uid': other_replica_uid,
                     'other_generation': other_generation,
                     'other_transaction_id': other_transaction_id,

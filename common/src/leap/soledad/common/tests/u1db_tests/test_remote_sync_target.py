@@ -22,6 +22,8 @@ from u1db import (
     errors,
 )
 
+from unittest import skip
+
 from leap.soledad.common.tests import u1db_tests as tests
 
 from u1db.remote import (
@@ -31,6 +33,7 @@ from u1db.remote import (
 )
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHTTPSyncTargetBasics(tests.TestCase):
 
     def test_parse_url(self):
@@ -41,6 +44,7 @@ class TestHTTPSyncTargetBasics(tests.TestCase):
         self.assertEqual('/', remote_target._url.path)
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestParsingSyncStream(tests.TestCase):
 
     def test_wrong_start(self):
@@ -130,6 +134,7 @@ def oauth_http_sync_target(test, path):
     return st
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestRemoteSyncTargets(tests.TestCaseWithServer):
 
     scenarios = [
