@@ -825,9 +825,15 @@ class Soledad(object):
 
     def raw_sqlcipher_query(self, *args, **kw):
         """
-        Run a raw sqlcipher query in the local database.
+        Run a raw sqlcipher query in the local database, and return the result.
         """
         return self._dbpool.runQuery(*args, **kw)
+
+    def raw_sqlcipher_operation(self, *args, **kw):
+        """
+        Run a raw sqlcipher operation in the local database, and return None.
+        """
+        return self._dbpool.runOperation(*args, **kw)
 
 
 def _convert_to_unicode(content):
