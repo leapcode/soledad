@@ -47,6 +47,7 @@ from twisted.plugin import getPlugins
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
+from leap.common.plugins import collect_plugins
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
@@ -71,28 +72,6 @@ Path to the certificate file used to certify the SSL connection between
 Soledad client and server.
 """
 SOLEDAD_CERT = None
-
-# A whitelist of modules from where to collect plugins dynamically.
-# For the moment restricted to leap namespace, but the idea is that we can pass
-# other "trusted" modules as options to the initialization of soledad.
-PLUGGABLE_LEAP_MODULES = ('mail', 'keymanager')
-
-
-# TODO move to leap.common
-
-def collect_plugins(interface):
-    """
-    Traverse a whitelist of modules and collect all the plugins that implement
-    the passed interface.
-    """
-    plugins = []
-    for namespace in PLUGGABLE_LEAP_MODULES:
-        try:
-            module = __import__('leap.%s.plugins' % namespace, fromlist='.')
-            plugins = plugins + list(getPlugins(interface, module))
-        except ImportError:
-            pass
-    return plugins
 
 
 class Soledad(object):
