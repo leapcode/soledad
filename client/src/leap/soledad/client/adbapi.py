@@ -217,6 +217,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         """
         meth = getattr(trans, meth)
         return meth(*args, **kw)
+        # XXX should return a fetchall?
 
     def _runInteraction(self, interaction, *args, **kw):
         """

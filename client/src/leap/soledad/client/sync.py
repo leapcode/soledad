@@ -39,6 +39,7 @@ class SoledadSynchronizer(Synchronizer):
 
     Also modified to allow for interrupting the synchronization process.
     """
+    received_docs = []
 
     @defer.inlineCallbacks
     def sync(self, defer_decryption=True):
@@ -62,6 +63,7 @@ class SoledadSynchronizer(Synchronizer):
         :rtype: twisted.internet.defer.Deferred
         """
         sync_target = self.sync_target
+        self.received_docs = []
 
         # get target identifier, its current generation,
         # and its last-seen database generation for this source
@@ -123,12 +125,14 @@ class SoledadSynchronizer(Synchronizer):
         changed_doc_ids = [doc_id for doc_id, _, _ in changes]
         docs_to_send = self.source.get_docs(
             changed_doc_ids, check_for_conflicts=False, include_deleted=True)
+        ids_sent = []
         docs_by_generation = []
         idx = 0
         for doc in docs_to_send:
             _, gen, trans = changes[idx]
             docs_by_generation.append((doc, gen, trans))
             idx += 1
+            ids_sent.append(doc.doc_id)
 
         # exchange documents and try to insert the returned ones with
         # the target, return target synced-up-to gen.
@@ -151,6 +155,18 @@ class SoledadSynchronizer(Synchronizer):
         self._syncing_info = info
         yield self.complete_sync()
 
+        _, _, changes = self.source.whats_changed(target_my_gen)
+        changed_doc_ids = [doc_id for doc_id, _, _ in changes]
+
+        print "--------------------------"
+        print "SENT", ids_sent
+        print "CHANGED_DOC_IDS", changed_doc_ids
+
+        just_received = list(set(changed_doc_ids) - set(ids_sent))
+        print "RECEIVED:", just_received
+        print "--------------------------"
+
+        self.received_docs = just_received
         defer.returnValue(my_gen)
 
     def complete_sync(self):
