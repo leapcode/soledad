@@ -456,6 +456,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         self._syncers = {}
 
+        # Storage for the documents received during a sync
+        self.received_docs = []
+
         self.running = False
         self._sync_threadpool = None
         self._initialize_sync_threadpool()
@@ -587,8 +590,16 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # the following context manager blocks until the syncing lock can be
         # acquired.
         with self._syncer(url, creds=creds) as syncer:
+
+            def _record_received_docs(result):
+                # beware, closure. syncer is in scope.
+                self.received_docs = syncer.received_docs
+                return result
+
             # XXX could mark the critical section here...
-            return syncer.sync(defer_decryption=defer_decryption)
+            d = syncer.sync(defer_decryption=defer_decryption)
+            d.addCallback(_record_received_docs)
+            return d
 
     @contextmanager
     def _syncer(self, url, creds=None):

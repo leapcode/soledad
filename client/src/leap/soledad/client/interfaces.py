@@ -19,6 +19,37 @@ Interfaces used by the Soledad Client.
 """
 from zope.interface import Interface, Attribute
 
+#
+# Plugins
+#
+
+
+class ISoledadPostSyncPlugin(Interface):
+    """
+    I implement the minimal methods and attributes for a plugin that can be
+    called after a soledad synchronization has ended.
+    """
+
+    def process_received_docs(self, doc_id_list):
+        """
+        Do something with the passed list of doc_ids received after the last
+        sync.
+
+        :param doc_id_list: a list of strings for the received doc_ids
+        """
+
+    watched_doc_types = Attribute("""
+        a tuple of the watched doc types for this plugin. So far, the
+        `doc-types` convention is just the preffix of the doc_id, which is
+        basically its first character, followed by a dash. So, for instance,
+        `M-` is used for meta-docs in mail, and `F-` is used for flag-docs in
+        mail. For now there's no central register of all the doc-types
+        used.""")
+
+
+#
+# Soledad storage
+#
 
 class ILocalStorage(Interface):
     """
