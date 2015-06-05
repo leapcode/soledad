@@ -38,6 +38,7 @@ try:
     import cchardet as chardet
 except ImportError:
     import chardet
+from itertools import chain
 
 from StringIO import StringIO
 from u1db.remote import http_client
@@ -679,19 +680,19 @@ class Soledad(object):
             defer_decryption=defer_decryption)
 
         def _sync_callback(local_gen):
-            self._last_received_docs = self._dbsyncer.received_docs
-            print "***"
-            print "LAST RECEIVED (API)", self._last_received_docs
-            print "***"
-            received_doc_ids = self._dbsyncer.received_docs
+            self._last_received_docs = docs = self._dbsyncer.received_docs
 
             # Post-Sync Hooks
             synced_plugin = soledad_interfaces.ISoledadPostSyncPlugin
-            if received_doc_ids:
+            if docs:
                 suitable_plugins = collect_plugins(synced_plugin)
                 for plugin in suitable_plugins:
-                    # TODO filter the doc_ids here
-                    plugin.process_received_docs(received_doc_ids)
+                    watched = plugin.watched_doc_types
+                    r = [filter(
+                        lambda s: s.startswith(preffix),
+                        docs) for preffix in watched]
+                    filtered = list(chain(*r))
+                    plugin.process_received_docs(filtered)
 
             soledad_events.emit(
                 soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
