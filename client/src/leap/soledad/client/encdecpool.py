@@ -29,6 +29,7 @@ import logging
 
 from twisted.internet import reactor
 from twisted.internet import defer
+from twisted.python import log
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common import soledad_assert
@@ -405,7 +406,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         return self._failure
 
     def _set_failure(self, failure):
-        failure.printTraceback()
+        log.err(failure)
         self._failure = failure
         self._finished = True
 
