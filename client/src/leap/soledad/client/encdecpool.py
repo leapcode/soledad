@@ -579,7 +579,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         query += " ORDER BY %s %s" % (order_by, order)
         return self._runQuery(query)
 
-
     @defer.inlineCallbacks
     def _get_insertable_docs(self):
         """

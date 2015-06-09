@@ -662,8 +662,8 @@ class Soledad(object):
             self._last_received_docs = docs = self._dbsyncer.received_docs
 
             # Post-Sync Hooks
-            synced_plugin = soledad_interfaces.ISoledadPostSyncPlugin
             if docs:
+                iface = soledad_interfaces.ISoledadPostSyncPlugin
                 suitable_plugins = collect_plugins(synced_plugin)
                 for plugin in suitable_plugins:
                     watched = plugin.watched_doc_types
@@ -805,13 +805,15 @@ class Soledad(object):
 
     def raw_sqlcipher_query(self, *args, **kw):
         """
-        Run a raw sqlcipher query in the local database, and return the result.
+        Run a raw sqlcipher query in the local database, and return a deferred
+        that will be fired with the result.
         """
         return self._dbpool.runQuery(*args, **kw)
 
     def raw_sqlcipher_operation(self, *args, **kw):
         """
-        Run a raw sqlcipher operation in the local database, and return None.
+        Run a raw sqlcipher operation in the local database, and return a
+        deferred that will be fired with None.
         """
         return self._dbpool.runOperation(*args, **kw)
 
