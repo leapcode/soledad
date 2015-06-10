@@ -1,3 +1,12 @@
+0.6.5 Apr 09 2015:
+Server:
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+
+0.6.4 Jan 23 2015:
+Common:
+  o Bail out if cdocs/ dir does not exist. Closes: #6671
+
 0.6.3 Dec 16 2014:
 Client:
   o Fix deferred encryption/decryption parameters (#6500).
