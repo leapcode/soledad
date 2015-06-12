@@ -664,7 +664,7 @@ class Soledad(object):
             # Post-Sync Hooks
             if docs:
                 iface = soledad_interfaces.ISoledadPostSyncPlugin
-                suitable_plugins = collect_plugins(synced_plugin)
+                suitable_plugins = collect_plugins(iface)
                 for plugin in suitable_plugins:
                     watched = plugin.watched_doc_types
                     r = [filter(
