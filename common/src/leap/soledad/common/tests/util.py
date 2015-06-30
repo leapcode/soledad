@@ -50,7 +50,7 @@ from leap.soledad.common.couch import CouchDatabase, CouchServerState
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 
 from leap.soledad.client import Soledad
-from leap.soledad.client import target
+from leap.soledad.client import http_target
 from leap.soledad.client import auth
 from leap.soledad.client.crypto import decrypt_doc_dict
 
@@ -165,6 +165,7 @@ class MockedSharedDBTest(object):
             lock = Mock(return_value=('atoken', 300))
             unlock = Mock(return_value=True)
             open = Mock(return_value=None)
+            close = Mock(return_value=None)
             syncable = True
 
             def __call__(self):
@@ -173,7 +174,7 @@ class MockedSharedDBTest(object):
 
 
 def soledad_sync_target(test, path):
-    return target.SoledadSyncTarget(
+    return http_target.SoledadSyncTarget(
         test.getURL(path), crypto=test._soledad._crypto)
 
 
