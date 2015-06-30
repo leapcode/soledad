@@ -50,16 +50,22 @@ LEAP_SCENARIOS = [
 # The following tests come from `u1db.tests.test_https`.
 #-----------------------------------------------------------------------------
 
-def token_leap_https_sync_target(test, host, path):
+def token_leap_https_sync_target(test, host, path, cert_file=None):
     _, port = test.server.server_address
-    st = client.target.SoledadSyncTarget(
+    #source_replica_uid = test._soledad._dbpool.replica_uid
+    creds = {'token': {'uuid': 'user-uuid', 'token': 'auth-token'}}
+    if not cert_file:
+        cert_file = test.cacert_pem
+    st = client.http_target.SoledadHTTPSyncTarget(
         'https://%s:%d/%s' % (host, port, path),
-        crypto=test._soledad._crypto)
-    st.set_token_credentials('user-uuid', 'auth-token')
+        source_replica_uid='other-id',
+        creds=creds,
+        crypto=test._soledad._crypto,
+        cert_file=cert_file)
     return st
 
 
-class TestSoledadSyncTargetHttpsSupport(
+class TestSoledadHTTPSyncTargetHttpsSupport(
         TestWithScenarios,
         test_https.TestHttpSyncTargetHttpsSupport,
         BaseSoledadTest):
@@ -80,6 +86,29 @@ class TestSoledadSyncTargetHttpsSupport(
         http_client._VerifiedHTTPSConnection = client.api.VerifiedHTTPSConnection
         client.api.SOLEDAD_CERT = http_client.CA_CERTS
 
+    def test_cannot_verify_cert(self):
+        self.startServer()
+        # don't print expected traceback server-side
+        self.server.handle_error = lambda req, cli_addr: None
+        self.request_state._create_database('test')
+        remote_target = self.getSyncTarget(
+            'localhost', 'test', cert_file=http_client.CA_CERTS)
+        d = remote_target.record_sync_info('other-id', 2, 'T-id')
+
+        def _assert_raises(result):
+            from twisted.python.failure import Failure
+            if isinstance(result, Failure):
+                from OpenSSL.SSL import Error
+                error = result.value.message[0].value
+                if isinstance(error, Error):
+                    msg = error.message[0][2]
+                    self.assertEqual("certificate verify failed", msg)
+                    return
+            self.fail("certificate verification should have failed.")
+
+        d.addCallbacks(_assert_raises, _assert_raises)
+        return d
+
     def test_working(self):
         """
         Test that SSL connections work well.
@@ -89,24 +118,19 @@ class TestSoledadSyncTargetHttpsSupport(
         """
         self.startServer()
         db = self.request_state._create_database('test')
-        self.patch(client.api, 'SOLEDAD_CERT', self.cacert_pem)
         remote_target = self.getSyncTarget('localhost', 'test')
-        remote_target.record_sync_info('other-id', 2, 'T-id')
-        self.assertEqual(
-            (2, 'T-id'), db._get_replica_gen_and_trans_id('other-id'))
+        d = remote_target.record_sync_info('other-id', 2, 'T-id')
+        d.addCallback(lambda _:
+            self.assertEqual(
+                (2, 'T-id'), db._get_replica_gen_and_trans_id('other-id')))
+        d.addCallback(lambda _:
+            remote_target.close())
+        return d
 
     def test_host_mismatch(self):
         """
-        Test that SSL connections to a hostname different than the one in the
-        certificate raise CertificateError.
-
-        This test was adapted to patch Soledad's HTTPS connection custom class
-        with the intended CA certificates.
+        This test is disabled because soledad's twisted-based http agent uses
+        pyOpenSSL, which will complain if we try to use an IP to connect to
+        the remote host (see the original test in u1db_tests/test_https.py).
         """
-        self.startServer()
-        self.request_state._create_database('test')
-        self.patch(client.api, 'SOLEDAD_CERT', self.cacert_pem)
-        remote_target = self.getSyncTarget('127.0.0.1', 'test')
-        self.assertRaises(
-            http_client.CertificateError, remote_target.record_sync_info,
-            'other-id', 2, 'T-id')
+        pass
