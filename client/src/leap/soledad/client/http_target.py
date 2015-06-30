@@ -75,8 +75,6 @@ class SoledadHTTPSyncTarget(SyncTarget):
         :param source_replica_uid: The source replica uid which we use when
                                    deferring decryption.
         :type source_replica_uid: str
-        :param url: The url of the target replica to sync with.
-        :type url: str
         :param creds: A dictionary containing the uuid and token.
         :type creds: creds
         :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
@@ -98,7 +96,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         """
         if url.endswith("/"):
             url = url[:-1]
-        self._url = str(url) + "/sync-from/" + source_replica_uid
+        self._url = str(url) + "/sync-from/" + str(source_replica_uid)
         self.source_replica_uid = source_replica_uid
         self._auth_header = None
         self.set_creds(creds)
@@ -110,6 +108,9 @@ class SoledadHTTPSyncTarget(SyncTarget):
         self._decryption_callback = None
         self._sync_decr_pool = None
         self._http = HTTPClient(cert_file)
+
+    def close(self):
+        self._http.close()
 
     def set_creds(self, creds):
         """
