@@ -240,8 +240,12 @@ def raise_server_error(exc, ddoc_path):
                                          document for an yet unknown reason.
     """
     path = "".join(ddoc_path)
-    if exc.message[1][0] == 'unnamed_error':
+    msg = exc.message[1][0]
+    if msg == 'unnamed_error':
         raise errors.MissingDesignDocListFunctionError(path)
+    elif msg == 'TypeError':
+        if 'point is undefined' in exc.message[1][1]:
+            raise errors.MissingDesignDocListFunctionError
     # other errors are unknown for now
     raise errors.DesignDocUnknownError(path)
 
