@@ -8,7 +8,7 @@ zope.proxy
 twisted
 
 # leap deps -- bump me!
-leap.common>=0.4.0
+leap.common>=0.4.1
 leap.soledad.common>=0.6.5
 
 # XXX -- fix me!
