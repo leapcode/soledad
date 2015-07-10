@@ -1,3 +1,8 @@
+0.7.1 Jul 10, 2015:
+Client:
+  o Fix sync encrypter pool close queue error. Closes #7088.
+  o Expose post-sync hooks via plugin system. Related: #6996.
+
 0.7.0 Jun 01 2015:
 Client:
   o Do not depend on pysqlite2 (#2945).

@@ -1,1 +1,0 @@
-  o Fix sync encrypter pool close queue error. Closes #7088.
