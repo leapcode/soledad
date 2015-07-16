@@ -27,10 +27,8 @@ import base64
 import logging
 
 from uuid import uuid4
-from functools import partial
 
 from twisted.internet import defer
-from twisted.internet import reactor
 from twisted.web.error import Error
 
 from u1db import errors
@@ -393,11 +391,10 @@ class SoledadHTTPSyncTarget(SyncTarget):
         # to know the total number of documents to be received, and this
         # information comes as metadata to each request.
 
-        d = self._receive_one_doc(
+        doc = yield self._receive_one_doc(
             headers, last_known_generation, last_known_trans_id,
             sync_id, 0)
-        d.addCallback(partial(self._insert_received_doc, 1, 1))
-        number_of_changes, ngen, ntrans = yield d
+        number_of_changes, ngen, ntrans = self._insert_received_doc(doc, 1, 1)
 
         if defer_decryption:
             self._sync_decr_pool.start(number_of_changes)
@@ -417,10 +414,9 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 headers, last_known_generation,
                 last_known_trans_id, sync_id, received)
             d.addCallback(
-                partial(
-                    self._insert_received_doc,
-                    received + 1,  # the index of the current received doc
-                    number_of_changes))
+                self._insert_received_doc,
+                received + 1,  # the index of the current received doc
+                number_of_changes)
             deferreds.append(d)
             received += 1
         results = yield defer.gatherResults(deferreds)
@@ -433,40 +429,10 @@ class SoledadHTTPSyncTarget(SyncTarget):
         # wait for async decryption to finish
         #---------------------------------------------------------------------
 
-        # below we do a trick so we can wait for the SyncDecrypterPool to
-        # finish its work before finally returning the new generation and
-        # transaction id of the remote replica. To achieve that, we create a
-        # Deferred that will return the results of the sync and, if we are
-        # decrypting asynchronously, we use reactor.callLater() to
-        # periodically poll the decrypter and check if it has finished its
-        # work. When it has finished, we either call the callback or errback
-        # of that deferred. In case we are not asynchronously decrypting, we
-        # just fire the deferred.
-
-        def _shutdown_and_finish(res):
-            self._sync_decr_pool.close()
-            return new_generation, new_transaction_id
-
-        d = defer.Deferred()
-        d.addCallback(_shutdown_and_finish)
-
-        def _wait_or_finish():
-            if not self._sync_decr_pool.has_finished():
-                reactor.callLater(
-                    SyncDecrypterPool.DECRYPT_LOOP_PERIOD,
-                    _wait_or_finish)
-            else:
-                if not self._sync_decr_pool.failed():
-                    d.callback(None)
-                else:
-                    d.errback(self._sync_decr_pool.failure)
-
         if defer_decryption:
-            _wait_or_finish()
-        else:
-            d.callback(None)
+            yield self._sync_decr_pool.deferred
+            self._sync_decr_pool.close()
 
-        new_generation, new_transaction_id = yield d
         defer.returnValue([new_generation, new_transaction_id])
 
     def _receive_one_doc(self, headers, last_known_generation,
@@ -490,16 +456,16 @@ class SoledadHTTPSyncTarget(SyncTarget):
             headers=headers,
             body=''.join(entries))
 
-    def _insert_received_doc(self, idx, total, response):
+    def _insert_received_doc(self, response, idx, total):
         """
         Insert a received document into the local replica.
 
+        :param response: The body and headers of the response.
+        :type response: tuple(str, dict)
         :param idx: The index count of the current operation.
         :type idx: int
         :param total: The total number of operations.
         :type total: int
-        :param response: The body and headers of the response.
-        :type response: tuple(str, dict)
         """
         new_generation, new_transaction_id, number_of_changes, doc_id, \
             rev, content, gen, trans_id = \
