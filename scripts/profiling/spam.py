@@ -31,7 +31,7 @@ def _send_email(host, subject, to_addr, from_addr, body_text):
             "",
             body_text
             ), "\r\n")
-    server = smtplib.SMTP(host)
+    server = smtplib.SMTP_SSL(host)
     server.sendmail(from_addr, [to_addr], body)
     server.quit()
 
