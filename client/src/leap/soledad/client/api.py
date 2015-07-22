@@ -43,7 +43,6 @@ from itertools import chain
 from StringIO import StringIO
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
-from twisted.plugin import getPlugins
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
@@ -59,7 +58,8 @@ from leap.soledad.client import interfaces as soledad_interfaces
 from leap.soledad.client.crypto import SoledadCrypto
 from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client.sqlcipher import SQLCipherOptions, SQLCipherU1DBSync
+from leap.soledad.client import sqlcipher
+from leap.soledad.client import encdecpool
 
 logger = logging.getLogger(name=__name__)
 
@@ -175,6 +175,7 @@ class Soledad(object):
         self._server_url = server_url
         self._defer_encryption = defer_encryption
         self._secrets_path = None
+        self._sync_enc_pool = None
 
         self.shared_db = shared_db
 
@@ -259,24 +260,32 @@ class Soledad(object):
         key = tohex(self._secrets.get_local_storage_key())
         sync_db_key = tohex(self._secrets.get_sync_db_key())
 
-        opts = SQLCipherOptions(
+        opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,
             is_raw_key=True, create=True,
             defer_encryption=self._defer_encryption,
             sync_db_key=sync_db_key,
         )
         self._sqlcipher_opts = opts
-        self._dbpool = adbapi.getConnectionPool(opts)
+
+        # the sync_db is used both for deferred encryption and decryption, so
+        # we want to initialize it anyway to allow for all combinations of
+        # deferred encryption and decryption configurations.
+        self._initialize_sync_db(opts)
+        self._dbpool = adbapi.getConnectionPool(
+           opts, sync_enc_pool=self._sync_enc_pool)
 
     def _init_u1db_syncer(self):
         """
         Initialize the U1DB synchronizer.
         """
         replica_uid = self._dbpool.replica_uid
-        self._dbsyncer = SQLCipherU1DBSync(
+        self._dbsyncer = sqlcipher.SQLCipherU1DBSync(
             self._sqlcipher_opts, self._crypto, replica_uid,
             SOLEDAD_CERT,
-            defer_encryption=self._defer_encryption)
+            defer_encryption=self._defer_encryption,
+            sync_db=self._sync_db,
+            sync_enc_pool=self._sync_enc_pool)
 
     #
     # Closing methods
@@ -290,6 +299,9 @@ class Soledad(object):
         self._dbpool.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
+        # close the sync database
+        self._sync_db.close()
+        self._sync_db = None
 
     #
     # ILocalStorage
@@ -728,6 +740,52 @@ class Soledad(object):
         return self._creds['token']['token']
 
     token = property(_get_token, _set_token, doc='The authentication Token.')
+
+    def _initialize_sync_db(self, opts):
+        """
+        Initialize the Symmetrically-Encrypted document to be synced database,
+        and the queue to communicate with subprocess workers.
+
+        :param opts:
+        :type opts: SQLCipherOptions
+        """
+        soledad_assert(opts.sync_db_key is not None)
+        sync_db_path = None
+        if opts.path != ":memory:":
+            sync_db_path = "%s-sync" % opts.path
+        else:
+            sync_db_path = ":memory:"
+
+        # we copy incoming options because the opts object might be used
+        # somewhere else
+        sync_opts = sqlcipher.SQLCipherOptions.copy(
+            opts, path=sync_db_path, create=True)
+        self._sync_db = sqlcipher.getConnectionPool(
+            sync_opts, extra_queries=self._sync_db_extra_init)
+        if self._defer_encryption:
+            # initialize syncing queue encryption pool
+            self._sync_enc_pool = encdecpool.SyncEncrypterPool(
+                self._crypto, self._sync_db)
+
+
+    @property
+    def _sync_db_extra_init(self):
+        """
+        Queries for creating tables for the local sync documents db if needed.
+        They are passed as extra initialization to initialize_sqlciphjer_db
+
+        :rtype: tuple of strings
+        """
+        maybe_create = "CREATE TABLE IF NOT EXISTS %s (%s)"
+        encr = encdecpool.SyncEncrypterPool
+        decr = encdecpool.SyncDecrypterPool
+        sql_encr_table_query = (maybe_create % (
+            encr.TABLE_NAME, encr.FIELD_NAMES))
+        sql_decr_table_query = (maybe_create % (
+            decr.TABLE_NAME, decr.FIELD_NAMES))
+        return (sql_encr_table_query, sql_decr_table_query)
+
+
 
     #
     # ISecretsStorage

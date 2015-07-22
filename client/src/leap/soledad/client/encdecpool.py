@@ -261,8 +261,10 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
                 % self.TABLE_NAME
         result = yield self._runQuery(query, (doc_id, doc_rev))
         if result:
+            logger.debug("Found doc on sync db: %s" % doc_id)
             val = result.pop()
             defer.returnValue(val[0])
+        logger.debug("Did not find doc on sync db: %s" % doc_id)
         defer.returnValue(None)
 
     def delete_encrypted_doc(self, doc_id, doc_rev):

@@ -54,7 +54,8 @@ How many times a SQLCipher query should be retried in case of timeout.
 SQLCIPHER_MAX_RETRIES = 10
 
 
-def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
+def getConnectionPool(opts, openfun=None, driver="pysqlcipher",
+        sync_enc_pool=None):
     """
     Return a connection pool.
 
@@ -75,8 +76,8 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
     if openfun is None and driver == "pysqlcipher":
         openfun = partial(set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
-        "%s.dbapi2" % driver, database=opts.path,
-        check_same_thread=False, cp_openfun=openfun,
+        "%s.dbapi2" % driver, opts=opts, sync_enc_pool=sync_enc_pool,
+        database=opts.path, check_same_thread=False, cp_openfun=openfun,
         timeout=SQLCIPHER_CONNECTION_TIMEOUT)
 
 
@@ -90,7 +91,7 @@ class U1DBConnection(adbapi.Connection):
     The U1DB wrapper to use.
     """
 
-    def __init__(self, pool, init_u1db=False):
+    def __init__(self, pool, sync_enc_pool, init_u1db=False):
         """
         :param pool: The pool of connections to that owns this connection.
         :type pool: adbapi.ConnectionPool
@@ -98,6 +99,7 @@ class U1DBConnection(adbapi.Connection):
         :type init_u1db: bool
         """
         self.init_u1db = init_u1db
+        self._sync_enc_pool = sync_enc_pool
         adbapi.Connection.__init__(self, pool)
 
     def reconnect(self):
@@ -109,7 +111,10 @@ class U1DBConnection(adbapi.Connection):
         self._connection = self._pool.connect()
 
         if self.init_u1db:
-            self._u1db = self.u1db_wrapper(self._connection)
+            self._u1db = self.u1db_wrapper(
+                self._connection,
+                self._pool.opts,
+                self._sync_enc_pool)
 
     def __getattr__(self, name):
         """
@@ -158,14 +163,20 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         """
         Initialize the connection pool.
         """
+        # extract soledad-specific objects from keyword arguments
+        self.opts = kwargs.pop("opts")
+        self._sync_enc_pool = kwargs.pop("sync_enc_pool")
+
         adbapi.ConnectionPool.__init__(self, *args, **kwargs)
+
         # all u1db connections, hashed by thread-id
         self._u1dbconnections = {}
 
         # The replica uid, primed by the connections on init.
         self.replica_uid = ProxyBase(None)
 
-        conn = self.connectionFactory(self, init_u1db=True)
+        conn = self.connectionFactory(
+            self, self._sync_enc_pool, init_u1db=True)
         replica_uid = conn._u1db._real_replica_uid
         setProxiedObject(self.replica_uid, replica_uid)
 
@@ -235,7 +246,8 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         """
         tid = self.threadID()
         u1db = self._u1dbconnections.get(tid)
-        conn = self.connectionFactory(self, init_u1db=not bool(u1db))
+        conn = self.connectionFactory(
+            self, self._sync_enc_pool, init_u1db=not bool(u1db))
 
         if self.replica_uid is None:
             replica_uid = conn._u1db._real_replica_uid

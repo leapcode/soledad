@@ -414,8 +414,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     Soledad syncer implementation.
     """
 
-    _sync_enc_pool = None
-
     """
     The name of the local symmetrically encrypted documents to
     sync database file.
@@ -435,17 +433,16 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     syncing_lock = defaultdict(threading.Lock)
 
     def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
-                 defer_encryption=False):
+                 defer_encryption=False, sync_db=None, sync_enc_pool=None):
 
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto
         self.__replica_uid = replica_uid
         self._cert_file = cert_file
+        self._sync_enc_pool = sync_enc_pool
 
-        self._sync_db_key = opts.sync_db_key
-        self._sync_db = None
-        self._sync_enc_pool = None
+        self._sync_db = sync_db
 
         # we store syncers in a dictionary indexed by the target URL. We also
         # store a hash of the auth info in case auth info expires and we need
@@ -468,16 +465,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         self._db_handle = None
         self._initialize_main_db()
-
-        # the sync_db is used both for deferred encryption and decryption, so
-        # we want to initialize it anyway to allow for all combinations of
-        # deferred encryption and decryption configurations.
-        self._initialize_sync_db(opts)
-
-        if defer_encryption:
-            # initialize syncing queue encryption pool
-            self._sync_enc_pool = encdecpool.SyncEncrypterPool(
-                self._crypto, self._sync_db)
 
         self.shutdownID = None
 
@@ -520,45 +507,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         #     should make sure that no operations on the database shuold occur
         #     before the database has been initialized.
         self._sync_threadpool = ThreadPool(0, 1)
-
-    def _initialize_sync_db(self, opts):
-        """
-        Initialize the Symmetrically-Encrypted document to be synced database,
-        and the queue to communicate with subprocess workers.
-
-        :param opts:
-        :type opts: SQLCipherOptions
-        """
-        soledad_assert(opts.sync_db_key is not None)
-        sync_db_path = None
-        if opts.path != ":memory:":
-            sync_db_path = "%s-sync" % opts.path
-        else:
-            sync_db_path = ":memory:"
-
-        # we copy incoming options because the opts object might be used
-        # somewhere else
-        sync_opts = SQLCipherOptions.copy(
-            opts, path=sync_db_path, create=True)
-        self._sync_db = getConnectionPool(
-            sync_opts, extra_queries=self._sync_db_extra_init)
-
-    @property
-    def _sync_db_extra_init(self):
-        """
-        Queries for creating tables for the local sync documents db if needed.
-        They are passed as extra initialization to initialize_sqlciphjer_db
-
-        :rtype: tuple of strings
-        """
-        maybe_create = "CREATE TABLE IF NOT EXISTS %s (%s)"
-        encr = encdecpool.SyncEncrypterPool
-        decr = encdecpool.SyncDecrypterPool
-        sql_encr_table_query = (maybe_create % (
-            encr.TABLE_NAME, encr.FIELD_NAMES))
-        sql_decr_table_query = (maybe_create % (
-            decr.TABLE_NAME, decr.FIELD_NAMES))
-        return (sql_encr_table_query, sql_decr_table_query)
 
     def sync(self, url, creds=None, defer_decryption=True):
         """
@@ -695,11 +643,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             self._sync_enc_pool.close()
             self._sync_enc_pool = None
 
-        # close the sync database
-        if self._sync_db is not None:
-            self._sync_db.close()
-            self._sync_db = None
-
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
     """
@@ -729,12 +672,14 @@ class SoledadSQLCipherWrapper(SQLCipherDatabase):
     It can be used from adbapi to initialize a soledad database after
     getting a regular connection to a sqlcipher database.
     """
-    def __init__(self, conn):
+    def __init__(self, conn, opts, sync_enc_pool):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
         self.set_document_factory(soledad_doc_factory)
         self._prime_replica_uid()
+        self.defer_encryption = opts.defer_encryption
+        self._sync_enc_pool = sync_enc_pool
 
 
 def _assert_db_is_encrypted(opts):
