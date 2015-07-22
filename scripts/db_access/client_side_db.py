@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-# This script gives client-side access to one Soledad user database.
-
 import os
 import argparse
 import tempfile
@@ -11,6 +9,7 @@ import srp._pysrp as srp
 import binascii
 import logging
 import json
+import time
 
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
@@ -20,6 +19,23 @@ from leap.keymanager import KeyManager
 from leap.keymanager.openpgp import OpenPGPKey
 
 from util import ValidateUserHandle
+
+
+"""
+Script to give access to client-side Soledad database.
+
+This is mainly used for tests, but can also be used to recover data from a
+Soledad database (public/private keys, export documents, etc).
+
+To speed up testing/debugging, this script can dump the auth data after
+logging in. Use the --export-auth-data option to export auth data to a file.
+The contents of the file is a json dictionary containing the uuid, server_url,
+cert_file and token, which is enough info to instantiate a soledad client
+without having to interact with the webapp again. Use the --use-auth-data
+option to use the auth data stored in a file.
+
+Use the --help option to see available options.
+"""
 
 
 # create a logger
@@ -118,7 +134,7 @@ def _get_soledad_instance(uuid, passphrase, basedir, server_url, cert_file,
         server_url=server_url,
         cert_file=cert_file,
         auth_token=token,
-        defer_encryption=False)
+        defer_encryption=True)
 
 
 def _get_keymanager_instance(username, provider, soledad, token,
@@ -151,8 +167,8 @@ def _parse_args():
         '--get-all-docs', '-a', action='store_true',
         help='get all documents from the local database')
     parser.add_argument(
-        '--create-doc', '-c', default=None,
-        help='create a document with give content')
+        '--create-docs', '-c', default=0, type=int,
+        help='create a number of documents')
     parser.add_argument(
         '--sync', '-s', action='store_true',
         help='synchronize with the server replica')
@@ -221,8 +237,18 @@ def _get_all_docs(soledad):
 @inlineCallbacks
 def _main(soledad, km, args):
     try:
-        if args.create_doc:
-            yield soledad.create_doc({'content': args.create_doc})
+        if args.create_docs:
+            for i in xrange(args.create_docs):
+                t = time.time()
+                logger.debug("Creating doc %d/%d..." % (i + 1, args.create_docs))
+                content = {
+                    'datetime': time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.gmtime(t)),
+                    'timestamp': t,
+                    'index': i,
+                    'total': args.create_docs,
+                }
+                yield soledad.create_doc(content)
         if args.sync:
             yield soledad.sync()
         if args.get_all_docs:
@@ -233,9 +259,10 @@ def _main(soledad, km, args):
             yield _export_key(args, km, args.expoert_public_key, private=False)
         if args.export_incoming_messages:
             yield _export_incoming_messages(soledad, args.export_incoming_messages)
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
     finally:
+        soledad.close()
         reactor.callWhenRunning(reactor.stop)
 
 
