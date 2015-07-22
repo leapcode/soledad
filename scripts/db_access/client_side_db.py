@@ -163,6 +163,12 @@ def _parse_args():
     parser.add_argument(
         '--export-incoming-messages',
         help="export incoming messages to a directory")
+    parser.add_argument(
+        '--export-auth-data',
+        help="export authentication data to a file")
+    parser.add_argument(
+        '--use-auth-data',
+        help="use authentication data from a file")
     return parser.parse_args()
 
 
@@ -237,8 +243,30 @@ if __name__ == '__main__':
     args = _parse_args()
     passphrase = _get_passphrase(args)
     basedir = _get_basedir(args)
-    uuid, server_url, cert_file, token = \
-        _get_soledad_info(args.username, args.provider, passphrase, basedir)
+
+    if not args.use_auth_data:
+        # get auth data from server
+        uuid, server_url, cert_file, token = \
+            _get_soledad_info(args.username, args.provider, passphrase, basedir)
+    else:
+        # load auth data from file
+        with open(args.use_auth_data) as f:
+            auth_data = json.loads(f.read())
+            uuid = auth_data['uuid']
+            server_url = auth_data['server_url']
+            cert_file = auth_data['cert_file']
+            token = auth_data['token']
+
+    # export auth data to a file
+    if args.export_auth_data:
+        with open(args.export_auth_data, "w") as f:
+            f.write(json.dumps({
+                'uuid': uuid,
+                'server_url': server_url,
+                'cert_file': cert_file,
+                'token': token,
+            }))
+
     soledad = _get_soledad_instance(
         uuid, passphrase, basedir, server_url, cert_file, token)
     km = _get_keymanager_instance(
