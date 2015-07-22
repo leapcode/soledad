@@ -250,6 +250,22 @@ cmdclass["develop"] = cmd_develop
 
 # XXX add ref to docs
 
+requirements = utils.parse_requirements()
+
+if utils.is_develop_mode():
+    print
+    print ("[WARNING] Skipping leap-specific dependencies "
+           "because development mode is detected.")
+    print ("[WARNING] You can install "
+           "the latest published versions with "
+           "'pip install -r pkg/requirements-leap.pip'")
+    print ("[WARNING] Or you can instead do 'python setup.py develop' "
+           "from the parent folder of each one of them.")
+    print
+else:
+    requirements += utils.parse_requirements(
+        reqfiles=["pkg/requirements-leap.pip"])
+
 setup(
     name='leap.soledad.common',
     version=VERSION,
@@ -273,7 +289,7 @@ setup(
     packages=find_packages('src', exclude=['*.tests', '*.tests.*']),
     package_dir={'': 'src'},
     test_suite='leap.soledad.common.tests',
-    install_requires=utils.parse_requirements(),
+    install_requires=requirements,
     tests_require=utils.parse_requirements(
         reqfiles=['pkg/requirements-testing.pip']),
     extras_require={
