@@ -236,7 +236,7 @@ def _main(soledad, km, args):
     except:
         pass
     finally:
-        reactor.stop()
+        reactor.callWhenRunning(reactor.stop)
 
 
 if __name__ == '__main__':
