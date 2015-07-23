@@ -106,7 +106,7 @@ def get_from_index(_):
 
     d = dbpool.runU1DBQuery(
         "get_doc",
-        #"1150c7f10fabce0a57ce13071349fc5064f15bdb0cc1bf2852f74ef3f103aff5")
+        # "1150c7f10fabce0a57ce13071349fc5064f15bdb0cc1bf2852f74ef3f103aff5")
         # XXX this is line 89 from the hacker crackdown...
         # Should accept any other optional hash as an enviroment variable.
         "57793320d4997a673fc7062652da0596c36a4e9fbe31310d2281e67d56d82469")
@@ -151,7 +151,6 @@ def printResult(r, **kwargs):
 def allDone(_):
     debug("ALL DONE!")
 
-    #if silent:
     end_time = datetime.datetime.now()
     print((end_time - start_time).total_seconds())
     reactor.stop()

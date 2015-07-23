@@ -50,12 +50,14 @@ logger = logging.getLogger(name=__name__)
 
 
 class SecretsException(Exception):
+
     """
     Generic exception type raised by this module.
     """
 
 
 class NoStorageSecret(SecretsException):
+
     """
     Raised when trying to use a storage secret but none is available.
     """
@@ -63,6 +65,7 @@ class NoStorageSecret(SecretsException):
 
 
 class PassphraseTooShort(SecretsException):
+
     """
     Raised when trying to change the passphrase but the provided passphrase is
     too short.
@@ -70,6 +73,7 @@ class PassphraseTooShort(SecretsException):
 
 
 class BootstrapSequenceError(SecretsException):
+
     """
     Raised when an attempt to generate a secret and store it in a recovery
     document on server failed.
@@ -81,6 +85,7 @@ class BootstrapSequenceError(SecretsException):
 #
 
 class SoledadSecrets(object):
+
     """
     Soledad secrets handler.
 
@@ -449,10 +454,11 @@ class SoledadSecrets(object):
                     sha256).hexdigest()
             else:
                 raise crypto.UnknownMacMethodError('Unknown MAC method: %s.' %
-                                       data[crypto.MAC_METHOD_KEY])
+                                                   data[crypto.MAC_METHOD_KEY])
             if mac != data[crypto.MAC_KEY]:
-                raise crypto.WrongMacError('Could not authenticate recovery document\'s '
-                               'contents.')
+                raise crypto.WrongMacError(
+                    'Could not authenticate recovery document\'s '
+                    'contents.')
         # include secrets in the secret pool.
         secret_count = 0
         secrets = data[self.STORAGE_SECRETS_KEY].items()

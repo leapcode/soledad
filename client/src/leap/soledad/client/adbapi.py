@@ -55,7 +55,7 @@ SQLCIPHER_MAX_RETRIES = 10
 
 
 def getConnectionPool(opts, openfun=None, driver="pysqlcipher",
-        sync_enc_pool=None):
+                      sync_enc_pool=None):
     """
     Return a connection pool.
 

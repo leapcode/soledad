@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 class SoledadHTTPSyncTarget(SyncTarget):
+
     """
     A SyncTarget that encrypts data before sending and decrypts data after
     receiving.
@@ -311,8 +312,8 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 self._sync_enc_pool.delete_encrypted_doc(
                     doc.doc_id, doc.rev)
             emit(SOLEDAD_SYNC_SEND_STATUS,
-                   "Soledad sync send status: %d/%d"
-                   % (idx, total))
+                 "Soledad sync send status: %d/%d"
+                 % (idx, total))
         response_dict = json.loads(result)[0]
         gen_after_send = response_dict['new_generation']
         trans_id_after_send = response_dict['new_transaction_id']
@@ -383,9 +384,9 @@ class SoledadHTTPSyncTarget(SyncTarget):
         headers = self._auth_header.copy()
         headers.update({'content-type': ['application/x-soledad-sync-get']})
 
-        #---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # maybe receive the first document
-        #---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
         # we fetch the first document before fetching the rest because we need
         # to know the total number of documents to be received, and this
@@ -399,9 +400,9 @@ class SoledadHTTPSyncTarget(SyncTarget):
         if defer_decryption:
             self._sync_decr_pool.start(number_of_changes)
 
-        #---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # maybe receive the rest of the documents
-        #---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
         # launch many asynchronous fetches and inserts of received documents
         # in the temporary sync db. Will wait for all results before
@@ -425,9 +426,9 @@ class SoledadHTTPSyncTarget(SyncTarget):
         if deferreds:
             _, new_generation, new_transaction_id = results.pop()
 
-        #---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # wait for async decryption to finish
-        #---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
         if defer_decryption:
             yield self._sync_decr_pool.deferred

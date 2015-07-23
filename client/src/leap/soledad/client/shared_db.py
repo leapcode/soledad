@@ -115,7 +115,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         :rtype: SoledadSharedDatabase
         """
         # XXX fix below, doesn't work with tests.
-        #if syncable and not url.startswith('https://'):
+        # if syncable and not url.startswith('https://'):
         #    raise ImproperlyConfiguredError(
         #        "Remote soledad server must be an https URI")
         db = SoledadSharedDatabase(url, uuid, creds=creds)

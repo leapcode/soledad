@@ -273,7 +273,7 @@ class Soledad(object):
         # deferred encryption and decryption configurations.
         self._initialize_sync_db(opts)
         self._dbpool = adbapi.getConnectionPool(
-           opts, sync_enc_pool=self._sync_enc_pool)
+            opts, sync_enc_pool=self._sync_enc_pool)
 
     def _init_u1db_syncer(self):
         """
@@ -767,7 +767,6 @@ class Soledad(object):
             self._sync_enc_pool = encdecpool.SyncEncrypterPool(
                 self._crypto, self._sync_db)
 
-
     @property
     def _sync_db_extra_init(self):
         """
@@ -784,8 +783,6 @@ class Soledad(object):
         sql_decr_table_query = (maybe_create % (
             decr.TABLE_NAME, decr.FIELD_NAMES))
         return (sql_encr_table_query, sql_decr_table_query)
-
-
 
     #
     # ISecretsStorage
