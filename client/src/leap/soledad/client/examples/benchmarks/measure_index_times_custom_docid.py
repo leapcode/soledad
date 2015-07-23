@@ -1,4 +1,4 @@
-># -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # measure_index_times.py
 # Copyright (C) 2014 LEAP
 #
