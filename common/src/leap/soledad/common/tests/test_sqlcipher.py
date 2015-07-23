@@ -62,9 +62,9 @@ def sqlcipher_open(path, passphrase, create=True, document_factory=None):
         SQLCipherOptions(path, passphrase, create=create))
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_common_backend`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class TestSQLCipherBackendImpl(tests.TestCase):
 
@@ -78,9 +78,9 @@ class TestSQLCipherBackendImpl(tests.TestCase):
         db.close()
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_backends`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
     return SoledadDocument(doc_id, rev, content, has_conflicts=has_conflicts)
@@ -102,19 +102,19 @@ class SQLCipherDatabaseTests(TestWithScenarios, test_backends.LocalDatabaseTests
 
 
 class SQLCipherValidateGenNTransIdTests(
-        TestWithScenarios, 
+        TestWithScenarios,
         test_backends.LocalDatabaseValidateGenNTransIdTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
 class SQLCipherValidateSourceGenTests(
-        TestWithScenarios, 
+        TestWithScenarios,
         test_backends.LocalDatabaseValidateSourceGenTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
 class SQLCipherWithConflictsTests(
-        TestWithScenarios, 
+        TestWithScenarios,
         test_backends.LocalDatabaseWithConflictsTests):
     scenarios = SQLCIPHER_SCENARIOS
 
@@ -124,9 +124,9 @@ class SQLCipherIndexTests(
     scenarios = SQLCIPHER_SCENARIOS
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_sqlite_backend`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class TestSQLCipherDatabase(TestWithScenarios, test_sqlite_backend.TestSQLiteDatabase):
 
@@ -280,7 +280,7 @@ class TestSQLCipherPartialExpandDatabase(
         pass
 
     def test_open_database_with_factory(self):
-        # SQLCipherDatabase's constructor has no factory parameter. 
+        # SQLCipherDatabase's constructor has no factory parameter.
         pass
 
     def test_open_database_create(self):
@@ -322,9 +322,9 @@ class TestSQLCipherPartialExpandDatabase(
         self.assertEqual(True, self.db.get_doc(doc.doc_id).syncable)
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_open`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class SQLCipherOpen(test_open.TestU1DBOpen):
@@ -344,7 +344,7 @@ class SQLCipherOpen(test_open.TestU1DBOpen):
 
     def test_open_with_factory(self):
         db = sqlcipher_open(self.db_path, PASSWORD, create=True,
-                       document_factory=TestAlternativeDocument)
+                            document_factory=TestAlternativeDocument)
         self.addCleanup(db.close)
         doc = db.create_doc({})
         self.assertTrue(isinstance(doc, SoledadDocument))
@@ -367,9 +367,9 @@ class SQLCipherOpen(test_open.TestU1DBOpen):
         self.assertIsInstance(db2, SQLCipherDatabase)
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Tests for actual encryption of the database
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class SQLCipherEncryptionTest(BaseSoledadTest):
     """

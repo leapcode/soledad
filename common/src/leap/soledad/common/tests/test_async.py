@@ -91,7 +91,7 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
         def _errback(e):
             if e.value[0].getErrorMessage() == "database is locked":
                 adbapi.SQLCIPHER_CONNECTION_TIMEOUT = old_timeout
-                adbapi.SQLCIPHER_MAX_RETRIES = old_max_retries 
+                adbapi.SQLCIPHER_MAX_RETRIES = old_max_retries
                 return defer.succeed("")
             raise Exception
 
@@ -130,7 +130,6 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
                 d = _create_doc(doc)
                 deferreds.append(d)
             return defer.gatherResults(deferreds, consumeErrors=True)
-
 
         def _count_docs(results):
             _, docs = results

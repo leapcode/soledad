@@ -46,13 +46,13 @@ LEAP_SCENARIOS = [
 ]
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_https`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def token_leap_https_sync_target(test, host, path, cert_file=None):
     _, port = test.server.server_address
-    #source_replica_uid = test._soledad._dbpool.replica_uid
+    # source_replica_uid = test._soledad._dbpool.replica_uid
     creds = {'token': {'uuid': 'user-uuid', 'token': 'auth-token'}}
     if not cert_file:
         cert_file = test.cacert_pem
@@ -121,10 +121,11 @@ class TestSoledadHTTPSyncTargetHttpsSupport(
         remote_target = self.getSyncTarget('localhost', 'test')
         d = remote_target.record_sync_info('other-id', 2, 'T-id')
         d.addCallback(lambda _:
-            self.assertEqual(
-                (2, 'T-id'), db._get_replica_gen_and_trans_id('other-id')))
-        d.addCallback(lambda _:
-            remote_target.close())
+                      self.assertEqual(
+                          (2, 'T-id'),
+                          db._get_replica_gen_and_trans_id('other-id')
+                      ))
+        d.addCallback(lambda _: remote_target.close())
         return d
 
     def test_host_mismatch(self):

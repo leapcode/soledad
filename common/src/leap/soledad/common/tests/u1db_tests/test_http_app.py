@@ -24,7 +24,7 @@ except ImportError:
     import json  # noqa
 import StringIO
 
-from unittest import skip 
+from unittest import skip
 
 from u1db import (
     __version__ as _u1db_version,

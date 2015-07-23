@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from leap.common.check import leap_assert as soledad_assert
+from leap.common.check import leap_assert_type as soledad_assert_type
+
+from ._version import get_versions
 
 """
 Soledad routines common to client and server.
@@ -34,11 +38,6 @@ USER_DB_PREFIX = 'user-'
 # Global functions
 #
 
-from leap.common.check import leap_assert as soledad_assert
-from leap.common.check import leap_assert_type as soledad_assert_type
-
-
-from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 

@@ -374,7 +374,7 @@ class EncryptedSyncTestCase(
         def _db1CreateDocs(results):
             deferreds = []
             for i in xrange(number_of_docs):
-                content = binascii.hexlify(os.urandom(doc_size/2))
+                content = binascii.hexlify(os.urandom(doc_size / 2))
                 deferreds.append(sol1.create_doc({'data': content}))
             return defer.DeferredList(deferreds)
 
@@ -456,7 +456,7 @@ class EncryptedSyncTestCase(
         """
         Test if Soledad can sync very large files.
         """
-        length = 100*(10**6)  # 100 MB
+        length = 100 * (10**6)  # 100 MB
         return self._test_encrypted_sym_sync(doc_size=length, number_of_docs=1)
 
     def test_sync_many_small_files(self):

@@ -35,20 +35,23 @@ from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_sync
 from leap.soledad.common.tests.util import CouchDBTestCase
+from u1db.backends.inmemory import InMemoryIndex
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_common_backend`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class TestCouchBackendImpl(CouchDBTestCase):
 
     def test__allocate_doc_id(self):
         db = couch.CouchDatabase.open_database(
             urljoin(
-                'http://localhost:' + str(self.wrapper.port), 'u1db_tests'),
-                create=True,
-                ensure_ddocs=True)
+                'http://localhost:' + str(self.wrapper.port),
+                'u1db_tests'
+            ),
+            create=True,
+            ensure_ddocs=True)
         doc_id1 = db._allocate_doc_id()
         self.assertTrue(doc_id1.startswith('D-'))
         self.assertEqual(34, len(doc_id1))
@@ -56,9 +59,9 @@ class TestCouchBackendImpl(CouchDBTestCase):
         self.assertNotEqual(doc_id1, db._allocate_doc_id())
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_backends`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def make_couch_database_for_test(test, replica_uid):
     port = str(test.wrapper.port)
@@ -151,7 +154,9 @@ class CouchTests(
 
 
 class CouchDatabaseTests(
-        TestWithScenarios, test_backends.LocalDatabaseTests, CouchDBTestCase):
+        TestWithScenarios,
+        test_backends.LocalDatabaseTests,
+        CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
@@ -160,8 +165,10 @@ class CouchDatabaseTests(
         test_backends.LocalDatabaseTests.tearDown(self)
 
 
-class CouchValidateGenNTransIdTests(TestWithScenarios,
-        test_backends.LocalDatabaseValidateGenNTransIdTests, CouchDBTestCase):
+class CouchValidateGenNTransIdTests(
+        TestWithScenarios,
+        test_backends.LocalDatabaseValidateGenNTransIdTests,
+        CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
@@ -170,8 +177,10 @@ class CouchValidateGenNTransIdTests(TestWithScenarios,
         test_backends.LocalDatabaseValidateGenNTransIdTests.tearDown(self)
 
 
-class CouchValidateSourceGenTests(TestWithScenarios,
-        test_backends.LocalDatabaseValidateSourceGenTests, CouchDBTestCase):
+class CouchValidateSourceGenTests(
+        TestWithScenarios,
+        test_backends.LocalDatabaseValidateSourceGenTests,
+        CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
@@ -180,31 +189,33 @@ class CouchValidateSourceGenTests(TestWithScenarios,
         test_backends.LocalDatabaseValidateSourceGenTests.tearDown(self)
 
 
-class CouchWithConflictsTests(TestWithScenarios,
-        test_backends.LocalDatabaseWithConflictsTests, CouchDBTestCase):
+class CouchWithConflictsTests(
+        TestWithScenarios,
+        test_backends.LocalDatabaseWithConflictsTests,
+        CouchDBTestCase):
 
-    scenarios = COUCH_SCENARIOS
+        scenarios = COUCH_SCENARIOS
 
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
+        def tearDown(self):
+            self.db.delete_database()
+            test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
 
 
 # Notice: the CouchDB backend does not have indexing capabilities, so we do
 # not test indexing now.
 
-#class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
+# class CouchIndexTests(test_backends.DatabaseIndexTests, CouchDBTestCase):
 #
-#    scenarios = COUCH_SCENARIOS
+#     scenarios = COUCH_SCENARIOS
 #
-#    def tearDown(self):
-#        self.db.delete_database()
-#        test_backends.DatabaseIndexTests.tearDown(self)
+#     def tearDown(self):
+#         self.db.delete_database()
+#         test_backends.DatabaseIndexTests.tearDown(self)
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_sync`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 target_scenarios = [
     ('local', {'create_db_and_target': test_sync._make_local_db_and_target}), ]
@@ -243,8 +254,6 @@ class CouchDatabaseSyncTargetTests(
 
 
 # The following tests need that the database have an index, so we fake one.
-from u1db.backends.inmemory import InMemoryIndex
-
 
 class IndexedCouchDatabase(couch.CouchDatabase):
 
@@ -350,13 +359,18 @@ class CouchDatabaseSyncTests(
         test_sync.DatabaseSyncTests.setUp(self)
 
     def tearDown(self):
-        for db in [self.db, self.db1, self.db2, self.db3, self.db1_copy,
-                self.db2_copy]:
+        for db in [
+            self.db, self.db1, self.db2,
+            self.db3, self.db1_copy, self.db2_copy
+        ]:
             if db is not None:
                 db.delete_database()
                 db.close()
-        for replica_uid, dbname in [('test1_copy', 'source'),
-                ('test2_copy', 'target'), ('test3', 'target')]:
+        for replica_uid, dbname in [
+            ('test1_copy', 'source'),
+            ('test2_copy', 'target'),
+            ('test3', 'target')
+        ]:
             db = self.create_database(replica_uid, dbname)
             db.delete_database()
             # cleanup connections to avoid leaking of file descriptors

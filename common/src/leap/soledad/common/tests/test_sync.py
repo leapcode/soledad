@@ -80,7 +80,7 @@ class InterruptableSyncTestCase(
             """
             A thread meant to interrupt the sync process.
             """
-            
+
             def __init__(self, soledad, couchdb):
                 self._soledad = soledad
                 self._couchdb = couchdb
@@ -88,7 +88,7 @@ class InterruptableSyncTestCase(
 
             def run(self):
                 while db._get_generation() < 2:
-                    #print "WAITING %d" % db._get_generation()
+                    # print "WAITING %d" % db._get_generation()
                     time.sleep(0.1)
                 self._soledad.stop_sync()
                 time.sleep(1)
@@ -171,16 +171,18 @@ class TestSoledadDbSync(
         """
         Need to explicitely invoke inicialization on all bases.
         """
-        #tests.TestCaseWithServer.setUp(self)
-        #self.main_test_class = test_sync.TestDbSync
+        # tests.TestCaseWithServer.setUp(self)
+        # self.main_test_class = test_sync.TestDbSync
         SoledadWithCouchServerMixin.setUp(self)
         self.startServer()
         self.db = self.make_database_for_test(self, 'test1')
         self.db2 = couch.CouchDatabase.open_database(
             urljoin(
-                'http://localhost:' + str(self.wrapper.port), 'test'),
-                create=True,
-                ensure_ddocs=True)
+                'http://localhost:' + str(self.wrapper.port),
+                'test'
+            ),
+            create=True,
+            ensure_ddocs=True)
 
     def tearDown(self):
         """
@@ -188,7 +190,7 @@ class TestSoledadDbSync(
         """
         self.db2.delete_database()
         SoledadWithCouchServerMixin.tearDown(self)
-        #tests.TestCaseWithServer.tearDown(self)
+        # tests.TestCaseWithServer.tearDown(self)
 
     def do_sync(self, target_name):
         """

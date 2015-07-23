@@ -51,9 +51,9 @@ from leap.soledad.common.tests.u1db_tests import test_remote_sync_target
 from leap.soledad.common.tests.u1db_tests import test_sync
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_remote_sync_target`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class TestSoledadSyncTargetBasics(
         test_remote_sync_target.TestHTTPSyncTargetBasics):
@@ -195,7 +195,7 @@ class TestSoledadSyncTarget(
         self.db2 = self.request_state._create_database('test2')
 
     def tearDown(self):
-        #db2, _ = self.request_state.ensure_database('test2')
+        # db2, _ = self.request_state.ensure_database('test2')
         self.db2.delete_database()
         self.db1.close()
         SoledadWithCouchServerMixin.tearDown(self)
@@ -326,9 +326,9 @@ class TestSoledadSyncTarget(
         pass
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_sync`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 target_scenarios = [
     ('token_leap', {'create_db_and_target':
@@ -468,7 +468,6 @@ class TestSoledadDbSync(
     oauth = False
     token = False
 
-
     def make_app(self):
         self.request_state = couch.CouchServerState(self._couch_url)
         return self.make_app_with_state(self.request_state)
@@ -510,9 +509,11 @@ class TestSoledadDbSync(
 
         self.db2 = couch.CouchDatabase.open_database(
             urljoin(
-                'http://localhost:' + str(self.wrapper.port), 'test'),
-                create=True,
-                ensure_ddocs=True)
+                'http://localhost:' + str(self.wrapper.port),
+                'test'
+            ),
+            create=True,
+            ensure_ddocs=True)
 
     def tearDown(self):
         """
@@ -535,7 +536,7 @@ class TestSoledadDbSync(
         and Token auth.
         """
         if self.token:
-            creds={'token': {
+            creds = {'token': {
                 'uuid': 'user-uuid',
                 'token': 'auth-token',
             }}
@@ -545,10 +546,12 @@ class TestSoledadDbSync(
             crypto = self._soledad._crypto
             replica_uid = self.db1._replica_uid
             dbsyncer = SQLCipherU1DBSync(self.opts, crypto, replica_uid,
-                defer_encryption=True)
+                                         defer_encryption=True)
             self.dbsyncer = dbsyncer
-            return dbsyncer.sync(target_url, creds=creds,
-                autocreate=True,defer_decryption=DEFER_DECRYPTION)
+            return dbsyncer.sync(target_url,
+                                 creds=creds,
+                                 autocreate=True,
+                                 defer_decryption=DEFER_DECRYPTION)
         else:
             return test_sync.TestDbSync.do_sync(self, target_name)
 

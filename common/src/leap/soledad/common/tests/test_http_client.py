@@ -28,9 +28,9 @@ from leap.soledad.common.tests.u1db_tests import test_http_client
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_http_client`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class TestSoledadClientBase(
         TestWithScenarios,

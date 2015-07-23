@@ -85,9 +85,11 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
 
         self.db2 = couch.CouchDatabase.open_database(
             urljoin(
-                'http://localhost:' + str(self.wrapper.port), 'test'),
-                create=True,
-                ensure_ddocs=True)
+                'http://localhost:' + str(self.wrapper.port),
+                'test'
+            ),
+            create=True,
+            ensure_ddocs=True)
 
     def tearDown(self):
         self.db1.close()
@@ -154,7 +156,7 @@ class TestSoledadDbSyncDeferredEncDecr(
         and Token auth.
         """
         if self.token:
-            creds={'token': {
+            creds = {'token': {
                 'uuid': 'user-uuid',
                 'token': 'auth-token',
             }}
@@ -163,11 +165,17 @@ class TestSoledadDbSyncDeferredEncDecr(
             # get a u1db syncer
             crypto = self._soledad._crypto
             replica_uid = self.db1._replica_uid
-            dbsyncer = SQLCipherU1DBSync(self.opts, crypto, replica_uid,
+            dbsyncer = SQLCipherU1DBSync(
+                self.opts,
+                crypto,
+                replica_uid,
                 defer_encryption=True)
             self.dbsyncer = dbsyncer
-            return dbsyncer.sync(target_url, creds=creds,
-                autocreate=True,defer_decryption=DEFER_DECRYPTION)
+            return dbsyncer.sync(
+                target_url,
+                creds=creds,
+                autocreate=True,
+                defer_decryption=DEFER_DECRYPTION)
         else:
             return test_sync.TestDbSync.do_sync(self, target_name)
 

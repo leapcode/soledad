@@ -156,7 +156,7 @@ def copy_sqlite_partial_expanded_for_test(test, db):
     new_db = sqlite_backend.SQLitePartialExpandDatabase(':memory:')
     tmpfile = StringIO()
     for line in db._db_handle.iterdump():
-        if not 'sqlite_sequence' in line:  # work around bug in iterdump
+        if 'sqlite_sequence' not in line:  # work around bug in iterdump
             tmpfile.write('%s\n' % line)
     tmpfile.seek(0)
     new_db._db_handle = dbapi2.connect(':memory:')
@@ -185,8 +185,9 @@ LOCAL_DATABASES_SCENARIOS = [
 
 class DatabaseBaseTests(TestCase):
 
-    accept_fixed_trans_id = False  # set to True assertTransactionLog
-                                   # is happy with all trans ids = ''
+    # set to True assertTransactionLog
+    # is happy with all trans ids = ''
+    accept_fixed_trans_id = False
 
     scenarios = LOCAL_DATABASES_SCENARIOS
 

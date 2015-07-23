@@ -114,7 +114,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         docs = [doc.doc_id]
         for i in range(0, REPEAT_TIMES):
             self.assertEqual(
-                i+1, len(self.db._get_transaction_log()))
+                i + 1, len(self.db._get_transaction_log()))
             doc.content['ops'] += 1
             self.db.put_doc(doc)
             docs.append(doc.doc_id)
@@ -122,13 +122,13 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         # assert length of transaction_log
         transaction_log = self.db._get_transaction_log()
         self.assertEqual(
-            REPEAT_TIMES+1, len(transaction_log))
+            REPEAT_TIMES + 1, len(transaction_log))
 
         # assert that all entries in the log belong to the same doc
-        self.assertEqual(REPEAT_TIMES+1, len(docs))
+        self.assertEqual(REPEAT_TIMES + 1, len(docs))
         for doc_id in docs:
             self.assertEqual(
-                REPEAT_TIMES+1,
+                REPEAT_TIMES + 1,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
 
     def test_correct_transaction_log_after_sequential_deletes(self):
@@ -140,16 +140,16 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         for i in range(0, REPEAT_TIMES):
             doc = self.db.create_doc({'ops': 0})
             self.assertEqual(
-                2*i+1, len(self.db._get_transaction_log()))
+                2 * i + 1, len(self.db._get_transaction_log()))
             docs.append(doc.doc_id)
             self.db.delete_doc(doc)
             self.assertEqual(
-                2*i+2, len(self.db._get_transaction_log()))
+                2 * i + 2, len(self.db._get_transaction_log()))
 
         # assert length of transaction_log
         transaction_log = self.db._get_transaction_log()
         self.assertEqual(
-            2*REPEAT_TIMES, len(transaction_log))
+            2 * REPEAT_TIMES, len(transaction_log))
 
         # assert that each doc appears twice in the transaction_log
         self.assertEqual(REPEAT_TIMES, len(docs))
@@ -176,7 +176,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         def _assert_transaction_and_sync_logs(results, sync_idx):
             # assert sizes of transaction and sync logs
             self.assertEqual(
-                sync_idx*REPEAT_TIMES,
+                sync_idx * REPEAT_TIMES,
                 len(self.db._get_transaction_log()))
             self.assertEqual(
                 1 if sync_idx > 0 else 0,
@@ -184,10 +184,10 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
         def _assert_sync(results, sync_idx):
             gen, docs = results
-            self.assertEqual((sync_idx+1)*REPEAT_TIMES, gen)
-            self.assertEqual((sync_idx+1)*REPEAT_TIMES, len(docs))
+            self.assertEqual((sync_idx + 1) * REPEAT_TIMES, gen)
+            self.assertEqual((sync_idx + 1) * REPEAT_TIMES, len(docs))
             # assert sizes of transaction and sync logs
-            self.assertEqual((sync_idx+1)*REPEAT_TIMES,
+            self.assertEqual((sync_idx + 1) * REPEAT_TIMES,
                              len(self.db._get_transaction_log()))
             sync_log_rows = self.db._database.view('syncs/log').rows
             sync_log = sync_log_rows[0].value
@@ -203,7 +203,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             sol_gen, sol_trans_id = conn._get_generation_info()
             self.assertEqual(sol_gen, known_gen)
             self.assertEqual(sol_trans_id, known_trans_id)
-            
+
         # create some documents
         d = _create_docs(None)
 
@@ -252,7 +252,6 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             pool.acquire()
             self._params['docs'].append(doc.doc_id)
             pool.release()
-
 
         for i in range(0, REPEAT_TIMES):
             thread = self._WorkerThread(
@@ -306,7 +305,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         # assert transaction log
         transaction_log = self.db._get_transaction_log()
         self.assertEqual(
-            2*REPEAT_TIMES, len(transaction_log))
+            2 * REPEAT_TIMES, len(transaction_log))
         # assert that each doc appears twice in the transaction_log
         self.assertEqual(REPEAT_TIMES, len(docs))
         for doc_id in docs:

@@ -24,9 +24,9 @@ from leap.soledad.common.tests.util import BaseSoledadTest
 from leap.soledad.common.tests.util import make_soledad_document_for_test
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_document`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class TestSoledadDocument(
         TestWithScenarios,

@@ -83,7 +83,7 @@ def copy_sqlcipher_database_for_test(test, db):
     new_db = make_sqlcipher_database_for_test(test, None)
     tmpfile = StringIO()
     for line in db._db_handle.iterdump():
-        if not 'sqlite_sequence' in line:  # work around bug in iterdump
+        if 'sqlite_sequence' not in line:  # work around bug in iterdump
             tmpfile.write('%s\n' % line)
     tmpfile.seek(0)
     new_db._db_handle = dbapi2.connect(':memory:')
@@ -117,7 +117,7 @@ def make_token_soledad_app(state):
 
 
 def make_soledad_document_for_test(test, doc_id, rev, content,
-                                has_conflicts=False):
+                                   has_conflicts=False):
     return SoledadDocument(
         doc_id, rev, content, has_conflicts=has_conflicts)
 
@@ -155,7 +155,7 @@ def copy_token_http_database_for_test(test, db):
 class MockedSharedDBTest(object):
 
     def get_default_shared_mock(self, put_doc_side_effect=None,
-            get_doc_return_value=None):
+                                get_doc_return_value=None):
         """
         Get a default class for mocking the shared DB
         """
@@ -235,7 +235,7 @@ class BaseSoledadTest(unittest.TestCase, MockedSharedDBTest):
         def _delete_temporary_dirs():
             # XXX should not access "private" attrs
             for f in [self._soledad.local_db_path,
-                    self._soledad.secrets.secrets_path]:
+                      self._soledad.secrets.secrets_path]:
                 if os.path.isfile(f):
                     os.unlink(f)
             # The following snippet comes from BaseLeapTest.setUpClass, but we
@@ -250,7 +250,6 @@ class BaseSoledadTest(unittest.TestCase, MockedSharedDBTest):
         from twisted.internet import reactor
         reactor.addSystemEventTrigger(
             "after", "shutdown", _delete_temporary_dirs)
-
 
     def _soledad_instance(self, user=ADDRESS, passphrase=u'123',
                           prefix='',
@@ -306,9 +305,9 @@ class BaseSoledadTest(unittest.TestCase, MockedSharedDBTest):
         self.assertEqual(exp_doc.content, doc.content)
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # A wrapper for running couchdb locally.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # from: https://github.com/smcq/paisley/blob/master/paisley/test/util.py
 # TODO: include license of above project.
@@ -427,13 +426,14 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
         """
         self.wrapper = CouchDBWrapper()
         self.wrapper.start()
-        #self.db = self.wrapper.db
+        # self.db = self.wrapper.db
 
     def tearDown(self):
         """
         Stop CouchDB instance for test.
         """
         self.wrapper.stop()
+
 
 class CouchServerStateForTests(CouchServerState):
     """

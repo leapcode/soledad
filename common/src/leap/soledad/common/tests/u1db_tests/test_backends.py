@@ -28,9 +28,6 @@ from u1db import (
 
 from leap.soledad.common.tests import u1db_tests as tests
 
-simple_doc = tests.simple_doc
-nested_doc = tests.nested_doc
-
 from leap.soledad.common.tests.u1db_tests.test_remote_sync_target import (
     make_http_app,
     make_oauth_http_app,
@@ -41,6 +38,9 @@ from u1db.remote import (
 )
 
 from unittest import skip
+
+simple_doc = tests.simple_doc
+nested_doc = tests.nested_doc
 
 
 def make_http_database_for_test(test, replica_uid, path='test', *args):

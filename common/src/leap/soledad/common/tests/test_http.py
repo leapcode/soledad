@@ -23,9 +23,9 @@ from leap.soledad.client import auth
 from leap.soledad.common.tests.u1db_tests import test_http_database
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_http_database`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class _HTTPDatabase(http_database.HTTPDatabase, auth.TokenBasedAuth):
     """

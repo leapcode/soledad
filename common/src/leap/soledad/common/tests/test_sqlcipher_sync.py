@@ -45,12 +45,12 @@ from leap.soledad.common.tests.util import (
 )
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_sync`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def sync_via_synchronizer_and_soledad(test, db_source, db_target,
-                                   trace_hook=None, trace_hook_shallow=None):
+                                      trace_hook=None, trace_hook_shallow=None):
     if trace_hook:
         test.skipTest("full trace hook unsupported over http")
     path = test._http_at[db_target]
@@ -82,8 +82,8 @@ class SQLCipherDatabaseSyncTests(
 
     scenarios = sync_scenarios
 
-    #def setUp(self):
-    #    test_sync.DatabaseSyncTests.setUp(self)
+    # def setUp(self):
+    #     test_sync.DatabaseSyncTests.setUp(self)
 
     def tearDown(self):
         test_sync.DatabaseSyncTests.tearDown(self)
@@ -123,7 +123,7 @@ class SQLCipherDatabaseSyncTests(
         self.assertFalse(doc.has_conflicts)
         # if remote content is in conflicted state, then document revisions
         # will be different.
-        #self.assertEqual(doc.rev, self.db2.get_doc('doc').rev)
+        # self.assertEqual(doc.rev, self.db2.get_doc('doc').rev)
         v = vectorclock.VectorClockRev(doc.rev)
         self.assertTrue(v.is_newer(vectorclock.VectorClockRev(rev1)))
         self.assertTrue(v.is_newer(vectorclock.VectorClockRev(rev2)))
@@ -245,7 +245,7 @@ class SQLCipherDatabaseSyncTests(
         # update on 1
         doc1.set_json('{"a": 3}')
         self.db1.put_doc(doc1)
-       # conflicts
+        # conflicts
         self.sync(self.db2, self.db1)
         self.sync(db3, self.db1)
         self.assertTrue(self.db2.get_doc('the-doc').has_conflicts)
@@ -307,7 +307,7 @@ def _make_local_db_and_token_http_target(test, path='test'):
 target_scenarios = [
     ('leap', {
         'create_db_and_target': _make_local_db_and_token_http_target,
-#        'make_app_with_state': tests.test_remote_sync_target.make_http_app,
+        # 'make_app_with_state': tests.test_remote_sync_target.make_http_app,
         'make_app_with_state': make_soledad_app,
         'do_sync': sync_via_synchronizer_and_soledad}),
 ]

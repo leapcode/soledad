@@ -32,9 +32,9 @@ from leap.soledad.common.tests.util import copy_token_http_database_for_test
 from leap.soledad.common.tests.u1db_tests import test_backends
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_backends`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 LEAP_SCENARIOS = [
     ('http', {

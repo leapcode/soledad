@@ -82,7 +82,7 @@ class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
 
     scenarios = (tests.multiply_scenarios(tests.DatabaseBaseTests.scenarios,
                                           target_scenarios))
-                 #+ c_db_scenarios)
+    # + c_db_scenarios)
     # whitebox true means self.db is the actual local db object
     # against which the sync is performed
     whitebox = True
@@ -373,8 +373,7 @@ class DatabaseSyncTargetTests(tests.DatabaseBaseTests,
                          called)
 
     def test__set_trace_hook_shallow(self):
-        if (self.st._set_trace_hook_shallow == self.st._set_trace_hook
-            or
+        if (self.st._set_trace_hook_shallow == self.st._set_trace_hook or
             self.st._set_trace_hook_shallow.im_func ==
                 SyncTarget._set_trace_hook_shallow.im_func):
             # shallow same as full
@@ -493,8 +492,8 @@ class DatabaseSyncTests(tests.DatabaseBaseTests,
         # NINJA TO YOUR HOUSE.
         db_copy = super(DatabaseSyncTests, self).copy_database(db)
         name, orig_sync_role = self._use_tracking[db]
-        self._use_tracking[db_copy] = (name + '(copy)', sync_role
-                                       or orig_sync_role)
+        self._use_tracking[db_copy] = (name + '(copy)', sync_role or
+                                       orig_sync_role)
         return db_copy
 
     def sync(self, db_from, db_to, trace_hook=None,
