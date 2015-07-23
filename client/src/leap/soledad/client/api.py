@@ -211,8 +211,10 @@ class Soledad(object):
         Initialize configuration using default values for missing params.
         """
         soledad_assert_type(self._passphrase, unicode)
-        initialize = lambda attr, val: getattr(
-            self, attr, None) is None and setattr(self, attr, val)
+
+        def initialize(attr, val):
+            return getattr(self, attr, None) is None and
+            setattr(self, attr, val)
 
         initialize("_secrets_path", os.path.join(
             self.default_prefix, self.secrets_file_name))

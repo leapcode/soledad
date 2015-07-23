@@ -10,8 +10,9 @@ CSVFILE = 'bench.csv'
 
 cmd = "SILENT=1 TIMES={times} TMPDIR={tmpdir} python ./use_{version}api.py"
 
-parse_time = lambda r: r.split('\n')[-1]
 
+def parse_time(r):
+    return r.split('\n')[-1]
 
 with open(CSVFILE, 'w') as log:
 
