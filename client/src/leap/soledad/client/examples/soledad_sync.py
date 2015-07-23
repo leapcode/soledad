@@ -1,7 +1,7 @@
 from leap.bitmask.config.providerconfig import ProviderConfig
 from leap.bitmask.crypto.srpauth import SRPAuth
 from leap.soledad.client import Soledad
-
+from twisted.internet import reactor
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -60,6 +60,4 @@ srpauth = SRPAuth(provider)
 d = srpauth.authenticate(user, _pass)
 d.addCallbacks(init_soledad, printErr)
 
-
-from twisted.internet import reactor
 reactor.run()

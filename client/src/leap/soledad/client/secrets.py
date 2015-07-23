@@ -459,6 +459,7 @@ class SoledadSecrets(object):
                 raise crypto.WrongMacError(
                     'Could not authenticate recovery document\'s '
                     'contents.')
+
         # include secrets in the secret pool.
         secret_count = 0
         secrets = data[self.STORAGE_SECRETS_KEY].items()

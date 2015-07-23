@@ -197,8 +197,8 @@ class SoledadSynchronizer(Synchronizer):
         :rtype: twisted.internet.defer.Deferred
         """
         cur_gen, trans_id = self.source._get_generation_info()
-        if (cur_gen == start_generation + self.num_inserted
-                and self.num_inserted > 0):
+        if (cur_gen == start_generation + self.num_inserted and
+                self.num_inserted > 0):
             return self.sync_target.record_sync_info(
                 self.source._replica_uid, cur_gen, trans_id)
         return defer.succeed(None)

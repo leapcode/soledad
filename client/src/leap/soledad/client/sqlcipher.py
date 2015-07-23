@@ -318,8 +318,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         novalue_where = ["d.doc_id = d%d.doc_id"
                          " AND d%d.field_name = ?"
                          % (i, i) for i in range(len(definition))]
-        exact_where = [novalue_where[i]
-                       + (" AND d%d.value = ?" % (i,))
+        exact_where = [novalue_where[i] + (" AND d%d.value = ?" % (i,))
                        for i in range(len(definition))]
         args = []
         where = []
