@@ -345,6 +345,7 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     # convert binary data to hexadecimal representation so the JSON
     # serialization does not complain about what it tries to serialize.
     hex_ciphertext = binascii.b2a_hex(ciphertext)
+    logger.debug("Encrypting doc: %s" % doc_id)
     return json.dumps({
         crypto.ENC_JSON_KEY: hex_ciphertext,
         crypto.ENC_SCHEME_KEY: enc_scheme,
