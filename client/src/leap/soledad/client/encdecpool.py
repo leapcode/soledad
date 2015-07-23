@@ -162,6 +162,8 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         logger.debug("Starting the encryption loop...")
         reactor.callWhenRunning(self._maybe_encrypt_and_recurse)
 
+        # TODO delete already synced files from database
+
     def enqueue_doc_for_encryption(self, doc):
         """
         Enqueue a document for encryption.
@@ -256,7 +258,6 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
                  db.
         :rtype: twisted.internet.defer.Deferred
         """
-        logger.debug("Trying to get encrypted doc from sync db: %s" % doc_id)
         query = "SELECT content FROM %s WHERE doc_id=? and rev=?" \
                 % self.TABLE_NAME
         result = yield self._runQuery(query, (doc_id, doc_rev))
@@ -350,7 +351,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         4. When we have processed as many documents as we should, the loop
            finishes.
     """
-    # TODO implement throttling to reduce cpu usage??
     TABLE_NAME = "docs_received"
     FIELD_NAMES = "doc_id PRIMARY KEY, rev, content, gen, " \
                   "trans_id, encrypted, idx"
@@ -382,6 +382,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         self._docs_to_process = None
         self._processed_docs = 0
         self._last_inserted_idx = 0
+        self._decrypting_docs = []
 
         self._async_results = []
 
@@ -551,6 +552,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         doc_id, rev, content, gen, trans_id, idx = result
         logger.debug("Sync decrypter pool: decrypted doc %s: %s %s %s"
                      % (doc_id, rev, gen, trans_id))
+        self._decrypting_docs.remove((doc_id, rev))
         return self.insert_received_doc(
             doc_id, rev, content, gen, trans_id, idx)
 
@@ -619,8 +621,10 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         """
         docs = yield self._get_docs(encrypted=True)
         for doc_id, rev, content, gen, trans_id, _, idx in docs:
-            self._async_decrypt_doc(
-                doc_id, rev, content, gen, trans_id, idx)
+            if (doc_id, rev) not in self._decrypting_docs:
+                self._decrypting_docs.append((doc_id, rev))
+                self._async_decrypt_doc(
+                    doc_id, rev, content, gen, trans_id, idx)
 
     @defer.inlineCallbacks
     def _process_decrypted_docs(self):

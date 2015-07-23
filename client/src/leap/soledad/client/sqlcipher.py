@@ -62,12 +62,10 @@ from twisted.internet.threads import deferToThreadPool
 from twisted.python.threadpool import ThreadPool
 from twisted.enterprise import adbapi
 
-from leap.soledad.client import encdecpool
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
 
 from leap.soledad.client import pragmas
-from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -636,11 +634,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # close all open syncers
         for url in self._syncers.keys():
             del self._syncers[url]
-
-        # stop the encryption pool
-        if self._sync_enc_pool is not None:
-            self._sync_enc_pool.close()
-            self._sync_enc_pool = None
 
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):

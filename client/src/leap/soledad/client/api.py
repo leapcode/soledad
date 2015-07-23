@@ -304,6 +304,8 @@ class Soledad(object):
         # close the sync database
         self._sync_db.close()
         self._sync_db = None
+        if self._defer_encryption:
+            self._sync_enc_pool.close()
 
     #
     # ILocalStorage
