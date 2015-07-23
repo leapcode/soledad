@@ -395,6 +395,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         doc = yield self._receive_one_doc(
             headers, last_known_generation, last_known_trans_id,
             sync_id, 0)
+        self._received_docs = 0
         number_of_changes, ngen, ntrans = self._insert_received_doc(doc, 1, 1)
 
         if defer_decryption:
@@ -502,9 +503,10 @@ class SoledadHTTPSyncTarget(SyncTarget):
             # -------------------------------------------------------------
             # end of symmetric decryption
             # -------------------------------------------------------------
-        msg = "%d/%d" % (idx, total)
+        self._received_docs += 1
+        msg = "%d/%d" % (self._received_docs, total)
         emit(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
-        logger.debug("Soledad sync receive status: %s" % msg)
+        logger.debug("Sync receive status: %s" % msg)
         return number_of_changes, new_generation, new_transaction_id
 
     def _parse_received_doc_response(self, response):
