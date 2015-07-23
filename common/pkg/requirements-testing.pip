@@ -1,6 +1,13 @@
 mock
 testscenarios
-leap.common>=0.4.0
-leap.soledad.server>=0.7.0
-leap.soledad.client>=0.7.0
 setuptools-trial
+
+#----------------------------------------------------------------------
+#Right now, common tests also depend on having the other soledad
+#modules installed. Commenting to avoid versioning problem, you should
+#know what you are testing against :)
+#----------------------------------------------------------------------
+
+#leap.common>=0.4.0
+#leap.soledad.server>=0.7.0
+#leap.soledad.client>=0.7.0
