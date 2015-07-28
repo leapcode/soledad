@@ -1,6 +1,7 @@
 mock
 testscenarios
 setuptools-trial
+pep8
 
 #----------------------------------------------------------------------
 #Right now, common tests also depend on having the other soledad
