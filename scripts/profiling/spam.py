@@ -7,12 +7,12 @@ import string
 import smtplib
 import threading
 import logging
+import dns.resolver
 
 from argparse import ArgumentParser
 
 
-SMTP_HOST = 'chipmonk.cdev.bitmask.net'
-SMTP_PORT = 465
+SMTP_DEFAULT_PORT = 465
 NUMBER_OF_THREADS = 20
 
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 LOG_FORMAT = '%(asctime)s %(message)s'
 
 
-def _send_email(host, port, subject, to_addr, from_addr, body_text):
+def _send_email(server, port, subject, to_addr, from_addr, body_text):
     """
     Send an email
     """
@@ -32,12 +32,12 @@ def _send_email(host, port, subject, to_addr, from_addr, body_text):
             body_text
             ), "\r\n")
     logger.debug("setting up smtp...")
-    server = smtplib.SMTP_SSL(host, port)
+    smtp = smtplib.SMTP_SSL(server, port)
     logger.info(
         "sending message: (%s, %s, %s, %i)"
-        % (from_addr, to_addr, host, port))
-    server.sendmail(from_addr, [to_addr], body)
-    server.quit()
+        % (from_addr, to_addr, server, port))
+    smtp.sendmail(from_addr, [to_addr], body)
+    smtp.quit()
 
 
 def _parse_args():
@@ -49,10 +49,10 @@ def _parse_args():
         'number_of_messages', type=int,
         help='The amount of messages email address to spam')
     parser.add_argument(
-        '--server', '-s', default=SMTP_HOST,
+        '--server', '-s',
         help='The SMTP server to use')
     parser.add_argument(
-        '--port', '-p', default=SMTP_PORT,
+        '--port', '-p', default=SMTP_DEFAULT_PORT,
         help='The SMTP port to use')
     parser.add_argument(
         '--threads', '-t', default=NUMBER_OF_THREADS,
@@ -65,11 +65,11 @@ def _parse_args():
 
 class EmailSenderThread(threading.Thread):
 
-    def __init__(self, host, port, subject, to_addr, from_addr, body_text,
-            finished_fun):
+    def __init__(self, server, port, subject, to_addr, from_addr, body_text,
+                 finished_fun):
         threading.Thread.__init__(self)
         logger.debug("initilizing thread...")
-        self._host = host
+        self._server = server
         self._port = port
         self._subject = subject
         self._to_addr = to_addr
@@ -80,16 +80,16 @@ class EmailSenderThread(threading.Thread):
     def run(self):
         logger.debug("running thread...")
         _send_email(
-            self._host, self._port, self._subject, self._to_addr,
+            self._server, self._port, self._subject, self._to_addr,
             self._from_addr, self._body_text)
         self._finished_fun()
 
 
-def _launch_email_thread(host, port, subject, to_addr, from_addr, body_text,
-        finished_fun):
+def _launch_email_thread(server, port, subject, to_addr, from_addr, body_text,
+                         finished_fun):
     logger.debug("will launch email thread...")
     thread = EmailSenderThread(
-        host, port, subject, to_addr, from_addr, body_text, finished_fun)
+        server, port, subject, to_addr, from_addr, body_text, finished_fun)
     thread.start()
     return thread
 
@@ -107,7 +107,7 @@ class FinishedThreads(object):
 
 
 def _send_messages(args):
-    host = args.server
+    server = args.server
     port = args.port
     subject = "Message from Soledad script"
     to_addr = args.target_address
@@ -121,6 +121,14 @@ def _send_messages(args):
         level = logging.INFO
     logging.basicConfig(format=LOG_FORMAT, level=level)
 
+    # get MX configuration
+    if not server:
+        logger.info("Resolving MX server...")
+        _, domain = to_addr.split("@", 1)
+        result = dns.resolver.query(domain, "MX")
+        server = result[0].exchange.to_text()
+        logger.info("MX server is: %s" % server)
+
     semaphore = threading.Semaphore(args.threads)
     threads = []
     finished_threads = FinishedThreads()
@@ -133,7 +141,7 @@ def _send_messages(args):
         semaphore.acquire()
         threads.append(
             _launch_email_thread(
-               host, port, subject, to_addr, from_addr, body_text,
+               server, port, subject, to_addr, from_addr, body_text,
                _finished_fun))
 
     for t in threads:
