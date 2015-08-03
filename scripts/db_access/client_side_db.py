@@ -106,18 +106,18 @@ def _get_soledad_info(username, provider, passphrase, basedir):
         if choice != '':
             host = hostnames[int(choice) - 1]
     server_url = 'https://%s:%d/user-%s' % \
-              (soledad_hosts[host]['hostname'], soledad_hosts[host]['port'],
-               auth[2]['id'])
+        (soledad_hosts[host]['hostname'], soledad_hosts[host]['port'],
+         auth[2]['id'])
     # get provider ca certificate
     ca_cert = requests.get('https://%s/ca.crt' % provider, verify=False).text
     cert_file = os.path.join(basedir, 'ca.crt')
     with open(cert_file, 'w') as f:
-      f.write(ca_cert)
+        f.write(ca_cert)
     return auth[2]['id'], server_url, cert_file, auth[2]['token']
 
 
 def _get_soledad_instance(uuid, passphrase, basedir, server_url, cert_file,
-        token):
+                          token):
     # setup soledad info
     logger.info('UUID is %s' % uuid)
     logger.info('Server URL is %s' % server_url)
@@ -138,8 +138,8 @@ def _get_soledad_instance(uuid, passphrase, basedir, server_url, cert_file,
 
 
 def _get_keymanager_instance(username, provider, soledad, token,
-        ca_cert_path=None, api_uri=None, api_version=None, uid=None,
-        gpgbinary=None):
+                             ca_cert_path=None, api_uri=None, api_version=None,
+                             uid=None, gpgbinary=None):
     return KeyManager(
         "{username}@{provider}".format(username=username, provider=provider),
         "http://uri",
@@ -212,7 +212,8 @@ def _get_basedir(args):
 @inlineCallbacks
 def _export_key(args, km, fname, private=False):
     address = args.username + "@" + args.provider
-    pkey = yield km.get_key(address, OpenPGPKey, private=private, fetch_remote=False)
+    pkey = yield km.get_key(
+        address, OpenPGPKey, private=private, fetch_remote=False)
     with open(args.export_private_key, "w") as f:
         f.write(pkey.key_data)
 
@@ -243,7 +244,8 @@ def _main(soledad, km, args):
         if args.create_docs:
             for i in xrange(args.create_docs):
                 t = time.time()
-                logger.debug("Creating doc %d/%d..." % (i + 1, args.create_docs))
+                logger.debug(
+                    "Creating doc %d/%d..." % (i + 1, args.create_docs))
                 content = {
                     'datetime': time.strftime(
                         "%Y-%m-%d %H:%M:%S", time.gmtime(t)),
@@ -267,7 +269,8 @@ def _main(soledad, km, args):
         if args.export_public_key:
             yield _export_key(args, km, args.expoert_public_key, private=False)
         if args.export_incoming_messages:
-            yield _export_incoming_messages(soledad, args.export_incoming_messages)
+            yield _export_incoming_messages(
+                soledad, args.export_incoming_messages)
     except Exception as e:
         logger.error(e)
     finally:
@@ -283,7 +286,8 @@ if __name__ == '__main__':
     if not args.use_auth_data:
         # get auth data from server
         uuid, server_url, cert_file, token = \
-            _get_soledad_info(args.username, args.provider, passphrase, basedir)
+            _get_soledad_info(
+                args.username, args.provider, passphrase, basedir)
     else:
         # load auth data from file
         with open(args.use_auth_data) as f:
