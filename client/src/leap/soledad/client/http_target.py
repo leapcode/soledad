@@ -311,9 +311,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
             if self._defer_encryption:
                 self._sync_enc_pool.delete_encrypted_doc(
                     doc.doc_id, doc.rev)
-            emit(SOLEDAD_SYNC_SEND_STATUS,
-                 "Soledad sync send status: %d/%d"
-                 % (idx, total))
+            msg = "%d/%d" % (idx, total)
+            emit(
+                SOLEDAD_SYNC_SEND_STATUS,
+                "Soledad sync send status: %s" % msg)
+            logger.debug("Sync send status: %s" % msg)
         response_dict = json.loads(result)[0]
         gen_after_send = response_dict['new_generation']
         trans_id_after_send = response_dict['new_transaction_id']
