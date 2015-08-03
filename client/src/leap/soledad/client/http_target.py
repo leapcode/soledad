@@ -435,7 +435,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
 
         if defer_decryption:
             yield self._sync_decr_pool.deferred
-            self._sync_decr_pool.close()
+            self._sync_decr_pool.stop()
 
         defer.returnValue([new_generation, new_transaction_id])
 

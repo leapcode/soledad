@@ -304,7 +304,7 @@ class Soledad(object):
         self._sync_db.close()
         self._sync_db = None
         if self._defer_encryption:
-            self._sync_enc_pool.close()
+            self._sync_enc_pool.stop()
 
     #
     # ILocalStorage
@@ -769,6 +769,7 @@ class Soledad(object):
             # initialize syncing queue encryption pool
             self._sync_enc_pool = encdecpool.SyncEncrypterPool(
                 self._crypto, self._sync_db)
+            self._sync_enc_pool.start()
 
     @property
     def _sync_db_extra_init(self):
