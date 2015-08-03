@@ -173,6 +173,9 @@ def _parse_args():
         '--sync', '-s', action='store_true',
         help='synchronize with the server replica')
     parser.add_argument(
+        '--repeat-sync', '-r', action='store_true',
+        help='repeat synchronization until no new data is received')
+    parser.add_argument(
         '--export-public-key', help="export the public key to a file")
     parser.add_argument(
         '--export-private-key', help="export the private key to a file")
@@ -251,6 +254,12 @@ def _main(soledad, km, args):
                 yield soledad.create_doc(content)
         if args.sync:
             yield soledad.sync()
+        if args.repeat_sync:
+            old_gen = 0
+            new_gen = yield soledad.sync()
+            while old_gen != new_gen:
+                old_gen = new_gen
+                new_gen = yield soledad.sync()
         if args.get_all_docs:
             yield _get_all_docs(soledad)
         if args.export_private_key:
