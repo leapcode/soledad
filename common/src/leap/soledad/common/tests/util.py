@@ -43,6 +43,7 @@ from u1db.remote import http_database
 from twisted.trial import unittest
 
 from leap.common.files import mkdir_p
+from leap.common.testing.basetest import BaseLeapTest
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
@@ -184,7 +185,7 @@ def token_soledad_sync_target(test, path):
     return st
 
 
-class BaseSoledadTest(unittest.TestCase, MockedSharedDBTest):
+class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
     """
     Instantiates Soledad for usage in tests.
     """
@@ -194,6 +195,7 @@ class BaseSoledadTest(unittest.TestCase, MockedSharedDBTest):
         # The following snippet comes from BaseLeapTest.setUpClass, but we
         # repeat it here because twisted.trial does not work with
         # setUpClass/tearDownClass.
+
         self.old_path = os.environ['PATH']
         self.old_home = os.environ['HOME']
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
