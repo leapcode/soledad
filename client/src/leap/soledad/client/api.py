@@ -196,9 +196,9 @@ class Soledad(object):
         # The following can raise BootstrapSequenceError, that will be
         # propagated upwards.
         self._init_secrets()
-        self._init_u1db_sqlcipher_backend()
 
         self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
+        self._init_u1db_sqlcipher_backend()
 
         if syncable:
             self._init_u1db_syncer()
