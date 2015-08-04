@@ -97,7 +97,8 @@ class SQLCipherTests(TestWithScenarios, test_backends.AllDatabaseTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
-class SQLCipherDatabaseTests(TestWithScenarios, test_backends.LocalDatabaseTests):
+class SQLCipherDatabaseTests(TestWithScenarios,
+                             test_backends.LocalDatabaseTests):
     scenarios = SQLCIPHER_SCENARIOS
 
 
@@ -128,7 +129,8 @@ class SQLCipherIndexTests(
 # The following tests come from `u1db.tests.test_sqlite_backend`.
 # -----------------------------------------------------------------------------
 
-class TestSQLCipherDatabase(TestWithScenarios, test_sqlite_backend.TestSQLiteDatabase):
+class TestSQLCipherDatabase(TestWithScenarios,
+                            test_sqlite_backend.TestSQLiteDatabase):
 
     def test_atomic_initialize(self):
         # This test was modified to ensure that db2.close() is called within
@@ -181,6 +183,7 @@ class TestSQLCipherDatabase(TestWithScenarios, test_sqlite_backend.TestSQLiteDat
 
 
 class TestAlternativeDocument(SoledadDocument):
+
     """A (not very) alternative implementation of Document."""
 
 
@@ -372,6 +375,7 @@ class SQLCipherOpen(test_open.TestU1DBOpen):
 # -----------------------------------------------------------------------------
 
 class SQLCipherEncryptionTest(BaseSoledadTest):
+
     """
     Tests to guarantee SQLCipher is indeed encrypting data when storing.
     """

@@ -57,6 +57,7 @@ from leap.soledad.common.tests.u1db_tests import test_sync
 
 class TestSoledadSyncTargetBasics(
         test_remote_sync_target.TestHTTPSyncTargetBasics):
+
     """
     Some tests had to be copied to this class so we can instantiate our own
     target.
@@ -73,6 +74,7 @@ class TestSoledadSyncTargetBasics(
 class TestSoledadParsingSyncStream(
         test_remote_sync_target.TestParsingSyncStream,
         BaseSoledadTest):
+
     """
     Some tests had to be copied to this class so we can instantiate our own
     target.
@@ -444,6 +446,7 @@ DBPASS = "pass"
 
 
 class SyncTimeoutError(Exception):
+
     """
     Dummy exception to notify timeout during sync.
     """
@@ -454,6 +457,7 @@ class TestSoledadDbSync(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
         test_sync.TestDbSync):
+
     """Test db.sync remote sync shortcut"""
 
     scenarios = [
@@ -581,8 +585,8 @@ class TestSoledadDbSync(
         def _assert_successful_sync(results):
             import time
             # need to give time to the encryption to proceed
-            # TODO should implement a defer list to subscribe to the all-decrypted
-            # event
+            # TODO should implement a defer list to subscribe to the
+            # all-decrypted event
             time.sleep(2)
             local_gen_before_sync = results
             self.wait_for_sync()

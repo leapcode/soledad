@@ -40,6 +40,7 @@ def register_exception(cls):
 
 
 class SoledadError(errors.U1DBError):
+
     """
     Base Soledad HTTP errors.
     """
@@ -52,6 +53,7 @@ class SoledadError(errors.U1DBError):
 
 @register_exception
 class InvalidAuthTokenError(errors.Unauthorized):
+
     """
     Exception raised when failing to get authorization for some action because
     the provided token either does not exist in the tokens database, has a
@@ -69,6 +71,7 @@ class InvalidAuthTokenError(errors.Unauthorized):
 
 @register_exception
 class InvalidTokenError(SoledadError):
+
     """
     Exception raised when trying to unlock shared database with invalid token.
     """
@@ -79,6 +82,7 @@ class InvalidTokenError(SoledadError):
 
 @register_exception
 class NotLockedError(SoledadError):
+
     """
     Exception raised when trying to unlock shared database when it is not
     locked.
@@ -90,6 +94,7 @@ class NotLockedError(SoledadError):
 
 @register_exception
 class AlreadyLockedError(SoledadError):
+
     """
     Exception raised when trying to lock shared database but it is already
     locked.
@@ -101,6 +106,7 @@ class AlreadyLockedError(SoledadError):
 
 @register_exception
 class LockTimedOutError(SoledadError):
+
     """
     Exception raised when timing out while trying to lock the shared database.
     """
@@ -111,6 +117,7 @@ class LockTimedOutError(SoledadError):
 
 @register_exception
 class CouldNotObtainLockError(SoledadError):
+
     """
     Exception raised when timing out while trying to lock the shared database.
     """
@@ -125,6 +132,7 @@ class CouldNotObtainLockError(SoledadError):
 
 @register_exception
 class MissingDesignDocError(SoledadError):
+
     """
     Raised when trying to access a missing couch design document.
     """
@@ -135,6 +143,7 @@ class MissingDesignDocError(SoledadError):
 
 @register_exception
 class MissingDesignDocNamedViewError(SoledadError):
+
     """
     Raised when trying to access a missing named view on a couch design
     document.
@@ -146,6 +155,7 @@ class MissingDesignDocNamedViewError(SoledadError):
 
 @register_exception
 class MissingDesignDocListFunctionError(SoledadError):
+
     """
     Raised when trying to access a missing list function on a couch design
     document.
@@ -157,6 +167,7 @@ class MissingDesignDocListFunctionError(SoledadError):
 
 @register_exception
 class MissingDesignDocDeletedError(SoledadError):
+
     """
     Raised when trying to access a deleted couch design document.
     """
@@ -167,6 +178,7 @@ class MissingDesignDocDeletedError(SoledadError):
 
 @register_exception
 class DesignDocUnknownError(SoledadError):
+
     """
     Raised when trying to access a couch design document and getting an
     unknown error.

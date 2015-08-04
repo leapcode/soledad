@@ -186,6 +186,7 @@ def token_soledad_sync_target(test, path):
 
 
 class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
+
     """
     Instantiates Soledad for usage in tests.
     """
@@ -314,6 +315,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
 # from: https://github.com/smcq/paisley/blob/master/paisley/test/util.py
 # TODO: include license of above project.
 class CouchDBWrapper(object):
+
     """
     Wrapper for external CouchDB instance which is started and stopped for
     testing.
@@ -331,7 +333,8 @@ class CouchDBWrapper(object):
                 print traceback.format_exc()
                 self.stop()
                 tries += 1
-        raise Exception("Check your couchdb: Tried to start 3 times and failed badly")
+        raise Exception(
+            "Check your couchdb: Tried to start 3 times and failed badly")
 
     def _try_start(self):
         """
@@ -358,7 +361,8 @@ class CouchDBWrapper(object):
         # create the dirs from the template
         mkdir_p(os.path.join(self.tempdir, 'lib'))
         mkdir_p(os.path.join(self.tempdir, 'log'))
-        args = ['/usr/bin/couchdb', '-n', '-a', defaultConfPath, '-a', confPath]
+        args = ['/usr/bin/couchdb', '-n',
+                '-a', defaultConfPath, '-a', confPath]
         null = open('/dev/null', 'w')
 
         self.process = subprocess.Popen(
@@ -418,6 +422,7 @@ stderr:
 
 
 class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
+
     """
     TestCase base class for tests against a real CouchDB server.
     """
@@ -438,6 +443,7 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
 
 
 class CouchServerStateForTests(CouchServerState):
+
     """
     This is a slightly modified CouchDB server state that allows for creating
     a database.

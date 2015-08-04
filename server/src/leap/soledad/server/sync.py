@@ -14,17 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Server side synchronization infrastructure.
 """
-
 import json
 
-
 from leap.soledad.common.couch import CouchDatabase
-from itertools import izip
 from u1db import sync, Document
 from u1db.remote import http_app
 

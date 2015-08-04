@@ -71,12 +71,14 @@ COUCH_TIMEOUT = 120  # timeout for transfers between Soledad server and Couch
 
 
 class InvalidURLError(Exception):
+
     """
     Exception raised when Soledad encounters a malformed URL.
     """
 
 
 class CouchDocument(SoledadDocument):
+
     """
     This is the document used for maintaining the Couch backend.
 
@@ -251,6 +253,7 @@ def raise_server_error(exc, ddoc_path):
 
 
 class MultipartWriter(object):
+
     """
     A multipart writer adapted from python-couchdb's one so we can PUT
     documents using couch's multipart PUT.
@@ -356,6 +359,7 @@ def couch_server(url):
 
 
 class CouchDatabase(CommonBackend):
+
     """
     A U1DB implementation that uses CouchDB as its persistence layer.
     """
@@ -367,6 +371,7 @@ class CouchDatabase(CommonBackend):
     sync_info_lock = defaultdict(threading.Lock)
 
     class _GetDocThread(threading.Thread):
+
         """
         A thread that gets a document from a database.
 
@@ -1506,6 +1511,7 @@ class CouchDatabase(CommonBackend):
 
 
 class CouchSyncTarget(CommonSyncTarget):
+
     """
     Functionality for using a CouchDatabase as a synchronization target.
     """
@@ -1528,6 +1534,7 @@ class CouchSyncTarget(CommonSyncTarget):
 
 
 class CouchServerState(ServerState):
+
     """
     Inteface of the WSGI server with the CouchDB backend.
     """

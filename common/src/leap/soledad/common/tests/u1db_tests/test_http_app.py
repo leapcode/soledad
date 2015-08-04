@@ -1134,6 +1134,7 @@ class TestPluggableSyncExchange(tests.TestCase):
     def test_plugging(self):
 
         class MySyncExchange(object):
+
             def __init__(self, db, source_replica_uid, last_known_generation):
                 pass
 

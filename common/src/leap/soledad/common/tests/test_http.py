@@ -28,6 +28,7 @@ from leap.soledad.common.tests.u1db_tests import test_http_database
 # -----------------------------------------------------------------------------
 
 class _HTTPDatabase(http_database.HTTPDatabase, auth.TokenBasedAuth):
+
     """
     Wraps our token auth implementation.
     """

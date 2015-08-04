@@ -71,9 +71,10 @@ class TestSyncEncrypterPool(TestCase, BaseSoledadTest):
         while encrypted is None and attempts < 10:
             encrypted = yield self._pool.get_encrypted_doc(DOC_ID, DOC_REV)
             attempts += 1
-        
+
         self.assertIsNotNone(encrypted)
         self.assertTrue(attempts < 10)
+
 
 class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
 
@@ -106,7 +107,7 @@ class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
         """
         self._pool.start(1)
         self._pool.insert_received_doc(
-           DOC_ID, DOC_REV, "{}", 1, "trans_id", 1)
+            DOC_ID, DOC_REV, "{}", 1, "trans_id", 1)
 
         def _assert_doc_was_inserted(_):
             self.assertEqual(
@@ -168,7 +169,7 @@ class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
         # insert the encrypted document in the pool
         self._pool.start(1)
         self._pool.insert_encrypted_received_doc(
-           DOC_ID, DOC_REV, encrypted_content, 1, "trans_id", 1)
+            DOC_ID, DOC_REV, encrypted_content, 1, "trans_id", 1)
 
         def _assert_doc_was_decrypted_and_inserted(_):
             self.assertEqual(self._inserted_docs, [(doc, 1, u"trans_id")])

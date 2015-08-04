@@ -34,6 +34,7 @@ from leap.soledad.common.crypto import MAC_METHOD_KEY
 
 
 class EncryptedSyncTestCase(BaseSoledadTest):
+
     """
     Tests that guarantee that data will always be encrypted when syncing.
     """
@@ -71,7 +72,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertEqual(secret_id, self._soledad.secrets._secret_id)
         self.assertEqual(secret, self._soledad.secrets._secrets[secret_id])
         # assert recovery document structure
-        encrypted_secret = rd[self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id]
+        encrypted_secret = rd[
+            self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id]
         self.assertTrue(self._soledad.secrets.CIPHER_KEY in encrypted_secret)
         self.assertTrue(
             encrypted_secret[self._soledad.secrets.CIPHER_KEY] == 'aes256')

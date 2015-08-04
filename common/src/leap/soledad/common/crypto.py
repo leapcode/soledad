@@ -26,6 +26,7 @@ Soledad common crypto bits.
 #
 
 class EncryptionSchemes(object):
+
     """
     Representation of encryption schemes used to encrypt documents.
     """
@@ -36,6 +37,7 @@ class EncryptionSchemes(object):
 
 
 class UnknownEncryptionSchemeError(Exception):
+
     """
     Raised when trying to decrypt from unknown encryption schemes.
     """
@@ -43,6 +45,7 @@ class UnknownEncryptionSchemeError(Exception):
 
 
 class EncryptionMethods(object):
+
     """
     Representation of encryption methods that can be used.
     """
@@ -51,6 +54,7 @@ class EncryptionMethods(object):
 
 
 class UnknownEncryptionMethodError(Exception):
+
     """
     Raised when trying to encrypt/decrypt with unknown method.
     """
@@ -58,6 +62,7 @@ class UnknownEncryptionMethodError(Exception):
 
 
 class MacMethods(object):
+
     """
     Representation of MAC methods used to authenticate document's contents.
     """
@@ -66,6 +71,7 @@ class MacMethods(object):
 
 
 class UnknownMacMethodError(Exception):
+
     """
     Raised when trying to authenticate document's content with unknown MAC
     mehtod.
@@ -74,6 +80,7 @@ class UnknownMacMethodError(Exception):
 
 
 class WrongMacError(Exception):
+
     """
     Raised when failing to authenticate document's contents based on MAC.
     """

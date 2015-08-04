@@ -78,6 +78,7 @@ def copy_oauth_http_database_for_test(test, db):
 
 
 class TestAlternativeDocument(DocumentBase):
+
     """A (not very) alternative implementation of Document."""
 
 

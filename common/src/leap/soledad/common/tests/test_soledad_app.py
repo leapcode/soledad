@@ -49,11 +49,10 @@ class SoledadTests(
         TestWithScenarios, test_backends.AllDatabaseTests, BaseSoledadTest):
 
     scenarios = LEAP_SCENARIOS + [
-        ('token_http', {'make_database_for_test':
-                        make_token_http_database_for_test,
-                        'copy_database_for_test':
-                        copy_token_http_database_for_test,
-                        'make_document_for_test': make_soledad_document_for_test,
-                        'make_app_with_state': make_token_soledad_app,
-                        })
+        ('token_http', {
+            'make_database_for_test': make_token_http_database_for_test,
+            'copy_database_for_test': copy_token_http_database_for_test,
+            'make_document_for_test': make_soledad_document_for_test,
+            'make_app_with_state': make_token_soledad_app,
+        })
     ]

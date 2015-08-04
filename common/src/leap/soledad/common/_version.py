@@ -129,11 +129,11 @@ def versions_from_vcs(tag_prefix, versionfile_source, verbose=False):
         root = os.path.dirname(
             os.path.join('..', here))
 
-    ######################################################
+    #
     # XXX patch for our specific configuration with
     # the three projects leap.soledad.{common, client, server}
     # inside the same repo.
-    ######################################################
+    #
     root = os.path.dirname(os.path.join('..', root))
 
     if not os.path.exists(os.path.join(root, ".git")):

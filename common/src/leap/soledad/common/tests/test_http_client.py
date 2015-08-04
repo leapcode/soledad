@@ -35,6 +35,7 @@ from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 class TestSoledadClientBase(
         TestWithScenarios,
         test_http_client.TestHTTPClientBase):
+
     """
     This class should be used to test Token auth.
     """

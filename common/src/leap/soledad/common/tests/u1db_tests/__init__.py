@@ -238,6 +238,7 @@ class DatabaseBaseTests(TestCase):
 
 
 class ServerStateForTests(server_state.ServerState):
+
     """Used in the test suite, so we don't have to touch disk, etc."""
 
     def __init__(self):
@@ -284,6 +285,7 @@ class ServerStateForTests(server_state.ServerState):
 
 
 class ResponderForTests(object):
+
     """Responder for tests."""
     _started = False
     sent_response = False
@@ -309,6 +311,7 @@ class TestCaseWithServer(TestCase):
         # hook point
         # should return (ServerClass, "shutdown method name", "url_scheme")
         class _RequestHandler(simple_server.WSGIRequestHandler):
+
             def log_request(*args):
                 pass  # suppress
 
@@ -394,6 +397,7 @@ token3 = oauth.OAuthToken('kkkk3', 'ZYX')
 
 
 class TestingOAuthDataStore(oauth.OAuthDataStore):
+
     """In memory predefined OAuthDataStore for testing."""
 
     consumers = {

@@ -49,6 +49,7 @@ DBPASS = "pass"
 
 
 class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
+
     """
     Another base class for testing the deferred encryption/decryption during
     the syncs, using the intermediate database.
@@ -102,6 +103,7 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
 
 
 class SyncTimeoutError(Exception):
+
     """
     Dummy exception to notify timeout during sync.
     """
@@ -112,6 +114,7 @@ class TestSoledadDbSyncDeferredEncDecr(
         TestWithScenarios,
         test_sync.TestDbSync,
         BaseSoledadDeferredEncTest):
+
     """
     Test db.sync remote sync shortcut.
     Case with deferred encryption and decryption: using the intermediate
@@ -205,8 +208,8 @@ class TestSoledadDbSyncDeferredEncDecr(
         def _assert_successful_sync(results):
             import time
             # need to give time to the encryption to proceed
-            # TODO should implement a defer list to subscribe to the all-decrypted
-            # event
+            # TODO should implement a defer list to subscribe to the
+            # all-decrypted event
             time.sleep(2)
             local_gen_before_sync = results
             self.wait_for_sync()

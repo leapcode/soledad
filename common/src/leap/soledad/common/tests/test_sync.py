@@ -45,6 +45,7 @@ from leap.soledad.common.tests.test_couch import CouchDBTestCase
 
 class InterruptableSyncTestCase(
         BaseSoledadTest, CouchDBTestCase, TestCaseWithServer):
+
     """
     Tests for encrypted sync using Soledad server backed by a couch database.
     """
@@ -77,6 +78,7 @@ class InterruptableSyncTestCase(
         """
 
         class _SyncInterruptor(threading.Thread):
+
             """
             A thread meant to interrupt the sync process.
             """
@@ -97,7 +99,8 @@ class InterruptableSyncTestCase(
         self.startServer()
 
         # instantiate soledad and create a document
-        sol = self._soledad_instance(user='user-uuid', server_url=self.getURL())
+        sol = self._soledad_instance(
+            user='user-uuid', server_url=self.getURL())
 
         # ensure remote db exists before syncing
         db = couch.CouchDatabase.open_database(
@@ -122,14 +125,18 @@ class InterruptableSyncTestCase(
         # sync with server
         d.addCallback(_create_docs)
         d.addCallback(lambda _: sol.get_all_docs())
-        d.addCallback(lambda results: self.assertEqual(number_of_docs, len(results[1])))
+        d.addCallback(
+            lambda results: self.assertEqual(number_of_docs, len(results[1])))
         d.addCallback(lambda _: sol.sync())
         d.addCallback(lambda _: t.join())
         d.addCallback(lambda _: db.get_all_docs())
-        d.addCallback(lambda results: self.assertNotEqual(number_of_docs, len(results[1])))
+        d.addCallback(
+            lambda results: self.assertNotEqual(
+                number_of_docs, len(results[1])))
         d.addCallback(lambda _: sol.sync())
         d.addCallback(lambda _: db.get_all_docs())
-        d.addCallback(lambda results: self.assertEqual(number_of_docs, len(results[1])))
+        d.addCallback(
+            lambda results: self.assertEqual(number_of_docs, len(results[1])))
 
         def _tear_down(results):
             db.delete_database()
@@ -148,6 +155,7 @@ class TestSoledadDbSync(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
         test_sync.TestDbSync):
+
     """
     Test db.sync remote sync shortcut
     """

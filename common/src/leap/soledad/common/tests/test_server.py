@@ -59,6 +59,7 @@ CouchServerState.ensure_database = _couch_ensure_database
 
 
 class ServerAuthorizationTestCase(BaseSoledadTest):
+
     """
     Tests related to Soledad server authorization.
     """
@@ -268,6 +269,7 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
 
 class EncryptedSyncTestCase(
         CouchDBTestCase, TestCaseWithServer):
+
     """
     Tests for encrypted sync using Soledad server backed by a couch database.
     """
@@ -456,7 +458,7 @@ class EncryptedSyncTestCase(
         """
         Test if Soledad can sync very large files.
         """
-        length = 100 * (10**6)  # 100 MB
+        length = 100 * (10 ** 6)  # 100 MB
         return self._test_encrypted_sym_sync(doc_size=length, number_of_docs=1)
 
     def test_sync_many_small_files(self):
@@ -468,6 +470,7 @@ class EncryptedSyncTestCase(
 
 class LockResourceTestCase(
         CouchDBTestCase, TestCaseWithServer):
+
     """
     Tests for use of PUT and DELETE on lock resource.
     """

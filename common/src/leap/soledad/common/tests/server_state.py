@@ -33,6 +33,7 @@ from leap.soledad.common.tests.util import (
 
 
 class ServerStateForTests(ServerState):
+
     """Passed to a Request when it is instantiated.
 
     This is used to track server-side state, such as working-directory, open

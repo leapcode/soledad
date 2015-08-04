@@ -165,6 +165,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
 
 
 class SoledadSharedDBTestCase(BaseSoledadTest):
+
     """
     These tests ensure the functionalities of the shared recovery database.
     """
@@ -209,6 +210,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
 
 
 class SoledadSignalingTestCase(BaseSoledadTest):
+
     """
     These tests ensure signals are correctly emmited by Soledad.
     """

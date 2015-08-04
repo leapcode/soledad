@@ -83,7 +83,8 @@ class TestSoledadHTTPSyncTargetHttpsSupport(
         # run smoothly with standard u1db.
         test_https.TestHttpSyncTargetHttpsSupport.setUp(self)
         # so here monkey patch again to test our functionality.
-        http_client._VerifiedHTTPSConnection = client.api.VerifiedHTTPSConnection
+        api = client.api
+        http_client._VerifiedHTTPSConnection = api.VerifiedHTTPSConnection
         client.api.SOLEDAD_CERT = http_client.CA_CERTS
 
     def test_cannot_verify_cert(self):

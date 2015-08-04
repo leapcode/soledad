@@ -27,6 +27,7 @@ from leap.soledad.client.sqlcipher import SQLCipherOptions
 
 
 class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
+
     """
     Test asynchronous SQLCipher operation.
     """

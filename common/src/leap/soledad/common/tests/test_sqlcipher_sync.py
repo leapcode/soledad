@@ -50,7 +50,8 @@ from leap.soledad.common.tests.util import (
 # -----------------------------------------------------------------------------
 
 def sync_via_synchronizer_and_soledad(test, db_source, db_target,
-                                      trace_hook=None, trace_hook_shallow=None):
+                                      trace_hook=None,
+                                      trace_hook_shallow=None):
     if trace_hook:
         test.skipTest("full trace hook unsupported over http")
     path = test._http_at[db_target]
@@ -72,6 +73,7 @@ class SQLCipherDatabaseSyncTests(
         TestWithScenarios,
         test_sync.DatabaseSyncTests,
         BaseSoledadTest):
+
     """
     Test for succesfull sync between SQLCipher and LeapBackend.
 
