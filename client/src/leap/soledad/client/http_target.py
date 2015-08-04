@@ -41,8 +41,6 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.errors import InvalidAuthTokenError
 
 from leap.soledad.client.crypto import is_symmetrically_encrypted
-from leap.soledad.client.crypto import encrypt_doc
-from leap.soledad.client.crypto import decrypt_doc
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit
@@ -89,9 +87,10 @@ class SoledadHTTPSyncTarget(SyncTarget):
                         instead of retreiving it from the dedicated
                         database.
         :type sync_db: Sqlite handler
-        :param verify_ssl: Whether we should perform SSL server certificate
-                           verification.
-        :type verify_ssl: bool
+        :param sync_enc_pool: The encryption pool to use to defer encryption.
+                              If None is passed the encryption will not be
+                              deferred.
+        :type sync_enc_pool: leap.soledad.client.encdecpool.SyncEncrypterPool
         """
         if url.endswith("/"):
             url = url[:-1]
@@ -347,7 +346,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             d = defer.succeed(None)
         elif not self._defer_encryption:
             # fallback case, for tests
-            d = defer.succeed(encrypt_doc(self._crypto, doc))
+            d = defer.succeed(self._crypto.encrypt_doc(doc))
         else:
 
             def _maybe_encrypt_doc_inline(doc_json):
@@ -355,7 +354,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                     # the document is not marked as tombstone, but we got
                     # nothing from the sync db. As it is not encrypted
                     # yet, we force inline encryption.
-                    return encrypt_doc(self._crypto, doc)
+                    return self._crypto.encrypt_doc(doc)
                 return doc_json
 
             d = self._sync_enc_pool.get_encrypted_doc(doc.doc_id, doc.rev)
@@ -491,7 +490,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                         idx)
                 else:
                     # defer_decryption is False or no-sync-db fallback
-                    doc.set_json(decrypt_doc(self._crypto, doc))
+                    doc.set_json(self._crypto.decrypt_doc(doc))
                     self._insert_doc_cb(doc, gen, trans_id)
             else:
                 # not symmetrically encrypted doc, insert it directly

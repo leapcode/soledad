@@ -37,6 +37,7 @@ from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
 from leap.soledad.common import errors
 from leap.soledad.client import events
+from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
 
 
 logger = logging.getLogger(name=__name__)
@@ -148,7 +149,7 @@ class SoledadSecrets(object):
     Keys used to access storage secrets in recovery documents.
     """
 
-    def __init__(self, uuid, passphrase, secrets_path, shared_db, crypto):
+    def __init__(self, uuid, passphrase, secrets_path, shared_db):
         """
         Initialize the secrets manager.
 
@@ -162,8 +163,6 @@ class SoledadSecrets(object):
         :type secrets_path: str
         :param shared_db: The shared database that stores user secrets.
         :type shared_db: leap.soledad.client.shared_db.SoledadSharedDatabase
-        :param crypto: A soledad crypto object.
-        :type crypto: SoledadCrypto
         """
         # XXX removed since not in use
         # We will pick the first secret available.
@@ -173,7 +172,6 @@ class SoledadSecrets(object):
         self._passphrase = passphrase
         self._secrets_path = secrets_path
         self._shared_db = shared_db
-        self._crypto = crypto
         self._secrets = {}
 
         self._secret_id = None
@@ -511,7 +509,7 @@ class SoledadSecrets(object):
         iv, ciphertext = encrypted_secret_dict[self.SECRET_KEY].split(
             self.IV_SEPARATOR, 1)
         ciphertext = binascii.a2b_base64(ciphertext)
-        decrypted_secret = self._crypto.decrypt_sym(ciphertext, key, iv=iv)
+        decrypted_secret = decrypt_sym(ciphertext, key, iv)
         if encrypted_secret_dict[self.LENGTH_KEY] != len(decrypted_secret):
             raise SecretsException("Wrong length of decrypted secret.")
         return decrypted_secret
@@ -543,7 +541,7 @@ class SoledadSecrets(object):
         salt = os.urandom(self.SALT_LENGTH)
         # get a 256-bit key
         key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
-        iv, ciphertext = self._crypto.encrypt_sym(decrypted_secret, key)
+        iv, ciphertext = encrypt_sym(decrypted_secret, key)
         encrypted_secret_dict = {
             # leap.soledad.crypto submodule uses AES256 for symmetric
             # encryption.

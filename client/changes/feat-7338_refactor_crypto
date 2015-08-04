@@ -1,0 +1,1 @@
+- refactor SoledadCrypto to remove circular dependency with SoledadSecrets (Closes: 7338)

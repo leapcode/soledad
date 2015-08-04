@@ -47,7 +47,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         doc1.content = simpledoc
 
         # encrypt doc
-        doc1.set_json(crypto.encrypt_doc(self._soledad._crypto, doc1))
+        doc1.set_json(self._soledad._crypto.encrypt_doc(doc1))
         # assert content is different and includes keys
         self.assertNotEqual(
             simpledoc, doc1.content,
@@ -55,7 +55,7 @@ class EncryptedSyncTestCase(BaseSoledadTest):
         self.assertTrue(ENC_JSON_KEY in doc1.content)
         self.assertTrue(ENC_SCHEME_KEY in doc1.content)
         # decrypt doc
-        doc1.set_json(crypto.decrypt_doc(self._soledad._crypto, doc1))
+        doc1.set_json(self._soledad._crypto.decrypt_doc(doc1))
         self.assertEqual(
             simpledoc, doc1.content, 'incorrect document encryption')
 
@@ -153,7 +153,7 @@ class MacAuthTestCase(BaseSoledadTest):
         doc = SoledadDocument(doc_id='id')
         doc.content = simpledoc
         # encrypt doc
-        doc.set_json(crypto.encrypt_doc(self._soledad._crypto, doc))
+        doc.set_json(self._soledad._crypto.encrypt_doc(doc))
         self.assertTrue(MAC_KEY in doc.content)
         self.assertTrue(MAC_METHOD_KEY in doc.content)
         # mess with MAC
@@ -161,7 +161,7 @@ class MacAuthTestCase(BaseSoledadTest):
         # try to decrypt doc
         self.assertRaises(
             WrongMacError,
-            crypto.decrypt_doc, self._soledad._crypto, doc)
+            self._soledad._crypto.decrypt_doc, doc)
 
     def test_decrypt_with_unknown_mac_method_raises(self):
         """
@@ -171,7 +171,7 @@ class MacAuthTestCase(BaseSoledadTest):
         doc = SoledadDocument(doc_id='id')
         doc.content = simpledoc
         # encrypt doc
-        doc.set_json(crypto.encrypt_doc(self._soledad._crypto, doc))
+        doc.set_json(self._soledad._crypto.encrypt_doc(doc))
         self.assertTrue(MAC_KEY in doc.content)
         self.assertTrue(MAC_METHOD_KEY in doc.content)
         # mess with MAC method
@@ -179,7 +179,7 @@ class MacAuthTestCase(BaseSoledadTest):
         # try to decrypt doc
         self.assertRaises(
             UnknownMacMethodError,
-            crypto.decrypt_doc, self._soledad._crypto, doc)
+            self._soledad._crypto.decrypt_doc, doc)
 
 
 class SoledadCryptoAESTestCase(BaseSoledadTest):
@@ -187,22 +187,16 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
     def test_encrypt_decrypt_sym(self):
         # generate 256-bit key
         key = os.urandom(32)
-        iv, cyphertext = self._soledad._crypto.encrypt_sym(
-            'data', key,
-            method=EncryptionMethods.AES_256_CTR)
+        iv, cyphertext = crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
-        plaintext = self._soledad._crypto.decrypt_sym(
-            cyphertext, key, iv=iv,
-            method=EncryptionMethods.AES_256_CTR)
+        plaintext = crypto.decrypt_sym(cyphertext, key, iv)
         self.assertEqual('data', plaintext)
 
     def test_decrypt_with_wrong_iv_fails(self):
         key = os.urandom(32)
-        iv, cyphertext = self._soledad._crypto.encrypt_sym(
-            'data', key,
-            method=EncryptionMethods.AES_256_CTR)
+        iv, cyphertext = crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -211,16 +205,13 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         wrongiv = rawiv
         while wrongiv == rawiv:
             wrongiv = os.urandom(1) + rawiv[1:]
-        plaintext = self._soledad._crypto.decrypt_sym(
-            cyphertext, key, iv=binascii.b2a_base64(wrongiv),
-            method=EncryptionMethods.AES_256_CTR)
+        plaintext = crypto.decrypt_sym(
+            cyphertext, key, iv=binascii.b2a_base64(wrongiv))
         self.assertNotEqual('data', plaintext)
 
     def test_decrypt_with_wrong_key_fails(self):
         key = os.urandom(32)
-        iv, cyphertext = self._soledad._crypto.encrypt_sym(
-            'data', key,
-            method=EncryptionMethods.AES_256_CTR)
+        iv, cyphertext = crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -228,59 +219,5 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         # ensure keys are different in case we are extremely lucky
         while wrongkey == key:
             wrongkey = os.urandom(32)
-        plaintext = self._soledad._crypto.decrypt_sym(
-            cyphertext, wrongkey, iv=iv,
-            method=EncryptionMethods.AES_256_CTR)
-        self.assertNotEqual('data', plaintext)
-
-
-class SoledadCryptoXSalsa20TestCase(BaseSoledadTest):
-
-    def test_encrypt_decrypt_sym(self):
-        # generate 256-bit key
-        key = os.urandom(32)
-        iv, cyphertext = self._soledad._crypto.encrypt_sym(
-            'data', key,
-            method=EncryptionMethods.XSALSA20)
-        self.assertTrue(cyphertext is not None)
-        self.assertTrue(cyphertext != '')
-        self.assertTrue(cyphertext != 'data')
-        plaintext = self._soledad._crypto.decrypt_sym(
-            cyphertext, key, iv=iv,
-            method=EncryptionMethods.XSALSA20)
-        self.assertEqual('data', plaintext)
-
-    def test_decrypt_with_wrong_iv_fails(self):
-        key = os.urandom(32)
-        iv, cyphertext = self._soledad._crypto.encrypt_sym(
-            'data', key,
-            method=EncryptionMethods.XSALSA20)
-        self.assertTrue(cyphertext is not None)
-        self.assertTrue(cyphertext != '')
-        self.assertTrue(cyphertext != 'data')
-        # get a different iv by changing the first byte
-        rawiv = binascii.a2b_base64(iv)
-        wrongiv = rawiv
-        while wrongiv == rawiv:
-            wrongiv = os.urandom(1) + rawiv[1:]
-        plaintext = self._soledad._crypto.decrypt_sym(
-            cyphertext, key, iv=binascii.b2a_base64(wrongiv),
-            method=EncryptionMethods.XSALSA20)
-        self.assertNotEqual('data', plaintext)
-
-    def test_decrypt_with_wrong_key_fails(self):
-        key = os.urandom(32)
-        iv, cyphertext = self._soledad._crypto.encrypt_sym(
-            'data', key,
-            method=EncryptionMethods.XSALSA20)
-        self.assertTrue(cyphertext is not None)
-        self.assertTrue(cyphertext != '')
-        self.assertTrue(cyphertext != 'data')
-        wrongkey = os.urandom(32)  # 256-bits key
-        # ensure keys are different in case we are extremely lucky
-        while wrongkey == key:
-            wrongkey = os.urandom(32)
-        plaintext = self._soledad._crypto.decrypt_sym(
-            cyphertext, wrongkey, iv=iv,
-            method=EncryptionMethods.XSALSA20)
+        plaintext = crypto.decrypt_sym(cyphertext, wrongkey, iv)
         self.assertNotEqual('data', plaintext)

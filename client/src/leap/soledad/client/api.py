@@ -183,9 +183,7 @@ class Soledad(object):
         global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
 
-        # init crypto variables
         self._set_token(auth_token)
-        self._crypto = SoledadCrypto(self)
 
         self._init_config_with_defaults()
         self._init_working_dirs()
@@ -199,6 +197,8 @@ class Soledad(object):
         # propagated upwards.
         self._init_secrets()
         self._init_u1db_sqlcipher_backend()
+
+        self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
 
         if syncable:
             self._init_u1db_syncer()
@@ -240,7 +240,7 @@ class Soledad(object):
         """
         self._secrets = SoledadSecrets(
             self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db, self._crypto)
+            self.shared_db)
         self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):

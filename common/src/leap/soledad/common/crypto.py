@@ -48,7 +48,6 @@ class EncryptionMethods(object):
     """
 
     AES_256_CTR = 'aes-256-ctr'
-    XSALSA20 = 'xsalsa20'
 
 
 class UnknownEncryptionMethodError(Exception):

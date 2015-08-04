@@ -25,7 +25,6 @@ import json
 import logging
 
 from pycryptopp.cipher.aes import AES
-from pycryptopp.cipher.xsalsa20 import XSalsa20
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
@@ -38,100 +37,52 @@ logger = logging.getLogger(__name__)
 MAC_KEY_LENGTH = 64
 
 
-def _assert_known_encryption_method(method):
+def encrypt_sym(data, key):
     """
-    Assert that we can encrypt/decrypt the given C{method}
-
-    :param method: The encryption method to assert.
-    :type method: str
-
-    :raise UnknownEncryptionMethodError: Raised when C{method} is unknown.
-    """
-    valid_methods = [
-        crypto.EncryptionMethods.AES_256_CTR,
-        crypto.EncryptionMethods.XSALSA20,
-    ]
-    try:
-        soledad_assert(method in valid_methods)
-    except AssertionError:
-        raise crypto.UnknownEncryptionMethodError
-
-
-def encrypt_sym(data, key, method):
-    """
-    Encrypt C{data} using a {password}.
-
-    Currently, the only encryption methods supported are AES-256 in CTR
-    mode and XSalsa20.
+    Encrypt data using AES-256 cipher in CTR mode.
 
     :param data: The data to be encrypted.
     :type data: str
-    :param key: The key used to encrypt C{data} (must be 256 bits long).
+    :param key: The key used to encrypt data (must be 256 bits long).
     :type key: str
-    :param method: The encryption method to use.
-    :type method: str
 
-    :return: A tuple with the initial value and the encrypted data.
+    :return: A tuple with the initialization vector and the encrypted data.
     :rtype: (long, str)
-
-    :raise AssertionError: Raised if C{method} is unknown.
     """
     soledad_assert_type(key, str)
     soledad_assert(
         len(key) == 32,  # 32 x 8 = 256 bits.
         'Wrong key size: %s bits (must be 256 bits long).' %
         (len(key) * 8))
-    _assert_known_encryption_method(method)
 
-    iv = None
-    # AES-256 in CTR mode
-    if method == crypto.EncryptionMethods.AES_256_CTR:
-        iv = os.urandom(16)
-        ciphertext = AES(key=key, iv=iv).process(data)
-    # XSalsa20
-    elif method == crypto.EncryptionMethods.XSALSA20:
-        iv = os.urandom(24)
-        ciphertext = XSalsa20(key=key, iv=iv).process(data)
+    iv = os.urandom(16)
+    ciphertext = AES(key=key, iv=iv).process(data)
 
     return binascii.b2a_base64(iv), ciphertext
 
 
-def decrypt_sym(data, key, method, **kwargs):
+def decrypt_sym(data, key, iv):
     """
-    Decrypt data using symmetric secret.
-
-    Currently, the only encryption method supported is AES-256 CTR mode.
+    Decrypt some data previously encrypted using AES-256 cipher in CTR mode.
 
     :param data: The data to be decrypted.
     :type data: str
-    :param key: The key used to decrypt C{data} (must be 256 bits long).
+    :param key: The symmetric key used to decrypt data (must be 256 bits
+                long).
     :type key: str
-    :param method: The encryption method to use.
-    :type method: str
-    :param kwargs: Other parameters specific to each encryption method.
-    :type kwargs: dict
+    :param iv: The initialization vector.
+    :type iv: long
 
     :return: The decrypted data.
     :rtype: str
-
-    :raise UnknownEncryptionMethodError: Raised when C{method} is unknown.
     """
     soledad_assert_type(key, str)
     # assert params
     soledad_assert(
         len(key) == 32,  # 32 x 8 = 256 bits.
         'Wrong key size: %s (must be 256 bits long).' % len(key))
-    soledad_assert(
-        'iv' in kwargs,
-        '%s needs an initial value.' % method)
-    _assert_known_encryption_method(method)
-    # AES-256 in CTR mode
-    if method == crypto.EncryptionMethods.AES_256_CTR:
-        return AES(
-            key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
-    elif method == crypto.EncryptionMethods.XSALSA20:
-        return XSalsa20(
-            key=key, iv=binascii.a2b_base64(kwargs['iv'])).process(data)
+    return AES(
+        key=key, iv=binascii.a2b_base64(iv)).process(data)
 
 
 def doc_mac_key(doc_id, secret):
@@ -164,25 +115,17 @@ class SoledadCrypto(object):
     General cryptographic functionality encapsulated in a
     object that can be passed along.
     """
-    def __init__(self, soledad):
+    def __init__(self, secret):
         """
         Initialize the crypto object.
 
-        :param soledad: A Soledad instance for key lookup.
-        :type soledad: leap.soledad.Soledad
+        :param secret: The Soledad remote storage secret.
+        :type secret: str
         """
-        self._soledad = soledad
+        self._secret = secret
 
-    def encrypt_sym(self, data, key,
-                    method=crypto.EncryptionMethods.AES_256_CTR):
-        return encrypt_sym(data, key, method)
-
-    def decrypt_sym(self, data, key,
-                    method=crypto.EncryptionMethods.AES_256_CTR, **kwargs):
-        return decrypt_sym(data, key, method, **kwargs)
-
-    def doc_mac_key(self, doc_id, secret):
-        return doc_mac_key(doc_id, self.secret)
+    def doc_mac_key(self, doc_id):
+        return doc_mac_key(doc_id, self._secret)
 
     def doc_passphrase(self, doc_id):
         """
@@ -201,21 +144,41 @@ class SoledadCrypto(object):
         :return: The passphrase.
         :rtype: str
         """
-        soledad_assert(self.secret is not None)
+        soledad_assert(self._secret is not None)
         return hmac.new(
-            self.secret[MAC_KEY_LENGTH:],
+            self._secret[MAC_KEY_LENGTH:],
             doc_id,
             hashlib.sha256).digest()
 
-    #
-    # secret setters/getters
-    #
+    def encrypt_doc(self, doc):
+        """
+        Wrapper around encrypt_docstr that accepts the document as argument.
 
-    def _get_secret(self):
-        return self._soledad.secrets.remote_storage_secret
+        :param doc: the document.
+        :type doc: SoledadDocument
+        """
+        key = self.doc_passphrase(doc.doc_id)
 
-    secret = property(
-        _get_secret, doc='The secret used for symmetric encryption')
+        return encrypt_docstr(
+            doc.get_json(), doc.doc_id, doc.rev, key, self._secret)
+
+    def decrypt_doc(self, doc):
+        """
+        Wrapper around decrypt_doc_dict that accepts the document as argument.
+
+        :param doc: the document.
+        :type doc: SoledadDocument
+
+        :return: json string with the decrypted document
+        :rtype: str
+        """
+        key = self.doc_passphrase(doc.doc_id)
+        return decrypt_doc_dict(
+            doc.content, doc.doc_id, doc.rev, key, self._secret)
+
+    @property
+    def secret(self):
+        return self._secret
 
 
 #
@@ -273,23 +236,6 @@ def mac_doc(doc_id, doc_rev, ciphertext, enc_scheme, enc_method, enc_iv,
         hashlib.sha256).digest()
 
 
-def encrypt_doc(crypto, doc):
-    """
-    Wrapper around encrypt_docstr that accepts a crypto object and the document
-    as arguments.
-
-    :param crypto: a soledad crypto object.
-    :type crypto: SoledadCrypto
-    :param doc: the document.
-    :type doc: SoledadDocument
-    """
-    key = crypto.doc_passphrase(doc.doc_id)
-    secret = crypto.secret
-
-    return encrypt_docstr(
-        doc.get_json(), doc.doc_id, doc.rev, key, secret)
-
-
 def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     """
     Encrypt C{doc}'s content.
@@ -330,7 +276,7 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     mac_method = crypto.MacMethods.HMAC
     enc_iv, ciphertext = encrypt_sym(
         str(docstr),  # encryption/decryption routines expect str
-        key, method=enc_method)
+        key)
     mac = binascii.b2a_hex(  # store the mac as hex.
         mac_doc(
             doc_id,
@@ -354,24 +300,6 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
         crypto.MAC_KEY: mac,
         crypto.MAC_METHOD_KEY: mac_method,
     })
-
-
-def decrypt_doc(crypto, doc):
-    """
-    Wrapper around decrypt_doc_dict that accepts a crypto object and the
-    document as arguments.
-
-    :param crypto: a soledad crypto object.
-    :type crypto: SoledadCrypto
-    :param doc: the document.
-    :type doc: SoledadDocument
-
-    :return: json string with the decrypted document
-    :rtype: str
-    """
-    key = crypto.doc_passphrase(doc.doc_id)
-    secret = crypto.secret
-    return decrypt_doc_dict(doc.content, doc.doc_id, doc.rev, key, secret)
 
 
 def _verify_doc_mac(doc_id, doc_rev, ciphertext, enc_scheme, enc_method,
@@ -458,8 +386,8 @@ def decrypt_doc_dict(doc_dict, doc_id, doc_rev, key, secret):
     :param key: The key used to encrypt ``data`` (must be 256 bits long).
     :type key: str
 
-    :param secret:
-    :type secret:
+    :param secret: The Soledad storage secret.
+    :type secret: str
 
     :return: The JSON serialization of the decrypted content.
     :rtype: str
@@ -491,7 +419,7 @@ def decrypt_doc_dict(doc_dict, doc_id, doc_rev, key, secret):
         doc_id, doc_rev, ciphertext, enc_scheme, enc_method,
         enc_iv, mac_method, secret, doc_mac)
 
-    return decrypt_sym(ciphertext, key, method=enc_method, iv=enc_iv)
+    return decrypt_sym(ciphertext, key, enc_iv)
 
 
 def is_symmetrically_encrypted(doc):
