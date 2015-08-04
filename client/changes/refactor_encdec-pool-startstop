@@ -1,0 +1,2 @@
+  o Refactor enc/dec pool to standardize start/stop of the pools.
+  o Add tests for enc/dec pool.
