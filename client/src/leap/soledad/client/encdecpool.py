@@ -67,16 +67,23 @@ class SyncEncryptDecryptPool(object):
         self._sync_db = sync_db
         self._pool = None
         self._delayed_call = None
+        self._started = False
 
     def start(self):
         self._create_pool()
+        self._started = True
 
     def stop(self):
+        self._started = False
         self._destroy_pool()
         # maybe cancel the next delayed call
         if self._delayed_call \
                 and not self._delayed_call.called:
             self._delayed_call.cancel()
+
+    @property
+    def running(self):
+        return self._started
 
     def _create_pool(self):
         self._pool = multiprocessing.Pool(self.WORKERS)
