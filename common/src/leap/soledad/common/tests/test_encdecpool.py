@@ -33,6 +33,7 @@ DOC_ID = "mydoc"
 DOC_REV = "rev"
 DOC_CONTENT = {'simple': 'document'}
 
+
 class TestSyncEncrypterPool(TestCase, BaseSoledadTest):
 
     def setUp(self):
@@ -48,11 +49,18 @@ class TestSyncEncrypterPool(TestCase, BaseSoledadTest):
 
     @inlineCallbacks
     def test_get_encrypted_doc_returns_none(self):
+        """
+        Test that trying to get an encrypted doc from the pool returns None if
+        the document was never added for encryption.
+        """
         doc = yield self._pool.get_encrypted_doc(DOC_ID, DOC_REV)
         self.assertIsNone(doc)
 
     @inlineCallbacks
     def test_enqueue_doc_for_encryption_and_get_encrypted_doc(self):
+        """
+        Test that the pool actually encrypts a document added to the queue.
+        """
         doc = SoledadDocument(
             doc_id=DOC_ID, rev=DOC_REV, json=json.dumps(DOC_CONTENT))
         self._pool.enqueue_doc_for_encryption(doc)
@@ -70,6 +78,9 @@ class TestSyncEncrypterPool(TestCase, BaseSoledadTest):
 class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
 
     def _insert_doc_cb(self, doc, gen, trans_id):
+        """
+        Method used to mock the sync's return_doc_cb callback.
+        """
         self._inserted_docs.append((doc, gen, trans_id))
 
     def setUp(self):
@@ -89,6 +100,10 @@ class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
         BaseSoledadTest.tearDown(self)
 
     def test_insert_received_doc(self):
+        """
+        Test that one document added to the pool is inserted using the
+        callback.
+        """
         self._pool.start(1)
         self._pool.insert_received_doc(
            DOC_ID, DOC_REV, "{}", 1, "trans_id", 1)
@@ -102,9 +117,14 @@ class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
         return self._pool.deferred
 
     def test_insert_received_doc_many(self):
+        """
+        Test that many documents added to the pool are inserted using the
+        callback.
+        """
         many = 100
         self._pool.start(many)
 
+        # insert many docs in the pool
         for i in xrange(many):
             gen = idx = i + 1
             doc_id = "doc_id: %d" % idx
@@ -133,4 +153,73 @@ class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
                 idx += 1
 
         self._pool.deferred.addCallback(_assert_doc_was_inserted)
+        return self._pool.deferred
+
+    def test_insert_encrypted_received_doc(self):
+        """
+        Test that one encrypted document added to the pool is decrypted and
+        inserted using the callback.
+        """
+        crypto = self._soledad._crypto
+        doc = SoledadDocument(
+            doc_id=DOC_ID, rev=DOC_REV, json=json.dumps(DOC_CONTENT))
+        encrypted_content = json.loads(crypto.encrypt_doc(doc))
+
+        # insert the encrypted document in the pool
+        self._pool.start(1)
+        self._pool.insert_encrypted_received_doc(
+           DOC_ID, DOC_REV, encrypted_content, 1, "trans_id", 1)
+
+        def _assert_doc_was_decrypted_and_inserted(_):
+            self.assertEqual(self._inserted_docs, [(doc, 1, u"trans_id")])
+
+        self._pool.deferred.addCallback(
+            _assert_doc_was_decrypted_and_inserted)
+        return self._pool.deferred
+
+    def test_insert_encrypted_received_doc_many(self):
+        """
+        Test that many encrypted documents added to the pool are decrypted and
+        inserted using the callback.
+        """
+        crypto = self._soledad._crypto
+        many = 100
+        self._pool.start(many)
+
+        # insert many encrypted docs in the pool
+        for i in xrange(many):
+            gen = idx = i + 1
+            doc_id = "doc_id: %d" % idx
+            rev = "rev: %d" % idx
+            content = {'idx': idx}
+            trans_id = "trans_id: %d" % idx
+
+            doc = SoledadDocument(
+                doc_id=doc_id, rev=rev, json=json.dumps(content))
+
+            encrypted_content = json.loads(crypto.encrypt_doc(doc))
+
+            self._pool.insert_encrypted_received_doc(
+                doc_id, rev, encrypted_content, gen, trans_id, idx)
+
+        def _assert_docs_were_decrypted_and_inserted(_):
+            self.assertEqual(many, len(self._inserted_docs))
+            idx = 1
+            for doc, gen, trans_id in self._inserted_docs:
+                expected_gen = idx
+                expected_doc_id = "doc_id: %d" % idx
+                expected_rev = "rev: %d" % idx
+                expected_content = json.dumps({'idx': idx})
+                expected_trans_id = "trans_id: %d" % idx
+
+                self.assertEqual(expected_doc_id, doc.doc_id)
+                self.assertEqual(expected_rev, doc.rev)
+                self.assertEqual(expected_content, json.dumps(doc.content))
+                self.assertEqual(expected_gen, gen)
+                self.assertEqual(expected_trans_id, trans_id)
+
+                idx += 1
+
+        self._pool.deferred.addCallback(
+            _assert_docs_were_decrypted_and_inserted)
         return self._pool.deferred

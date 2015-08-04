@@ -461,7 +461,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :param doc_rev: The document Revision
         :param doc_rev: str
         :param content: The content of the document
-        :type content: str
+        :type content: dict
         :param gen: The document Generation
         :type gen: int
         :param trans_id: Transaction ID
@@ -486,15 +486,15 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         We store it in the staging area (the decrypted_docs dictionary) to be
         picked up in order as the preceding documents are decrypted.
 
-        :param doc_id: The Document ID.
+        :param doc_id: The document id
         :type doc_id: str
-        :param doc_rev: The Document Revision
-        :param doc_rev: str
-        :param content: the Content of the document
-        :type content: str
-        :param gen: the Document Generation
+        :param doc_rev: The document revision
+        :param doc_rev: str or dict
+        :param content: The content of the document
+        :type content: dict
+        :param gen: The document generation
         :type gen: int
-        :param trans_id: Transaction ID
+        :param trans_id: The transaction id
         :type trans_id: str
         :param idx: The index of this document in the current sync process.
         :type idx: int
