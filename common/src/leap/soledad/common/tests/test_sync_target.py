@@ -65,6 +65,19 @@ class TestSoledadParsingSyncStream(
     target.
     """
 
+    def setUp(self):
+        super(test_remote_sync_target.TestParsingSyncStream, self).setUp()
+        creds = {'token': {
+            'uuid': 'user-uuid',
+            'token': 'auth-token',
+        }}
+        self.target = target.SoledadHTTPSyncTarget(
+            "http://foo/foo",
+            uuid4().hex,
+            creds,
+            self._soledad._crypto,
+            None)
+
     def test_extra_comma(self):
         """
         Test adapted to use encrypted content.
@@ -78,29 +91,25 @@ class TestSoledadParsingSyncStream(
         enc_json = crypto.encrypt_docstr(
             doc.get_json(), doc.doc_id, doc.rev,
             key, secret)
-        tgt = target.SoledadHTTPSyncTarget(
-            "http://foo/foo", crypto=self._soledad._crypto)
 
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "[\r\n{},\r\n]", None)
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream,
-                          '[\r\n{},\r\n{"id": "i", "rev": "r", '
-                          '"content": %s, "gen": 3, "trans_id": "T-sid"}'
-                          ',\r\n]' % json.dumps(enc_json),
-                          lambda doc, gen, trans_id: None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("[\r\n{},\r\n]")
+
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response(
+                ('[\r\n{},\r\n{"id": "i", "rev": "r", ' +
+                 '"content": %s, "gen": 3, "trans_id": "T-sid"}' +
+                 ',\r\n]') % json.dumps(enc_json))
 
     def test_wrong_start(self):
-        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("{}\r\n]")
 
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "{}\r\n]", None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("\r\n{}\r\n]")
 
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "\r\n{}\r\n]", None)
-
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "", None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("")
 
     def test_wrong_end(self):
         tgt = target.SoledadHTTPSyncTarget("http://foo/foo")

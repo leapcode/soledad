@@ -534,7 +534,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             new_generation = metadata['new_generation']
             new_transaction_id = metadata['new_transaction_id']
             number_of_changes = metadata['number_of_changes']
-        except (json.JSONDecodeError, KeyError):
+        except (ValueError, KeyError):
             raise errors.BrokenSyncStream
         # make sure we have replica_uid from fresh new dbs
         if self._ensure_callback and 'replica_uid' in metadata:
