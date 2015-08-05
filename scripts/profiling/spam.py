@@ -79,10 +79,14 @@ class EmailSenderThread(threading.Thread):
 
     def run(self):
         logger.debug("running thread...")
-        _send_email(
-            self._server, self._port, self._subject, self._to_addr,
-            self._from_addr, self._body_text)
-        self._finished_fun()
+        try:
+            _send_email(
+                self._server, self._port, self._subject, self._to_addr,
+                self._from_addr, self._body_text)
+        except Exception as e:
+            logger.error(e)
+        finally:
+            self._finished_fun()
 
 
 def _launch_email_thread(server, port, subject, to_addr, from_addr, body_text,
