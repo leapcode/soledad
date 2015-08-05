@@ -14,7 +14,7 @@ Description: Synchronization of locally encrypted data among devices.
  Soledad is the part of LEAP that allows application data to be securely 
  shared among devices. It provides, to other parts of the LEAP client, an 
  API for data storage and sync.
- . 
+ .
  This package contains the server components.
 
 Package: soledad-common
@@ -25,7 +25,7 @@ Description: Synchronization of locally encrypted data among devices.
  Soledad is the part of LEAP that allows application data to be securely 
  shared among devices. It provides, to other parts of the LEAP client, an 
  API for data storage and sync.
- . 
+ .
  This package contains the common soledad libraries. For the server, see the
  soledad-server package
 
@@ -39,5 +39,5 @@ Description: Synchronization of locally encrypted data among devices.
  Soledad is the part of LEAP that allows application data to be securely 
  shared among devices. It provides, to other parts of the LEAP client, an 
  API for data storage and sync.
- . 
+ .
  This package contains the soledad client.
