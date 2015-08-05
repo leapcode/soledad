@@ -25,11 +25,12 @@ import u1db
 import random
 import string
 import shutil
+from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 from urlparse import urljoin
 
-from leap.soledad.client import target
+from leap.soledad.client import http_target as target
 from leap.soledad.client import crypto
 from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
@@ -55,22 +56,6 @@ from leap.soledad.common.tests.u1db_tests import test_sync
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 # -----------------------------------------------------------------------------
 
-class TestSoledadSyncTargetBasics(
-        test_remote_sync_target.TestHTTPSyncTargetBasics):
-
-    """
-    Some tests had to be copied to this class so we can instantiate our own
-    target.
-    """
-
-    def test_parse_url(self):
-        remote_target = target.SoledadSyncTarget('http://127.0.0.1:12345/')
-        self.assertEqual('http', remote_target._url.scheme)
-        self.assertEqual('127.0.0.1', remote_target._url.hostname)
-        self.assertEqual(12345, remote_target._url.port)
-        self.assertEqual('/', remote_target._url.path)
-
-
 class TestSoledadParsingSyncStream(
         test_remote_sync_target.TestParsingSyncStream,
         BaseSoledadTest):
@@ -93,7 +78,7 @@ class TestSoledadParsingSyncStream(
         enc_json = crypto.encrypt_docstr(
             doc.get_json(), doc.doc_id, doc.rev,
             key, secret)
-        tgt = target.SoledadSyncTarget(
+        tgt = target.SoledadHTTPSyncTarget(
             "http://foo/foo", crypto=self._soledad._crypto)
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
@@ -106,7 +91,7 @@ class TestSoledadParsingSyncStream(
                           lambda doc, gen, trans_id: None)
 
     def test_wrong_start(self):
-        tgt = target.SoledadSyncTarget("http://foo/foo")
+        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "{}\r\n]", None)
@@ -118,7 +103,7 @@ class TestSoledadParsingSyncStream(
                           tgt._parse_sync_stream, "", None)
 
     def test_wrong_end(self):
-        tgt = target.SoledadSyncTarget("http://foo/foo")
+        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n{}", None)
@@ -127,7 +112,7 @@ class TestSoledadParsingSyncStream(
                           tgt._parse_sync_stream, "[\r\n", None)
 
     def test_missing_comma(self):
-        tgt = target.SoledadSyncTarget("http://foo/foo")
+        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream,
@@ -135,13 +120,13 @@ class TestSoledadParsingSyncStream(
                           '"content": "c", "gen": 3}\r\n]', None)
 
     def test_no_entries(self):
-        tgt = target.SoledadSyncTarget("http://foo/foo")
+        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.BrokenSyncStream,
                           tgt._parse_sync_stream, "[\r\n]", None)
 
     def test_error_in_stream(self):
-        tgt = target.SoledadSyncTarget("http://foo/foo")
+        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
 
         self.assertRaises(u1db.errors.Unavailable,
                           tgt._parse_sync_stream,
@@ -164,7 +149,7 @@ class TestSoledadParsingSyncStream(
 def make_local_db_and_soledad_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = target.SoledadSyncTarget.connect(
+    st = target.SoledadHTTPSyncTarget.connect(
         test.getURL(path), crypto=test._soledad._crypto)
     return db, st
 

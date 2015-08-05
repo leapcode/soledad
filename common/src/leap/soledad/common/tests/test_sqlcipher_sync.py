@@ -29,7 +29,7 @@ from u1db import (
 from testscenarios import TestWithScenarios
 
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
-from leap.soledad.client.target import SoledadSyncTarget
+from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.crypto import decrypt_doc_dict
 from leap.soledad.client.sqlcipher import (
     SQLCipherDatabase,
@@ -55,7 +55,7 @@ def sync_via_synchronizer_and_soledad(test, db_source, db_target,
     if trace_hook:
         test.skipTest("full trace hook unsupported over http")
     path = test._http_at[db_target]
-    target = SoledadSyncTarget.connect(
+    target = SoledadHTTPSyncTarget.connect(
         test.getURL(path), test._soledad._crypto)
     target.set_token_credentials('user-uuid', 'auth-token')
     if trace_hook_shallow:
@@ -300,7 +300,7 @@ class SQLCipherDatabaseSyncTests(
 def _make_local_db_and_token_http_target(test, path='test'):
     test.startServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = SoledadSyncTarget.connect(
+    st = SoledadHTTPSyncTarget.connect(
         test.getURL(path), crypto=test._soledad._crypto)
     st.set_token_credentials('user-uuid', 'auth-token')
     return db, st
