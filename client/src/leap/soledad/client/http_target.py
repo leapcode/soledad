@@ -527,8 +527,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
             raise errors.BrokenSyncStream
         data = parts[1:-1]
         # decode metadata
-        line, comma = utils.check_and_strip_comma(data[0])
-        metadata = None
+        try:
+            line, comma = utils.check_and_strip_comma(data[0])
+            metadata = None
+        except (IndexError):
+            raise errors.BrokenSyncStream
         try:
             metadata = json.loads(line)
             new_generation = metadata['new_generation']

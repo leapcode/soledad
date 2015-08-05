@@ -56,7 +56,7 @@ from leap.soledad.common.tests.u1db_tests import test_sync
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 # -----------------------------------------------------------------------------
 
-class TestSoledadParsingSyncStream(
+class TestSoledadParseReceivedDocResponse(
         test_remote_sync_target.TestParsingSyncStream,
         BaseSoledadTest):
 
@@ -112,48 +112,39 @@ class TestSoledadParsingSyncStream(
             self.target._parse_received_doc_response("")
 
     def test_wrong_end(self):
-        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("[\r\n{}")
 
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "[\r\n{}", None)
-
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "[\r\n", None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("[\r\n")
 
     def test_missing_comma(self):
-        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
-
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream,
-                          '[\r\n{}\r\n{"id": "i", "rev": "r", '
-                          '"content": "c", "gen": 3}\r\n]', None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response(
+                '[\r\n{}\r\n{"id": "i", "rev": "r", '
+                '"content": "c", "gen": 3}\r\n]')
 
     def test_no_entries(self):
-        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
-
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream, "[\r\n]", None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response("[\r\n]")
 
     def test_error_in_stream(self):
-        tgt = target.SoledadHTTPSyncTarget("http://foo/foo")
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response(
+                '[\r\n{"new_generation": 0},'
+                '\r\n{"error": "unavailable"}\r\n')
 
-        self.assertRaises(u1db.errors.Unavailable,
-                          tgt._parse_sync_stream,
-                          '[\r\n{"new_generation": 0},'
-                          '\r\n{"error": "unavailable"}\r\n', None)
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response(
+                '[\r\n{"error": "unavailable"}\r\n')
 
-        self.assertRaises(u1db.errors.Unavailable,
-                          tgt._parse_sync_stream,
-                          '[\r\n{"error": "unavailable"}\r\n', None)
-
-        self.assertRaises(u1db.errors.BrokenSyncStream,
-                          tgt._parse_sync_stream,
-                          '[\r\n{"error": "?"}\r\n', None)
-
+        with self.assertRaises(u1db.errors.BrokenSyncStream):
+            self.target._parse_received_doc_response('[\r\n{"error": "?"}\r\n')
 
 #
 # functions for TestRemoteSyncTargets
 #
+
 
 def make_local_db_and_soledad_target(test, path='test'):
     test.startServer()
