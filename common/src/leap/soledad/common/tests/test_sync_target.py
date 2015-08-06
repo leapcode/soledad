@@ -51,13 +51,12 @@ from leap.soledad.common.tests.util import ADDRESS
 from leap.soledad.common.tests.u1db_tests import test_remote_sync_target
 from leap.soledad.common.tests.u1db_tests import test_sync
 
-
 # -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 # -----------------------------------------------------------------------------
 
 class TestSoledadParseReceivedDocResponse(
-        test_remote_sync_target.TestParsingSyncStream,
+        tests.TestCase,
         BaseSoledadTest):
 
     """
@@ -66,7 +65,7 @@ class TestSoledadParseReceivedDocResponse(
     """
 
     def setUp(self):
-        super(test_remote_sync_target.TestParsingSyncStream, self).setUp()
+        super(tests.TestCase, self).setUp()
         creds = {'token': {
             'uuid': 'user-uuid',
             'token': 'auth-token',
