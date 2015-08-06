@@ -30,7 +30,7 @@ from leap.soledad.common.couch import CouchDatabase, CouchServerState
 from leap.soledad.common.tests.util import (
     make_token_soledad_app,
     make_soledad_document_for_test,
-    token_soledad_sync_target,
+    soledad_sync_target,
 )
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
@@ -53,7 +53,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
     make_document_for_test = make_soledad_document_for_test
 
-    sync_target = token_soledad_sync_target
+    sync_target = soledad_sync_target
 
     def _soledad_instance(self, user='user-uuid', passphrase=u'123',
                           prefix='',

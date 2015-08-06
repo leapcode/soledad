@@ -31,6 +31,7 @@ import subprocess
 import time
 import re
 import traceback
+from uuid import uuid4
 
 from mock import Mock
 from urlparse import urljoin
@@ -175,14 +176,16 @@ class MockedSharedDBTest(object):
 
 
 def soledad_sync_target(test, path):
-    return http_target.SoledadSyncTarget(
-        test.getURL(path), crypto=test._soledad._crypto)
-
-
-def token_soledad_sync_target(test, path):
-    st = soledad_sync_target(test, path)
-    st.set_token_credentials('user-uuid', 'auth-token')
-    return st
+    creds = {'token': {
+        'uuid': 'user-uuid',
+        'token': 'auth-token',
+    }}
+    return http_target.SoledadHTTPSyncTarget(
+        test.getURL(path),
+        uuid4().hex,
+        creds,
+        test._soledad._crypto,
+        None)
 
 
 class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):

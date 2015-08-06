@@ -37,7 +37,7 @@ from leap.soledad.common.tests.u1db_tests import simple_doc
 from leap.soledad.common.tests.u1db_tests import test_sync
 from leap.soledad.common.tests.util import make_token_soledad_app
 from leap.soledad.common.tests.util import make_soledad_document_for_test
-from leap.soledad.common.tests.util import token_soledad_sync_target
+from leap.soledad.common.tests.util import soledad_sync_target
 from leap.soledad.common.tests.util import BaseSoledadTest
 from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
@@ -56,7 +56,7 @@ class InterruptableSyncTestCase(
 
     make_document_for_test = make_soledad_document_for_test
 
-    sync_target = token_soledad_sync_target
+    sync_target = soledad_sync_target
 
     def make_app(self):
         self.request_state = couch.CouchServerState(self._couch_url)

@@ -36,7 +36,7 @@ from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.util import (
     make_token_soledad_app,
     make_soledad_document_for_test,
-    token_soledad_sync_target,
+    soledad_sync_target,
     BaseSoledadTest,
 )
 
@@ -284,7 +284,7 @@ class EncryptedSyncTestCase(
 
     make_document_for_test = make_soledad_document_for_test
 
-    sync_target = token_soledad_sync_target
+    sync_target = soledad_sync_target
 
     def _soledad_instance(self, user=None, passphrase=u'123',
                           prefix='',
@@ -484,7 +484,7 @@ class LockResourceTestCase(
 
     make_document_for_test = make_soledad_document_for_test
 
-    sync_target = token_soledad_sync_target
+    sync_target = soledad_sync_target
 
     def setUp(self):
         # the order of the following initializations is crucial because of
