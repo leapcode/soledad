@@ -184,6 +184,9 @@ class SoledadSynchronizer(Synchronizer):
         # if gapless record current reached generation with target
         return self._record_sync_info_with_the_target(info["my_gen"])
 
+    def close(self):
+        self.sync_target.close()
+
     def _record_sync_info_with_the_target(self, start_generation):
         """
         Store local replica metadata in server.

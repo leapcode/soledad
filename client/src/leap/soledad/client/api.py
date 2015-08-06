@@ -301,7 +301,8 @@ class Soledad(object):
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
         # close the sync database
-        self._sync_db.close()
+        if self._sync_db:
+            self._sync_db.close()
         self._sync_db = None
         if self._defer_encryption:
             self._sync_enc_pool.stop()
