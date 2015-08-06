@@ -356,7 +356,7 @@ class TestCaseWithServer(TestCase):
     def url_scheme(self):
         return 'http'
 
-    def startServer(self):
+    def startTwistedServer(self):
         application = self.make_app()
         resource = WSGIResource(reactor, reactor.getThreadPool(), application)
         site = Site(resource)
@@ -364,6 +364,18 @@ class TestCaseWithServer(TestCase):
         host = self.port.getHost()
         self.server_address = (host.host, host.port)
         self.addCleanup(self.port.stopListening)
+
+    def startServer(self):
+        server_def = self.server_def()
+        server_class, shutdown_meth, _ = server_def
+        application = self.make_app()
+        self.server = server_class(('127.0.0.1', 0), application)
+        self.server_thread = threading.Thread(target=self.server.serve_forever,
+                                              kwargs=dict(poll_interval=0.01))
+        self.server_thread.start()
+        self.addCleanup(self.server_thread.join)
+        self.addCleanup(getattr(self.server, shutdown_meth))
+        self.server_address = self.server.server_address
 
     def getURL(self, path=None):
         host, port = self.server_address
