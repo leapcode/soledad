@@ -307,6 +307,9 @@ class EncryptedSyncTestCase(
             server = getattr(self, 'server', None)
             if server:
                 server_address = getattr(self.server, 'server_address', None)
+            else:
+                host = self.port.getHost()
+                server_address = (host.host, host.port)
             if server_address:
                 server_url = 'http://%s:%d' % (server_address)
 

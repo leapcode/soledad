@@ -69,7 +69,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         def _put_doc_side_effect(doc):
             self._doc_put = doc
 
-        return Soledad(
+        soledad = Soledad(
             user,
             passphrase,
             secrets_path=os.path.join(self.tempdir, prefix, secrets_path),
@@ -79,6 +79,8 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             cert_file=cert_file,
             auth_token=auth_token,
             shared_db=self.get_default_shared_mock(_put_doc_side_effect))
+        self.addCleanup(soledad.close)
+        return soledad
 
     def make_app(self):
         self.request_state = CouchServerState(self._couch_url)

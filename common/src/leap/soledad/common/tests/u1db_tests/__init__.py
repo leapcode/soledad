@@ -36,6 +36,9 @@ from StringIO import StringIO
 
 import testscenarios
 from twisted.trial import unittest
+from twisted.web.server import Site
+from twisted.web.wsgi import WSGIResource
+from twisted.internet import reactor
 
 from u1db import (
     errors,
@@ -338,32 +341,32 @@ class TestCaseWithServer(TestCase):
 
     def setUp(self):
         super(TestCaseWithServer, self).setUp()
-        self.server = self.server_thread = None
+        self.server = self.server_thread = self.port = None
 
     def tearDown(self):
         if self.server is not None:
             self.server.shutdown()
             self.server_thread.join()
             self.server.server_close()
+        if self.port:
+            self.port.stopListening()
         super(TestCaseWithServer, self).tearDown()
 
     @property
     def url_scheme(self):
-        return self.server_def()[-1]
+        return 'http'
 
     def startServer(self):
-        server_def = self.server_def()
-        server_class, shutdown_meth, _ = server_def
         application = self.make_app()
-        self.server = server_class(('127.0.0.1', 0), application)
-        self.server_thread = threading.Thread(target=self.server.serve_forever,
-                                              kwargs=dict(poll_interval=0.01))
-        self.server_thread.start()
-        self.addCleanup(self.server_thread.join)
-        self.addCleanup(getattr(self.server, shutdown_meth))
+        resource = WSGIResource(reactor, reactor.getThreadPool(), application)
+        site = Site(resource)
+        self.port = reactor.listenTCP(0, site, interface='127.0.0.1')
+        host = self.port.getHost()
+        self.server_address = (host.host, host.port)
+        self.addCleanup(self.port.stopListening)
 
     def getURL(self, path=None):
-        host, port = self.server.server_address
+        host, port = self.server_address
         if path is None:
             path = ''
         return '%s://%s:%s/%s' % (self.url_scheme, host, port, path)
