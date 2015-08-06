@@ -55,6 +55,7 @@ from leap.soledad.common.tests.u1db_tests import test_sync
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 # -----------------------------------------------------------------------------
 
+
 class TestSoledadParseReceivedDocResponse(
         tests.TestCase,
         BaseSoledadTest):
