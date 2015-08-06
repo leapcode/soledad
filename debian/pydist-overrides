@@ -7,3 +7,4 @@ configparser python-configparser
 leap.soledad.common soledad-common
 leap.soledad.server soledad-server
 leap.soledad.client soledad-client
+leap.common python-leap-common
