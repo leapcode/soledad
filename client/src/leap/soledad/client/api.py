@@ -47,6 +47,7 @@ from zope.interface import implements
 
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
+from twisted.internet import defer
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
@@ -199,6 +200,7 @@ class Soledad(object):
 
         self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
         self._init_u1db_sqlcipher_backend()
+        self.sync_lock = defer.DeferredLock()
 
         if syncable:
             self._init_u1db_syncer()
@@ -669,10 +671,10 @@ class Soledad(object):
         # -----------------------------------------------------------------
 
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
-        d = self._dbsyncer.sync(
+        d = self.sync_lock.run(lambda: self._dbsyncer.sync(
             sync_url,
             creds=self._creds,
-            defer_decryption=defer_decryption)
+            defer_decryption=defer_decryption))
 
         def _sync_callback(local_gen):
             self._last_received_docs = docs = self._dbsyncer.received_docs
@@ -711,7 +713,7 @@ class Soledad(object):
         :return: Wether Soledad is currently synchronizing with the server.
         :rtype: bool
         """
-        return self._dbsyncer.syncing
+        return self.sync_lock.locked
 
     def _set_token(self, token):
         """

@@ -96,6 +96,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             replica_uid='replica',
             ensure_ddocs=True)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
+        self.startTwistedServer()
 
     def tearDown(self):
         self.db.delete_database()
@@ -164,7 +165,6 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         """
         Assert that the sync_log increases accordingly with sequential syncs.
         """
-        self.startServer()
         sol = self._soledad_instance(
             auth_token='auth-token',
             server_url=self.getURL())
@@ -321,8 +321,6 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         """
         docs = []
 
-        self.startServer()
-
         sol = self._soledad_instance(
             auth_token='auth-token',
             server_url=self.getURL())
@@ -357,14 +355,13 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
         return d
 
+    @defer.inlineCallbacks
     def test_concurrent_syncs_do_not_fail(self):
         """
         Assert that concurrent attempts to sync end up being executed
         sequentially and do not fail.
         """
         docs = []
-
-        self.startServer()
 
         sol = self._soledad_instance(
             auth_token='auth-token',
@@ -374,21 +371,15 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         for i in xrange(0, REPEAT_TIMES):
             d = sol.create_doc({})
             d.addCallback(lambda doc: docs.append(doc.doc_id))
-            d.addCallback(lambda _: sol.sync())
+            d.addCallback(sol.sync)
             deferreds.append(d)
+        yield defer.gatherResults(deferreds, consumeErrors=True)
 
-        def _assert_logs(results):
-            transaction_log = self.db._get_transaction_log()
-            self.assertEqual(REPEAT_TIMES, len(transaction_log))
-            # assert all documents are in the remote log
-            self.assertEqual(REPEAT_TIMES, len(docs))
-            for doc_id in docs:
-                self.assertEqual(
-                    1,
-                    len(filter(lambda t: t[0] == doc_id, transaction_log)))
-
-        d = defer.gatherResults(deferreds)
-        d.addCallback(_assert_logs)
-        d.addCallback(lambda _: sol.close())
-
-        return d
+        transaction_log = self.db._get_transaction_log()
+        self.assertEqual(REPEAT_TIMES, len(transaction_log))
+        # assert all documents are in the remote log
+        self.assertEqual(REPEAT_TIMES, len(docs))
+        for doc_id in docs:
+            self.assertEqual(
+                1,
+                len(filter(lambda t: t[0] == doc_id, transaction_log)))

@@ -43,7 +43,6 @@ handled by Soledad should be created by SQLCipher >= 2.0.
 """
 import logging
 import os
-import threading
 import json
 import u1db
 
@@ -51,8 +50,6 @@ from u1db import errors as u1db_errors
 from u1db.backends import sqlite_backend
 
 from hashlib import sha256
-from contextlib import contextmanager
-from collections import defaultdict
 from functools import partial
 
 from pysqlcipher import dbapi2 as sqlcipher_dbapi2
@@ -427,7 +424,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     A dictionary that hold locks which avoid multiple sync attempts from the
     same database replica.
     """
-    syncing_lock = defaultdict(threading.Lock)
 
     def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
                  defer_encryption=False, sync_db=None, sync_enc_pool=None):
@@ -532,46 +528,17 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             before the synchronisation was performed.
         :rtype: Deferred
         """
-        # the following context manager blocks until the syncing lock can be
-        # acquired.
-        with self._syncer(url, creds=creds) as syncer:
+        syncer = self._get_syncer(url, creds=creds)
 
-            def _record_received_docs(result):
-                # beware, closure. syncer is in scope.
-                self.received_docs = syncer.received_docs
-                return result
+        def _record_received_docs(result):
+            # beware, closure. syncer is in scope.
+            self.received_docs = syncer.received_docs
+            return result
 
-            # XXX could mark the critical section here...
-            d = syncer.sync(defer_decryption=defer_decryption)
-            d.addCallback(_record_received_docs)
-            return d
-
-    @contextmanager
-    def _syncer(self, url, creds=None):
-        """
-        Accesor for synchronizer.
-
-        As we reuse the same synchronizer for every sync, there can be only
-        one instance synchronizing the same database replica at the same time.
-        Because of that, this method blocks until the syncing lock can be
-        acquired.
-
-        :param creds: optional dictionary giving credentials to authorize the
-                      operation with the server.
-        :type creds: dict
-        """
-        with self.syncing_lock[self._path]:
-            syncer = self._get_syncer(url, creds=creds)
-            yield syncer
-
-    @property
-    def syncing(self):
-        lock = self.syncing_lock[self._path]
-        acquired_lock = lock.acquire(False)
-        if acquired_lock is False:
-            return True
-        lock.release()
-        return False
+        # XXX could mark the critical section here...
+        d = syncer.sync(defer_decryption=defer_decryption)
+        d.addCallback(_record_received_docs)
+        return d
 
     def _get_syncer(self, url, creds=None):
         """

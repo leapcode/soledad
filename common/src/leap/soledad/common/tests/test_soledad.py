@@ -361,7 +361,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
 
         def _assert_done_data_sync_signal_emitted(results):
             # assert the signal has been emitted
-            soledad.client.signal.assert_called_with(
+            soledad.client.events.emit.assert_called_with(
                 catalog.SOLEDAD_DONE_DATA_SYNC,
                 ADDRESS,
             )

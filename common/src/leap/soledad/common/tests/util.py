@@ -275,7 +275,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
             MockSharedDB = self.get_default_shared_mock(
                 _put_doc_side_effect)
 
-        return Soledad(
+        soledad = Soledad(
             user,
             passphrase,
             secrets_path=os.path.join(
@@ -287,6 +287,8 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
             defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),
             auth_token=auth_token)
+        self.addCleanup(soledad.close)
+        return soledad
 
     def assertGetEncryptedDoc(
             self, db, doc_id, doc_rev, content, has_conflicts):

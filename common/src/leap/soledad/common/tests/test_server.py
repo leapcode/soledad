@@ -347,7 +347,7 @@ class EncryptedSyncTestCase(
         Test the complete syncing chain between two soledad dbs using a
         Soledad server backed by a couch database.
         """
-        self.startServer()
+        self.startTwistedServer()
         user = 'user-' + uuid4().hex
 
         # instantiate soledad and create a document
