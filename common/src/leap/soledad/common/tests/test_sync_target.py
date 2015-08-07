@@ -46,7 +46,6 @@ from leap.soledad.common.tests.util import make_soledad_app
 from leap.soledad.common.tests.util import make_token_soledad_app
 from leap.soledad.common.tests.util import make_soledad_document_for_test
 from leap.soledad.common.tests.util import soledad_sync_target
-from leap.soledad.common.tests.util import BaseSoledadTest
 from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 from leap.soledad.common.tests.util import ADDRESS
 
@@ -55,9 +54,7 @@ from leap.soledad.common.tests.util import ADDRESS
 # -----------------------------------------------------------------------------
 
 
-class TestSoledadParseReceivedDocResponse(
-        tests.TestCase,
-        BaseSoledadTest):
+class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
 
     """
     Some tests had to be copied to this class so we can instantiate our own
@@ -65,17 +62,22 @@ class TestSoledadParseReceivedDocResponse(
     """
 
     def setUp(self):
-        super(tests.TestCase, self).setUp()
+        SoledadWithCouchServerMixin.setUp(self)
+        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
         creds = {'token': {
             'uuid': 'user-uuid',
             'token': 'auth-token',
         }}
         self.target = target.SoledadHTTPSyncTarget(
-            "http://foo/foo",
+            self._couch_url,
             uuid4().hex,
             creds,
             self._soledad._crypto,
             None)
+
+    def tearDown(self):
+        self.target.close()
+        SoledadWithCouchServerMixin.tearDown(self)
 
     def test_extra_comma(self):
         """
@@ -627,9 +629,3 @@ class TestSoledadDbSync(
 
         d.addCallback(_assert_successful_sync)
         return d
-
-    def test_db_sync_autocreate(self):
-        """
-        We bypass this test because we never need to autocreate databases.
-        """
-        pass
