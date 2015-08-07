@@ -49,7 +49,6 @@ from leap.soledad.common.tests.util import soledad_sync_target
 from leap.soledad.common.tests.util import BaseSoledadTest
 from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 from leap.soledad.common.tests.util import ADDRESS
-from leap.soledad.common.tests.u1db_tests import test_sync
 
 # -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_remote_sync_target`.
