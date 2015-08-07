@@ -23,18 +23,18 @@ import time
 
 from urlparse import urljoin
 from twisted.internet import defer
+from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 
 from leap.soledad.common import couch
-from leap.soledad.client import http_target as target
+from leap.soledad.client import http_target
 from leap.soledad.client import sync
 from leap.soledad.server import SoledadApp
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 from leap.soledad.common.tests.u1db_tests import simple_doc
-from leap.soledad.common.tests.u1db_tests import test_sync
 from leap.soledad.common.tests.util import make_token_soledad_app
 from leap.soledad.common.tests.util import make_soledad_document_for_test
 from leap.soledad.common.tests.util import soledad_sync_target
@@ -153,8 +153,8 @@ def make_soledad_app(state):
 
 class TestSoledadDbSync(
         TestWithScenarios,
-        SoledadWithCouchServerMixin,
-        test_sync.TestDbSync):
+        tests.TestCaseWithServer,
+        SoledadWithCouchServerMixin):
 
     """
     Test db.sync remote sync shortcut
@@ -205,20 +205,18 @@ class TestSoledadDbSync(
         Perform sync using SoledadSynchronizer, SoledadSyncTarget
         and Token auth.
         """
-        extra = {}
-        extra = dict(creds={'token': {
+
+        target_url = self.getURL(target_name)
+        creds = {'token': {
             'uuid': 'user-uuid',
             'token': 'auth-token',
-        }})
-        target_url = self.getURL(target_name)
+        }}
+        target = soledad_sync_target(self, target_name)
         return sync.SoledadSynchronizer(
             self.db,
-            target.SoledadHTTPSyncTarget(
-                target_url,
-                crypto=self._soledad._crypto,
-                **extra)).sync(autocreate=True,
-                               defer_decryption=False)
+            target).sync(defer_decryption=False)
 
+    @defer.inlineCallbacks
     def test_db_sync(self):
         """
         Test sync.
@@ -229,7 +227,7 @@ class TestSoledadDbSync(
         doc1 = self.db.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
 
-        local_gen_before_sync = self.do_sync('test')
+        local_gen_before_sync = yield self.do_sync('test')
         gen, _, changes = self.db.whats_changed(local_gen_before_sync)
         self.assertEqual(1, len(changes))
         self.assertEqual(doc2.doc_id, changes[0][0])
@@ -246,7 +244,7 @@ class TestSoledadDbSync(
         Adapted to check for encrypted content.
         """
         doc1 = self.db.create_doc_from_json(tests.simple_doc)
-        local_gen_before_sync = self.do_sync('test')
+        local_gen_before_sync = yield self.do_sync('test')
         gen, _, changes = self.db.whats_changed(local_gen_before_sync)
         self.assertEqual(0, gen - local_gen_before_sync)
         db3 = self.request_state.open_database('test')
