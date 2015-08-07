@@ -420,11 +420,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     """
     ENCRYPT_LOOP_PERIOD = 1
 
-    """
-    A dictionary that hold locks which avoid multiple sync attempts from the
-    same database replica.
-    """
-
     def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
                  defer_encryption=False, sync_db=None, sync_enc_pool=None):
 
@@ -512,6 +507,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         we don't need to actually wait for the db to be ready. If this ever
         changes, we should add a thread-safe condition to ensure the db is
         ready before using it.
+
+        This method is atomic, with atomicity guaranteed by caller. Each
+        caller should implement a locking mechanism to ensure atomicity.
 
         :param url: The url of the target replica to sync with.
         :type url: str

@@ -41,13 +41,14 @@ except ImportError:
 from itertools import chain
 
 from StringIO import StringIO
+from collections import defaultdict
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
-from twisted.internet import defer
+from twisted.internet.defer import DeferredLock
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
@@ -114,6 +115,7 @@ class Soledad(object):
     local_db_file_name = 'soledad.u1db'
     secrets_file_name = "soledad.json"
     default_prefix = os.path.join(get_path_prefix(), 'leap', 'soledad')
+    _syncing_lock = defaultdict(DeferredLock)
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
@@ -200,7 +202,6 @@ class Soledad(object):
 
         self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
         self._init_u1db_sqlcipher_backend()
-        self.sync_lock = defer.DeferredLock()
 
         if syncable:
             self._init_u1db_syncer()
@@ -671,7 +672,7 @@ class Soledad(object):
         # -----------------------------------------------------------------
 
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
-        d = self.sync_lock.run(lambda: self._dbsyncer.sync(
+        d = self.syncing_lock.run(lambda: self._dbsyncer.sync(
             sync_url,
             creds=self._creds,
             defer_decryption=defer_decryption))
@@ -706,6 +707,17 @@ class Soledad(object):
         return d
 
     @property
+    def syncing_lock(self):
+        """
+        Class based lock to ensure consistency on concurrent calls to sync.
+        Each lock is based on the path of db file.
+
+        :return: DeferredLock based on this instance path of db file
+        :rtype: DeferredLock
+        """
+        return self._syncing_lock[self._local_db_path]
+
+    @property
     def syncing(self):
         """
         Return wether Soledad is currently synchronizing with the server.
@@ -713,7 +725,7 @@ class Soledad(object):
         :return: Wether Soledad is currently synchronizing with the server.
         :rtype: bool
         """
-        return self.sync_lock.locked
+        return self.syncing_lock.locked
 
     def _set_token(self, token):
         """
