@@ -149,8 +149,7 @@ class TestSoledadParseReceivedDocResponse(
 def make_local_db_and_soledad_target(test, path='test'):
     test.startTwistedServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = target.SoledadHTTPSyncTarget.connect(
-        test.getURL(path), crypto=test._soledad._crypto)
+    st = soledad_sync_target(test, test.getURL(path))
     return db, st
 
 
@@ -334,7 +333,8 @@ target_scenarios = [
 class SoledadDatabaseSyncTargetTests(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
-        test_sync.DatabaseSyncTargetTests):
+        tests.DatabaseBaseTests,
+        tests.TestCaseWithServer):
 
     scenarios = (
         tests.multiply_scenarios(
@@ -344,8 +344,17 @@ class SoledadDatabaseSyncTargetTests(
     whitebox = False
 
     def setUp(self):
-        self.main_test_class = test_sync.DatabaseSyncTargetTests
+        tests.TestCaseWithServer.setUp(self)
+        self.other_changes = []
         SoledadWithCouchServerMixin.setUp(self)
+        self.db, self.st = make_local_db_and_soledad_target(self)
+
+    def tearDown(self):
+        tests.TestCaseWithServer.tearDown(self)
+        SoledadWithCouchServerMixin.tearDown(self)
+        self.other_changes = []
+        self.db.close()
+        self.st.close()
 
     @defer.inlineCallbacks
     def test_sync_exchange(self):
@@ -354,7 +363,6 @@ class SoledadDatabaseSyncTargetTests(
 
         This test was adapted to decrypt remote content before assert.
         """
-        sol, _ = make_local_db_and_soledad_target(self)
         docs_by_gen = [
             (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
              'T-sid')]
@@ -369,8 +377,8 @@ class SoledadDatabaseSyncTargetTests(
         self.assertEqual(([], 1, last_trans_id),
                          (self.other_changes, new_gen, last_trans_id))
         self.assertEqual(10, self.st.get_sync_info('replica')[3])
-        sol.close()
 
+    @defer.inlineCallbacks
     def test_sync_exchange_push_many(self):
         """
         Test sync exchange.
@@ -382,7 +390,7 @@ class SoledadDatabaseSyncTargetTests(
                 'doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
             (self.make_document(
                 'doc-id2', 'replica:1', tests.nested_doc), 11, 'T-2')]
-        new_gen, trans_id = self.st.sync_exchange(
+        new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc,
             defer_decryption=False)
@@ -396,6 +404,7 @@ class SoledadDatabaseSyncTargetTests(
                          (self.other_changes, new_gen, trans_id))
         self.assertEqual(11, self.st.get_sync_info('replica')[3])
 
+    @defer.inlineCallbacks
     def test_sync_exchange_returns_many_new_docs(self):
         """
         Test sync exchange.
@@ -407,7 +416,7 @@ class SoledadDatabaseSyncTargetTests(
         doc = self.db.create_doc_from_json(tests.simple_doc)
         doc2 = self.db.create_doc_from_json(tests.nested_doc)
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
-        new_gen, _ = self.st.sync_exchange(
+        new_gen, _ = yield self.st.sync_exchange(
             [], 'other-replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc,
             defer_decryption=False)
@@ -428,6 +437,10 @@ class SoledadDatabaseSyncTargetTests(
                 self.db._last_exchange_log['return'],
                 {'last_gen': 2, 'docs':
                  [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
+
+    def receive_doc(self, doc, gen, trans_id):
+        self.other_changes.append(
+            (doc.doc_id, doc.rev, doc.get_json(), gen, trans_id))
 
 
 # Just to make clear how this test is different... :)
