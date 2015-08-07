@@ -34,7 +34,6 @@ from leap.soledad.client.sqlcipher import (
 from testscenarios import TestWithScenarios
 
 from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests.u1db_tests import test_sync
 from leap.soledad.common.tests.util import ADDRESS
 from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 from leap.soledad.common.tests.util import make_soledad_app
@@ -93,10 +92,6 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
             ensure_ddocs=True)
 
     def tearDown(self):
-        self.db1.close()
-        self.db2.close()
-        self._soledad.close()
-
         # XXX should not access "private" attrs
         shutil.rmtree(os.path.dirname(self._soledad._local_db_path))
         SoledadWithCouchServerMixin.tearDown(self)
@@ -112,7 +107,7 @@ class SyncTimeoutError(Exception):
 
 class TestSoledadDbSyncDeferredEncDecr(
         TestWithScenarios,
-        test_sync.TestDbSync,
+        tests.TestCaseWithServer,
         BaseSoledadDeferredEncTest):
 
     """
@@ -172,15 +167,13 @@ class TestSoledadDbSyncDeferredEncDecr(
                 self.opts,
                 crypto,
                 replica_uid,
+                None,
                 defer_encryption=True)
             self.dbsyncer = dbsyncer
             return dbsyncer.sync(
                 target_url,
                 creds=creds,
-                autocreate=True,
                 defer_decryption=DEFER_DECRYPTION)
-        else:
-            return test_sync.TestDbSync.do_sync(self, target_name)
 
     def wait_for_sync(self):
         """

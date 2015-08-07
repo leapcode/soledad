@@ -191,10 +191,11 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         Stop the encrypter pool.
         """
         # close the sync queue
-        self._encr_queue.close()
-        q = self._encr_queue
-        del q
-        self._encr_queue = None
+        if self._encr_queue:
+            self._encr_queue.close()
+            q = self._encr_queue
+            del q
+            self._encr_queue = None
 
         SyncEncryptDecryptPool.stop(self)
 

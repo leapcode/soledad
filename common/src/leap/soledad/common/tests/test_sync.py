@@ -179,8 +179,6 @@ class TestSoledadDbSync(
         """
         Need to explicitely invoke inicialization on all bases.
         """
-        # tests.TestCaseWithServer.setUp(self)
-        # self.main_test_class = test_sync.TestDbSync
         SoledadWithCouchServerMixin.setUp(self)
         self.startServer()
         self.db = self.make_database_for_test(self, 'test1')
