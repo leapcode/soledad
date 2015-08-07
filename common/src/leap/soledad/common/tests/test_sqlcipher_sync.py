@@ -38,7 +38,6 @@ from leap.soledad.client.sqlcipher import (
 )
 
 from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests.u1db_tests import test_sync
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS
 from leap.soledad.common.tests.util import (
     make_soledad_app,
@@ -66,9 +65,19 @@ def sync_via_synchronizer_and_soledad(test, db_source, db_target,
     return sync.Synchronizer(db_source, target).sync()
 
 
+def sync_via_synchronizer(test, db_source, db_target,
+                          trace_hook=None,
+                          trace_hook_shallow=None):
+    target = db_target.get_sync_target()
+    trace_hook = trace_hook or trace_hook_shallow
+    if trace_hook:
+        target._set_trace_hook(trace_hook)
+    return sync.Synchronizer(db_source, target).sync()
+
+
 sync_scenarios = []
 for name, scenario in SQLCIPHER_SCENARIOS:
-    scenario['do_sync'] = test_sync.sync_via_synchronizer
+    scenario['do_sync'] = sync_via_synchronizer
     sync_scenarios.append((name, scenario))
 
 
