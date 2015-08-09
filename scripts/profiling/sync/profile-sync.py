@@ -11,6 +11,9 @@ from twisted.internet import reactor
 
 from util import StatsLogger, ValidateUserHandle
 from client_side_db import _get_soledad_instance, _get_soledad_info
+from leap.common.events import flags
+
+flags.set_events_enabled(False)
 
 
 # create a logger
