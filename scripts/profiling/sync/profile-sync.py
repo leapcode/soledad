@@ -31,6 +31,12 @@ def get_and_run_plop_collector():
     return collector
 
 
+def get_and_run_theseus_tracer():
+    from theseus import Tracer
+    t = Tracer()
+    t.install()
+    return t
+
 # main program
 
 if __name__ == '__main__':
@@ -57,7 +63,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--plop', dest='do_plop', action='store_true',
         help='run sync script under plop profiler')
-    parser.set_defaults(do_stats=True, do_plot=False, do_plop=False)
+    parser.add_argument(
+        '--theseus', dest='do_theseus', action='store_true',
+        help='run sync script under theseus profiler')
+    parser.set_defaults(
+        do_stats=True, do_plot=False, do_plop=False, do_theseus=False)
     args = parser.parse_args()
 
     # get the password
@@ -79,8 +89,11 @@ if __name__ == '__main__':
     s = _get_soledad_instance(
         uuid, passphrase, basedir, server_url, cert_file, token)
 
+    # TODO Profile this with more realistic payloads
+    # TODO Add option to disable sending new docs. If we're profiling
+    # receiving against a fixed account, this will alter each run's results.
+
     for i in xrange(10):
-        # XXX Profile this with more realistic payloads
         s.create_doc({})
 
     def start_sync():
@@ -96,11 +109,16 @@ if __name__ == '__main__':
         else:
             plop_collector = None
 
+        if args.do_theseus:
+            theseus = get_and_run_theseus_tracer()
+        else:
+            theseus = None
+
         t0 = datetime.now()
         d = s.sync()
-        d.addCallback(onSyncDone, sl, t0, plop_collector)
+        d.addCallback(onSyncDone, sl, t0, plop_collector, theseus)
 
-    def onSyncDone(sync_result, sl, t0, plop_collector):
+    def onSyncDone(sync_result, sl, t0, plop_collector, theseus):
         print "GOT SYNC RESULT: ", sync_result
         t1 = datetime.now()
         if sl:
@@ -112,6 +130,10 @@ if __name__ == '__main__':
             # XXX mkdir profiles dir if not exist
             with open('profiles/plop-sync-%s' % GITVER, 'w') as f:
                 f.write(formatter.format(plop_collector))
+        if theseus:
+            with open('callgrind.theseus', 'wb') as outfile:
+                theseus.write_data(outfile)
+            theseus.uninstall()
 
         delta = (t1 - t0).total_seconds()
         print "[+] Sync took %s seconds." % delta
