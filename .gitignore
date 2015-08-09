@@ -15,3 +15,4 @@ MANIFEST
 .eggs
 _trial_temp
 .DS_Store
+scripts/profiling/sync/profiles
