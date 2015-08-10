@@ -4,6 +4,8 @@ import argparse
 import commands
 import getpass
 import logging
+import mmap
+import os
 import tempfile
 
 from datetime import datetime
@@ -37,6 +39,35 @@ def get_and_run_theseus_tracer():
     t.install()
     return t
 
+
+def bail(msg):
+    print "[!] %s" % msg
+
+
+def create_docs(soledad, args):
+    """
+    Populates the soledad database with dummy messages, so we can exercise
+    sending payloads during the sync.
+    """
+    sample_path = args.payload_f
+    if not sample_path:
+        bail('Need to pass a --payload-file')
+        return
+    if not os.path.isfile(sample_path):
+        bail('--payload-file does not exist!')
+        return
+
+    numdocs = args.send_num
+    docsize = args.send_size
+
+    # XXX this will FAIL if the payload source is smaller to size * num
+    # XXX could use a cycle iterator
+    with open(sample_path, "r+b") as sample_f:
+        fmap = mmap.mmap(sample_f.fileno(), 0, prot=mmap.PROT_READ)
+        for index in xrange(numdocs):
+            payload = fmap.read(docsize * 1024)
+            s.create_doc({payload: payload})
+
 # main program
 
 if __name__ == '__main__':
@@ -55,6 +86,18 @@ if __name__ == '__main__':
         '-l', dest='logfile', required=False, default='/tmp/profile.log',
         help='the file to which write the log')
     parser.add_argument(
+        '--no-send', dest='do_send', action='store_false',
+        help='skip sending messages')
+    parser.add_argument(
+        '--send-size', dest='send_size', default=10,
+        help='size of doc to send, in KB (default: 10)')
+    parser.add_argument(
+        '--send-num', dest='send_num', default=10,
+        help='number of docs to send (default: 10)')
+    parser.add_argument(
+        '--payload-file', dest="payload_f", default=None,
+        help='path to a sample file to use for the payloads')
+    parser.add_argument(
         '--no-stats', dest='do_stats', action='store_false',
         help='skip system stats')
     parser.add_argument(
@@ -67,7 +110,9 @@ if __name__ == '__main__':
         '--theseus', dest='do_theseus', action='store_true',
         help='run sync script under theseus profiler')
     parser.set_defaults(
-        do_stats=True, do_plot=False, do_plop=False, do_theseus=False)
+        do_send=True, do_stats=True, do_plot=False, do_plop=False,
+        do_theseus=False,
+    )
     args = parser.parse_args()
 
     # get the password
@@ -89,12 +134,8 @@ if __name__ == '__main__':
     s = _get_soledad_instance(
         uuid, passphrase, basedir, server_url, cert_file, token)
 
-    # TODO Profile this with more realistic payloads
-    # TODO Add option to disable sending new docs. If we're profiling
-    # receiving against a fixed account, this will alter each run's results.
-
-    for i in xrange(10):
-        s.create_doc({})
+    if args.do_send:
+        create_docs(s, args)
 
     def start_sync():
         if args.do_stats:
@@ -119,6 +160,7 @@ if __name__ == '__main__':
         d.addCallback(onSyncDone, sl, t0, plop_collector, theseus)
 
     def onSyncDone(sync_result, sl, t0, plop_collector, theseus):
+        # TODO should write this to a result file
         print "GOT SYNC RESULT: ", sync_result
         t1 = datetime.now()
         if sl:
@@ -127,7 +169,8 @@ if __name__ == '__main__':
             from plop.collector import PlopFormatter
             formatter = PlopFormatter()
             plop_collector.stop()
-            # XXX mkdir profiles dir if not exist
+            if not os.path.isdir('profiles'):
+                os.mkdir('profiles')
             with open('profiles/plop-sync-%s' % GITVER, 'w') as f:
                 f.write(formatter.format(plop_collector))
         if theseus:
@@ -136,6 +179,7 @@ if __name__ == '__main__':
             theseus.uninstall()
 
         delta = (t1 - t0).total_seconds()
+        # TODO should write this to a result file
         print "[+] Sync took %s seconds." % delta
         reactor.stop()
 
