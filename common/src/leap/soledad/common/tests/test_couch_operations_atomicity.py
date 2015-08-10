@@ -371,7 +371,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         for i in xrange(0, REPEAT_TIMES):
             d = sol.create_doc({})
             d.addCallback(lambda doc: docs.append(doc.doc_id))
-            d.addCallback(sol.sync)
+            d.addCallback(lambda _: sol.sync())
             deferreds.append(d)
         yield defer.gatherResults(deferreds, consumeErrors=True)
 
