@@ -345,7 +345,7 @@ class SQLCipherDatabaseSyncTests(
 def _make_local_db_and_token_http_target(test, path='test'):
     test.startTwistedServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = soledad_sync_target(test, test.getURL(path))
+    st = soledad_sync_target(test, path)
     return db, st
 
 target_scenarios = [
