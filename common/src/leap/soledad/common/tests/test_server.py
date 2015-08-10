@@ -461,7 +461,7 @@ class EncryptedSyncTestCase(
         """
         Test if Soledad can sync very large files.
         """
-        self.fail("Work in progress, was exploding memory")
+        self.skipTest("Work in progress. For reference, see: https://leap.se/code/issues/7370 ")
         length = 100 * (10 ** 6)  # 100 MB
         return self._test_encrypted_sym_sync(doc_size=length, number_of_docs=1)
 
