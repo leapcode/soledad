@@ -147,15 +147,18 @@ class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
 #
 
 
-def make_local_db_and_soledad_target(test, path='test'):
+def make_local_db_and_soledad_target(test, path='test',
+        source_replica_uid=uuid4().hex):
     test.startTwistedServer()
     db = test.request_state._create_database(os.path.basename(path))
-    st = soledad_sync_target(test, path)
+    st = soledad_sync_target(test, path, source_replica_uid)
     return db, st
 
 
-def make_local_db_and_token_soledad_target(test):
-    db, st = make_local_db_and_soledad_target(test, 'test')
+def make_local_db_and_token_soledad_target(test,
+        source_replica_uid=uuid4().hex):
+    db, st = make_local_db_and_soledad_target(test, path='test',
+        source_replica_uid=source_replica_uid)
     st.set_token_credentials('user-uuid', 'auth-token')
     return db, st
 
@@ -174,10 +177,10 @@ class TestSoledadSyncTarget(
              'sync_target': soledad_sync_target}),
     ]
 
-    def getSyncTarget(self, path=None):
+    def getSyncTarget(self, path=None, source_replica_uid=uuid4().hex):
         if self.port is None:
             self.startTwistedServer()
-        return self.sync_target(self, path)
+        return self.sync_target(self, path, source_replica_uid)
 
     def setUp(self):
         TestWithScenarios.setUp(self)
@@ -215,6 +218,7 @@ class TestSoledadSyncTarget(
         self.assertEqual(1, new_gen)
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
+        remote_target.close()
 
     @defer.inlineCallbacks
     def test_sync_exchange_send_failure_and_retry_scenario(self):
@@ -236,7 +240,7 @@ class TestSoledadSyncTarget(
                                   replica_trans_id=None, number_of_docs=None,
                                   doc_idx=None, sync_id=None):
             if doc.doc_id in trigger_ids:
-                raise Exception
+                raise u1db.errors.U1DBError
             return _put_doc_if_newer(doc, save_conflict=save_conflict,
                                      replica_uid=replica_uid,
                                      replica_gen=replica_gen,
@@ -246,7 +250,9 @@ class TestSoledadSyncTarget(
         from leap.soledad.common.tests.test_couch import IndexedCouchDatabase
         self.patch(
             IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
-        remote_target = self.getSyncTarget('test')
+        remote_target = self.getSyncTarget(
+            'test',
+            source_replica_uid='replica')
         other_changes = []
 
         def receive_doc(doc, gen, trans_id):
@@ -257,13 +263,15 @@ class TestSoledadSyncTarget(
         doc2 = self.make_document('doc-here2', 'replica:1',
                                   '{"value": "here2"}')
 
-        with self.assertRaises(u1db.errors.HTTPError):
+        with self.assertRaises(u1db.errors.U1DBError):
             yield remote_target.sync_exchange(
                 [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
                 'replica',
                 last_known_generation=0,
                 last_known_trans_id=None,
-                insert_doc_cb=receive_doc)
+                insert_doc_cb=receive_doc,
+                defer_decryption=False)
+
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}',
             False)
@@ -274,7 +282,8 @@ class TestSoledadSyncTarget(
         trigger_ids = []
         new_gen, trans_id = yield remote_target.sync_exchange(
             [(doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=receive_doc)
+            last_known_trans_id=None, insert_doc_cb=receive_doc,
+            defer_decryption=False)
         self.assertGetEncryptedDoc(
             db, 'doc-here2', 'replica:1', '{"value": "here2"}',
             False)
@@ -284,6 +293,7 @@ class TestSoledadSyncTarget(
         self.assertEqual(
             ('doc-here', 'replica:1', '{"value": "here"}', 1),
             other_changes[0][:-1])
+        remote_target.close()
 
     @defer.inlineCallbacks
     def test_sync_exchange_send_ensure_callback(self):
@@ -313,6 +323,7 @@ class TestSoledadSyncTarget(
         self.assertEqual(db._replica_uid, replica_uid_box[0])
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
+        remote_target.close()
 
     def test_sync_exchange_in_stream_error(self):
         # we bypass this test because our sync_exchange process does not
@@ -377,7 +388,8 @@ class SoledadDatabaseSyncTargetTests(
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 1, last_trans_id),
                          (self.other_changes, new_gen, last_trans_id))
-        self.assertEqual(10, self.st.get_sync_info('replica')[3])
+        sync_info = yield self.st.get_sync_info('replica')
+        self.assertEqual(10, sync_info[3])
 
     @defer.inlineCallbacks
     def test_sync_exchange_push_many(self):
@@ -403,7 +415,8 @@ class SoledadDatabaseSyncTargetTests(
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 2, last_trans_id),
                          (self.other_changes, new_gen, trans_id))
-        self.assertEqual(11, self.st.get_sync_info('replica')[3])
+        sync_info = yield self.st.get_sync_info('replica')
+        self.assertEqual(11, sync_info[3])
 
     @defer.inlineCallbacks
     def test_sync_exchange_returns_many_new_docs(self):

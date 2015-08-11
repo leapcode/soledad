@@ -175,17 +175,24 @@ class MockedSharedDBTest(object):
         return defaultMockSharedDB
 
 
-def soledad_sync_target(test, path):
+def soledad_sync_target(test, path, source_replica_uid=uuid4().hex):
     creds = {'token': {
         'uuid': 'user-uuid',
         'token': 'auth-token',
     }}
     return http_target.SoledadHTTPSyncTarget(
         test.getURL(path),
-        uuid4().hex,
+        source_replica_uid,
         creds,
         test._soledad._crypto,
         None)
+
+
+# redefine the base leap test class so it inherits from twisted trial's
+# TestCase. This is needed so trial knows that it has to manage a reactor and
+# wait for deferreds returned by tests to be fired.
+BaseLeapTest = type(
+    'BaseLeapTest', (unittest.TestCase,), dict(BaseLeapTest.__dict__)) 
 
 
 class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
