@@ -25,15 +25,21 @@ after receiving.
 import json
 import base64
 import logging
+import warnings
 
 from uuid import uuid4
 
 from twisted.internet import defer
 from twisted.web.error import Error
+from twisted.web.client import _ReadBodyProtocol
+from twisted.web.client import PartialDownloadError
+from twisted.web._newclient import ResponseDone
+from twisted.web._newclient import PotentialDataLoss
 
 from u1db import errors
 from u1db import SyncTarget
 from u1db.remote import utils
+from u1db.remote import http_errors
 
 from leap.common.http import HTTPClient
 
@@ -48,6 +54,108 @@ from leap.soledad.client.encdecpool import SyncDecrypterPool
 
 
 logger = logging.getLogger(__name__)
+
+
+# we want to make sure that HTTP errors will raise appropriate u1db errors,
+# that is, fire errbacks with the appropriate failures, in the context of
+# twisted. Because of that, we redefine the http body reader used by the HTTP
+# client below.
+
+class ReadBodyProtocol(_ReadBodyProtocol):
+
+    def __init__(self, response, deferred):
+        """
+        Initialize the protocol, additionally storing the response headers.
+        """
+        _ReadBodyProtocol.__init__(
+            self, response.code, response.phrase, deferred)
+        self.headers = response.headers
+
+    # ---8<--- snippet from u1db.remote.http_client, modified to use errbacks
+    def _error(self, respdic):
+        descr = respdic.get("error")
+        exc_cls = errors.wire_description_to_exc.get(descr)
+        if exc_cls is not None:
+            message = respdic.get("message")
+            self.deferred.errback(exc_cls(message))
+    # ---8<--- end of snippet from u1db.remote.http_client
+
+    def connectionLost(self, reason):
+        """
+        Deliver the accumulated response bytes to the waiting L{Deferred}, if
+        the response body has been completely received without error.
+        """
+        if reason.check(ResponseDone):
+
+            body = b''.join(self.dataBuffer)
+
+            # ---8<--- snippet from u1db.remote.http_client
+            if self.status in (200, 201):
+                self.deferred.callback(body)
+            elif self.status in http_errors.ERROR_STATUSES:
+                try:
+                    respdic = json.loads(body)
+                except ValueError:
+                    self.deferred.errback(
+                        errors.HTTPError(self.status, body, self.headers))
+                else:
+                    self._error(respdic)
+            # special cases
+            elif self.status == 503:
+                self.deferred.errback(errors.Unavailable(body, self.headers))
+            else:
+                self.deferred.errback(
+                    errors.HTTPError(self.status, body, self.headers))
+            # ---8<--- end of snippet from u1db.remote.http_client
+
+        elif reason.check(PotentialDataLoss):
+            self.deferred.errback(
+                PartialDownloadError(self.status, self.message,
+                                     b''.join(self.dataBuffer)))
+        else:
+            self.deferred.errback(reason)
+
+
+def readBody(response):
+    """
+    Get the body of an L{IResponse} and return it as a byte string.
+
+    This is a helper function for clients that don't want to incrementally
+    receive the body of an HTTP response.
+
+    @param response: The HTTP response for which the body will be read.
+    @type response: L{IResponse} provider
+
+    @return: A L{Deferred} which will fire with the body of the response.
+        Cancelling it will close the connection to the server immediately.
+    """
+    def cancel(deferred):
+        """
+        Cancel a L{readBody} call, close the connection to the HTTP server
+        immediately, if it is still open.
+
+        @param deferred: The cancelled L{defer.Deferred}.
+        """
+        abort = getAbort()
+        if abort is not None:
+            abort()
+
+    d = defer.Deferred(cancel)
+    protocol = ReadBodyProtocol(response, d)
+
+    def getAbort():
+        return getattr(protocol.transport, 'abortConnection', None)
+
+    response.deliverBody(protocol)
+
+    if protocol.transport is not None and getAbort() is None:
+        warnings.warn(
+            'Using readBody with a transport that does not have an '
+            'abortConnection method',
+            category=DeprecationWarning,
+            stacklevel=2)
+
+    return d
 
 
 class SoledadHTTPSyncTarget(SyncTarget):
@@ -576,7 +684,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 source_replica_uid=self.source_replica_uid)
 
     def _http_request(self, url, method='GET', body=None, headers={}):
-        d = self._http.request(url, method, body, headers)
+        d = self._http.request(url, method, body, headers, readBody)
         d.addErrback(_unauth_to_invalid_token_error)
         return d
 
