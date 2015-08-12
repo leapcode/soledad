@@ -27,7 +27,7 @@ from leap.soledad.common.tests.util import (
 )
 from leap import soledad
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.crypto import WrongMacError
+from leap.soledad.common.errors import DatabaseAccessError
 from leap.soledad.client import Soledad
 from leap.soledad.client.adbapi import U1DBConnectionPool
 from leap.soledad.client.secrets import PassphraseTooShort
@@ -114,11 +114,11 @@ class AuxMethodsTestCase(BaseSoledadTest):
             sol.close()
 
         def _assert_wrong_password_raises(results):
-            self.assertRaises(
-                WrongMacError,
-                self._soledad_instance, 'leap@leap.se',
-                passphrase=u'123',
-                prefix=prefix)
+            with self.assertRaises(DatabaseAccessError):
+                self._soledad_instance(
+                    'leap@leap.se',
+                    passphrase=u'123',
+                    prefix=prefix)
 
         def _instantiate_with_new_passphrase(results):
             sol2 = self._soledad_instance(

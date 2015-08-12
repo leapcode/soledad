@@ -51,6 +51,11 @@ class SoledadError(errors.U1DBError):
 # Authorization errors
 #
 
+
+class DatabaseAccessError(Exception):
+    pass
+
+
 @register_exception
 class InvalidAuthTokenError(errors.Unauthorized):
 

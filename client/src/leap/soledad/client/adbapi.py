@@ -30,6 +30,9 @@ from twisted.enterprise import adbapi
 from twisted.python import log
 from zope.proxy import ProxyBase, setProxiedObject
 from pysqlcipher.dbapi2 import OperationalError
+from pysqlcipher.dbapi2 import DatabaseError
+
+from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client import sqlcipher as soledad_sqlcipher
 from leap.soledad.client.pragmas import set_init_pragmas
@@ -100,7 +103,10 @@ class U1DBConnection(adbapi.Connection):
         """
         self.init_u1db = init_u1db
         self._sync_enc_pool = sync_enc_pool
-        adbapi.Connection.__init__(self, pool)
+        try:
+            adbapi.Connection.__init__(self, pool)
+        except DatabaseError:
+            raise DatabaseAccessError('Could not open sqlcipher database')
 
     def reconnect(self):
         """
@@ -166,8 +172,10 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         # extract soledad-specific objects from keyword arguments
         self.opts = kwargs.pop("opts")
         self._sync_enc_pool = kwargs.pop("sync_enc_pool")
-
-        adbapi.ConnectionPool.__init__(self, *args, **kwargs)
+        try:
+            adbapi.ConnectionPool.__init__(self, *args, **kwargs)
+        except DatabaseError:
+            raise DatabaseAccessError('Could not open sqlcipher database')
 
         # all u1db connections, hashed by thread-id
         self._u1dbconnections = {}
