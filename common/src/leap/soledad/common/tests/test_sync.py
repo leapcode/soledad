@@ -235,6 +235,7 @@ class TestSoledadDbSync(
         self.assertGetEncryptedDoc(
             self.db, doc2.doc_id, doc2.rev, tests.nested_doc, False)
 
+    @defer.inlineCallbacks
     def test_db_sync_autocreate(self):
         """
         Test sync.
