@@ -34,7 +34,7 @@ DOC_REV = "rev"
 DOC_CONTENT = {'simple': 'document'}
 
 
-class TestSyncEncrypterPool(TestCase, BaseSoledadTest):
+class TestSyncEncrypterPool(BaseSoledadTest):
 
     def setUp(self):
         BaseSoledadTest.setUp(self)
@@ -76,7 +76,7 @@ class TestSyncEncrypterPool(TestCase, BaseSoledadTest):
         self.assertTrue(attempts < 10)
 
 
-class TestSyncDecrypterPool(TestCase, BaseSoledadTest):
+class TestSyncDecrypterPool(BaseSoledadTest):
 
     def _insert_doc_cb(self, doc, gen, trans_id):
         """
