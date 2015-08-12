@@ -147,7 +147,8 @@ class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
 #
 
 
-def make_local_db_and_soledad_target(test, path='test',
+def make_local_db_and_soledad_target(
+        test, path='test',
         source_replica_uid=uuid4().hex):
     test.startTwistedServer()
     db = test.request_state._create_database(os.path.basename(path))
@@ -155,9 +156,11 @@ def make_local_db_and_soledad_target(test, path='test',
     return db, st
 
 
-def make_local_db_and_token_soledad_target(test,
+def make_local_db_and_token_soledad_target(
+        test,
         source_replica_uid=uuid4().hex):
-    db, st = make_local_db_and_soledad_target(test, path='test',
+    db, st = make_local_db_and_soledad_target(
+        test, path='test',
         source_replica_uid=source_replica_uid)
     st.set_token_credentials('user-uuid', 'auth-token')
     return db, st

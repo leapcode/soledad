@@ -192,7 +192,7 @@ def soledad_sync_target(test, path, source_replica_uid=uuid4().hex):
 # TestCase. This is needed so trial knows that it has to manage a reactor and
 # wait for deferreds returned by tests to be fired.
 BaseLeapTest = type(
-    'BaseLeapTest', (unittest.TestCase,), dict(BaseLeapTest.__dict__)) 
+    'BaseLeapTest', (unittest.TestCase,), dict(BaseLeapTest.__dict__))
 
 
 class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
