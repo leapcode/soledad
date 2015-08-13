@@ -238,6 +238,7 @@ class HTTPInvocationByMethodWithBody(
                 if content_type == 'application/x-soledad-sync-put':
                     meth_put = self._lookup('%s_put' % method)
                     meth_end = self._lookup('%s_end' % method)
+                    entries = []
                     while True:
                         line = body_getline()
                         entry = line.strip()
@@ -246,9 +247,11 @@ class HTTPInvocationByMethodWithBody(
                         if not entry or not comma:  # empty or no prec comma
                             raise http_app.BadRequest
                         entry, comma = utils.check_and_strip_comma(entry)
-                        meth_put({}, entry)
+                        entries.append(entry)
                     if comma or body_getline():  # extra comma or data
                         raise http_app.BadRequest
+                    for entry in entries:
+                        meth_put({}, entry)
                     return meth_end()
                 # handle outgoing documents
                 elif content_type == 'application/x-soledad-sync-get':
