@@ -1421,16 +1421,16 @@ class CouchDatabase(CommonBackend):
         # First, we prepare the arriving doc to update couch database.
         old_doc = doc
         doc = self._factory(doc.doc_id, doc.rev, doc.get_json())
-        if cur_doc is not None:
+        if cur_doc is None:
+            self._put_doc(cur_doc, doc)
+            return 'inserted'
+        else:
             doc.couch_rev = cur_doc.couch_rev
         # fetch conflicts because we will eventually manipulate them
         doc._ensure_fetch_conflicts(self._get_conflicts)
         # from now on, it works just like u1db sqlite backend
         doc_vcr = vectorclock.VectorClockRev(doc.rev)
-        if cur_doc is None:
-            cur_vcr = vectorclock.VectorClockRev(None)
-        else:
-            cur_vcr = vectorclock.VectorClockRev(cur_doc.rev)
+        cur_vcr = vectorclock.VectorClockRev(cur_doc.rev)
         if doc_vcr.is_newer(cur_vcr):
             rev = doc.rev
             self._prune_conflicts(doc, doc_vcr)
