@@ -232,6 +232,10 @@ class SoledadHTTPSyncTarget(SyncTarget):
         self._auth_header = {'Authorization': ['Token %s' % b64_token]}
 
     @property
+    def _base_header(self):
+        return self._auth_header.copy() if self._auth_header else {}
+
+    @property
     def _defer_encryption(self):
         return self._sync_enc_pool is not None
 
@@ -257,7 +261,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
                  source_replica_last_known_transaction_id)
         :rtype: twisted.internet.defer.Deferred
         """
-        raw = yield self._http_request(self._url, headers=self._auth_header)
+        raw = yield self._http_request(self._url)
         res = json.loads(raw)
         defer.returnValue((
             res['target_replica_uid'],
@@ -300,13 +304,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
             'generation': source_replica_generation,
             'transaction_id': source_replica_transaction_id
         })
-        headers = self._auth_header.copy()
-        headers.update({'content-type': ['application/json']})
         return self._http_request(
             self._url,
             method='PUT',
-            headers=headers,
-            body=data)
+            body=data,
+            content_type='application/json')
 
     @defer.inlineCallbacks
     def sync_exchange(self, docs_by_generation, source_replica_uid,
@@ -386,11 +388,6 @@ class SoledadHTTPSyncTarget(SyncTarget):
     # methods to send docs
     #
 
-    def _prepare(self, comma, entries, **dic):
-        entry = comma + '\r\n' + json.dumps(dic)
-        entries.append(entry)
-        return len(entry)
-
     @defer.inlineCallbacks
     def _send_docs(self, docs_by_generation, last_known_generation,
                    last_known_trans_id, sync_id):
@@ -398,12 +395,9 @@ class SoledadHTTPSyncTarget(SyncTarget):
         if not docs_by_generation:
             defer.returnValue([None, None])
 
-        headers = self._auth_header.copy()
-        headers.update({'content-type': ['application/x-soledad-sync-put']})
         # add remote replica metadata to the request
-        first_entries = ['[']
-        self._prepare(
-            '', first_entries,
+        header_entry = Entries()
+        header_entry.update(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
@@ -413,7 +407,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         for doc, gen, trans_id in docs_by_generation:
             idx += 1
             result = yield self._send_one_doc(
-                headers, first_entries, doc,
+                header_entry, doc,
                 gen, trans_id, total, idx)
             if self._defer_encryption:
                 self._sync_enc_pool.delete_encrypted_doc(
@@ -425,23 +419,21 @@ class SoledadHTTPSyncTarget(SyncTarget):
         defer.returnValue([gen_after_send, trans_id_after_send])
 
     @defer.inlineCallbacks
-    def _send_one_doc(self, headers, first_entries, doc, gen, trans_id,
+    def _send_one_doc(self, header_entry, doc, gen, trans_id,
                       number_of_docs, doc_idx):
-        entries = first_entries[:]
+        entries = header_entry.copy()
         # add the document to the request
         content = yield self._encrypt_doc(doc)
-        self._prepare(
-            ',', entries,
+        entries.update(
+            ',',
             id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
             trans_id=trans_id, number_of_docs=number_of_docs,
             doc_idx=doc_idx)
-        entries.append('\r\n]')
-        data = ''.join(entries)
         result = yield self._http_request(
             self._url,
             method='POST',
-            headers=headers,
-            body=data)
+            body=str(entries),
+            content_type='application/x-soledad-sync-put')
         defer.returnValue(result)
 
     def _encrypt_doc(self, doc):
@@ -486,9 +478,6 @@ class SoledadHTTPSyncTarget(SyncTarget):
         if defer_decryption:
             self._setup_sync_decr_pool()
 
-        headers = self._auth_header.copy()
-        headers.update({'content-type': ['application/x-soledad-sync-get']})
-
         # ---------------------------------------------------------------------
         # maybe receive the first document
         # ---------------------------------------------------------------------
@@ -498,7 +487,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         # information comes as metadata to each request.
 
         doc = yield self._receive_one_doc(
-            headers, last_known_generation, last_known_trans_id,
+            last_known_generation, last_known_trans_id,
             sync_id, 0)
         self._received_docs = 0
         number_of_changes, ngen, ntrans = self._insert_received_doc(doc, 1, 1)
@@ -523,7 +512,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
         deferreds = []
         while received < number_of_changes:
             d = self._receive_one_doc(
-                headers, last_known_generation,
+                last_known_generation,
                 last_known_trans_id, sync_id, received)
             d.addCallback(
                 self._insert_received_doc,
@@ -547,26 +536,24 @@ class SoledadHTTPSyncTarget(SyncTarget):
 
         defer.returnValue([new_generation, new_transaction_id])
 
-    def _receive_one_doc(self, headers, last_known_generation,
+    def _receive_one_doc(self, last_known_generation,
                          last_known_trans_id, sync_id, received):
-        entries = ['[']
+        entries = Entries()
         # add remote replica metadata to the request
-        self._prepare(
-            '', entries,
+        entries.update(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
         # inform server of how many documents have already been received
-        self._prepare(
-            ',', entries, received=received)
-        entries.append('\r\n]')
+        entries.update(
+            ',', received=received)
         # send headers
         return self._http_request(
             self._url,
             method='POST',
-            headers=headers,
-            body=''.join(entries))
+            body=str(entries),
+            content_type='application/x-soledad-sync-get')
 
     def _insert_received_doc(self, response, idx, total):
         """
@@ -680,7 +667,10 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 insert_doc_cb=self._insert_doc_cb,
                 source_replica_uid=self.source_replica_uid)
 
-    def _http_request(self, url, method='GET', body=None, headers={}):
+    def _http_request(self, url, method='GET', body=None, headers=None, content_type=None):
+        headers = headers or self._base_header
+        if content_type:
+            headers.update({'content-type': [content_type]})
         d = self._http.request(url, method, body, headers, readBody)
         d.addErrback(_unauth_to_invalid_token_error)
         return d
@@ -715,3 +705,20 @@ def _emit_received(received_docs, total):
     msg = "%d/%d" % (received_docs, total)
     emit(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
     logger.debug("Sync receive status: %s" % msg)
+
+
+class Entries(object):
+
+    def __init__(self, entries='['):
+        self.entries = entries
+
+    def update(self, separator='', **dic):
+        entry = separator + '\r\n' + json.dumps(dic)
+        self.entries += entry
+        return len(entry)
+
+    def __str__(self):
+        return self.entries + '\r\n]'
+
+    def copy(self):
+        return Entries(self.entries)
