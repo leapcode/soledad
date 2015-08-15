@@ -1140,9 +1140,11 @@ class CouchDatabase(CommonBackend):
         :param sync_id: The id of the current sync session.
         :type sync_id: str
         """
-        self._do_set_replica_gen_and_trans_id(
-            other_replica_uid, other_generation, other_transaction_id,
-            number_of_docs=number_of_docs, doc_idx=doc_idx, sync_id=sync_id)
+        if other_replica_uid is not None and other_generation is not None:
+            self._do_set_replica_gen_and_trans_id(
+                other_replica_uid, other_generation, other_transaction_id,
+                number_of_docs=number_of_docs, doc_idx=doc_idx,
+                sync_id=sync_id)
 
     def _do_set_replica_gen_and_trans_id(
             self, other_replica_uid, other_generation, other_transaction_id,
@@ -1392,6 +1394,27 @@ class CouchDatabase(CommonBackend):
                  'converged', at_gen is the insertion/current generation.
         :rtype: (str, int)
         """
+        self._save_source_info(replica_uid, replica_gen,
+                               replica_trans_id, number_of_docs,
+                               doc_idx, sync_id)
+        state = self._process_incoming_doc(doc, save_conflict)
+        return state, self._get_generation()
+
+    def _save_source_info(self, replica_uid, replica_gen, replica_trans_id,
+                          number_of_docs, doc_idx, sync_id):
+        """
+        Validate and save source information.
+        """
+        self._validate_source(replica_uid, replica_gen, replica_trans_id)
+        self._set_replica_gen_and_trans_id(
+            replica_uid, replica_gen, replica_trans_id,
+            number_of_docs=number_of_docs, doc_idx=doc_idx,
+            sync_id=sync_id)
+
+    def _process_incoming_doc(self, doc, save_conflict):
+        """
+        Check document, save and return state.
+        """
         cur_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         # at this point, `doc` has arrived from the other syncing party, and
         # we will decide what to do with it.
@@ -1408,7 +1431,6 @@ class CouchDatabase(CommonBackend):
             cur_vcr = vectorclock.VectorClockRev(None)
         else:
             cur_vcr = vectorclock.VectorClockRev(cur_doc.rev)
-        self._validate_source(replica_uid, replica_gen, replica_trans_id)
         if doc_vcr.is_newer(cur_vcr):
             rev = doc.rev
             self._prune_conflicts(doc, doc_vcr)
@@ -1437,11 +1459,6 @@ class CouchDatabase(CommonBackend):
             state = 'conflicted'
             if save_conflict:
                 self._force_doc_sync_conflict(doc)
-        if replica_uid is not None and replica_gen is not None:
-            self._set_replica_gen_and_trans_id(
-                replica_uid, replica_gen, replica_trans_id,
-                number_of_docs=number_of_docs, doc_idx=doc_idx,
-                sync_id=sync_id)
         # update info
         old_doc.rev = doc.rev
         if doc.is_tombstone():
@@ -1449,7 +1466,7 @@ class CouchDatabase(CommonBackend):
         else:
             old_doc.content = doc.content
         old_doc.has_conflicts = doc.has_conflicts
-        return state, self._get_generation()
+        return state
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
                  include_deleted=False):
