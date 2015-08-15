@@ -418,12 +418,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             if self._defer_encryption:
                 self._sync_enc_pool.delete_encrypted_doc(
                     doc.doc_id, doc.rev)
-
-            msg = "%d/%d" % (idx, total)
-            content = {'sent': idx, 'total': total}
-            emit(SOLEDAD_SYNC_SEND_STATUS, content)
-            logger.debug("Sync send status: %s" % msg)
-
+            _emit_send(idx, total)
         response_dict = json.loads(result)[0]
         gen_after_send = response_dict['new_generation']
         trans_id_after_send = response_dict['new_transaction_id']
@@ -619,10 +614,7 @@ class SoledadHTTPSyncTarget(SyncTarget):
             # end of symmetric decryption
             # -------------------------------------------------------------
         self._received_docs += 1
-        msg = "%d/%d" % (self._received_docs, total)
-        content = {'received': self._received_docs, 'total': total}
-        emit(SOLEDAD_SYNC_RECEIVE_STATUS, content)
-        logger.debug("Sync receive status: %s" % msg)
+        _emit_received(self._received_docs, total)
         return number_of_changes, new_generation, new_transaction_id
 
     def _parse_received_doc_response(self, response):
@@ -709,3 +701,17 @@ def _unauth_to_invalid_token_error(failure):
     if failure.getErrorMessage() == "401 Unauthorized":
         raise InvalidAuthTokenError
     return failure
+
+
+def _emit_send(idx, total):
+    msg = "%d/%d" % (idx, total)
+    emit(
+        SOLEDAD_SYNC_SEND_STATUS,
+        "Soledad sync send status: %s" % msg)
+    logger.debug("Sync send status: %s" % msg)
+
+
+def _emit_received(received_docs, total):
+    msg = "%d/%d" % (received_docs, total)
+    emit(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
+    logger.debug("Sync receive status: %s" % msg)
