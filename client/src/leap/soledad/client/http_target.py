@@ -396,45 +396,43 @@ class SoledadHTTPSyncTarget(SyncTarget):
             defer.returnValue([None, None])
 
         # add remote replica metadata to the request
-        header_entry = Entries()
-        header_entry.update(
+        initial_body = RequestBody(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
-        idx = 0
         total = len(docs_by_generation)
-        for doc, gen, trans_id in docs_by_generation:
-            idx += 1
-            result = yield self._send_one_doc(
-                header_entry, doc,
-                gen, trans_id, total, idx)
+        entries = yield self._entries_from_docs(initial_body, docs_by_generation)
+        while len(entries):
+            result = yield self._http_request(
+                self._url,
+                method='POST',
+                body=entries.remove(1),
+                content_type='application/x-soledad-sync-put')
+            idx = total - len(entries)
             if self._defer_encryption:
-                self._sync_enc_pool.delete_encrypted_doc(
-                    doc.doc_id, doc.rev)
+                self._delete_sent(idx, docs_by_generation)
             _emit_send(idx, total)
         response_dict = json.loads(result)[0]
         gen_after_send = response_dict['new_generation']
         trans_id_after_send = response_dict['new_transaction_id']
         defer.returnValue([gen_after_send, trans_id_after_send])
 
+    def _delete_sent(self, idx, docs_by_generation):
+        doc = docs_by_generation[idx][0]
+        self._sync_enc_pool.delete_encrypted_doc(
+            doc.doc_id, doc.rev)
+
     @defer.inlineCallbacks
-    def _send_one_doc(self, header_entry, doc, gen, trans_id,
-                      number_of_docs, doc_idx):
-        entries = header_entry.copy()
-        # add the document to the request
-        content = yield self._encrypt_doc(doc)
-        entries.update(
-            ',',
-            id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
-            trans_id=trans_id, number_of_docs=number_of_docs,
-            doc_idx=doc_idx)
-        result = yield self._http_request(
-            self._url,
-            method='POST',
-            body=str(entries),
-            content_type='application/x-soledad-sync-put')
-        defer.returnValue(result)
+    def _entries_from_docs(self, initial_body, docs_by_generation):
+        number_of_docs = len(docs_by_generation)
+        for idx, (doc, gen, trans_id) in enumerate(docs_by_generation, 1):
+            content = yield self._encrypt_doc(doc)
+            initial_body.insert_info(
+                id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
+                trans_id=trans_id, number_of_docs=number_of_docs,
+                doc_idx=idx)
+        defer.returnValue(initial_body)
 
     def _encrypt_doc(self, doc):
         d = None
@@ -538,21 +536,19 @@ class SoledadHTTPSyncTarget(SyncTarget):
 
     def _receive_one_doc(self, last_known_generation,
                          last_known_trans_id, sync_id, received):
-        entries = Entries()
         # add remote replica metadata to the request
-        entries.update(
+        body = RequestBody(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
         # inform server of how many documents have already been received
-        entries.update(
-            ',', received=received)
+        body.insert_info(received=received)
         # send headers
         return self._http_request(
             self._url,
             method='POST',
-            body=str(entries),
+            body=str(body),
             content_type='application/x-soledad-sync-get')
 
     def _insert_received_doc(self, response, idx, total):
@@ -707,18 +703,28 @@ def _emit_received(received_docs, total):
     logger.debug("Sync receive status: %s" % msg)
 
 
-class Entries(object):
+class RequestBody(object):
 
-    def __init__(self, entries='['):
-        self.entries = entries
+    def __init__(self, **header_dict):
+        self.headers = header_dict
+        self.entries = []
 
-    def update(self, separator='', **dic):
-        entry = separator + '\r\n' + json.dumps(dic)
-        self.entries += entry
+    def insert_info(self, **entry_dict):
+        entry = json.dumps(entry_dict)
+        self.entries.append(entry)
         return len(entry)
 
-    def __str__(self):
-        return self.entries + '\r\n]'
+    def remove(self, number=1):
+        entries = [self.entries.pop(0) for i in xrange(number)]
+        return self.entries_to_str(entries)
 
-    def copy(self):
-        return Entries(self.entries)
+    def __str__(self):
+        return self.entries_to_str(self.entries)
+
+    def __len__(self):
+        return len(self.entries)
+
+    def entries_to_str(self, entries=None):
+        data = '[\r\n' + json.dumps(self.headers)
+        data += ''.join(',\r\n' + entry for entry in entries)
+        return data + '\r\n]'
