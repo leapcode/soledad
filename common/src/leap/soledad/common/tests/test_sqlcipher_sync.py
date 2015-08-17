@@ -27,9 +27,11 @@ from u1db import (
 )
 
 from testscenarios import TestWithScenarios
+from urlparse import urljoin
 
 from twisted.internet import defer
 
+from leap.soledad.common import couch
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.crypto import decrypt_doc_dict
@@ -39,12 +41,10 @@ from leap.soledad.client.sqlcipher import (
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS
-from leap.soledad.common.tests.util import (
-    make_soledad_app,
-    soledad_sync_target,
-    BaseSoledadTest,
-    SoledadWithCouchServerMixin,
-)
+from leap.soledad.common.tests.util import make_soledad_app
+from leap.soledad.common.tests.util import soledad_sync_target
+from leap.soledad.common.tests.util import BaseSoledadTest
+from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 
 
 # -----------------------------------------------------------------------------
@@ -344,8 +344,21 @@ class SQLCipherDatabaseSyncTests(
 
 def _make_local_db_and_token_http_target(test, path='test'):
     test.startTwistedServer()
-    db = test.request_state._create_database(os.path.basename(path))
-    st = soledad_sync_target(test, path)
+    # ensure remote db exists before syncing
+    db = couch.CouchDatabase.open_database(
+        urljoin(test._couch_url, 'test'),
+        create=True,
+        ensure_ddocs=True)
+
+    #db = test.request_state.open_database(os.path.basename(path))
+    replica_uid = test._soledad._dbpool.replica_uid
+    sync_db = test._soledad._sync_db
+    sync_enc_pool = test._soledad._sync_enc_pool
+    st = soledad_sync_target(
+        test, path,
+        source_replica_uid=replica_uid,
+        sync_db=sync_db,
+        sync_enc_pool=sync_enc_pool)
     return db, st
 
 target_scenarios = [
@@ -370,6 +383,8 @@ class SQLCipherSyncTargetTests(
     def setUp(self):
         super(tests.DatabaseBaseTests, self).setUp()
         self.db, self.st = self.create_db_and_target(self)
+        self.addCleanup(self.st.close)
+        self.other_changes = []
 
     def tearDown(self):
         super(tests.DatabaseBaseTests, self).tearDown()
@@ -384,12 +399,17 @@ class SQLCipherSyncTargetTests(
         self.other_changes.append(
             (doc.doc_id, doc.rev, doc.get_json(), gen, trans_id))
 
+    def make_app(self):
+        self.request_state = couch.CouchServerState(self._couch_url)
+        return self.make_app_with_state(self.request_state)
+
     @defer.inlineCallbacks
     def test_sync_exchange(self):
         """
         Modified to account for possibly receiving encrypted documents from
         sever-side.
         """
+
         docs_by_gen = [
             (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
              'T-sid')]
@@ -402,7 +422,8 @@ class SQLCipherSyncTargetTests(
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 1, last_trans_id),
                          (self.other_changes, new_gen, last_trans_id))
-        self.assertEqual(10, self.st.get_sync_info('replica')[3])
+        sync_info = yield self.st.get_sync_info('replica')
+        self.assertEqual(10, sync_info[3])
 
     @defer.inlineCallbacks
     def test_sync_exchange_push_many(self):
@@ -426,7 +447,8 @@ class SQLCipherSyncTargetTests(
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 2, last_trans_id),
                          (self.other_changes, new_gen, trans_id))
-        self.assertEqual(11, self.st.get_sync_info('replica')[3])
+        sync_info = yield self.st.get_sync_info('replica')
+        self.assertEqual(11, sync_info[3])
 
     @defer.inlineCallbacks
     def test_sync_exchange_returns_many_new_docs(self):
