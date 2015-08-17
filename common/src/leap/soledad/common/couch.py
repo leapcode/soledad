@@ -102,22 +102,7 @@ class CouchDocument(SoledadDocument):
         """
         SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
         self.couch_rev = None
-        self._conflicts = None
         self.transactions = None
-
-    def _ensure_fetch_conflicts(self, get_conflicts_fun):
-        """
-        Ensure conflict data has been fetched from the server.
-
-        :param get_conflicts_fun: A function which, given the document id and
-                                  the couch revision, return the conflicted
-                                  versions of the current document.
-        :type get_conflicts_fun: function
-        """
-        if self._conflicts is None:
-            self._conflicts = get_conflicts_fun(self.doc_id,
-                                                couch_rev=self.couch_rev)
-        self.has_conflicts = len(self._conflicts) > 0
 
     def get_conflicts(self):
         """
@@ -146,7 +131,7 @@ class CouchDocument(SoledadDocument):
         :type doc: CouchDocument
         """
         if self._conflicts is None:
-            raise Exception("Run self._ensure_fetch_conflicts first!")
+            raise Exception("Fetch conflicts first!")
         self._conflicts.append(doc)
         self.has_conflicts = len(self._conflicts) > 0
 
@@ -158,7 +143,7 @@ class CouchDocument(SoledadDocument):
         :type conflict_revs: [str]
         """
         if self._conflicts is None:
-            raise Exception("Run self._ensure_fetch_conflicts first!")
+            raise Exception("Fetch conflicts first!")
         self._conflicts = filter(
             lambda doc: doc.rev not in conflict_revs,
             self._conflicts)
@@ -731,7 +716,6 @@ class CouchDatabase(CommonBackend):
         if check_for_conflicts \
                 and '_attachments' in result \
                 and 'u1db_conflicts' in result['_attachments']:
-            doc.has_conflicts = True
             doc.set_conflicts(
                 self._build_conflicts(
                     doc.doc_id,
@@ -1025,7 +1009,7 @@ class CouchDatabase(CommonBackend):
             conflicts.append(doc)
         return conflicts
 
-    def _get_conflicts(self, doc_id, couch_rev=None):
+    def get_doc_conflicts(self, doc_id, couch_rev=None):
         """
         Get the conflicted versions of a document.
 
@@ -1040,31 +1024,20 @@ class CouchDatabase(CommonBackend):
         """
         # request conflicts attachment from server
         params = {}
+        conflicts = []
         if couch_rev is not None:
             params['rev'] = couch_rev  # restric document's couch revision
+        else:
+            # TODO: move into resource logic!
+            first_entry = self._get_doc(doc_id, check_for_conflicts=True)
+            conflicts.append(first_entry)
         resource = self._database.resource(doc_id, 'u1db_conflicts')
         try:
             response = resource.get_json(**params)
-            return self._build_conflicts(
+            return conflicts + self._build_conflicts(
                 doc_id, json.loads(response[2].read()))
         except ResourceNotFound:
             return []
-
-    def get_doc_conflicts(self, doc_id):
-        """
-        Get the list of conflicts for the given document.
-
-        The order of the conflicts is such that the first entry is the value
-        that would be returned by "get_doc".
-
-        :return: A list of the document entries that are conflicted.
-        :rtype: [CouchDocument]
-        """
-        conflict_docs = self._get_conflicts(doc_id)
-        if len(conflict_docs) == 0:
-            return []
-        this_doc = self._get_doc(doc_id, check_for_conflicts=True)
-        return [this_doc] + conflict_docs
 
     def _get_replica_gen_and_trans_id(self, other_replica_uid):
         """
@@ -1189,43 +1162,6 @@ class CouchDatabase(CommonBackend):
         except ResourceNotFound as e:
             raise_missing_design_doc_error(e, ddoc_path)
 
-    def _add_conflict(self, doc, my_doc_rev, my_content):
-        """
-        Add a conflict to the document.
-
-        Note that this method does not actually update the backend; rather, it
-        updates the CouchDocument object which will provide the conflict data
-        when the atomic document update is made.
-
-        :param doc: The document to have conflicts added to.
-        :type doc: CouchDocument
-        :param my_doc_rev: The revision of the conflicted document.
-        :type my_doc_rev: str
-        :param my_content: The content of the conflicted document as a JSON
-                           serialized string.
-        :type my_content: str
-        """
-        doc._ensure_fetch_conflicts(self._get_conflicts)
-        doc.add_conflict(
-            self._factory(doc_id=doc.doc_id, rev=my_doc_rev,
-                          json=my_content))
-
-    def _delete_conflicts(self, doc, conflict_revs):
-        """
-        Delete the conflicted revisions from the list of conflicts of C{doc}.
-
-        Note that this method does not actually update the backend; rather, it
-        updates the CouchDocument object which will provide the conflict data
-        when the atomic document update is made.
-
-        :param doc: The document to have conflicts deleted.
-        :type doc: CouchDocument
-        :param conflict_revs: A list of the revisions to be deleted.
-        :param conflict_revs: [str]
-        """
-        doc._ensure_fetch_conflicts(self._get_conflicts)
-        doc.delete_conflicts(conflict_revs)
-
     def _prune_conflicts(self, doc, doc_vcr):
         """
         Prune conflicts that are older then the current document's revision, or
@@ -1251,7 +1187,7 @@ class CouchDatabase(CommonBackend):
             if autoresolved:
                 doc_vcr.increment(self._replica_uid)
                 doc.rev = doc_vcr.as_str()
-            self._delete_conflicts(doc, c_revs_to_prune)
+            doc.delete_conflicts(c_revs_to_prune)
 
     def _force_doc_sync_conflict(self, doc):
         """
@@ -1262,8 +1198,7 @@ class CouchDatabase(CommonBackend):
         """
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         self._prune_conflicts(doc, vectorclock.VectorClockRev(doc.rev))
-        self._add_conflict(doc, my_doc.rev, my_doc.get_json())
-        doc.has_conflicts = True
+        doc.add_conflict(my_doc)
         self._put_doc(my_doc, doc)
 
     def resolve_doc(self, doc, conflicted_doc_revs):
@@ -1308,14 +1243,14 @@ class CouchDatabase(CommonBackend):
             # the newer doc version will supersede the one in the database, so
             # we copy conflicts before updating the backend.
             doc.set_conflicts(cur_doc.get_conflicts())  # copy conflicts over.
-            self._delete_conflicts(doc, superseded_revs)
+            doc.delete_conflicts(superseded_revs)
             self._put_doc(cur_doc, doc)
         else:
             # the newer doc version does not supersede the one in the
             # database, so we will add a conflict to the database and copy
             # those over to the document the user has in her hands.
-            self._add_conflict(cur_doc, new_rev, doc.get_json())
-            self._delete_conflicts(cur_doc, superseded_revs)
+            cur_doc.add_conflict(doc)
+            cur_doc.delete_conflicts(superseded_revs)
             self._put_doc(cur_doc, cur_doc)  # just update conflicts
             # backend has been updated with current conflicts, now copy them
             # to the current document.
@@ -1405,10 +1340,9 @@ class CouchDatabase(CommonBackend):
         if cur_doc is None:
             self._put_doc(cur_doc, doc)
             return 'inserted'
-        else:
-            doc.couch_rev = cur_doc.couch_rev
+        doc.couch_rev = cur_doc.couch_rev
+        doc.set_conflicts(self.get_doc_conflicts(doc.doc_id, doc.couch_rev))
         # fetch conflicts because we will eventually manipulate them
-        doc._ensure_fetch_conflicts(self._get_conflicts)
         # from now on, it works just like u1db sqlite backend
         doc_vcr = vectorclock.VectorClockRev(doc.rev)
         cur_vcr = vectorclock.VectorClockRev(cur_doc.rev)
