@@ -149,6 +149,15 @@ class CouchDocument(SoledadDocument):
             self._conflicts)
         self.has_conflicts = len(self._conflicts) > 0
 
+    def update(self, new_doc):
+        # update info
+        self.rev = new_doc.rev
+        if new_doc.is_tombstone():
+            self.is_tombstone()
+        else:
+            self.content = new_doc.content
+        self.has_conflicts = new_doc.has_conflicts
+
     def _prune_conflicts(self, doc_vcr, autoresolved_increment):
         """
         Prune conflicts that are older then the current document's revision, or
@@ -1313,7 +1322,13 @@ class CouchDatabase(CommonBackend):
         self._save_source_info(replica_uid, replica_gen,
                                replica_trans_id, number_of_docs,
                                doc_idx, sync_id)
-        state = self._process_incoming_doc(doc, save_conflict)
+        my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
+        if my_doc is not None:
+            my_doc.set_conflicts(self.get_doc_conflicts(my_doc.doc_id, my_doc.couch_rev))
+        state, save_doc = _process_incoming_doc(my_doc, doc, save_conflict, self.replica_uid)
+        if save_doc:
+            self._put_doc(my_doc, save_doc)
+            doc.update(save_doc)
         return state, self._get_generation()
 
     def _save_source_info(self, replica_uid, replica_gen, replica_trans_id,
@@ -1326,62 +1341,6 @@ class CouchDatabase(CommonBackend):
             replica_uid, replica_gen, replica_trans_id,
             number_of_docs=number_of_docs, doc_idx=doc_idx,
             sync_id=sync_id)
-
-    def _process_incoming_doc(self, doc, save_conflict):
-        """
-        Check document, save and return state.
-        """
-        cur_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
-        # at this point, `doc` has arrived from the other syncing party, and
-        # we will decide what to do with it.
-        # First, we prepare the arriving doc to update couch database.
-        old_doc = doc
-        doc = self._factory(doc.doc_id, doc.rev, doc.get_json())
-        if cur_doc is None:
-            self._put_doc(cur_doc, doc)
-            return 'inserted'
-        doc.couch_rev = cur_doc.couch_rev
-        doc.set_conflicts(self.get_doc_conflicts(doc.doc_id, doc.couch_rev))
-        # fetch conflicts because we will eventually manipulate them
-        # from now on, it works just like u1db sqlite backend
-        doc_vcr = vectorclock.VectorClockRev(doc.rev)
-        cur_vcr = vectorclock.VectorClockRev(cur_doc.rev)
-        if doc_vcr.is_newer(cur_vcr):
-            rev = doc.rev
-            doc._prune_conflicts(doc_vcr, self._replica_uid)
-            if doc.rev != rev:
-                # conflicts have been autoresolved
-                state = 'superseded'
-            else:
-                state = 'inserted'
-            self._put_doc(cur_doc, doc)
-        elif doc.rev == cur_doc.rev:
-            # magical convergence
-            state = 'converged'
-        elif cur_vcr.is_newer(doc_vcr):
-            # Don't add this to seen_ids, because we have something newer,
-            # so we should send it back, and we should not generate a
-            # conflict
-            state = 'superseded'
-        elif cur_doc.same_content_as(doc):
-            # the documents have been edited to the same thing at both ends
-            doc_vcr.maximize(cur_vcr)
-            doc_vcr.increment(self._replica_uid)
-            doc.rev = doc_vcr.as_str()
-            self._put_doc(cur_doc, doc)
-            state = 'superseded'
-        else:
-            state = 'conflicted'
-            if save_conflict:
-                self._force_doc_sync_conflict(doc)
-        # update info
-        old_doc.rev = doc.rev
-        if doc.is_tombstone():
-            old_doc.is_tombstone()
-        else:
-            old_doc.content = doc.content
-        old_doc.has_conflicts = doc.has_conflicts
-        return state
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
                  include_deleted=False):
@@ -1525,3 +1484,51 @@ class CouchServerState(ServerState):
                              delete databases.
         """
         raise Unauthorized()
+
+
+def _process_incoming_doc(my_doc, other_doc, save_conflict, replica_uid):
+    """
+    Check document, save and return state.
+    """
+    # at this point, `doc` has arrived from the other syncing party, and
+    # we will decide what to do with it.
+    # First, we prepare the arriving doc to update couch database.
+    new_doc = CouchDocument(other_doc.doc_id, other_doc.rev, other_doc.get_json())
+    if my_doc is None:
+        return 'inserted', new_doc
+    new_doc.couch_rev = my_doc.couch_rev
+    new_doc.set_conflicts(my_doc.get_conflicts())
+    # fetch conflicts because we will eventually manipulate them
+    # from now on, it works just like u1db sqlite backend
+    doc_vcr = vectorclock.VectorClockRev(new_doc.rev)
+    cur_vcr = vectorclock.VectorClockRev(my_doc.rev)
+    if doc_vcr.is_newer(cur_vcr):
+        rev = new_doc.rev
+        new_doc._prune_conflicts(doc_vcr, replica_uid)
+        if new_doc.rev != rev:
+            # conflicts have been autoresolved
+            return 'superseded', new_doc
+        else:
+            return'inserted', new_doc
+    elif new_doc.rev == my_doc.rev:
+        # magical convergence
+        return 'converged', None
+    elif cur_vcr.is_newer(doc_vcr):
+        # Don't add this to seen_ids, because we have something newer,
+        # so we should send it back, and we should not generate a
+        # conflict
+        other_doc.update(new_doc)
+        return 'superseded', None
+    elif my_doc.same_content_as(new_doc):
+        # the documents have been edited to the same thing at both ends
+        doc_vcr.maximize(cur_vcr)
+        doc_vcr.increment(replica_uid)
+        new_doc.rev = doc_vcr.as_str()
+        return 'superseded', new_doc
+    else:
+        if save_conflict:
+            new_doc._prune_conflicts(vectorclock.VectorClockRev(new_doc.rev), replica_uid)
+            new_doc.add_conflict(my_doc)
+            return 'conflicted', new_doc
+        other_doc.update(new_doc)
+        return 'conflicted', None
