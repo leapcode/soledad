@@ -104,9 +104,9 @@ class CouchDocument(SoledadDocument):
         :type syncable: bool
         """
         SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
-        self._couch_rev = None
+        self.couch_rev = None
         self._conflicts = None
-        self._transactions = None
+        self.transactions = None
 
     def _ensure_fetch_conflicts(self, get_conflicts_fun):
         """
@@ -166,22 +166,6 @@ class CouchDocument(SoledadDocument):
             lambda doc: doc.rev not in conflict_revs,
             self._conflicts)
         self.has_conflicts = len(self._conflicts) > 0
-
-    def _get_couch_rev(self):
-        return self._couch_rev
-
-    def _set_couch_rev(self, rev):
-        self._couch_rev = rev
-
-    couch_rev = property(_get_couch_rev, _set_couch_rev)
-
-    def _get_transactions(self):
-        return self._transactions
-
-    def _set_transactions(self, rev):
-        self._transactions = rev
-
-    transactions = property(_get_transactions, _set_transactions)
 
 
 # monkey-patch the u1db http app to use CouchDocument
@@ -1563,7 +1547,7 @@ class CouchServerState(ServerState):
         :param couch_url: The URL for the couch database.
         :type couch_url: str
         """
-        self._couch_url = couch_url
+        self.couch_url = couch_url
 
     def open_database(self, dbname):
         """
@@ -1576,7 +1560,7 @@ class CouchServerState(ServerState):
         :rtype: CouchDatabase
         """
         return CouchDatabase(
-            self._couch_url,
+            self.couch_url,
             dbname,
             ensure_ddocs=False)
 
@@ -1610,22 +1594,3 @@ class CouchServerState(ServerState):
                              delete databases.
         """
         raise Unauthorized()
-
-    def _set_couch_url(self, url):
-        """
-        Set the couchdb URL
-
-        :param url: CouchDB URL
-        :type url: str
-        """
-        self._couch_url = url
-
-    def _get_couch_url(self):
-        """
-        Return CouchDB URL
-
-        :rtype: str
-        """
-        return self._couch_url
-
-    couch_url = property(_get_couch_url, _set_couch_url, doc='CouchDB URL')
