@@ -24,12 +24,13 @@ import shutil
 
 from urlparse import urljoin
 
+from twisted.internet import defer
+
 from leap.soledad.common import couch
-from leap.soledad.client.sqlcipher import (
-    SQLCipherOptions,
-    SQLCipherDatabase,
-    SQLCipherU1DBSync,
-)
+
+from leap.soledad.client import sync
+from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
 from testscenarios import TestWithScenarios
 
@@ -37,6 +38,7 @@ from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.util import ADDRESS
 from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 from leap.soledad.common.tests.util import make_soledad_app
+from leap.soledad.common.tests.util import soledad_sync_target
 
 
 # Just to make clear how this test is different... :)
@@ -136,7 +138,7 @@ class TestSoledadDbSyncDeferredEncDecr(
         """
         BaseSoledadDeferredEncTest.setUp(self)
         self.server = self.server_thread = None
-        self.startServer()
+        self.startTwistedServer()
         self.syncer = None
 
     def tearDown(self):
@@ -153,27 +155,18 @@ class TestSoledadDbSyncDeferredEncDecr(
         Perform sync using SoledadSynchronizer, SoledadSyncTarget
         and Token auth.
         """
-        if self.token:
-            creds = {'token': {
-                'uuid': 'user-uuid',
-                'token': 'auth-token',
-            }}
-            target_url = self.getURL(target_name)
-
-            # get a u1db syncer
-            crypto = self._soledad._crypto
-            replica_uid = self.db1._replica_uid
-            dbsyncer = SQLCipherU1DBSync(
-                self.opts,
-                crypto,
-                replica_uid,
-                None,
-                defer_encryption=True)
-            self.dbsyncer = dbsyncer
-            return dbsyncer.sync(
-                target_url,
-                creds=creds,
-                defer_decryption=DEFER_DECRYPTION)
+        replica_uid = self._soledad._dbpool.replica_uid
+        sync_db = self._soledad._sync_db
+        sync_enc_pool = self._soledad._sync_enc_pool
+        target = soledad_sync_target(
+            self, target_name,
+            source_replica_uid=replica_uid,
+            sync_db=sync_db,
+            sync_enc_pool=sync_enc_pool)
+        self.addCleanup(target.close)
+        return sync.SoledadSynchronizer(
+            self.db1,
+            target).sync(defer_decryption=True)
 
     def wait_for_sync(self):
         """
@@ -188,6 +181,7 @@ class TestSoledadDbSyncDeferredEncDecr(
                 if wait >= MAX_WAIT:
                     raise SyncTimeoutError
 
+    @defer.inlineCallbacks
     def test_db_sync(self):
         """
         Test sync.
@@ -196,30 +190,15 @@ class TestSoledadDbSyncDeferredEncDecr(
         """
         doc1 = self.db1.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
-        d = self.do_sync('test')
+        local_gen_before_sync = yield self.do_sync('test')
 
-        def _assert_successful_sync(results):
-            import time
-            # need to give time to the encryption to proceed
-            # TODO should implement a defer list to subscribe to the
-            # all-decrypted event
-            time.sleep(2)
-            local_gen_before_sync = results
-            self.wait_for_sync()
+        gen, _, changes = self.db1.whats_changed(local_gen_before_sync)
+        self.assertEqual(1, len(changes))
 
-            gen, _, changes = self.db1.whats_changed(local_gen_before_sync)
-            self.assertEqual(1, len(changes))
+        self.assertEqual(doc2.doc_id, changes[0][0])
+        self.assertEqual(1, gen - local_gen_before_sync)
 
-            self.assertEqual(doc2.doc_id, changes[0][0])
-            self.assertEqual(1, gen - local_gen_before_sync)
-
-            self.assertGetEncryptedDoc(
-                self.db2, doc1.doc_id, doc1.rev, tests.simple_doc, False)
-            self.assertGetEncryptedDoc(
-                self.db1, doc2.doc_id, doc2.rev, tests.nested_doc, False)
-
-        d.addCallback(_assert_successful_sync)
-        return d
-
-    def test_db_sync_autocreate(self):
-        pass
+        self.assertGetEncryptedDoc(
+            self.db2, doc1.doc_id, doc1.rev, tests.simple_doc, False)
+        self.assertGetEncryptedDoc(
+            self.db1, doc2.doc_id, doc2.rev, tests.nested_doc, False)

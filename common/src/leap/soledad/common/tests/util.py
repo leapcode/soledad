@@ -175,7 +175,9 @@ class MockedSharedDBTest(object):
         return defaultMockSharedDB
 
 
-def soledad_sync_target(test, path, source_replica_uid=uuid4().hex):
+def soledad_sync_target(
+        test, path, source_replica_uid=uuid4().hex,
+        sync_db=None, sync_enc_pool=None):
     creds = {'token': {
         'uuid': 'user-uuid',
         'token': 'auth-token',
@@ -185,7 +187,9 @@ def soledad_sync_target(test, path, source_replica_uid=uuid4().hex):
         source_replica_uid,
         creds,
         test._soledad._crypto,
-        None)
+        None, # cert_file
+        sync_db=sync_db,
+        sync_enc_pool=sync_enc_pool)
 
 
 # redefine the base leap test class so it inherits from twisted trial's
