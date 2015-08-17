@@ -149,6 +149,33 @@ class CouchDocument(SoledadDocument):
             self._conflicts)
         self.has_conflicts = len(self._conflicts) > 0
 
+    def _prune_conflicts(self, doc_vcr, autoresolved_increment):
+        """
+        Prune conflicts that are older then the current document's revision, or
+        whose content match to the current document's content.
+
+        :param doc: The document to have conflicts pruned.
+        :type doc: CouchDocument
+        :param doc_vcr: A vector clock representing the current document's
+                        revision.
+        :type doc_vcr: u1db.vectorclock.VectorClock
+        """
+        if self.has_conflicts:
+            autoresolved = False
+            c_revs_to_prune = []
+            for c_doc in self._conflicts:
+                c_vcr = vectorclock.VectorClockRev(c_doc.rev)
+                if doc_vcr.is_newer(c_vcr):
+                    c_revs_to_prune.append(c_doc.rev)
+                elif self.same_content_as(c_doc):
+                    c_revs_to_prune.append(c_doc.rev)
+                    doc_vcr.maximize(c_vcr)
+                    autoresolved = True
+            if autoresolved:
+                doc_vcr.increment(autoresolved_increment)
+                self.rev = doc_vcr.as_str()
+            self.delete_conflicts(c_revs_to_prune)
+
 
 # monkey-patch the u1db http app to use CouchDocument
 http_app.Document = CouchDocument
@@ -1162,33 +1189,6 @@ class CouchDatabase(CommonBackend):
         except ResourceNotFound as e:
             raise_missing_design_doc_error(e, ddoc_path)
 
-    def _prune_conflicts(self, doc, doc_vcr):
-        """
-        Prune conflicts that are older then the current document's revision, or
-        whose content match to the current document's content.
-
-        :param doc: The document to have conflicts pruned.
-        :type doc: CouchDocument
-        :param doc_vcr: A vector clock representing the current document's
-                        revision.
-        :type doc_vcr: u1db.vectorclock.VectorClock
-        """
-        if doc.has_conflicts is True:
-            autoresolved = False
-            c_revs_to_prune = []
-            for c_doc in doc.get_conflicts():
-                c_vcr = vectorclock.VectorClockRev(c_doc.rev)
-                if doc_vcr.is_newer(c_vcr):
-                    c_revs_to_prune.append(c_doc.rev)
-                elif doc.same_content_as(c_doc):
-                    c_revs_to_prune.append(c_doc.rev)
-                    doc_vcr.maximize(c_vcr)
-                    autoresolved = True
-            if autoresolved:
-                doc_vcr.increment(self._replica_uid)
-                doc.rev = doc_vcr.as_str()
-            doc.delete_conflicts(c_revs_to_prune)
-
     def _force_doc_sync_conflict(self, doc):
         """
         Add a conflict and force a document put.
@@ -1197,7 +1197,7 @@ class CouchDatabase(CommonBackend):
         :type doc: CouchDocument
         """
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
-        self._prune_conflicts(doc, vectorclock.VectorClockRev(doc.rev))
+        doc._prune_conflicts(vectorclock.VectorClockRev(doc.rev), self._replica_uid)
         doc.add_conflict(my_doc)
         self._put_doc(my_doc, doc)
 
@@ -1348,7 +1348,7 @@ class CouchDatabase(CommonBackend):
         cur_vcr = vectorclock.VectorClockRev(cur_doc.rev)
         if doc_vcr.is_newer(cur_vcr):
             rev = doc.rev
-            self._prune_conflicts(doc, doc_vcr)
+            doc._prune_conflicts(doc_vcr, self._replica_uid)
             if doc.rev != rev:
                 # conflicts have been autoresolved
                 state = 'superseded'
