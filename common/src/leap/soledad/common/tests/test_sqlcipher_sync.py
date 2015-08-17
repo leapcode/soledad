@@ -349,7 +349,6 @@ def _make_local_db_and_token_http_target(test, path='test'):
         create=True,
         ensure_ddocs=True)
 
-    #db = test.request_state.open_database(os.path.basename(path))
     replica_uid = test._soledad._dbpool.replica_uid
     sync_db = test._soledad._sync_db
     sync_enc_pool = test._soledad._sync_enc_pool

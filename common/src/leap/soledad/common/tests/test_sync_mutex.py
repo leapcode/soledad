@@ -47,6 +47,7 @@ from leap.soledad.common.tests.util import soledad_sync_target
 
 _old_sync = SoledadSynchronizer.sync
 
+
 def _timed_sync(self, defer_decryption=True):
     t = time.time()
 
@@ -54,7 +55,6 @@ def _timed_sync(self, defer_decryption=True):
 
     if not getattr(self.source, 'sync_times', False):
         self.source.sync_times = {}
-
 
     self.source.sync_times[sync_id] = {'start': t}
 
@@ -97,7 +97,6 @@ class TestSyncMutex(
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
         shutil.rmtree(self.tempdir)
-
 
     def test_two_concurrent_syncs_do_not_overlap_no_docs(self):
         self.startServer()

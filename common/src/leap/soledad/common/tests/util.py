@@ -187,7 +187,7 @@ def soledad_sync_target(
         source_replica_uid,
         creds,
         test._soledad._crypto,
-        None, # cert_file
+        None,  # cert_file
         sync_db=sync_db,
         sync_enc_pool=sync_enc_pool)
 
