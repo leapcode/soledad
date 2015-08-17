@@ -19,7 +19,6 @@ Test sqlcipher backend sync.
 """
 
 
-import os
 import simplejson as json
 from u1db import (
     sync,
