@@ -87,8 +87,7 @@ class CouchDocument(SoledadDocument):
     atomic and consistent update of the database.
     """
 
-    def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False,
-                 syncable=True):
+    def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False):
         """
         Container for handling a document that is stored in couch backend.
 
@@ -100,8 +99,6 @@ class CouchDocument(SoledadDocument):
         :type json: str
         :param has_conflicts: Boolean indicating if this document has conflicts
         :type has_conflicts: bool
-        :param syncable: Should this document be synced with remote replicas?
-        :type syncable: bool
         """
         SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
         self.couch_rev = None
