@@ -264,7 +264,8 @@ class SoledadAuthMiddleware(object):
         scheme, encoded = auth.split(None, 1)
         uuid, auth_data = encoded.decode('base64').split(':', 1)
         if not self._verify_authentication_scheme(scheme):
-            return self._unauthorized_error("Wrong authentication scheme")
+            return self._unauthorized_error(
+                start_response, "Wrong authentication scheme")
 
         # verify if user is athenticated
         try:
