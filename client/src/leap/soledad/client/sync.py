@@ -59,7 +59,8 @@ class SoledadSynchronizer(Synchronizer):
                                  decryption will be done inline.
         :type defer_decryption: bool
 
-        :return: A deferred which will fire after the sync has finished.
+        :return: A deferred which will fire after the sync has finished with
+                 the local generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
         sync_target = self.sync_target
