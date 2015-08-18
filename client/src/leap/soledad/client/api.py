@@ -115,7 +115,13 @@ class Soledad(object):
     local_db_file_name = 'soledad.u1db'
     secrets_file_name = "soledad.json"
     default_prefix = os.path.join(get_path_prefix(), 'leap', 'soledad')
-    _syncing_lock = defaultdict(DeferredLock)
+
+    """
+    A dictionary that holds locks which avoid multiple sync attempts from the
+    same database replica. The dictionary indexes are the paths to each local
+    db, so we guarantee that only one sync happens for a local db at a time.
+    """
+    _sync_lock = defaultdict(DeferredLock)
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
@@ -673,10 +679,11 @@ class Soledad(object):
         # -----------------------------------------------------------------
 
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
-        d = self.syncing_lock.run(lambda: self._dbsyncer.sync(
+        d = self.sync_lock.run(
+            self._dbsyncer.sync,
             sync_url,
             creds=self._creds,
-            defer_decryption=defer_decryption))
+            defer_decryption=defer_decryption)
 
         def _sync_callback(local_gen):
             self._last_received_docs = docs = self._dbsyncer.received_docs
@@ -708,15 +715,15 @@ class Soledad(object):
         return d
 
     @property
-    def syncing_lock(self):
+    def sync_lock(self):
         """
-        Class based lock to ensure consistency on concurrent calls to sync.
-        Each lock is based on the path of db file.
+        Class based lock to prevent concurrent syncs using the same local db
+        file.
 
-        :return: DeferredLock based on this instance path of db file
+        :return: A shared lock based on this instance's db file path.
         :rtype: DeferredLock
         """
-        return self._syncing_lock[self._local_db_path]
+        return self._sync_lock[self._local_db_path]
 
     @property
     def syncing(self):
@@ -726,7 +733,7 @@ class Soledad(object):
         :return: Wether Soledad is currently synchronizing with the server.
         :rtype: bool
         """
-        return self.syncing_lock.locked
+        return self.sync_lock.locked
 
     def _set_token(self, token):
         """
