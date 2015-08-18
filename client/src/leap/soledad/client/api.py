@@ -656,6 +656,28 @@ class Soledad(object):
         """
         Synchronize documents with the server replica.
 
+        This method uses a lock to prevent multiple concurrent sync processes
+        over the same local db file.
+
+        :param defer_decryption:
+            Whether to defer decryption of documents, or do it inline while
+            syncing.
+        :type defer_decryption: bool
+
+        :return: A deferred lock that will run the actual sync process when
+                 the lock is acquired, and which will fire with with the local
+                 generation before the synchronization was performed.
+        :rtype: twisted.internet.defer.Deferred
+        """
+        d = self.sync_lock.run(
+            self._sync,
+            defer_decryption)
+        return d
+
+    def _sync(self, defer_decryption):
+        """
+        Synchronize documents with the server replica.
+
         :param defer_decryption:
             Whether to defer decryption of documents, or do it inline while
             syncing.
@@ -665,22 +687,8 @@ class Soledad(object):
             generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
-
-        # -----------------------------------------------------------------
-        # TODO this needs work.
-        # Should review/write tests to check that this:
-
-        # (1) Defer to the syncer pool -- DONE (on dbsyncer)
-        # (2) Return the deferred
-        # (3) Add the callback for signaling the event (executed on reactor
-        #     thread)
-        # (4) Check that the deferred is called with the local gen.
-
-        # -----------------------------------------------------------------
-
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
-        d = self.sync_lock.run(
-            self._dbsyncer.sync,
+        d = self._dbsyncer.sync(
             sync_url,
             creds=self._creds,
             defer_decryption=defer_decryption)
