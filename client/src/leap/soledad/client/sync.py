@@ -185,6 +185,9 @@ class SoledadSynchronizer(Synchronizer):
         return self._record_sync_info_with_the_target(info["my_gen"])
 
     def close(self):
+        """
+        Close the synchronizer.
+        """
         self.sync_target.close()
 
     def _record_sync_info_with_the_target(self, start_generation):
