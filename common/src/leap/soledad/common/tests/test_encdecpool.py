@@ -20,7 +20,6 @@ Tests for encryption and decryption pool.
 import json
 
 from twisted.internet.defer import inlineCallbacks
-from twisted.trial.unittest import TestCase
 
 from leap.soledad.client.encdecpool import SyncEncrypterPool
 from leap.soledad.client.encdecpool import SyncDecrypterPool

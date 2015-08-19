@@ -1,0 +1,2 @@
+  o Fix hanging sync by properly waiting db initialization on sync decrypter
+    pool. Closes #7686.
