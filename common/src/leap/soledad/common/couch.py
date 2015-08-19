@@ -158,10 +158,11 @@ class CouchDocument(SoledadDocument):
             self.content = new_doc.content
         self.has_conflicts = new_doc.has_conflicts
 
-    def _prune_conflicts(self, doc_vcr, autoresolved_increment):
+    def prune_conflicts(self, doc_vcr, autoresolved_increment):
         """
         Prune conflicts that are older then the current document's revision, or
         whose content match to the current document's content.
+        Originally in u1db.CommonBackend
 
         :param doc: The document to have conflicts pruned.
         :type doc: CouchDocument
@@ -1206,7 +1207,7 @@ class CouchDatabase(CommonBackend):
         :type doc: CouchDocument
         """
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
-        doc._prune_conflicts(vectorclock.VectorClockRev(doc.rev), self._replica_uid)
+        doc.prune_conflicts(vectorclock.VectorClockRev(doc.rev), self._replica_uid)
         doc.add_conflict(my_doc)
         self._put_doc(my_doc, doc)
 
@@ -1388,6 +1389,13 @@ class CouchDatabase(CommonBackend):
                 continue
             yield t._doc
 
+    def _prune_conflicts(self, doc, doc_vcr):
+        """
+        Overrides original method, but it is implemented elsewhere for
+        simplicity.
+        """
+        doc.prune_conflicts(doc_vcr, self._replica_uid)
+
     def _new_resource(self, *path):
         """
         Return a new resource for accessing a couch database.
@@ -1506,7 +1514,7 @@ def _process_incoming_doc(my_doc, other_doc, save_conflict, replica_uid):
     cur_vcr = vectorclock.VectorClockRev(my_doc.rev)
     if doc_vcr.is_newer(cur_vcr):
         rev = new_doc.rev
-        new_doc._prune_conflicts(doc_vcr, replica_uid)
+        new_doc.prune_conflicts(doc_vcr, replica_uid)
         if new_doc.rev != rev:
             # conflicts have been autoresolved
             return 'superseded', new_doc
@@ -1529,7 +1537,7 @@ def _process_incoming_doc(my_doc, other_doc, save_conflict, replica_uid):
         return 'superseded', new_doc
     else:
         if save_conflict:
-            new_doc._prune_conflicts(vectorclock.VectorClockRev(new_doc.rev), replica_uid)
+            new_doc.prune_conflicts(vectorclock.VectorClockRev(new_doc.rev), replica_uid)
             new_doc.add_conflict(my_doc)
             return 'conflicted', new_doc
         other_doc.update(new_doc)

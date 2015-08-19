@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# http_target.py
+# fetch.py
 # Copyright (C) 2015 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -164,7 +164,7 @@ class HTTPDocFetcher(object):
             # end of symmetric decryption
             # -------------------------------------------------------------
         self._received_docs += 1
-        _emit_received(self._received_docs, total)
+        _emit_receive_status(self._received_docs, total)
         return number_of_changes, new_generation, new_transaction_id
 
     def _parse_received_doc_response(self, response):
@@ -231,7 +231,7 @@ class HTTPDocFetcher(object):
                 source_replica_uid=self.source_replica_uid)
 
 
-def _emit_received(received_docs, total):
+def _emit_receive_status(received_docs, total):
     msg = "%d/%d" % (received_docs, total)
     emit(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
     logger.debug("Sync receive status: %s" % msg)

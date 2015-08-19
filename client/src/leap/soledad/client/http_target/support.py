@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# http_target.py
+# support.py
 # Copyright (C) 2015 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -128,17 +128,47 @@ def readBody(response):
 
 
 class RequestBody(object):
+    """
+    This class is a helper to generate send and fetch requests.
+    The expected format is something like:
+    [
+    {headers},
+    {entry1},
+    {...},
+    {entryN},
+    ]
+    """
 
     def __init__(self, **header_dict):
+        """
+        Creates a new RequestBody holding header information.
+
+        @param header_dict: A dictionary with the headers.
+        """
         self.headers = header_dict
         self.entries = []
 
     def insert_info(self, **entry_dict):
+        """
+        Dumps an entry into JSON format and add it to entries list.
+
+        @param entry_dicts: Entry as a dictionary
+
+        @return: length of the entry after JSON dumps
+        """
         entry = json.dumps(entry_dict)
         self.entries.append(entry)
         return len(entry)
 
     def remove(self, number=1):
+        """
+        Removes an amount of entries and returns it formatted and ready
+        to be sent.
+
+        @param number: number of entries to remove and format
+
+        @return: formatted body ready to be sent
+        """
         entries = [self.entries.pop(0) for i in xrange(number)]
         return self.entries_to_str(entries)
 
@@ -149,6 +179,14 @@ class RequestBody(object):
         return len(self.entries)
 
     def entries_to_str(self, entries=None):
+        """
+        Format a list of entries into the body format expected
+        by the server.
+
+        @param entries: entries to format
+
+        @return: formatted body ready to be sent
+        """
         data = '[\r\n' + json.dumps(self.headers)
         data += ''.join(',\r\n' + entry for entry in entries)
         return data + '\r\n]'

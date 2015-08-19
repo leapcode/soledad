@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# http_target.py
+# send.py
 # Copyright (C) 2015 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -33,13 +33,13 @@ class HTTPDocSender(object):
             defer.returnValue([None, None])
 
         # add remote replica metadata to the request
-        initial_body = RequestBody(
+        metadata = RequestBody(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
         total = len(docs_by_generation)
-        entries = yield self._entries_from_docs(initial_body, docs_by_generation)
+        entries = yield self._entries_from_docs(metadata, docs_by_generation)
         while len(entries):
             result = yield self._http_request(
                 self._url,
@@ -49,14 +49,14 @@ class HTTPDocSender(object):
             idx = total - len(entries)
             if self._defer_encryption:
                 self._delete_sent(idx, docs_by_generation)
-            _emit_send(idx, total)
+            _emit_send_status(idx, total)
         response_dict = json.loads(result)[0]
         gen_after_send = response_dict['new_generation']
         trans_id_after_send = response_dict['new_transaction_id']
         defer.returnValue([gen_after_send, trans_id_after_send])
 
     def _delete_sent(self, idx, docs_by_generation):
-        doc = docs_by_generation[idx][0]
+        doc = docs_by_generation[idx - 1][0]
         self._sync_enc_pool.delete_encrypted_doc(
             doc.doc_id, doc.rev)
 
@@ -93,7 +93,7 @@ class HTTPDocSender(object):
         return d
 
 
-def _emit_send(idx, total):
+def _emit_send_status(idx, total):
     msg = "%d/%d" % (idx, total)
     emit(
         SOLEDAD_SYNC_SEND_STATUS,
