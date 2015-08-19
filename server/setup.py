@@ -21,14 +21,15 @@ import os
 import re
 from setuptools import setup
 from setuptools import find_packages
+from setuptools import Command
+
+from pkg import utils
 
 import versioneer
 versioneer.versionfile_source = 'src/leap/soledad/server/_version.py'
 versioneer.versionfile_build = 'leap/soledad/server/_version.py'
 versioneer.tag_prefix = ''  # tags are like 1.2.0
 versioneer.parentdir_prefix = 'leap.soledad.server-'
-
-from pkg import utils
 
 isset = lambda var: os.environ.get(var, None)
 if isset('VIRTUAL_ENV') or isset('LEAP_SKIP_INIT'):
@@ -66,9 +67,6 @@ if len(_version_short) > 0:
     DOWNLOAD_URL = DOWNLOAD_BASE % VERSION_SHORT
 
 cmdclass = versioneer.get_cmdclass()
-
-
-from setuptools import Command
 
 
 class freeze_debianver(Command):

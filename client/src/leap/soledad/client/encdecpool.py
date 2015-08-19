@@ -136,6 +136,7 @@ class SyncEncryptDecryptPool(object):
         """
         return self._sync_db.runQuery(query, *args)
 
+
 def encrypt_doc_task(doc_id, doc_rev, content, key, secret):
     """
     Encrypt the content of the given document.
@@ -418,7 +419,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         # db initialization
         self._deferred_init = self._init_db()
         self._wait_init_db('_runOperation', '_runQuery')
-
 
     def _wait_init_db(self, *methods):
         """

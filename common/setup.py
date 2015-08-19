@@ -17,9 +17,18 @@
 """
 setup file for leap.soledad.common
 """
+import binascii
+import json
+from os import listdir
+from os.path import realpath, dirname, isdir, join, isfile, basename
 import re
+
 from setuptools import setup
 from setuptools import find_packages
+from setuptools import Command
+from setuptools.command.develop import develop as _cmd_develop
+
+from pkg import utils
 
 import versioneer
 versioneer.versionfile_source = 'src/leap/soledad/common/_version.py'
@@ -27,7 +36,6 @@ versioneer.versionfile_build = 'leap/soledad/common/_version.py'
 versioneer.tag_prefix = ''  # tags are like 1.2.0
 versioneer.parentdir_prefix = 'leap.soledad.common-'
 
-from pkg import utils
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -57,9 +65,6 @@ if len(_version_short) > 0:
     DOWNLOAD_URL = DOWNLOAD_BASE % VERSION_SHORT
 
 cmdclass = versioneer.get_cmdclass()
-
-
-from setuptools import Command
 
 
 class freeze_debianver(Command):
@@ -106,12 +111,6 @@ def get_versions(default={}, verbose=False):
 #
 # Couch backend design docs file generation.
 #
-
-from os import listdir
-from os.path import realpath, dirname, isdir, join, isfile, basename
-import json
-import binascii
-
 
 old_cmd_sdist = cmdclass["sdist"]
 
@@ -217,9 +216,6 @@ def build_ddocs_py(basedir=None, with_src=True):
                 "%s = '%s'\n" %
                 (ddoc, binascii.b2a_base64(json.dumps(ddocs[ddoc]))[:-1]))
     print "Wrote design docs in %s" % (dest_prefix + '/' + ddoc_filename,)
-
-
-from setuptools.command.develop import develop as _cmd_develop
 
 
 class cmd_develop(_cmd_develop):

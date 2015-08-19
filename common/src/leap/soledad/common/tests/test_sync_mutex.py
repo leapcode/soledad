@@ -121,9 +121,9 @@ class TestSyncMutex(
             sync_times.sort(key=lambda s: s['start'])
 
             self.assertTrue(
-                sync_times[0]['start'] < sync_times[0]['end']
-                and sync_times[0]['end'] < sync_times[1]['start']
-                and sync_times[1]['start'] < sync_times[1]['end'])
+                (sync_times[0]['start'] < sync_times[0]['end'] and
+                 sync_times[0]['end'] < sync_times[1]['start'] and
+                 sync_times[1]['start'] < sync_times[1]['end']))
 
             db.delete_database()
             db.close()
