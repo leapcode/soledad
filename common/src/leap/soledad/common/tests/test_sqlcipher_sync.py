@@ -34,9 +34,7 @@ from leap.soledad.common import couch
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.crypto import decrypt_doc_dict
-from leap.soledad.client.sqlcipher import (
-    SQLCipherDatabase,
-)
+from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS

@@ -31,13 +31,14 @@ import subprocess
 import time
 import re
 import traceback
-from uuid import uuid4
 
+from uuid import uuid4
 from mock import Mock
 from urlparse import urljoin
 from StringIO import StringIO
 from pysqlcipher import dbapi2
 
+from u1db import sync
 from u1db.errors import DatabaseDoesNotExist
 from u1db.remote import http_database
 
@@ -55,18 +56,21 @@ from leap.soledad.client import Soledad
 from leap.soledad.client import http_target
 from leap.soledad.client import auth
 from leap.soledad.client.crypto import decrypt_doc_dict
+from leap.soledad.client.sqlcipher import SQLCipherDatabase
+from leap.soledad.client.sqlcipher import SQLCipherOptions
 
 from leap.soledad.server import SoledadApp
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
-from leap.soledad.client.sqlcipher import (
-    SQLCipherDatabase,
-    SQLCipherOptions,
-)
-
 
 PASSWORD = '123456'
 ADDRESS = 'leap@leap.se'
+
+
+def make_local_db_and_target(test):
+    db = test.create_database('test')
+    st = db.get_sync_target()
+    return db, st
 
 
 def make_sqlcipher_database_for_test(test, replica_uid):
@@ -152,6 +156,15 @@ def copy_token_http_database_for_test(test, db):
     http_db = test.request_state._copy_database(db)
     http_db.set_token_credentials(http_db, 'user-uuid', 'auth-token')
     return http_db
+
+
+def sync_via_synchronizer(test, db_source, db_target, trace_hook=None,
+                          trace_hook_shallow=None):
+    target = db_target.get_sync_target()
+    trace_hook = trace_hook or trace_hook_shallow
+    if trace_hook:
+        target._set_trace_hook(trace_hook)
+    return sync.Synchronizer(db_source, target).sync()
 
 
 class MockedSharedDBTest(object):
