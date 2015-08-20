@@ -26,55 +26,11 @@ from twisted.internet import defer
 from leap.soledad.common.errors import InvalidAuthTokenError
 from leap.soledad.client.http_target.support import readBody
 
-from leap.common.http import HTTPClient
-
 
 class SyncTargetAPI(SyncTarget):
-
-    def __init__(self, url, source_replica_uid, creds, crypto, cert_file,
-                 sync_db=None, sync_enc_pool=None):
-        """
-        Initialize the sync target.
-
-        :param url: The server sync url.
-        :type url: str
-        :param source_replica_uid: The source replica uid which we use when
-                                   deferring decryption.
-        :type source_replica_uid: str
-        :param creds: A dictionary containing the uuid and token.
-        :type creds: creds
-        :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
-                        document contents when syncing.
-        :type crypto: soledad.crypto.SoledadCrypto
-        :param cert_file: Path to the certificate of the ca used to validate
-                          the SSL certificate used by the remote soledad
-                          server.
-        :type cert_file: str
-        :param sync_db: Optional. handler for the db with the symmetric
-                        encryption of the syncing documents. If
-                        None, encryption will be done in-place,
-                        instead of retreiving it from the dedicated
-                        database.
-        :type sync_db: Sqlite handler
-        :param sync_enc_pool: The encryption pool to use to defer encryption.
-                              If None is passed the encryption will not be
-                              deferred.
-        :type sync_enc_pool: leap.soledad.client.encdecpool.SyncEncrypterPool
-        """
-        if url.endswith("/"):
-            url = url[:-1]
-        self._url = str(url) + "/sync-from/" + str(source_replica_uid)
-        self.source_replica_uid = source_replica_uid
-        self._auth_header = None
-        self.set_creds(creds)
-        self._crypto = crypto
-        self._sync_db = sync_db
-        self._sync_enc_pool = sync_enc_pool
-        self._insert_doc_cb = None
-        # asynchronous encryption/decryption attributes
-        self._decryption_callback = None
-        self._sync_decr_pool = None
-        self._http = HTTPClient(cert_file)
+    """
+    Declares public methods and implements u1db.SyncTarget.
+    """
 
     def close(self):
         self._http.close()

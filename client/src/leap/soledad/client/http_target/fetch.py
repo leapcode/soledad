@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 
 
 class HTTPDocFetcher(object):
+    """
+    Handles Document fetching from Soledad server, using HTTP as transport.
+    Steps:
+    * Prepares metadata by asking server for one document
+    * Fetch the total on response and prepare to ask all remaining
+    * (async) Documents will come encrypted.
+              So we parse, decrypt and insert locally as they arrive.
+    """
 
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,

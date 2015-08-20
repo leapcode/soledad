@@ -31,6 +31,10 @@ from twisted.web._newclient import PotentialDataLoss
 # client below.
 
 class ReadBodyProtocol(_ReadBodyProtocol):
+    """
+    From original Twisted implementation, focused on adding our error
+    handling and ensuring that the proper u1db error is raised.
+    """
 
     def __init__(self, response, deferred):
         """
@@ -143,7 +147,8 @@ class RequestBody(object):
         """
         Creates a new RequestBody holding header information.
 
-        @param header_dict: A dictionary with the headers.
+        :param header_dict: A dictionary with the headers.
+        :type header_dict: dict
         """
         self.headers = header_dict
         self.entries = []
@@ -152,9 +157,11 @@ class RequestBody(object):
         """
         Dumps an entry into JSON format and add it to entries list.
 
-        @param entry_dicts: Entry as a dictionary
+        :param entry_dict: Entry as a dictionary
+        :type entry_dict: dict
 
-        @return: length of the entry after JSON dumps
+        :return: length of the entry after JSON dumps
+        :rtype: int
         """
         entry = json.dumps(entry_dict)
         self.entries.append(entry)
@@ -165,9 +172,11 @@ class RequestBody(object):
         Removes an amount of entries and returns it formatted and ready
         to be sent.
 
-        @param number: number of entries to remove and format
+        :param number: number of entries to remove and format
+        :type number: int
 
-        @return: formatted body ready to be sent
+        :return: formatted body ready to be sent
+        :rtype: str
         """
         entries = [self.entries.pop(0) for i in xrange(number)]
         return self.entries_to_str(entries)
@@ -183,9 +192,11 @@ class RequestBody(object):
         Format a list of entries into the body format expected
         by the server.
 
-        @param entries: entries to format
+        :param entries: entries to format
+        :type entries: list
 
-        @return: formatted body ready to be sent
+        :return: formatted body ready to be sent
+        :rtype: str
         """
         data = '[\r\n' + json.dumps(self.headers)
         data += ''.join(',\r\n' + entry for entry in entries)

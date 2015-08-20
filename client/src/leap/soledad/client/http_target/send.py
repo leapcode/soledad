@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class HTTPDocSender(object):
+    """
+    Handles Document uploading from Soledad server, using HTTP as transport.
+    They need to be encrypted and metadata prepared before sending.
+    """
 
     @defer.inlineCallbacks
     def _send_docs(self, docs_by_generation, last_known_generation,
