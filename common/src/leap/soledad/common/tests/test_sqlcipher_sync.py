@@ -580,7 +580,8 @@ class SQLCipherDatabaseSyncTests(
         doc = self.db2.create_doc_from_json(tests.simple_doc)
         self.db1.create_index('test-idx', 'key')
         self.assertEqual(0, self.sync(self.db1, self.db2))
-        self.assertGetDoc(self.db1, doc.doc_id, doc.rev, tests.simple_doc, False)
+        self.assertGetDoc(self.db1, doc.doc_id, doc.rev,
+                          tests.simple_doc, False)
         self.assertEqual(1, self.db1._get_replica_gen_and_trans_id('test2')[0])
         self.assertEqual(1, self.db2._get_replica_gen_and_trans_id('test1')[0])
         self.assertLastExchangeLog(self.db2,
@@ -799,7 +800,6 @@ class SQLCipherSyncTargetTests(
         self.assertEqual(
             ('test', 0, '', 10, 'T-transid'), sync_info)
 
-
     @defer.inlineCallbacks
     def test_sync_exchange(self):
         """
@@ -907,7 +907,8 @@ class SQLCipherSyncTargetTests(
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
         self.assertEqual(
-            (doc.doc_id, doc.rev, tests.simple_doc, 1), self.other_changes[0][:-1])
+            (doc.doc_id, doc.rev, tests.simple_doc, 1),
+            self.other_changes[0][:-1])
         self.assertEqual(1, new_gen)
         if self.whitebox:
             self.assertEqual(self.db._last_exchange_log['return'],
@@ -919,7 +920,8 @@ class SQLCipherSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         gen, txid = self.db._get_generation_info()
         docs_by_gen = [
-            (self.make_document(doc.doc_id, doc.rev, tests.simple_doc), 10, 'T-sid')]
+            (self.make_document(
+                doc.doc_id, doc.rev, tests.simple_doc), 10, 'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=gen,
             last_known_trans_id=txid, insert_doc_cb=self.receive_doc)
@@ -935,7 +937,8 @@ class SQLCipherSyncTargetTests(
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
         self.assertEqual(
-            (doc.doc_id, doc.rev, tests.simple_doc, 1), self.other_changes[0][:-1])
+            (doc.doc_id, doc.rev, tests.simple_doc, 1),
+            self.other_changes[0][:-1])
         self.assertEqual(1, new_gen)
         if self.whitebox:
             self.assertEqual(self.db._last_exchange_log['return'],
@@ -1036,7 +1039,7 @@ class SQLCipherSyncTargetTests(
             raise errors.U1DBError("fail")
         self.set_trace_hook(before_get_docs_explode)
         # suppress traceback printing in the wsgiref server
-        #self.patch(simple_server.ServerHandler,
+        # self.patch(simple_server.ServerHandler,
         #           'log_exception', lambda h, exc_info: None)
         doc = self.db.create_doc_from_json(tests.simple_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
@@ -1056,7 +1059,8 @@ class SQLCipherSyncTargetTests(
         new_gen, trans_id = sync_exchange_doc_ids(
             db2, [(doc.doc_id, 10, 'T-sid')], 0, None,
             insert_doc_cb=self.receive_doc)
-        self.assertGetDoc(self.db, doc.doc_id, doc.rev, tests.simple_doc, False)
+        self.assertGetDoc(self.db, doc.doc_id, doc.rev,
+                          tests.simple_doc, False)
         self.assertTransactionLog([doc.doc_id], self.db)
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 1, last_trans_id),
