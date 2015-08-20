@@ -18,7 +18,10 @@
 Tests for general Soledad functionality.
 """
 import os
+
 from mock import Mock
+
+from twisted.internet import defer
 
 from leap.common.events import catalog
 from leap.soledad.common.tests.util import (
@@ -348,26 +351,26 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         self.assertEqual([], soledad.client.signal.mock_calls)
         sol.close()
 
+    @defer.inlineCallbacks
     def test_sync_signals(self):
         """
         Test Soledad emits SOLEDAD_CREATING_KEYS signal.
         """
-        soledad.client.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance()
+        soledad.client.signal.reset_mock()
+
         # mock the actual db sync so soledad does not try to connect to the
         # server
-        sol._dbsyncer.sync = Mock()
+        d = defer.Deferred()
+        d.callback(None)
+        sol._dbsyncer.sync = Mock(return_value=d)
 
-        def _assert_done_data_sync_signal_emitted(results):
-            # assert the signal has been emitted
-            soledad.client.events.emit.assert_called_with(
-                catalog.SOLEDAD_DONE_DATA_SYNC,
-                ADDRESS,
-            )
-            sol.close()
+        yield sol.sync()
 
-        # do the sync and assert signal was emitted
-        d = sol.sync()
-        d.addCallback(_assert_done_data_sync_signal_emitted)
-        return d
+        # assert the signal has been emitted
+        soledad.client.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_DATA_SYNC,
+            ADDRESS,
+        )
+        sol.close()
