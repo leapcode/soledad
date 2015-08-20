@@ -1320,7 +1320,7 @@ class CouchDatabase(CommonBackend):
                  'converged', at_gen is the insertion/current generation.
         :rtype: (str, int)
         """
-        if type(doc) is not CouchDocument:
+        if not isinstance(doc, CouchDocument):
             doc = self._factory(doc.doc_id, doc.rev, doc.get_json())
         self._save_source_info(replica_uid, replica_gen,
                                replica_trans_id, number_of_docs,
