@@ -508,6 +508,11 @@ class SoledadHTTPSyncTarget(SyncTarget):
         self._received_docs = 0
         number_of_changes, ngen, ntrans = self._insert_received_doc(doc, 1, 1)
 
+        # update the target gen and trans_id in case a document was received
+        if ngen:
+            new_generation = ngen
+            new_transaction_id = ntrans
+
         if defer_decryption:
             self._sync_decr_pool.start(number_of_changes)
 
