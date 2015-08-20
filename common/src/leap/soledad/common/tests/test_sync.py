@@ -226,3 +226,5 @@ class TestSoledadDbSync(
             self.db2, doc1.doc_id, doc1.rev, tests.simple_doc, False)
         self.assertGetEncryptedDoc(
             self.db, doc2.doc_id, doc2.rev, tests.nested_doc, False)
+
+    # TODO: add u1db.tests.test_sync.TestRemoteSyncIntegration
