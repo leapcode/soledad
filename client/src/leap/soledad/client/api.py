@@ -708,8 +708,6 @@ class Soledad(object):
                     filtered = list(chain(*r))
                     plugin.process_received_docs(filtered)
 
-            soledad_events.emit(
-                soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
             return local_gen
 
         def _sync_errback(failure):
@@ -719,7 +717,13 @@ class Soledad(object):
             logger.error(msg)
             return failure
 
+        def _emit_done_data_sync(passthrough):
+            soledad_events.emit(
+                soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
+            return passthrough
+
         d.addCallbacks(_sync_callback, _sync_errback)
+        d.addBoth(_emit_done_data_sync)
         return d
 
     @property
