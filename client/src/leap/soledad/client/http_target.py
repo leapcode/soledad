@@ -259,13 +259,13 @@ class SoledadHTTPSyncTarget(SyncTarget):
         """
         raw = yield self._http_request(self._url, headers=self._auth_header)
         res = json.loads(raw)
-        defer.returnValue([
+        defer.returnValue((
             res['target_replica_uid'],
             res['target_replica_generation'],
             res['target_replica_transaction_id'],
             res['source_replica_generation'],
             res['source_transaction_id']
-        ])
+        ))
 
     def record_sync_info(
             self, source_replica_uid, source_replica_generation,
