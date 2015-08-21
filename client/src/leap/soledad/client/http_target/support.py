@@ -167,12 +167,12 @@ class RequestBody(object):
         self.entries.append(entry)
         return len(entry)
 
-    def remove(self, number=1):
+    def pop(self, number=1):
         """
         Removes an amount of entries and returns it formatted and ready
         to be sent.
 
-        :param number: number of entries to remove and format
+        :param number: number of entries to pop and format
         :type number: int
 
         :return: formatted body ready to be sent

@@ -37,20 +37,19 @@ class HTTPDocSender(object):
             defer.returnValue([None, None])
 
         # add remote replica metadata to the request
-        metadata = RequestBody(
+        body = RequestBody(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
         total = len(docs_by_generation)
-        entries = yield self._entries_from_docs(metadata, docs_by_generation)
-        while len(entries):
+        for idx, entry in enumerate(docs_by_generation, 1):
+            yield self._prepare_one_doc(entry, body, idx, total)
             result = yield self._http_request(
                 self._url,
                 method='POST',
-                body=entries.remove(1),
+                body=body.pop(1),
                 content_type='application/x-soledad-sync-put')
-            idx = total - len(entries)
             if self._defer_encryption:
                 self._delete_sent(idx, docs_by_generation)
             _emit_send_status(idx, total)
@@ -65,15 +64,13 @@ class HTTPDocSender(object):
             doc.doc_id, doc.rev)
 
     @defer.inlineCallbacks
-    def _entries_from_docs(self, initial_body, docs_by_generation):
-        number_of_docs = len(docs_by_generation)
-        for idx, (doc, gen, trans_id) in enumerate(docs_by_generation, 1):
-            content = yield self._encrypt_doc(doc)
-            initial_body.insert_info(
-                id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
-                trans_id=trans_id, number_of_docs=number_of_docs,
-                doc_idx=idx)
-        defer.returnValue(initial_body)
+    def _prepare_one_doc(self, entry, body, idx, total):
+        doc, gen, trans_id = entry
+        content = yield self._encrypt_doc(doc)
+        body.insert_info(
+            id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
+            trans_id=trans_id, number_of_docs=total,
+            doc_idx=idx)
 
     def _encrypt_doc(self, doc):
         d = None
