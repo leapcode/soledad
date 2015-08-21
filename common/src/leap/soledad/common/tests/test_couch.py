@@ -547,9 +547,11 @@ class CouchDatabaseSyncTargetTests(
                          called)
 
     def test__set_trace_hook_shallow(self):
-        if (self.st._set_trace_hook_shallow == self.st._set_trace_hook
-                or self.st._set_trace_hook_shallow.im_func ==
-                SyncTarget._set_trace_hook_shallow.im_func):
+        st_trace_shallow = self.st._set_trace_hook_shallow
+        target_st_trace_shallow = SyncTarget._set_trace_hook_shallow
+        same_meth = st_trace_shallow == self.st._set_trace_hook
+        same_fun = st_trace_shallow.im_func == target_st_trace_shallow.im_func
+        if (same_meth or same_fun):
             # shallow same as full
             expected = ['before whats_changed',
                         'after whats_changed',
@@ -689,8 +691,8 @@ class CouchDatabaseSyncTests(
         # NINJA TO YOUR HOUSE.
         db_copy = self.copy_database_for_test(self, db)
         name, orig_sync_role = self._use_tracking[db]
-        self._use_tracking[db_copy] = (name + '(copy)', sync_role
-                                       or orig_sync_role)
+        self._use_tracking[db_copy] = (
+            name + '(copy)', sync_role or orig_sync_role)
         return db_copy
 
     def sync(self, db_from, db_to, trace_hook=None,
