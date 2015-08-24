@@ -27,34 +27,25 @@ from pysqlcipher import dbapi2
 from testscenarios import TestWithScenarios
 
 # u1db stuff.
-from u1db import (
-    errors,
-    query_parser,
-)
+from u1db import errors
+from u1db import query_parser
 from u1db.backends.sqlite_backend import SQLitePartialExpandDatabase
-
 
 # soledad stuff.
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.client.sqlcipher import (
-    SQLCipherDatabase,
-    SQLCipherOptions,
-    DatabaseIsNotEncrypted,
-)
-
+from leap.soledad.client.sqlcipher import SQLCipherDatabase
+from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client.sqlcipher import DatabaseIsNotEncrypted
 
 # u1db tests stuff.
 from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests.u1db_tests import test_sqlite_backend
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_open
-from leap.soledad.common.tests.util import (
-    make_sqlcipher_database_for_test,
-    copy_sqlcipher_database_for_test,
-    PASSWORD,
-    BaseSoledadTest,
-)
+from leap.soledad.common.tests.util import make_sqlcipher_database_for_test
+from leap.soledad.common.tests.util import copy_sqlcipher_database_for_test
+from leap.soledad.common.tests.util import PASSWORD
+from leap.soledad.common.tests.util import BaseSoledadTest
 
 
 def sqlcipher_open(path, passphrase, create=True, document_factory=None):
@@ -129,8 +120,10 @@ class SQLCipherIndexTests(
 # The following tests come from `u1db.tests.test_sqlite_backend`.
 # -----------------------------------------------------------------------------
 
-class TestSQLCipherDatabase(TestWithScenarios,
-                            test_sqlite_backend.TestSQLiteDatabase):
+class TestSQLCipherDatabase(tests.TestCase):
+    """
+    Tests from u1db.tests.test_sqlite_backend.TestSQLiteDatabase.
+    """
 
     def test_atomic_initialize(self):
         # This test was modified to ensure that db2.close() is called within
@@ -187,20 +180,20 @@ class TestAlternativeDocument(SoledadDocument):
     """A (not very) alternative implementation of Document."""
 
 
-class TestSQLCipherPartialExpandDatabase(
-        test_sqlite_backend.TestSQLitePartialExpandDatabase):
+class TestSQLCipherPartialExpandDatabase(tests.TestCase):
+    """
+    Tests from u1db.tests.test_sqlite_backend.TestSQLitePartialExpandDatabase.
+    """
 
     # The following tests had to be cloned from u1db because they all
     # instantiate the backend directly, so we need to change that in order to
     # our backend be instantiated in place.
 
     def setUp(self):
-        test_sqlite_backend.TestSQLitePartialExpandDatabase.setUp(self)
         self.db = sqlcipher_open(':memory:', PASSWORD)
 
     def tearDown(self):
         self.db.close()
-        test_sqlite_backend.TestSQLitePartialExpandDatabase.tearDown(self)
 
     def test_default_replica_uid(self):
         self.assertIsNot(None, self.db._replica_uid)
@@ -220,6 +213,10 @@ class TestSQLCipherPartialExpandDatabase(
         c.execute('SELECT doc_id, field_name, value FROM document_fields')
         self.assertEqual([('doc-id', 'fieldname', 'val')],
                          c.fetchall())
+
+    def test_create_database(self):
+        raw_db = self.db._get_sqlite_handle()
+        self.assertNotEqual(None, raw_db)
 
     def test__set_replica_uid(self):
         # Start from scratch, so that replica_uid isn't set.
@@ -324,6 +321,269 @@ class TestSQLCipherPartialExpandDatabase(
         self.db.put_doc(doc)
         self.assertEqual(True, self.db.get_doc(doc.doc_id).syncable)
 
+    def test__close_sqlite_handle(self):
+        raw_db = self.db._get_sqlite_handle()
+        self.db._close_sqlite_handle()
+        self.assertRaises(dbapi2.ProgrammingError,
+                          raw_db.cursor)
+
+    def test__get_generation(self):
+        self.assertEqual(0, self.db._get_generation())
+
+    def test__get_generation_info(self):
+        self.assertEqual((0, ''), self.db._get_generation_info())
+
+    def test_create_index(self):
+        self.db.create_index('test-idx', "key")
+        self.assertEqual([('test-idx', ["key"])], self.db.list_indexes())
+
+    def test_create_index_multiple_fields(self):
+        self.db.create_index('test-idx', "key", "key2")
+        self.assertEqual([('test-idx', ["key", "key2"])],
+                         self.db.list_indexes())
+
+    def test__get_index_definition(self):
+        self.db.create_index('test-idx', "key", "key2")
+        # TODO: How would you test that an index is getting used for an SQL
+        #       request?
+        self.assertEqual(["key", "key2"],
+                         self.db._get_index_definition('test-idx'))
+
+    def test_list_index_mixed(self):
+        # Make sure that we properly order the output
+        c = self.db._get_sqlite_handle().cursor()
+        # We intentionally insert the data in weird ordering, to make sure the
+        # query still gets it back correctly.
+        c.executemany("INSERT INTO index_definitions VALUES (?, ?, ?)",
+                      [('idx-1', 0, 'key10'),
+                       ('idx-2', 2, 'key22'),
+                       ('idx-1', 1, 'key11'),
+                       ('idx-2', 0, 'key20'),
+                       ('idx-2', 1, 'key21')])
+        self.assertEqual([('idx-1', ['key10', 'key11']),
+                          ('idx-2', ['key20', 'key21', 'key22'])],
+                         self.db.list_indexes())
+
+    def test_no_indexes_no_document_fields(self):
+        self.db.create_doc_from_json(
+            '{"key1": "val1", "key2": "val2"}')
+        c = self.db._get_sqlite_handle().cursor()
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual([], c.fetchall())
+
+    def test_create_extracts_fields(self):
+        doc1 = self.db.create_doc_from_json('{"key1": "val1", "key2": "val2"}')
+        doc2 = self.db.create_doc_from_json('{"key1": "valx", "key2": "valy"}')
+        c = self.db._get_sqlite_handle().cursor()
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual([], c.fetchall())
+        self.db.create_index('test', 'key1', 'key2')
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual(sorted(
+            [(doc1.doc_id, "key1", "val1"),
+             (doc1.doc_id, "key2", "val2"),
+             (doc2.doc_id, "key1", "valx"),
+             (doc2.doc_id, "key2", "valy"), ]), sorted(c.fetchall()))
+
+    def test_put_updates_fields(self):
+        self.db.create_index('test', 'key1', 'key2')
+        doc1 = self.db.create_doc_from_json(
+            '{"key1": "val1", "key2": "val2"}')
+        doc1.content = {"key1": "val1", "key2": "valy"}
+        self.db.put_doc(doc1)
+        c = self.db._get_sqlite_handle().cursor()
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual([(doc1.doc_id, "key1", "val1"),
+                          (doc1.doc_id, "key2", "valy"), ], c.fetchall())
+
+    def test_put_updates_nested_fields(self):
+        self.db.create_index('test', 'key', 'sub.doc')
+        doc1 = self.db.create_doc_from_json(tests.nested_doc)
+        c = self.db._get_sqlite_handle().cursor()
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual([(doc1.doc_id, "key", "value"),
+                          (doc1.doc_id, "sub.doc", "underneath"), ],
+                         c.fetchall())
+
+    def test__ensure_schema_rollback(self):
+        temp_dir = self.createTempDir(prefix='u1db-test-')
+        path = temp_dir + '/rollback.db'
+
+        class SQLitePartialExpandDbTesting(SQLCipherDatabase):
+
+            def _set_replica_uid_in_transaction(self, uid):
+                super(SQLitePartialExpandDbTesting,
+                      self)._set_replica_uid_in_transaction(uid)
+                if fail:
+                    raise Exception()
+
+        db = SQLitePartialExpandDbTesting.__new__(SQLitePartialExpandDbTesting)
+        db._db_handle = dbapi2.connect(path)  # db is there but not yet init-ed
+        fail = True
+        self.assertRaises(Exception, db._ensure_schema)
+        fail = False
+        db._initialize(db._db_handle.cursor())
+
+    def test_open_database_non_existent(self):
+        temp_dir = self.createTempDir(prefix='u1db-test-')
+        path = temp_dir + '/non-existent.sqlite'
+        self.assertRaises(errors.DatabaseDoesNotExist,
+                          sqlcipher_open, path, "123",
+                          create=False)
+
+    def test_delete_database_existent(self):
+        temp_dir = self.createTempDir(prefix='u1db-test-')
+        path = temp_dir + '/new.sqlite'
+        db = sqlcipher_open(path, "123", create=True)
+        db.close()
+        SQLCipherDatabase.delete_database(path)
+        self.assertRaises(errors.DatabaseDoesNotExist,
+                          sqlcipher_open, path, "123",
+                          create=False)
+
+    def test_delete_database_nonexistent(self):
+        temp_dir = self.createTempDir(prefix='u1db-test-')
+        path = temp_dir + '/non-existent.sqlite'
+        self.assertRaises(errors.DatabaseDoesNotExist,
+                          SQLCipherDatabase.delete_database, path)
+
+    def test__get_indexed_fields(self):
+        self.db.create_index('idx1', 'a', 'b')
+        self.assertEqual(set(['a', 'b']), self.db._get_indexed_fields())
+        self.db.create_index('idx2', 'b', 'c')
+        self.assertEqual(set(['a', 'b', 'c']), self.db._get_indexed_fields())
+
+    def test_indexed_fields_expanded(self):
+        self.db.create_index('idx1', 'key1')
+        doc1 = self.db.create_doc_from_json('{"key1": "val1", "key2": "val2"}')
+        self.assertEqual(set(['key1']), self.db._get_indexed_fields())
+        c = self.db._get_sqlite_handle().cursor()
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual([(doc1.doc_id, 'key1', 'val1')], c.fetchall())
+
+    def test_create_index_updates_fields(self):
+        doc1 = self.db.create_doc_from_json('{"key1": "val1", "key2": "val2"}')
+        self.db.create_index('idx1', 'key1')
+        self.assertEqual(set(['key1']), self.db._get_indexed_fields())
+        c = self.db._get_sqlite_handle().cursor()
+        c.execute("SELECT doc_id, field_name, value FROM document_fields"
+                  " ORDER BY doc_id, field_name, value")
+        self.assertEqual([(doc1.doc_id, 'key1', 'val1')], c.fetchall())
+
+    def assertFormatQueryEquals(self, exp_statement, exp_args, definition,
+                                values):
+        statement, args = self.db._format_query(definition, values)
+        self.assertEqual(exp_statement, statement)
+        self.assertEqual(exp_args, args)
+
+    def test__format_query(self):
+        self.assertFormatQueryEquals(
+            "SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM "
+            "document d, document_fields d0 LEFT OUTER JOIN conflicts c ON "
+            "c.doc_id = d.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name "
+            "= ? AND d0.value = ? GROUP BY d.doc_id, d.doc_rev, d.content "
+            "ORDER BY d0.value;", ["key1", "a"],
+            ["key1"], ["a"])
+
+    def test__format_query2(self):
+        self.assertFormatQueryEquals(
+            'SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM '
+            'document d, document_fields d0, document_fields d1, '
+            'document_fields d2 LEFT OUTER JOIN conflicts c ON c.doc_id = '
+            'd.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value = ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value = ? AND d.doc_id = d2.doc_id AND d2.field_name = ? AND '
+            'd2.value = ? GROUP BY d.doc_id, d.doc_rev, d.content ORDER BY '
+            'd0.value, d1.value, d2.value;',
+            ["key1", "a", "key2", "b", "key3", "c"],
+            ["key1", "key2", "key3"], ["a", "b", "c"])
+
+    def test__format_query_wildcard(self):
+        self.assertFormatQueryEquals(
+            'SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM '
+            'document d, document_fields d0, document_fields d1, '
+            'document_fields d2 LEFT OUTER JOIN conflicts c ON c.doc_id = '
+            'd.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value = ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value GLOB ? AND d.doc_id = d2.doc_id AND d2.field_name = ? '
+            'AND d2.value NOT NULL GROUP BY d.doc_id, d.doc_rev, d.content '
+            'ORDER BY d0.value, d1.value, d2.value;',
+            ["key1", "a", "key2", "b*", "key3"], ["key1", "key2", "key3"],
+            ["a", "b*", "*"])
+
+    def assertFormatRangeQueryEquals(self, exp_statement, exp_args, definition,
+                                     start_value, end_value):
+        statement, args = self.db._format_range_query(
+            definition, start_value, end_value)
+        self.assertEqual(exp_statement, statement)
+        self.assertEqual(exp_args, args)
+
+    def test__format_range_query(self):
+        self.assertFormatRangeQueryEquals(
+            'SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM '
+            'document d, document_fields d0, document_fields d1, '
+            'document_fields d2 LEFT OUTER JOIN conflicts c ON c.doc_id = '
+            'd.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value >= ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value >= ? AND d.doc_id = d2.doc_id AND d2.field_name = ? AND '
+            'd2.value >= ? AND d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value <= ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value <= ? AND d.doc_id = d2.doc_id AND d2.field_name = ? AND '
+            'd2.value <= ? GROUP BY d.doc_id, d.doc_rev, d.content ORDER BY '
+            'd0.value, d1.value, d2.value;',
+            ['key1', 'a', 'key2', 'b', 'key3', 'c', 'key1', 'p', 'key2', 'q',
+             'key3', 'r'],
+            ["key1", "key2", "key3"], ["a", "b", "c"], ["p", "q", "r"])
+
+    def test__format_range_query_no_start(self):
+        self.assertFormatRangeQueryEquals(
+            'SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM '
+            'document d, document_fields d0, document_fields d1, '
+            'document_fields d2 LEFT OUTER JOIN conflicts c ON c.doc_id = '
+            'd.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value <= ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value <= ? AND d.doc_id = d2.doc_id AND d2.field_name = ? AND '
+            'd2.value <= ? GROUP BY d.doc_id, d.doc_rev, d.content ORDER BY '
+            'd0.value, d1.value, d2.value;',
+            ['key1', 'a', 'key2', 'b', 'key3', 'c'],
+            ["key1", "key2", "key3"], None, ["a", "b", "c"])
+
+    def test__format_range_query_no_end(self):
+        self.assertFormatRangeQueryEquals(
+            'SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM '
+            'document d, document_fields d0, document_fields d1, '
+            'document_fields d2 LEFT OUTER JOIN conflicts c ON c.doc_id = '
+            'd.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value >= ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value >= ? AND d.doc_id = d2.doc_id AND d2.field_name = ? AND '
+            'd2.value >= ? GROUP BY d.doc_id, d.doc_rev, d.content ORDER BY '
+            'd0.value, d1.value, d2.value;',
+            ['key1', 'a', 'key2', 'b', 'key3', 'c'],
+            ["key1", "key2", "key3"], ["a", "b", "c"], None)
+
+    def test__format_range_query_wildcard(self):
+        self.assertFormatRangeQueryEquals(
+            'SELECT d.doc_id, d.doc_rev, d.content, count(c.doc_rev) FROM '
+            'document d, document_fields d0, document_fields d1, '
+            'document_fields d2 LEFT OUTER JOIN conflicts c ON c.doc_id = '
+            'd.doc_id WHERE d.doc_id = d0.doc_id AND d0.field_name = ? AND '
+            'd0.value >= ? AND d.doc_id = d1.doc_id AND d1.field_name = ? AND '
+            'd1.value >= ? AND d.doc_id = d2.doc_id AND d2.field_name = ? AND '
+            'd2.value NOT NULL AND d.doc_id = d0.doc_id AND d0.field_name = ? '
+            'AND d0.value <= ? AND d.doc_id = d1.doc_id AND d1.field_name = ? '
+            'AND (d1.value < ? OR d1.value GLOB ?) AND d.doc_id = d2.doc_id '
+            'AND d2.field_name = ? AND d2.value NOT NULL GROUP BY d.doc_id, '
+            'd.doc_rev, d.content ORDER BY d0.value, d1.value, d2.value;',
+            ['key1', 'a', 'key2', 'b', 'key3', 'key1', 'p', 'key2', 'q', 'q*',
+             'key3'],
+            ["key1", "key2", "key3"], ["a", "b*", "*"], ["p", "q*", "*"])
+
 
 # -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_open`.
@@ -374,7 +634,7 @@ class SQLCipherOpen(test_open.TestU1DBOpen):
 # Tests for actual encryption of the database
 # -----------------------------------------------------------------------------
 
-class SQLCipherEncryptionTest(BaseSoledadTest):
+class SQLCipherEncryptionTests(BaseSoledadTest):
 
     """
     Tests to guarantee SQLCipher is indeed encrypting data when storing.
