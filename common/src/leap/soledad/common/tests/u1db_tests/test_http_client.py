@@ -17,10 +17,7 @@
 """Tests for HTTPDatabase"""
 
 from oauth import oauth
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from u1db import (
     errors,

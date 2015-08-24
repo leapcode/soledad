@@ -20,7 +20,7 @@ Test Leap backend bits: sync target
 import cStringIO
 import os
 import time
-import simplejson as json
+import json
 import u1db
 import random
 import string

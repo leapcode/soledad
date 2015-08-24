@@ -22,11 +22,7 @@ import shutil
 import socket
 import tempfile
 import threading
-
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from wsgiref import simple_server
 

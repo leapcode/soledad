@@ -16,10 +16,7 @@
 
 """The backend class for U1DB. This deals with hiding storage details."""
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from u1db import DocumentBase
 from u1db import errors

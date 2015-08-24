@@ -19,7 +19,7 @@ Test sqlcipher backend sync.
 """
 
 
-import simplejson as json
+import json
 
 from u1db import sync
 from u1db import vectorclock

@@ -19,7 +19,7 @@
 """A U1DB backend that uses CouchDB as its persistence layer."""
 
 
-import simplejson as json
+import json
 import re
 import uuid
 import logging

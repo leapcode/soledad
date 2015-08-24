@@ -17,10 +17,7 @@
 """Tests for HTTPDatabase"""
 
 import inspect
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from unittest import skip
 
