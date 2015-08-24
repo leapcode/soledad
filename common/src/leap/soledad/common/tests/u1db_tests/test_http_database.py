@@ -22,22 +22,15 @@ try:
 except ImportError:
     import json  # noqa
 
-from u1db import (
-    errors,
-    Document,
-)
-
 from unittest import skip
 
-from leap.soledad.common.tests import u1db_tests as tests
+from u1db import errors
+from u1db import Document
+from u1db.remote import http_database
+from u1db.remote import http_target
 
-from u1db.remote import (
-    http_database,
-    http_target,
-)
-from leap.soledad.common.tests.u1db_tests.test_remote_sync_target import (
-    make_http_app,
-)
+from leap.soledad.common.tests import u1db_tests as tests
+from leap.soledad.common.tests.u1db_tests import make_http_app
 
 
 @skip("Skiping tests imported from U1DB.")

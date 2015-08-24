@@ -40,17 +40,13 @@ from twisted.web.server import Site
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
 
-from u1db import (
-    errors,
-    Document,
-)
-from u1db.backends import (
-    inmemory,
-    sqlite_backend,
-)
-from u1db.remote import (
-    server_state,
-)
+from u1db import errors
+from u1db import Document
+from u1db.backends import inmemory
+from u1db.backends import sqlite_backend
+from u1db.remote import server_state
+from u1db.remote import http_app
+from u1db.remote import http_target
 
 
 class TestCase(unittest.TestCase):
@@ -450,3 +446,20 @@ def load_with_scenarios(loader, standard_tests, pattern):
     suite = loader.suiteClass()
     suite.addTests(testscenarios.generate_scenarios(standard_tests))
     return suite
+
+
+# from u1db.tests.test_remote_sync_target
+
+def make_http_app(state):
+    return http_app.HTTPApp(state)
+
+
+def http_sync_target(test, path):
+    return http_target.HTTPSyncTarget(test.getURL(path))
+
+
+def make_oauth_http_app(state):
+    app = http_app.HTTPApp(state)
+    application = oauth_middleware.OAuthMiddleware(app, None, prefix='/~/')
+    application.get_oauth_data_store = lambda: tests.testingOAuthStore
+    return application

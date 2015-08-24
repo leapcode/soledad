@@ -7,16 +7,12 @@ import sys
 from paste import httpserver
 from unittest import skip
 
-from u1db.remote import (
-    http_client,
-    http_target,
-)
+from u1db.remote import http_client
+from u1db.remote import http_target
 
 from leap import soledad
 from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests.u1db_tests.test_remote_sync_target import (
-    make_oauth_http_app,
-)
+from leap.soledad.common.tests.u1db_tests import make_oauth_http_app
 
 
 def https_server_def():

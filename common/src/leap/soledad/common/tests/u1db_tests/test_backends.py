@@ -20,22 +20,17 @@ try:
     import simplejson as json
 except ImportError:
     import json  # noqa
-from u1db import (
-    DocumentBase,
-    errors,
-    vectorclock,
-)
+
+from u1db import DocumentBase
+from u1db import errors
+from u1db import vectorclock
 
 from leap.soledad.common.tests import u1db_tests as tests
 
-from leap.soledad.common.tests.u1db_tests.test_remote_sync_target import (
-    make_http_app,
-    make_oauth_http_app,
-)
+from leap.soledad.common.tests.u1db_tests import make_http_app
+from leap.soledad.common.tests.u1db_tests import make_oauth_http_app
 
-from u1db.remote import (
-    http_database,
-)
+from u1db.remote import http_database
 
 from unittest import skip
 
