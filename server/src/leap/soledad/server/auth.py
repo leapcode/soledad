@@ -23,7 +23,7 @@ Authentication facilities for Soledad Server.
 
 import time
 import httplib
-import simplejson as json
+import json
 
 from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod

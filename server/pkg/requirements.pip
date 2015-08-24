@@ -1,6 +1,5 @@
 configparser
 couchdb
-simplejson
 u1db
 routes
 PyOpenSSL
