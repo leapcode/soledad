@@ -26,11 +26,9 @@ import scrypt
 import logging
 import binascii
 import errno
-
+import json
 
 from hashlib import sha256
-import simplejson as json
-
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
