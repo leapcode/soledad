@@ -497,6 +497,35 @@ class SQLCipherDatabaseSyncTests(
         self.assertGetDocIncludeDeleted(
             self.db3, doc_id, deleted_rev, None, False)
 
+    def test_sync_propagates_deletes_2(self):
+        self.db1 = self.create_database('test1', 'source')
+        self.db2 = self.create_database('test2', 'target')
+        self.db1.create_doc_from_json('{"a": "1"}', doc_id='the-doc')
+        self.sync(self.db1, self.db2)
+        doc1_2 = self.db2.get_doc('the-doc')
+        self.db2.delete_doc(doc1_2)
+        self.sync(self.db1, self.db2)
+        self.assertGetDocIncludeDeleted(
+            self.db1, 'the-doc', doc1_2.rev, None, False)
+
+    def test_sync_detects_identical_replica_uid(self):
+        self.db1 = self.create_database('test1', 'source')
+        self.db2 = self.create_database('test1', 'target')
+        self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc1')
+        self.assertRaises(
+            errors.InvalidReplicaUID, self.sync, self.db1, self.db2)
+
+    def test_optional_sync_preserve_json(self):
+        self.db1 = self.create_database('test1', 'source')
+        self.db2 = self.create_database('test2', 'target')
+        cont1 = '{  "a":  2  }'
+        cont2 = '{ "b":3}'
+        self.db1.create_doc_from_json(cont1, doc_id="1")
+        self.db2.create_doc_from_json(cont2, doc_id="2")
+        self.sync(self.db1, self.db2)
+        self.assertEqual(cont1, self.db2.get_doc("1").get_json())
+        self.assertEqual(cont2, self.db1.get_doc("2").get_json())
+
     def test_sync_propagates_resolution(self):
         """
         Test if synchronization propagates resolution.
