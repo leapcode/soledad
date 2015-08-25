@@ -581,7 +581,8 @@ class SoledadDatabaseSyncTargetTests(
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
         self.assertEqual(
-            (doc.doc_id, doc.rev, tests.simple_doc, 1), self.other_changes[0][:-1])
+            (doc.doc_id, doc.rev, tests.simple_doc, 1),
+            self.other_changes[0][:-1])
         self.assertEqual(1, new_gen)
         if self.whitebox:
             self.assertEqual(self.db._last_exchange_log['return'],
@@ -593,7 +594,8 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         gen, txid = self.db._get_generation_info()
         docs_by_gen = [
-            (self.make_document(doc.doc_id, doc.rev, tests.simple_doc), 10, 'T-sid')]
+            (self.make_document(doc.doc_id, doc.rev, tests.simple_doc),
+             10, 'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=gen,
             last_known_trans_id=txid, insert_doc_cb=self.receive_doc)
@@ -609,7 +611,8 @@ class SoledadDatabaseSyncTargetTests(
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
         self.assertEqual(
-            (doc.doc_id, doc.rev, tests.simple_doc, 1), self.other_changes[0][:-1])
+            (doc.doc_id, doc.rev, tests.simple_doc, 1),
+            self.other_changes[0][:-1])
         self.assertEqual(1, new_gen)
         if self.whitebox:
             self.assertEqual(self.db._last_exchange_log['return'],
@@ -710,7 +713,7 @@ class SoledadDatabaseSyncTargetTests(
             raise u1db.errors.U1DBError("fail")
         self.set_trace_hook(before_get_docs_explode)
         # suppress traceback printing in the wsgiref server
-        #self.patch(simple_server.ServerHandler,
+        # self.patch(simple_server.ServerHandler,
         #           'log_exception', lambda h, exc_info: None)
         doc = self.db.create_doc_from_json(tests.simple_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
@@ -730,7 +733,8 @@ class SoledadDatabaseSyncTargetTests(
         new_gen, trans_id = yield sync_exchange_doc_ids(
             db2, [(doc.doc_id, 10, 'T-sid')], 0, None,
             insert_doc_cb=self.receive_doc)
-        self.assertGetDoc(self.db, doc.doc_id, doc.rev, tests.simple_doc, False)
+        self.assertGetDoc(self.db, doc.doc_id, doc.rev,
+                          tests.simple_doc, False)
         self.assertTransactionLog([doc.doc_id], self.db)
         last_trans_id = self.getLastTransId(self.db)
         self.assertEqual(([], 1, last_trans_id),
@@ -756,9 +760,9 @@ class SoledadDatabaseSyncTargetTests(
 
     @defer.inlineCallbacks
     def test__set_trace_hook_shallow(self):
-        if (self.st._set_trace_hook_shallow == self.st._set_trace_hook
-            or self.st._set_trace_hook_shallow.im_func ==
-               target.SoledadHTTPSyncTarget._set_trace_hook_shallow.im_func):
+        if (self.st._set_trace_hook_shallow == self.st._set_trace_hook or
+            self.st._set_trace_hook_shallow.im_func ==
+                target.SoledadHTTPSyncTarget._set_trace_hook_shallow.im_func):
             # shallow same as full
             expected = ['before whats_changed',
                         'after whats_changed',
