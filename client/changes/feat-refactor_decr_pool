@@ -1,1 +1,0 @@
-- Refactor decription pool and http target to use a deferred instead of a waiting loop.

@@ -1,2 +1,0 @@
-- Improve how we send information on SOLEDAD_SYNC_SEND_STATUS and in
-  SOLEDAD_SYNC_RECEIVE_STATUS. Related to Feature #7353.
