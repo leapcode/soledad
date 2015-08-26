@@ -486,7 +486,7 @@ class CouchServerStateForTests(CouchServerState):
 
     def _create_database(self, dbname):
         return CouchDatabase.open_database(
-            urljoin(self._couch_url, dbname),
+            urljoin(self.couch_url, dbname),
             True,
             replica_uid=dbname,
             ensure_ddocs=True)
@@ -506,7 +506,7 @@ class SoledadWithCouchServerMixin(
         main_test_class = getattr(self, 'main_test_class', None)
         if main_test_class is not None:
             main_test_class.setUp(self)
-        self._couch_url = 'http://localhost:%d' % self.wrapper.port
+        self.couch_url = 'http://localhost:%d' % self.wrapper.port
 
     def tearDown(self):
         main_test_class = getattr(self, 'main_test_class', None)
@@ -514,7 +514,7 @@ class SoledadWithCouchServerMixin(
             main_test_class.tearDown(self)
         # delete the test database
         try:
-            db = CouchDatabase(self._couch_url, 'test')
+            db = CouchDatabase(self.couch_url, 'test')
             db.delete_database()
         except DatabaseDoesNotExist:
             pass

@@ -63,13 +63,13 @@ class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
 
     def setUp(self):
         SoledadWithCouchServerMixin.setUp(self)
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        self.couch_url = 'http://localhost:' + str(self.wrapper.port)
         creds = {'token': {
             'uuid': 'user-uuid',
             'token': 'auth-token',
         }}
         self.target = target.SoledadHTTPSyncTarget(
-            self._couch_url,
+            self.couch_url,
             uuid4().hex,
             creds,
             self._soledad._crypto,
@@ -819,7 +819,7 @@ class TestSoledadDbSync(
     token = False
 
     def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
+        self.request_state = couch.CouchServerState(self.couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):

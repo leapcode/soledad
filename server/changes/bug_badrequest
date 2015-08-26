@@ -1,0 +1,1 @@
+  o Fix a bug where BadRequest could be raised after everything was persisted

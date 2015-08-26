@@ -84,14 +84,14 @@ class TestSyncMutex(
     sync_target = soledad_sync_target
 
     def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
+        self.request_state = couch.CouchServerState(self.couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        self.couch_url = 'http://localhost:' + str(self.wrapper.port)
 
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
@@ -103,7 +103,7 @@ class TestSyncMutex(
 
         # ensure remote db exists before syncing
         db = couch.CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
+            urljoin(self.couch_url, 'user-user-uuid'),
             create=True,
             ensure_ddocs=True)
 

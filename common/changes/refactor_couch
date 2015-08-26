@@ -1,0 +1,2 @@
+  o Refactor couch.py to separate persistence from logic while saving uploaded
+  documents. Also simplify logic while checking for conflicts.

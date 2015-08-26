@@ -83,15 +83,15 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         return soledad
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url)
+        self.request_state = CouchServerState(self.couch_url)
         return self.make_app_after_state(self.request_state)
 
     def setUp(self):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        self.couch_url = 'http://localhost:' + str(self.wrapper.port)
         self.db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
+            urljoin(self.couch_url, 'user-user-uuid'),
             create=True,
             replica_uid='replica',
             ensure_ddocs=True)

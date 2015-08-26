@@ -733,7 +733,7 @@ def _make_local_db_and_token_http_target(test, path='test'):
     test.startTwistedServer()
     # ensure remote db exists before syncing
     db = couch.CouchDatabase.open_database(
-        urljoin(test._couch_url, 'test'),
+        urljoin(test.couch_url, 'test'),
         create=True,
         replica_uid='test',
         ensure_ddocs=True)
@@ -790,7 +790,7 @@ class SQLCipherSyncTargetTests(
             (doc.doc_id, doc.rev, doc.get_json(), gen, trans_id))
 
     def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
+        self.request_state = couch.CouchServerState(self.couch_url)
         return self.make_app_with_state(self.request_state)
 
     def set_trace_hook(self, callback, shallow=False):
