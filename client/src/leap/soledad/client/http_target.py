@@ -402,7 +402,8 @@ class SoledadHTTPSyncTarget(SyncTarget):
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
         total = len(docs_by_generation)
-        entries = yield self._entries_from_docs(initial_body, docs_by_generation)
+        entries = yield self._entries_from_docs(
+            initial_body, docs_by_generation)
         while len(entries):
             result = yield self._http_request(
                 self._url,
@@ -663,7 +664,8 @@ class SoledadHTTPSyncTarget(SyncTarget):
                 insert_doc_cb=self._insert_doc_cb,
                 source_replica_uid=self.source_replica_uid)
 
-    def _http_request(self, url, method='GET', body=None, headers=None, content_type=None):
+    def _http_request(self, url, method='GET', body=None, headers=None,
+                      content_type=None):
         headers = headers or self._base_header
         if content_type:
             headers.update({'content-type': [content_type]})

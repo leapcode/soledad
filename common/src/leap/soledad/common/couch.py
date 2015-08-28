@@ -1207,7 +1207,8 @@ class CouchDatabase(CommonBackend):
         :type doc: CouchDocument
         """
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
-        doc.prune_conflicts(vectorclock.VectorClockRev(doc.rev), self._replica_uid)
+        doc.prune_conflicts(
+            vectorclock.VectorClockRev(doc.rev), self._replica_uid)
         doc.add_conflict(my_doc)
         self._put_doc(my_doc, doc)
 
@@ -1327,8 +1328,10 @@ class CouchDatabase(CommonBackend):
                                doc_idx, sync_id)
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if my_doc is not None:
-            my_doc.set_conflicts(self.get_doc_conflicts(my_doc.doc_id, my_doc.couch_rev))
-        state, save_doc = _process_incoming_doc(my_doc, doc, save_conflict, self.replica_uid)
+            my_doc.set_conflicts(
+                self.get_doc_conflicts(my_doc.doc_id, my_doc.couch_rev))
+        state, save_doc = _process_incoming_doc(
+            my_doc, doc, save_conflict, self.replica_uid)
         if save_doc:
             self._put_doc(my_doc, save_doc)
             doc.update(save_doc)
@@ -1503,7 +1506,8 @@ def _process_incoming_doc(my_doc, other_doc, save_conflict, replica_uid):
     # at this point, `doc` has arrived from the other syncing party, and
     # we will decide what to do with it.
     # First, we prepare the arriving doc to update couch database.
-    new_doc = CouchDocument(other_doc.doc_id, other_doc.rev, other_doc.get_json())
+    new_doc = CouchDocument(
+        other_doc.doc_id, other_doc.rev, other_doc.get_json())
     if my_doc is None:
         return 'inserted', new_doc
     new_doc.couch_rev = my_doc.couch_rev
@@ -1537,7 +1541,8 @@ def _process_incoming_doc(my_doc, other_doc, save_conflict, replica_uid):
         return 'superseded', new_doc
     else:
         if save_conflict:
-            new_doc.prune_conflicts(vectorclock.VectorClockRev(new_doc.rev), replica_uid)
+            new_doc.prune_conflicts(
+                vectorclock.VectorClockRev(new_doc.rev), replica_uid)
             new_doc.add_conflict(my_doc)
             return 'conflicted', new_doc
         other_doc.update(new_doc)

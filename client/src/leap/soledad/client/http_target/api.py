@@ -56,7 +56,8 @@ class SyncTargetAPI(SyncTarget):
     def _defer_encryption(self):
         return self._sync_enc_pool is not None
 
-    def _http_request(self, url, method='GET', body=None, headers=None, content_type=None):
+    def _http_request(self, url, method='GET', body=None, headers=None,
+                      content_type=None):
         headers = headers or self._base_header
         if content_type:
             headers.update({'content-type': [content_type]})
