@@ -22,5 +22,4 @@ u1db tests depend on the following python packages:
   dirspec
   paste
   routes
-  simplejson
   cython

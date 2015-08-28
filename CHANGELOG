@@ -1,3 +1,76 @@
+0.7.2 Aug 26, 2015:
+Client:
+  o Remove MAC from secrets file. Closes #6980.
+  o refactor SoledadCrypto to remove circular dependency with SoledadSecrets.
+    Closes #7338.
+  o Improve how we send information on SOLEDAD_SYNC_SEND_STATUS and in
+    SOLEDAD_SYNC_RECEIVE_STATUS. Related to Feature #7353.
+  o Fix hanging sync by properly waiting db initialization on sync decrypter
+    pool. Closes #7686.
+  o Avoid double decryption of documents.
+  o Fix the order of the events emited for incoming documents.
+  o bugfix: move sync db and encpool creation to api.
+  o Bugfix: wrong sqlcipher passphrase now raises correctly.
+  o Refactor decription pool and http target to use a deferred instead of a
+    waiting loop.
+  o Improve helper scripts and dependencies listing.
+  o Refactor enc/dec pool to standardize start/stop of the pools.
+  o Add tests for enc/dec pool.
+
+Client, Server, Common:
+  o Lots of code restyling to pass CI tests.
+  o Lots of work done to get tests passing.
+  o Remove dependency on simplejson.
+
+0.7.1 Jul 10, 2015:
+Client:
+  o Fix sync encrypter pool close queue error. Closes #7088.
+  o Expose post-sync hooks via plugin system. Related: #6996.
+
+0.7.0 Jun 01 2015:
+Client:
+  o Do not depend on pysqlite2 (#2945).
+  o Reset syncer connection when getting HTTP error during sync (#5855).
+  o Wait for last post request to finish before starting a new one (#5975).
+  o Use TLS v1 in soledad client. Fixes partially #6437
+  o Retry on sqlcipher thread timeouts (#6625).
+  o Fix the order of insertion of documents when using workers for decrypting
+    incoming documents during a sync. Closes #6757.
+  o Add dependency on Twisted. Closes #6797.
+  o Fix the log message when a local secret is not found so it's less
+    confusing. Closes #6892.
+  o Always initialize the sync db to allow for both asynchronous encryption
+    and asynchronous decryption when syncing.
+  o Fallback to utf-8 if confidence on chardet guessing is too low.
+  o Refactor asynchronous encryption/decryption code to its own file.
+  o Fix logging and graceful failing when exceptions are raised during sync.
+  o Improve log messages when concurrently fetching documents from the server.
+  o Store all incoming documents in the sync db (#5895).
+  o Include the IV in the encrypted document MAC (#6400).
+  o Adapt soledad to the new events api on leap.common. Related to #6359.
+  o Add a pool of HTTP/HTTPS connections that is able to verify the server
+    certificate against a given CA certificate.
+  o Use twisted.enterprise.adbapi for access to the sync database.
+  o Use twisted.web.client for client sync.
+
+Common:
+  o Include couch design docs source files in source distribution and only
+    compile ddocs.py when building the package (#5896).
+  o Bail out if cdocs/ dir does not exist. Closes: #6671
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+  o  Adapt soledad to the new events api on leap.common. Related to #6359.
+
+Server:
+  o Run daemon as user soledad (#6436).
+  o Avoid use of SSLv3 (#6437).
+  o Fix server initscript location (#6557).
+  o Add dependency on Twisted. Closes #6797.
+  o Remove unneeded parameters from CouchServerState initialization. Closes
+    #6833.
+  o Fix server daemon uid and gid by passing them to twistd on the initscript.
+  o Use monthly token databases. Closes #6785.
+
 0.6.5 Apr 09 2015:
 Server:
   o Remove unneeded parameters from CouchServerState initialization. Closes

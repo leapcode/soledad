@@ -22,11 +22,7 @@ import shutil
 import socket
 import tempfile
 import threading
-
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from wsgiref import simple_server
 
@@ -35,22 +31,21 @@ from pysqlcipher import dbapi2
 from StringIO import StringIO
 
 import testscenarios
-import testtools
+from twisted.trial import unittest
+from twisted.web.server import Site
+from twisted.web.wsgi import WSGIResource
+from twisted.internet import reactor
 
-from u1db import (
-    errors,
-    Document,
-)
-from u1db.backends import (
-    inmemory,
-    sqlite_backend,
-)
-from u1db.remote import (
-    server_state,
-)
+from u1db import errors
+from u1db import Document
+from u1db.backends import inmemory
+from u1db.backends import sqlite_backend
+from u1db.remote import server_state
+from u1db.remote import http_app
+from u1db.remote import http_target
 
 
-class TestCase(testtools.TestCase):
+class TestCase(unittest.TestCase):
 
     def createTempDir(self, prefix='u1db-tmp-'):
         """Create a temporary directory to do some work in.
@@ -156,7 +151,7 @@ def copy_sqlite_partial_expanded_for_test(test, db):
     new_db = sqlite_backend.SQLitePartialExpandDatabase(':memory:')
     tmpfile = StringIO()
     for line in db._db_handle.iterdump():
-        if not 'sqlite_sequence' in line:  # work around bug in iterdump
+        if 'sqlite_sequence' not in line:  # work around bug in iterdump
             tmpfile.write('%s\n' % line)
     tmpfile.seek(0)
     new_db._db_handle = dbapi2.connect(':memory:')
@@ -185,8 +180,9 @@ LOCAL_DATABASES_SCENARIOS = [
 
 class DatabaseBaseTests(TestCase):
 
-    accept_fixed_trans_id = False  # set to True assertTransactionLog
-                                   # is happy with all trans ids = ''
+    # set to True assertTransactionLog
+    # is happy with all trans ids = ''
+    accept_fixed_trans_id = False
 
     scenarios = LOCAL_DATABASES_SCENARIOS
 
@@ -237,6 +233,7 @@ class DatabaseBaseTests(TestCase):
 
 
 class ServerStateForTests(server_state.ServerState):
+
     """Used in the test suite, so we don't have to touch disk, etc."""
 
     def __init__(self):
@@ -283,6 +280,7 @@ class ServerStateForTests(server_state.ServerState):
 
 
 class ResponderForTests(object):
+
     """Responder for tests."""
     _started = False
     sent_response = False
@@ -308,6 +306,7 @@ class TestCaseWithServer(TestCase):
         # hook point
         # should return (ServerClass, "shutdown method name", "url_scheme")
         class _RequestHandler(simple_server.WSGIRequestHandler):
+
             def log_request(*args):
                 pass  # suppress
 
@@ -334,18 +333,29 @@ class TestCaseWithServer(TestCase):
 
     def setUp(self):
         super(TestCaseWithServer, self).setUp()
-        self.server = self.server_thread = None
+        self.server = self.server_thread = self.port = None
 
     def tearDown(self):
         if self.server is not None:
             self.server.shutdown()
             self.server_thread.join()
             self.server.server_close()
+        if self.port:
+            self.port.stopListening()
         super(TestCaseWithServer, self).tearDown()
 
     @property
     def url_scheme(self):
-        return self.server_def()[-1]
+        return 'http'
+
+    def startTwistedServer(self):
+        application = self.make_app()
+        resource = WSGIResource(reactor, reactor.getThreadPool(), application)
+        site = Site(resource)
+        self.port = reactor.listenTCP(0, site, interface='127.0.0.1')
+        host = self.port.getHost()
+        self.server_address = (host.host, host.port)
+        self.addCleanup(self.port.stopListening)
 
     def startServer(self):
         server_def = self.server_def()
@@ -357,9 +367,10 @@ class TestCaseWithServer(TestCase):
         self.server_thread.start()
         self.addCleanup(self.server_thread.join)
         self.addCleanup(getattr(self.server, shutdown_meth))
+        self.server_address = self.server.server_address
 
     def getURL(self, path=None):
-        host, port = self.server.server_address
+        host, port = self.server_address
         if path is None:
             path = ''
         return '%s://%s:%s/%s' % (self.url_scheme, host, port, path)
@@ -393,6 +404,7 @@ token3 = oauth.OAuthToken('kkkk3', 'ZYX')
 
 
 class TestingOAuthDataStore(oauth.OAuthDataStore):
+
     """In memory predefined OAuthDataStore for testing."""
 
     consumers = {
@@ -430,3 +442,20 @@ def load_with_scenarios(loader, standard_tests, pattern):
     suite = loader.suiteClass()
     suite.addTests(testscenarios.generate_scenarios(standard_tests))
     return suite
+
+
+# from u1db.tests.test_remote_sync_target
+
+def make_http_app(state):
+    return http_app.HTTPApp(state)
+
+
+def http_sync_target(test, path):
+    return http_target.HTTPSyncTarget(test.getURL(path))
+
+
+def make_oauth_http_app(state):
+    app = http_app.HTTPApp(state)
+    application = oauth_middleware.OAuthMiddleware(app, None, prefix='/~/')
+    application.get_oauth_data_store = lambda: tests.testingOAuthStore
+    return application

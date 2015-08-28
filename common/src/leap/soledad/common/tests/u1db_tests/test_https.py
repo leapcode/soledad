@@ -5,17 +5,14 @@ import ssl
 import sys
 
 from paste import httpserver
+from unittest import skip
 
-from u1db.remote import (
-    http_client,
-    http_target,
-)
+from u1db.remote import http_client
+from u1db.remote import http_target
 
 from leap import soledad
 from leap.soledad.common.tests import u1db_tests as tests
-from leap.soledad.common.tests.u1db_tests.test_remote_sync_target import (
-    make_oauth_http_app,
-)
+from leap.soledad.common.tests.u1db_tests import make_oauth_http_app
 
 
 def https_server_def():
@@ -51,6 +48,7 @@ def oauth_https_sync_target(test, host, path):
     return st
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestHttpSyncTargetHttpsSupport(tests.TestCaseWithServer):
 
     scenarios = [
@@ -75,13 +73,13 @@ class TestHttpSyncTargetHttpsSupport(tests.TestCaseWithServer):
         # order to maintain the compatibility with u1db default tests, we undo
         # that replacement here.
         http_client._VerifiedHTTPSConnection = \
-            soledad.client.old__VerifiedHTTPSConnection
+            soledad.client.api.old__VerifiedHTTPSConnection
         super(TestHttpSyncTargetHttpsSupport, self).setUp()
 
-    def getSyncTarget(self, host, path=None):
+    def getSyncTarget(self, host, path=None, cert_file=None):
         if self.server is None:
             self.startServer()
-        return self.sync_target(self, host, path)
+        return self.sync_target(self, host, path, cert_file=cert_file)
 
     def test_working(self):
         self.startServer()

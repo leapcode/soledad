@@ -21,9 +21,9 @@ Authentication facilities for Soledad Server.
 """
 
 
+import time
 import httplib
-import simplejson as json
-
+import json
 
 from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod
@@ -32,12 +32,8 @@ from couchdb.client import Server
 from twisted.python import log
 from hashlib import sha512
 
-
-from leap.soledad.common import (
-    SHARED_DB_NAME,
-    SHARED_DB_LOCK_DOC_ID_PREFIX,
-    USER_DB_PREFIX,
-)
+from leap.soledad.common import SHARED_DB_NAME
+from leap.soledad.common import USER_DB_PREFIX
 from leap.soledad.common.errors import InvalidAuthTokenError
 
 
@@ -268,7 +264,8 @@ class SoledadAuthMiddleware(object):
         scheme, encoded = auth.split(None, 1)
         uuid, auth_data = encoded.decode('base64').split(':', 1)
         if not self._verify_authentication_scheme(scheme):
-            return self._unauthorized_error("Wrong authentication scheme")
+            return self._unauthorized_error(
+                start_response, "Wrong authentication scheme")
 
         # verify if user is athenticated
         try:
@@ -354,7 +351,8 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
     Token based authentication.
     """
 
-    TOKENS_DB = "tokens"
+    TOKENS_DB_PREFIX = "tokens_"
+    TOKENS_DB_EXPIRE = 30 * 24 * 3600  # 30 days in seconds
     TOKENS_TYPE_KEY = "type"
     TOKENS_TYPE_DEF = "Token"
     TOKENS_USER_ID_KEY = "user_id"
@@ -414,7 +412,14 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
                                       invalid.
         """
         server = Server(url=self._app.state.couch_url)
-        dbname = self.TOKENS_DB
+        # the tokens db rotates every 30 days, and the current db name is
+        # "tokens_NNN", where NNN is the number of seconds since epoch divided
+        # by the rotate period in seconds. When rotating, old and new tokens
+        # db coexist during a certain window of time and valid tokens are
+        # replicated from the old db to the new one. See:
+        # https://leap.se/code/issues/6785
+        dbname = self.TOKENS_DB_PREFIX + \
+            str(int(time.time() / self.TOKENS_DB_EXPIRE))
         db = server[dbname]
         # lookup key is a hash of the token to prevent timing attacks.
         token = db.get(sha512(token).hexdigest())

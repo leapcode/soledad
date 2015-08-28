@@ -18,48 +18,48 @@
 Tests for general Soledad functionality.
 """
 import os
+
 from mock import Mock
 
+from twisted.internet import defer
 
-from leap.common.events import events_pb2 as proto
-from leap.soledad.common.tests import (
+from leap.common.events import catalog
+from leap.soledad.common.tests.util import (
     BaseSoledadTest,
     ADDRESS,
 )
 from leap import soledad
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.crypto import WrongMac
-from leap.soledad.client import Soledad, PassphraseTooShort
-from leap.soledad.client.crypto import SoledadCrypto
+from leap.soledad.common.errors import DatabaseAccessError
+from leap.soledad.client import Soledad
+from leap.soledad.client.adbapi import U1DBConnectionPool
+from leap.soledad.client.secrets import PassphraseTooShort
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client.target import SoledadSyncTarget
 
 
 class AuxMethodsTestCase(BaseSoledadTest):
 
     def test__init_dirs(self):
         sol = self._soledad_instance(prefix='_init_dirs')
-        sol._init_dirs()
         local_db_dir = os.path.dirname(sol.local_db_path)
-        secrets_path = os.path.dirname(sol.secrets_path)
+        secrets_path = os.path.dirname(sol.secrets.secrets_path)
         self.assertTrue(os.path.isdir(local_db_dir))
         self.assertTrue(os.path.isdir(secrets_path))
+
+        def _close_soledad(results):
+            sol.close()
+
+        d = sol.create_doc({})
+        d.addCallback(_close_soledad)
+        return d
+
+    def test__init_u1db_sqlcipher_backend(self):
+        sol = self._soledad_instance(prefix='_init_db')
+        self.assertIsInstance(sol._dbpool, U1DBConnectionPool)
+        self.assertTrue(os.path.isfile(sol.local_db_path))
         sol.close()
 
-    def test__init_db(self):
-        sol = self._soledad_instance()
-        sol._init_dirs()
-        sol._crypto = SoledadCrypto(sol)
-        #self._soledad._gpg.import_keys(PUBLIC_KEY)
-        if not sol._has_secret():
-            sol._gen_secret()
-        sol._load_secrets()
-        sol._init_db()
-        from leap.soledad.client.sqlcipher import SQLCipherDatabase
-        self.assertIsInstance(sol._db, SQLCipherDatabase)
-        sol.close()
-
-    def test__init_config_defaults(self):
+    def test__init_config_with_defaults(self):
         """
         Test if configuration defaults point to the correct place.
         """
@@ -69,17 +69,15 @@ class AuxMethodsTestCase(BaseSoledadTest):
             def __init__(self):
                 pass
 
-        # instantiate without initializing so we just test _init_config()
+        # instantiate without initializing so we just test
+        # _init_config_with_defaults()
         sol = SoledadMock()
-        Soledad._init_config(sol, None, None, '')
-        # assert value of secrets_path
-        self.assertEquals(
-            os.path.join(
-                sol.DEFAULT_PREFIX, Soledad.STORAGE_SECRETS_FILE_NAME),
-            sol.secrets_path)
+        sol._passphrase = u''
+        sol._server_url = ''
+        sol._init_config_with_defaults()
         # assert value of local_db_path
         self.assertEquals(
-            os.path.join(sol.DEFAULT_PREFIX, 'soledad.u1db'),
+            os.path.join(sol.default_prefix, 'soledad.u1db'),
             sol.local_db_path)
 
     def test__init_config_from_params(self):
@@ -95,43 +93,56 @@ class AuxMethodsTestCase(BaseSoledadTest):
             cert_file=None)
         self.assertEqual(
             os.path.join(self.tempdir, 'value_3'),
-            sol.secrets_path)
+            sol.secrets.secrets_path)
         self.assertEqual(
             os.path.join(self.tempdir, 'value_2'),
             sol.local_db_path)
-        self.assertEqual('value_1', sol.server_url)
+        self.assertEqual('value_1', sol._server_url)
         sol.close()
 
     def test_change_passphrase(self):
         """
         Test if passphrase can be changed.
         """
+        prefix = '_change_passphrase'
         sol = self._soledad_instance(
             'leap@leap.se',
             passphrase=u'123',
-            prefix=self.rand_prefix,
+            prefix=prefix,
         )
-        doc = sol.create_doc({'simple': 'doc'})
-        doc_id = doc.doc_id
 
-        # change the passphrase
-        sol.change_passphrase(u'654321')
-        sol.close()
+        def _change_passphrase(doc1):
+            self._doc1 = doc1
+            sol.change_passphrase(u'654321')
+            sol.close()
 
-        self.assertRaises(
-            WrongMac,
-            self._soledad_instance, 'leap@leap.se',
-            passphrase=u'123',
-            prefix=self.rand_prefix)
+        def _assert_wrong_password_raises(results):
+            with self.assertRaises(DatabaseAccessError):
+                self._soledad_instance(
+                    'leap@leap.se',
+                    passphrase=u'123',
+                    prefix=prefix)
 
-        # use new passphrase and retrieve doc
-        sol2 = self._soledad_instance(
-            'leap@leap.se',
-            passphrase=u'654321',
-            prefix=self.rand_prefix)
-        doc2 = sol2.get_doc(doc_id)
-        self.assertEqual(doc, doc2)
-        sol2.close()
+        def _instantiate_with_new_passphrase(results):
+            sol2 = self._soledad_instance(
+                'leap@leap.se',
+                passphrase=u'654321',
+                prefix=prefix)
+            self._sol2 = sol2
+            return sol2.get_doc(self._doc1.doc_id)
+
+        def _assert_docs_are_equal(doc2):
+            self.assertEqual(self._doc1, doc2)
+            self._sol2.close()
+
+        d = sol.create_doc({'simple': 'doc'})
+        d.addCallback(_change_passphrase)
+        d.addCallback(_assert_wrong_password_raises)
+        d.addCallback(_instantiate_with_new_passphrase)
+        d.addCallback(_assert_docs_are_equal)
+        d.addCallback(lambda _: sol.close())
+
+        return d
 
     def test_change_passphrase_with_short_passphrase_raises(self):
         """
@@ -152,11 +163,12 @@ class AuxMethodsTestCase(BaseSoledadTest):
         Assert passphrase getter works fine.
         """
         sol = self._soledad_instance()
-        self.assertEqual('123', sol.passphrase)
+        self.assertEqual('123', sol._passphrase)
         sol.close()
 
 
 class SoledadSharedDBTestCase(BaseSoledadTest):
+
     """
     These tests ensure the functionalities of the shared recovery database.
     """
@@ -174,10 +186,10 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         """
         Ensure the shared db is queried with the correct doc_id.
         """
-        doc_id = self._soledad._shared_db_doc_id()
-        self._soledad._get_secrets_from_shared_db()
+        doc_id = self._soledad.secrets._shared_db_doc_id()
+        self._soledad.secrets._get_secrets_from_shared_db()
         self.assertTrue(
-            self._soledad._shared_db().get_doc.assert_called_with(
+            self._soledad.shared_db.get_doc.assert_called_with(
                 doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
 
@@ -185,14 +197,14 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
         """
         Ensure recovery document is put into shared recover db.
         """
-        doc_id = self._soledad._shared_db_doc_id()
-        self._soledad._put_secrets_in_shared_db()
+        doc_id = self._soledad.secrets._shared_db_doc_id()
+        self._soledad.secrets._put_secrets_in_shared_db()
         self.assertTrue(
-            self._soledad._shared_db().get_doc.assert_called_with(
+            self._soledad.shared_db.get_doc.assert_called_with(
                 doc_id) is None,
             'Wrong doc_id when fetching recovery document.')
         self.assertTrue(
-            self._soledad._shared_db.put_doc.assert_called_with(
+            self._soledad.shared_db.put_doc.assert_called_with(
                 self._doc_put) is None,
             'Wrong document when putting recovery document.')
         self.assertTrue(
@@ -201,6 +213,7 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
 
 
 class SoledadSignalingTestCase(BaseSoledadTest):
+
     """
     These tests ensure signals are correctly emmited by Soledad.
     """
@@ -210,6 +223,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
     def setUp(self):
         # mock signaling
         soledad.client.signal = Mock()
+        soledad.client.secrets.events.emit = Mock()
         # run parent's setUp
         BaseSoledadTest.setUp(self)
 
@@ -231,63 +245,63 @@ class SoledadSignalingTestCase(BaseSoledadTest):
           - downloading keys / done downloading keys.
           - uploading keys / done uploading keys.
         """
-        soledad.client.signal.reset_mock()
+        soledad.client.secrets.events.emit.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage3.json',
             local_db_path='alternative_stage3.u1db')
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.signal.mock_calls.reverse()
-        soledad.client.signal.call_args = \
-            soledad.client.signal.call_args_list[0]
-        soledad.client.signal.call_args_list.reverse()
+        soledad.client.secrets.events.emit.mock_calls.reverse()
+        soledad.client.secrets.events.emit.call_args = \
+            soledad.client.secrets.events.emit.call_args_list[0]
+        soledad.client.secrets.events.emit.call_args_list.reverse()
         # downloading keys signals
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DOWNLOADING_KEYS,
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         # creating keys signals
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_CREATING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_CREATING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DONE_CREATING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_CREATING_KEYS,
             ADDRESS,
         )
         # downloading once more (inside _put_keys_in_shared_db)
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DOWNLOADING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         # uploading keys signals
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_UPLOADING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_UPLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DONE_UPLOADING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_UPLOADING_KEYS,
             ADDRESS,
         )
         # assert db was locked and unlocked
-        sol._shared_db.lock.assert_called_with()
-        sol._shared_db.unlock.assert_called_with('atoken')
+        sol.shared_db.lock.assert_called_with()
+        sol.shared_db.unlock.assert_called_with('atoken')
         sol.close()
 
     def test_stage2_bootstrap_signals(self):
@@ -298,41 +312,31 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # get existing instance so we have access to keys
         sol = self._soledad_instance()
         # create a document with secrets
-        doc = SoledadDocument(doc_id=sol._shared_db_doc_id())
-        doc.content = sol.export_recovery_document()
-
-        class Stage2MockSharedDB(object):
-
-            get_doc = Mock(return_value=doc)
-            put_doc = Mock()
-            lock = Mock(return_value=('atoken', 300))
-            unlock = Mock()
-
-            def __call__(self):
-                return self
-
+        doc = SoledadDocument(doc_id=sol.secrets._shared_db_doc_id())
+        doc.content = sol.secrets._export_recovery_document()
         sol.close()
         # reset mock
-        soledad.client.signal.reset_mock()
+        soledad.client.secrets.events.emit.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
+        shared_db = self.get_default_shared_mock(get_doc_return_value=doc)
         sol = self._soledad_instance(
             secrets_path='alternative_stage2.json',
             local_db_path='alternative_stage2.u1db',
-            shared_db_class=Stage2MockSharedDB)
+            shared_db_class=shared_db)
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.signal.mock_calls.reverse()
-        soledad.client.signal.call_args = \
-            soledad.client.signal.call_args_list[0]
-        soledad.client.signal.call_args_list.reverse()
+        soledad.client.secrets.events.emit.mock_calls.reverse()
+        soledad.client.secrets.events.emit.call_args = \
+            soledad.client.secrets.events.emit.call_args_list[0]
+        soledad.client.secrets.events.emit.call_args_list.reverse()
         # assert download keys signals
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DOWNLOADING_KEYS,
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.signal)
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DONE_DOWNLOADING_KEYS,
+        self._pop_mock_call(soledad.client.secrets.events.emit)
+        soledad.client.secrets.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         sol.close()
@@ -347,42 +351,26 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         self.assertEqual([], soledad.client.signal.mock_calls)
         sol.close()
 
+    @defer.inlineCallbacks
     def test_sync_signals(self):
         """
         Test Soledad emits SOLEDAD_CREATING_KEYS signal.
         """
-        soledad.client.signal.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance()
+        soledad.client.signal.reset_mock()
+
         # mock the actual db sync so soledad does not try to connect to the
         # server
-        sol._db.sync = Mock()
-        # do the sync
-        sol.sync()
-        # assert the signal has been emitted
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_DONE_DATA_SYNC,
-            ADDRESS,
-        )
-        sol.close()
+        d = defer.Deferred()
+        d.callback(None)
+        sol._dbsyncer.sync = Mock(return_value=d)
 
-    def test_need_sync_signals(self):
-        """
-        Test Soledad emits SOLEDAD_CREATING_KEYS signal.
-        """
-        soledad.client.signal.reset_mock()
-        sol = self._soledad_instance()
-        # mock the sync target
-        old_get_sync_info = SoledadSyncTarget.get_sync_info
-        SoledadSyncTarget.get_sync_info = Mock(return_value=[0, 0, 0, 0, 2])
-        # mock our generation so soledad thinks there's new data to sync
-        sol._db._get_generation = Mock(return_value=1)
-        # check for new data to sync
-        sol.need_sync('http://provider/userdb')
+        yield sol.sync()
+
         # assert the signal has been emitted
-        soledad.client.signal.assert_called_with(
-            proto.SOLEDAD_NEW_DATA_TO_SYNC,
+        soledad.client.events.emit.assert_called_with(
+            catalog.SOLEDAD_DONE_DATA_SYNC,
             ADDRESS,
         )
-        SoledadSyncTarget.get_sync_info = old_get_sync_info
         sol.close()

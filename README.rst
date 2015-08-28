@@ -27,10 +27,16 @@ repository:
         :target: https://crate.io/packages/leap.soledad.server
 
 
-Library dependencies
---------------------
+Compatibility
+-------------
 
-* ``libsqlite3-dev``
+* Soledad Server >= 0.7.0 is incompatible with client < 0.7.0 because of
+  modifications on encrypted document MAC calculation.
+
+* Soledad Server >= 0.7.0 is incompatible with LEAP Platform < 0.6.1 because
+  that platform version implements ephemeral tokens databases and Soledad
+  Server needs to act accordingly.
+
 
 Tests
 -----

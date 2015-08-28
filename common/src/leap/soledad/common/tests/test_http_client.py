@@ -21,17 +21,21 @@ import json
 
 from u1db.remote import http_client
 
+from testscenarios import TestWithScenarios
+
 from leap.soledad.client import auth
-from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import test_http_client
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # The following tests come from `u1db.tests.test_http_client`.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
-class TestSoledadClientBase(test_http_client.TestHTTPClientBase):
+class TestSoledadClientBase(
+        TestWithScenarios,
+        test_http_client.TestHTTPClientBase):
+
     """
     This class should be used to test Token auth.
     """
@@ -90,7 +94,7 @@ class TestSoledadClientBase(test_http_client.TestHTTPClientBase):
                                     "message": e.message})]
             uuid, token = encoded.decode('base64').split(':', 1)
             if uuid != 'user-uuid' and token != 'auth-token':
-                return unauth_err("Incorrect address or token.")
+                return Exception("Incorrect address or token.")
             start_response("200 OK", [('Content-Type', 'application/json')])
             return [json.dumps([environ['PATH_INFO'], uuid, token])]
 
@@ -112,5 +116,3 @@ class TestSoledadClientBase(test_http_client.TestHTTPClientBase):
         res, headers = cli._request('GET', ['doc', 'token'])
         self.assertEqual(
             ['/dbase/doc/token', 'user-uuid', 'auth-token'], json.loads(res))
-
-load_tests = tests.load_with_scenarios

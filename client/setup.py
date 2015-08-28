@@ -20,14 +20,15 @@ setup file for leap.soledad.client
 import re
 from setuptools import setup
 from setuptools import find_packages
+from setuptools import Command
+
+from pkg import utils
 
 import versioneer
 versioneer.versionfile_source = 'src/leap/soledad/client/_version.py'
 versioneer.versionfile_build = 'leap/soledad/client/_version.py'
 versioneer.tag_prefix = ''  # tags are like 1.2.0
 versioneer.parentdir_prefix = 'leap.soledad.client-'
-
-from pkg import utils
 
 
 trove_classifiers = (
@@ -58,9 +59,6 @@ if len(_version_short) > 0:
     DOWNLOAD_URL = DOWNLOAD_BASE % VERSION_SHORT
 
 cmdclass = versioneer.get_cmdclass()
-
-
-from setuptools import Command
 
 
 class freeze_debianver(Command):
@@ -106,7 +104,24 @@ def get_versions(default={}, verbose=False):
 
 cmdclass["freeze_debianver"] = freeze_debianver
 
+
 # XXX add ref to docs
+
+requirements = utils.parse_requirements()
+
+if utils.is_develop_mode():
+    print
+    print ("[WARNING] Skipping leap-specific dependencies "
+           "because development mode is detected.")
+    print ("[WARNING] You can install "
+           "the latest published versions with "
+           "'pip install -r pkg/requirements-leap.pip'")
+    print ("[WARNING] Or you can instead do 'python setup.py develop' "
+           "from the parent folder of each one of them.")
+    print
+else:
+    requirements += utils.parse_requirements(
+        reqfiles=["pkg/requirements-leap.pip"])
 
 setup(
     name='leap.soledad.client',
@@ -130,6 +145,6 @@ setup(
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    install_requires=utils.parse_requirements(),
+    install_requires=requirements,
     extras_require={'signaling': ['leap.common>=0.3.0']},
 )

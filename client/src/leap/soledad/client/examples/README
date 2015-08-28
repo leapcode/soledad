@@ -1,0 +1,4 @@
+Right now, you can find here both an example of use
+and the benchmarking scripts.
+TODO move benchmark scripts to root scripts/ folder,
+and leave here only a minimal example.

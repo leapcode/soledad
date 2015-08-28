@@ -15,16 +15,18 @@
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from unittest import skip
 from u1db import errors
 
 from leap.soledad.common.tests import u1db_tests as tests
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestDocument(tests.TestCase):
 
     scenarios = ([(
         'py', {'make_document_for_test': tests.make_document_for_test})])  # +
-        #tests.C_DATABASE_SCENARIOS)
+    # tests.C_DATABASE_SCENARIOS)
 
     def test_create_doc(self):
         doc = self.make_document('doc-id', 'uid:1', tests.simple_doc)
@@ -83,6 +85,7 @@ class TestDocument(tests.TestCase):
         self.assertEqual(len('a' + 'b'), doc_a.get_size())
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestPyDocument(tests.TestCase):
 
     scenarios = ([(

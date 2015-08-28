@@ -1,5 +1,4 @@
-pysqlcipher
-simplejson
+pysqlcipher>2.6.3
 u1db
 scrypt
 pycryptopp
@@ -8,17 +7,5 @@ pycryptopp
 # repos instead.
 chardet
 zope.proxy
-
-#
-# leap deps
-#
-
-leap.soledad.common>=0.6.0
-
-#
-# XXX things to fix yet:
-#
-
-# this is not strictly needed by us, but we need it
-# until u1db adds it to its release as a dep.
+twisted
 oauth

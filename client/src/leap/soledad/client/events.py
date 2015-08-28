@@ -20,39 +20,35 @@
 Signaling functions.
 """
 
+from leap.common.events import emit
+from leap.common.events import catalog
 
-SOLEDAD_CREATING_KEYS = 'Creating keys...'
-SOLEDAD_DONE_CREATING_KEYS = 'Done creating keys.'
-SOLEDAD_DOWNLOADING_KEYS = 'Downloading keys...'
-SOLEDAD_DONE_DOWNLOADING_KEYS = 'Done downloading keys.'
-SOLEDAD_UPLOADING_KEYS = 'Uploading keys...'
-SOLEDAD_DONE_UPLOADING_KEYS = 'Done uploading keys.'
-SOLEDAD_NEW_DATA_TO_SYNC = 'New data available.'
-SOLEDAD_DONE_DATA_SYNC = 'Done data sync.'
-SOLEDAD_SYNC_SEND_STATUS = 'Sync: sent one document.'
-SOLEDAD_SYNC_RECEIVE_STATUS = 'Sync: received one document.'
 
-# we want to use leap.common.events to emits signals, if it is available.
-try:
-    from leap.common import events
-    from leap.common.events import signal
-    SOLEDAD_CREATING_KEYS = events.proto.SOLEDAD_CREATING_KEYS
-    SOLEDAD_DONE_CREATING_KEYS = events.proto.SOLEDAD_DONE_CREATING_KEYS
-    SOLEDAD_DOWNLOADING_KEYS = events.proto.SOLEDAD_DOWNLOADING_KEYS
-    SOLEDAD_DONE_DOWNLOADING_KEYS = \
-        events.proto.SOLEDAD_DONE_DOWNLOADING_KEYS
-    SOLEDAD_UPLOADING_KEYS = events.proto.SOLEDAD_UPLOADING_KEYS
-    SOLEDAD_DONE_UPLOADING_KEYS = \
-        events.proto.SOLEDAD_DONE_UPLOADING_KEYS
-    SOLEDAD_NEW_DATA_TO_SYNC = events.proto.SOLEDAD_NEW_DATA_TO_SYNC
-    SOLEDAD_DONE_DATA_SYNC = events.proto.SOLEDAD_DONE_DATA_SYNC
-    SOLEDAD_SYNC_SEND_STATUS = events.proto.SOLEDAD_SYNC_SEND_STATUS
-    SOLEDAD_SYNC_RECEIVE_STATUS = events.proto.SOLEDAD_SYNC_RECEIVE_STATUS
+SOLEDAD_CREATING_KEYS = catalog.SOLEDAD_CREATING_KEYS
+SOLEDAD_DONE_CREATING_KEYS = catalog.SOLEDAD_DONE_CREATING_KEYS
+SOLEDAD_DOWNLOADING_KEYS = catalog.SOLEDAD_DOWNLOADING_KEYS
+SOLEDAD_DONE_DOWNLOADING_KEYS = \
+    catalog.SOLEDAD_DONE_DOWNLOADING_KEYS
+SOLEDAD_UPLOADING_KEYS = catalog.SOLEDAD_UPLOADING_KEYS
+SOLEDAD_DONE_UPLOADING_KEYS = \
+    catalog.SOLEDAD_DONE_UPLOADING_KEYS
+SOLEDAD_NEW_DATA_TO_SYNC = catalog.SOLEDAD_NEW_DATA_TO_SYNC
+SOLEDAD_DONE_DATA_SYNC = catalog.SOLEDAD_DONE_DATA_SYNC
+SOLEDAD_SYNC_SEND_STATUS = catalog.SOLEDAD_SYNC_SEND_STATUS
+SOLEDAD_SYNC_RECEIVE_STATUS = catalog.SOLEDAD_SYNC_RECEIVE_STATUS
 
-except ImportError:
-    # we define a fake signaling function and fake signal constants that will
-    # allow for logging signaling attempts in case leap.common.events is not
-    # available.
 
-    def signal(signal, content=""):
-        logger.info("Would signal: %s - %s." % (str(signal), content))
+__all__ = [
+    "catalog",
+    "emit",
+    "SOLEDAD_CREATING_KEYS",
+    "SOLEDAD_DONE_CREATING_KEYS",
+    "SOLEDAD_DOWNLOADING_KEYS",
+    "SOLEDAD_DONE_DOWNLOADING_KEYS",
+    "SOLEDAD_UPLOADING_KEYS",
+    "SOLEDAD_DONE_UPLOADING_KEYS",
+    "SOLEDAD_NEW_DATA_TO_SYNC",
+    "SOLEDAD_DONE_DATA_SYNC",
+    "SOLEDAD_SYNC_SEND_STATUS",
+    "SOLEDAD_SYNC_RECEIVE_STATUS",
+]

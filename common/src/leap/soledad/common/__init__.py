@@ -15,19 +15,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from leap.common.check import leap_assert as soledad_assert
+from leap.common.check import leap_assert_type as soledad_assert_type
+
+from ._version import get_versions
 
 """
 Soledad routines common to client and server.
 """
 
 
-from hashlib import sha256
-
-
 #
 # Global constants
 #
-
 
 SHARED_DB_NAME = 'shared'
 SHARED_DB_LOCK_DOC_ID_PREFIX = 'lock-'
@@ -38,45 +38,12 @@ USER_DB_PREFIX = 'user-'
 # Global functions
 #
 
-# we want to use leap.common.check.leap_assert in case it is available,
-# because it also logs in a way other parts of leap can access log messages.
-
-try:
-    from leap.common.check import leap_assert as soledad_assert
-
-except ImportError:
-
-    def soledad_assert(condition, message):
-        """
-        Asserts the condition and displays the message if that's not
-        met.
-
-        @param condition: condition to check
-        @type condition: bool
-        @param message: message to display if the condition isn't met
-        @type message: str
-        """
-        assert condition, message
-
-try:
-    from leap.common.check import leap_assert_type as soledad_assert_type
-
-except ImportError:
-
-    def soledad_assert_type(var, expectedType):
-        """
-        Helper assert check for a variable's expected type
-
-        @param var: variable to check
-        @type var: any
-        @param expectedType: type to check agains
-        @type expectedType: type
-        """
-        soledad_assert(isinstance(var, expectedType),
-                       "Expected type %r instead of %r" %
-                       (expectedType, type(var)))
-
-
-from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
+
+
+__all__ = [
+    "soledad_assert",
+    "soledad_assert_type",
+    "__version__",
+]

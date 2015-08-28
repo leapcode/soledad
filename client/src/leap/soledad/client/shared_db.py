@@ -14,25 +14,20 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 A shared database for storing/retrieving encrypted key material.
 """
-
-import simplejson as json
-
-
 from u1db.remote import http_database
 
-
-from leap.soledad.common import SHARED_DB_LOCK_DOC_ID_PREFIX
 from leap.soledad.client.auth import TokenBasedAuth
 
 
 # ----------------------------------------------------------------------------
 # Soledad shared database
 # ----------------------------------------------------------------------------
+
+# TODO could have a hierarchy of soledad exceptions.
+
 
 class NoTokenForAuth(Exception):
     """
@@ -46,6 +41,12 @@ class Unauthorized(Exception):
     """
 
 
+class ImproperlyConfiguredError(Exception):
+    """
+    Wrong parameters in the database configuration.
+    """
+
+
 class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     """
     This is a shared recovery database that enables users to store their
@@ -53,6 +54,10 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     """
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
+
+    # If syncable is False, the database will not attempt to sync against
+    # a remote replica. Default is True.
+    syncable = True
 
     #
     # Token auth methods.
@@ -90,9 +95,7 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     #
 
     @staticmethod
-    def open_database(url, uuid, create, creds=None):
-        # TODO: users should not be able to create the shared database, so we
-        # have to remove this from here in the future.
+    def open_database(url, uuid, creds=None, syncable=True):
         """
         Open a Soledad shared database.
 
@@ -100,17 +103,23 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         :type url: str
         :param uuid: The user's unique id.
         :type uuid: str
-        :param create: Should the database be created if it does not already
-                       exist?
-        :type create: bool
-        :param token: An authentication token for accessing the shared db.
-        :type token: str
+        :param creds: A tuple containing the authentication method and
+            credentials.
+        :type creds: tuple
+        :param syncable:
+            If syncable is False, the database will not attempt to sync against
+            a remote replica.
+        :type syncable: bool
 
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
+        # XXX fix below, doesn't work with tests.
+        # if syncable and not url.startswith('https://'):
+        #    raise ImproperlyConfiguredError(
+        #        "Remote soledad server must be an https URI")
         db = SoledadSharedDatabase(url, uuid, creds=creds)
-        db.open(create)
+        db.syncable = syncable
         return db
 
     @staticmethod
@@ -153,9 +162,12 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
 
         :raise HTTPError: Raised if any HTTP error occurs.
         """
-        res, headers = self._request_json('PUT', ['lock', self._uuid],
-                                          body={})
-        return res['token'], res['timeout']
+        if self.syncable:
+            res, headers = self._request_json(
+                'PUT', ['lock', self._uuid], body={})
+            return res['token'], res['timeout']
+        else:
+            return None, None
 
     def unlock(self, token):
         """
@@ -166,5 +178,6 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
 
         :raise HTTPError:
         """
-        res, headers = self._request_json('DELETE', ['lock', self._uuid],
-                                          params={'token': token})
+        if self.syncable:
+            _, _ = self._request_json(
+                'DELETE', ['lock', self._uuid], params={'token': token})

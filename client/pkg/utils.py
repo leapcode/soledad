@@ -14,14 +14,28 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 Utils to help in the setup process
 """
-
 import os
 import re
 import sys
+
+
+def is_develop_mode():
+    """
+    Returns True if we're calling the setup script using the argument for
+    setuptools development mode.
+
+    This avoids messing up with dependency pinning and order, the
+    responsibility of installing the leap dependencies is left to the
+    developer.
+    """
+    args = sys.argv
+    devflags = "setup.py", "develop"
+    if (args[0], args[1]) == devflags:
+        return True
+    return False
 
 
 def get_reqs_from_files(reqfiles):
@@ -58,9 +72,9 @@ def parse_requirements(reqfiles=['requirements.txt',
         if re.match(r'\s*-e\s+', line):
             pass
             # do not try to do anything with externals on vcs
-            #requirements.append(re.sub(r'\s*-e\s+.*#egg=(.*)$', r'\1',
-                                #line))
-        # http://foo.bar/baz/foobar/zipball/master#egg=foobar
+            # requirements.append(re.sub(r'\s*-e\s+.*#egg=(.*)$', r'\1',
+            # line))
+            # http://foo.bar/baz/foobar/zipball/master#egg=foobar
         elif re.match(r'\s*https?:', line):
             requirements.append(re.sub(r'\s*https?:.*#egg=(.*)$', r'\1',
                                 line))

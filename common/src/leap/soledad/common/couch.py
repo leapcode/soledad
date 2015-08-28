@@ -18,12 +18,12 @@
 
 """A U1DB backend that uses CouchDB as its persistence layer."""
 
-import simplejson as json
+
+import json
 import re
 import uuid
 import logging
 import binascii
-import socket
 import time
 import sys
 import threading
@@ -44,7 +44,7 @@ from couchdb.http import (
     urljoin as couch_urljoin,
     Resource,
 )
-from u1db import query_parser, vectorclock
+from u1db import vectorclock
 from u1db.errors import (
     DatabaseDoesNotExist,
     InvalidGeneration,
@@ -60,7 +60,7 @@ from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
 
 
-from leap.soledad.common import USER_DB_PREFIX, ddocs, errors
+from leap.soledad.common import ddocs, errors
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -71,12 +71,14 @@ COUCH_TIMEOUT = 120  # timeout for transfers between Soledad server and Couch
 
 
 class InvalidURLError(Exception):
+
     """
     Exception raised when Soledad encounters a malformed URL.
     """
 
 
 class CouchDocument(SoledadDocument):
+
     """
     This is the document used for maintaining the Couch backend.
 
@@ -160,7 +162,6 @@ class CouchDocument(SoledadDocument):
         """
         if self._conflicts is None:
             raise Exception("Run self._ensure_fetch_conflicts first!")
-        conflicts_len = len(self._conflicts)
         self._conflicts = filter(
             lambda doc: doc.rev not in conflict_revs,
             self._conflicts)
@@ -241,13 +242,18 @@ def raise_server_error(exc, ddoc_path):
                                          document for an yet unknown reason.
     """
     path = "".join(ddoc_path)
-    if exc.message[1][0] == 'unnamed_error':
+    msg = exc.message[1][0]
+    if msg == 'unnamed_error':
         raise errors.MissingDesignDocListFunctionError(path)
+    elif msg == 'TypeError':
+        if 'point is undefined' in exc.message[1][1]:
+            raise errors.MissingDesignDocListFunctionError
     # other errors are unknown for now
     raise errors.DesignDocUnknownError(path)
 
 
 class MultipartWriter(object):
+
     """
     A multipart writer adapted from python-couchdb's one so we can PUT
     documents using couch's multipart PUT.
@@ -353,6 +359,7 @@ def couch_server(url):
 
 
 class CouchDatabase(CommonBackend):
+
     """
     A U1DB implementation that uses CouchDB as its persistence layer.
     """
@@ -364,6 +371,7 @@ class CouchDatabase(CommonBackend):
     sync_info_lock = defaultdict(threading.Lock)
 
     class _GetDocThread(threading.Thread):
+
         """
         A thread that gets a document from a database.
 
@@ -1181,7 +1189,7 @@ class CouchDatabase(CommonBackend):
         res = self._database.resource(*ddoc_path)
         try:
             with CouchDatabase.update_handler_lock[self._get_replica_uid()]:
-                body={
+                body = {
                     'other_replica_uid': other_replica_uid,
                     'other_generation': other_generation,
                     'other_transaction_id': other_transaction_id,
@@ -1503,6 +1511,7 @@ class CouchDatabase(CommonBackend):
 
 
 class CouchSyncTarget(CommonSyncTarget):
+
     """
     Functionality for using a CouchDatabase as a synchronization target.
     """
@@ -1525,6 +1534,7 @@ class CouchSyncTarget(CommonSyncTarget):
 
 
 class CouchServerState(ServerState):
+
     """
     Inteface of the WSGI server with the CouchDB backend.
     """

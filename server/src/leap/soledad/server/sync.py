@@ -14,17 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Server side synchronization infrastructure.
 """
-
 import json
 
-
 from leap.soledad.common.couch import CouchDatabase
-from itertools import izip
 from u1db import sync, Document
 from u1db.remote import http_app
 
@@ -224,7 +219,6 @@ class SyncExchange(sync.SyncExchange):
         self._sync_state = ServerSyncState(
             self._db, self.source_replica_uid, sync_id)
 
-
     def find_changes_to_return(self, received):
         """
         Find changes to return.
@@ -286,7 +280,8 @@ class SyncExchange(sync.SyncExchange):
             doc = self._db.get_doc(changed_doc_id, include_deleted=True)
             return_doc_cb(doc, gen, trans_id)
 
-    def insert_doc_from_source(self, doc, source_gen, trans_id,
+    def insert_doc_from_source(
+            self, doc, source_gen, trans_id,
             number_of_docs=None, doc_idx=None, sync_id=None):
         """Try to insert synced document from source.
 
@@ -371,8 +366,9 @@ class SyncResource(http_app.SyncResource):
         self._sync_id = sync_id
 
     @http_app.http_method(content_as_args=True)
-    def post_put(self, id, rev, content, gen, trans_id, number_of_docs,
-            doc_idx):
+    def post_put(
+            self, id, rev, content, gen,
+            trans_id, number_of_docs, doc_idx):
         """
         Put one incoming document into the server replica.
 

@@ -46,7 +46,7 @@ class StatsLogger(threading.Thread):
         stats = []
         stats.append("%f" % (now - self._start))   # elapsed time
         stats.append("%f" % psutil.cpu_percent())  # total cpu
-        stats.append("%f" % psutil.phymem_usage().percent)  # total memory
+        stats.append("%f" % psutil.virtual_memory().percent)  # total memory
         return ' '.join(stats)
 
     def _make_proc_stats(self):

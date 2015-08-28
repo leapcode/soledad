@@ -17,9 +17,18 @@
 """
 setup file for leap.soledad.common
 """
+import binascii
+import json
+from os import listdir
+from os.path import realpath, dirname, isdir, join, isfile, basename
 import re
+
 from setuptools import setup
 from setuptools import find_packages
+from setuptools import Command
+from setuptools.command.develop import develop as _cmd_develop
+
+from pkg import utils
 
 import versioneer
 versioneer.versionfile_source = 'src/leap/soledad/common/_version.py'
@@ -27,7 +36,6 @@ versioneer.versionfile_build = 'leap/soledad/common/_version.py'
 versioneer.tag_prefix = ''  # tags are like 1.2.0
 versioneer.parentdir_prefix = 'leap.soledad.common-'
 
-from pkg import utils
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -57,9 +65,6 @@ if len(_version_short) > 0:
     DOWNLOAD_URL = DOWNLOAD_BASE % VERSION_SHORT
 
 cmdclass = versioneer.get_cmdclass()
-
-
-from setuptools import Command
 
 
 class freeze_debianver(Command):
@@ -106,12 +111,6 @@ def get_versions(default={}, verbose=False):
 #
 # Couch backend design docs file generation.
 #
-
-from os import listdir
-from os.path import realpath, dirname, isdir, join, isfile, basename
-import json
-import binascii
-
 
 old_cmd_sdist = cmdclass["sdist"]
 
@@ -219,9 +218,6 @@ def build_ddocs_py(basedir=None, with_src=True):
     print "Wrote design docs in %s" % (dest_prefix + '/' + ddoc_filename,)
 
 
-from setuptools.command.develop import develop as _cmd_develop
-
-
 class cmd_develop(_cmd_develop):
     def run(self):
         # versioneer:
@@ -231,23 +227,6 @@ class cmd_develop(_cmd_develop):
         self.distribution.metadata.version = versions["version"]
         _cmd_develop.run(self)
         build_ddocs_py()
-
-
-# versioneer powered
-old_cmd_sdist = cmdclass["sdist"]
-
-
-class cmd_sdist(old_cmd_sdist):
-    """
-    Generate 'src/leap/soledad/common/ddocs.py' which contains couch design
-    documents scripts.
-    """
-    def run(self):
-        old_cmd_sdist.run(self)
-
-    def make_release_tree(self, base_dir, files):
-        old_cmd_sdist.make_release_tree(self, base_dir, files)
-        build_ddocs_py(basedir=base_dir)
 
 
 # versioneer powered
@@ -262,11 +241,26 @@ class cmd_build(old_cmd_build):
 
 cmdclass["freeze_debianver"] = freeze_debianver
 cmdclass["build"] = cmd_build
-cmdclass["sdist"] = cmd_sdist
 cmdclass["develop"] = cmd_develop
 
 
 # XXX add ref to docs
+
+requirements = utils.parse_requirements()
+
+if utils.is_develop_mode():
+    print
+    print ("[WARNING] Skipping leap-specific dependencies "
+           "because development mode is detected.")
+    print ("[WARNING] You can install "
+           "the latest published versions with "
+           "'pip install -r pkg/requirements-leap.pip'")
+    print ("[WARNING] Or you can instead do 'python setup.py develop' "
+           "from the parent folder of each one of them.")
+    print
+else:
+    requirements += utils.parse_requirements(
+        reqfiles=["pkg/requirements-leap.pip"])
 
 setup(
     name='leap.soledad.common',
@@ -288,10 +282,10 @@ setup(
     ),
     classifiers=trove_classifiers,
     namespace_packages=["leap", "leap.soledad"],
-    packages=find_packages('src', exclude=['leap.soledad.common.tests']),
+    packages=find_packages('src', exclude=['*.tests', '*.tests.*']),
     package_dir={'': 'src'},
-    test_suite='leap.soledad.common.tests.load_tests',
-    install_requires=utils.parse_requirements(),
+    test_suite='leap.soledad.common.tests',
+    install_requires=requirements,
     tests_require=utils.parse_requirements(
         reqfiles=['pkg/requirements-testing.pip']),
     extras_require={
