@@ -1071,14 +1071,20 @@ class CouchDatabase(CommonBackend):
         """
         if other_replica_uid in self.cache:
             return self.cache[other_replica_uid]
-        # query a couch view
-        result = self._database.view('syncs/log')
-        if len(result[other_replica_uid].rows) == 0:
-            return (0, '')
-        return (
-            result[other_replica_uid].rows[0]['value']['known_generation'],
-            result[other_replica_uid].rows[0]['value']['known_transaction_id']
-        )
+
+        doc_id = 'u1db_sync_%s' % other_replica_uid
+        try:
+            doc = self._database[doc_id]
+        except ResourceNotFound:
+            doc = {
+                '_id': doc_id,
+                'generation': 0,
+                'transaction_id': '',
+            }
+            self._database.save(doc)
+        result = doc['generation'], doc['transaction_id']
+        self.cache[other_replica_uid] = result
+        return result
 
     def _set_replica_gen_and_trans_id(self, other_replica_uid,
                                       other_generation, other_transaction_id,
@@ -1138,43 +1144,16 @@ class CouchDatabase(CommonBackend):
         :type doc_idx: int
         :param sync_id: The id of the current sync session.
         :type sync_id: str
-
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
         """
         self.cache[other_replica_uid] = (other_generation, other_transaction_id)
-        # query a couch update function
-        ddoc_path = ['_design', 'syncs', '_update', 'put', 'u1db_sync_log']
-        res = self._database.resource(*ddoc_path)
+        doc_id = 'u1db_sync_%s' % other_replica_uid
         try:
-            with CouchDatabase.update_handler_lock[self._get_replica_uid()]:
-                body = {
-                    'other_replica_uid': other_replica_uid,
-                    'other_generation': other_generation,
-                    'other_transaction_id': other_transaction_id,
-                }
-                if number_of_docs is not None:
-                    body['number_of_docs'] = number_of_docs
-                if doc_idx is not None:
-                    body['doc_idx'] = doc_idx
-                if sync_id is not None:
-                    body['sync_id'] = sync_id
-                res.put_json(
-                    body=body,
-                    headers={'content-type': 'application/json'})
-        except ResourceNotFound as e:
-            raise_missing_design_doc_error(e, ddoc_path)
+            doc = self._database[doc_id]
+        except ResourceNotFound:
+            doc = {'_id': doc_id}
+        doc['generation'] = other_generation
+        doc['transaction_id'] = other_transaction_id
+        self._database.save(doc)
 
     def _force_doc_sync_conflict(self, doc):
         """
