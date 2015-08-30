@@ -4,6 +4,7 @@ u1db
 routes
 PyOpenSSL
 twisted
+Beaker
 
 # XXX -- fix me!
 # oauth is not strictly needed by us, but we need it until u1db adds it to its
