@@ -1,4 +1,4 @@
-pysqlcipher>2.6.3
+#pysqlcipher>2.6.3
 u1db
 scrypt
 pycryptopp
