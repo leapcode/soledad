@@ -244,6 +244,8 @@ class HTTPDocFetcher(object):
 
 
 def _emit_receive_status(received_docs, total):
+    content = {'received': received_docs, 'total': total}
+    emit(SOLEDAD_SYNC_RECEIVE_STATUS, content)
+
     msg = "%d/%d" % (received_docs, total)
-    emit(SOLEDAD_SYNC_RECEIVE_STATUS, msg)
     logger.debug("Sync receive status: %s" % msg)

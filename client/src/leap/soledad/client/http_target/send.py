@@ -95,8 +95,8 @@ class HTTPDocSender(object):
 
 
 def _emit_send_status(idx, total):
+    content = {'sent': idx, 'total': total}
+    emit(SOLEDAD_SYNC_SEND_STATUS, content)
+
     msg = "%d/%d" % (idx, total)
-    emit(
-        SOLEDAD_SYNC_SEND_STATUS,
-        "Soledad sync send status: %s" % msg)
     logger.debug("Sync send status: %s" % msg)
