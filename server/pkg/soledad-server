@@ -1,6 +1,6 @@
 #!/bin/sh
 ### BEGIN INIT INFO
-# Provides:          soledad
+# Provides:          soledad-server
 # Required-Start:    $network $named $remote_fs $syslog $time
 # Required-Stop:     $network $named $remote_fs $syslog
 # Default-Start:     2 3 4 5

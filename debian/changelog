@@ -1,8 +1,11 @@
 soledad (0.7.2) unstable; urgency=medium
 
   * Update to 0.7.2 release
-
- -- Ben Carrillo <ben@futeisha.org>  Fri, 28 Aug 2015 15:43:11 -0400
+  * Update short descriptions in debian/control to be unique
+  * Update debian/copyright to point to the specific GPL-3 symlink
+  * Fix init.d-script-does-not-provide-itself lintian error
+  
+ -- Micah Anderson <micah@debian.org>  Tue, 01 Sep 2015 15:43:11 -0400
 
 soledad (0.6.5.1) unstable; urgency=medium
 
