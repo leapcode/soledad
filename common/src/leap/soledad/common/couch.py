@@ -103,6 +103,7 @@ class CouchDocument(SoledadDocument):
         SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
         self.couch_rev = None
         self.transactions = None
+        self._conflicts = None
 
     def get_conflicts(self):
         """
@@ -111,7 +112,7 @@ class CouchDocument(SoledadDocument):
         :return: The conflicted versions of the document.
         :rtype: [CouchDocument]
         """
-        return self._conflicts
+        return self._conflicts or []
 
     def set_conflicts(self, conflicts):
         """
@@ -1203,10 +1204,10 @@ class CouchDatabase(CommonBackend):
         :param doc: The document to be put.
         :type doc: CouchDocument
         """
-        my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
-        doc.prune_conflicts(
-            vectorclock.VectorClockRev(doc.rev), self._replica_uid)
-        doc.add_conflict(my_doc)
+        my_doc = self._get_doc(doc.doc_id)
+        self._prune_conflicts(doc, vectorclock.VectorClockRev(doc.rev))
+        doc.add_conflict(self._factory(doc.doc_id, my_doc.rev, my_doc.get_json()))
+        doc.has_conflicts = True
         self._put_doc(my_doc, doc)
 
     def resolve_doc(self, doc, conflicted_doc_revs):
@@ -1320,30 +1321,14 @@ class CouchDatabase(CommonBackend):
         """
         if not isinstance(doc, CouchDocument):
             doc = self._factory(doc.doc_id, doc.rev, doc.get_json())
-        self._save_source_info(replica_uid, replica_gen,
-                               replica_trans_id, number_of_docs,
-                               doc_idx, sync_id)
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
-        if my_doc is not None:
-            my_doc.set_conflicts(
-                self.get_doc_conflicts(my_doc.doc_id, my_doc.couch_rev))
-        state, save_doc = _process_incoming_doc(
-            my_doc, doc, save_conflict, self.replica_uid)
-        if save_doc:
-            self._put_doc(my_doc, save_doc)
-            doc.update(save_doc)
-        return state, self._get_generation()
+        if my_doc:
+            doc.set_conflicts(my_doc.get_conflicts())
+        return CommonBackend._put_doc_if_newer(self, doc, save_conflict, replica_uid,
+                                               replica_gen, replica_trans_id)
 
-    def _save_source_info(self, replica_uid, replica_gen, replica_trans_id,
-                          number_of_docs, doc_idx, sync_id):
-        """
-        Validate and save source information.
-        """
-        self._validate_source(replica_uid, replica_gen, replica_trans_id)
-        self._set_replica_gen_and_trans_id(
-            replica_uid, replica_gen, replica_trans_id,
-            number_of_docs=number_of_docs, doc_idx=doc_idx,
-            sync_id=sync_id)
+    def _put_and_update_indexes(self, cur_doc, doc):
+        self._put_doc(cur_doc, doc)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
                  include_deleted=False):
@@ -1494,53 +1479,3 @@ class CouchServerState(ServerState):
                              delete databases.
         """
         raise Unauthorized()
-
-
-def _process_incoming_doc(my_doc, other_doc, save_conflict, replica_uid):
-    """
-    Check document, save and return state.
-    """
-    # at this point, `doc` has arrived from the other syncing party, and
-    # we will decide what to do with it.
-    # First, we prepare the arriving doc to update couch database.
-    new_doc = CouchDocument(
-        other_doc.doc_id, other_doc.rev, other_doc.get_json())
-    if my_doc is None:
-        return 'inserted', new_doc
-    new_doc.couch_rev = my_doc.couch_rev
-    new_doc.set_conflicts(my_doc.get_conflicts())
-    # fetch conflicts because we will eventually manipulate them
-    # from now on, it works just like u1db sqlite backend
-    doc_vcr = vectorclock.VectorClockRev(new_doc.rev)
-    cur_vcr = vectorclock.VectorClockRev(my_doc.rev)
-    if doc_vcr.is_newer(cur_vcr):
-        rev = new_doc.rev
-        new_doc.prune_conflicts(doc_vcr, replica_uid)
-        if new_doc.rev != rev:
-            # conflicts have been autoresolved
-            return 'superseded', new_doc
-        else:
-            return'inserted', new_doc
-    elif new_doc.rev == my_doc.rev:
-        # magical convergence
-        return 'converged', None
-    elif cur_vcr.is_newer(doc_vcr):
-        # Don't add this to seen_ids, because we have something newer,
-        # so we should send it back, and we should not generate a
-        # conflict
-        other_doc.update(new_doc)
-        return 'superseded', None
-    elif my_doc.same_content_as(new_doc):
-        # the documents have been edited to the same thing at both ends
-        doc_vcr.maximize(cur_vcr)
-        doc_vcr.increment(replica_uid)
-        new_doc.rev = doc_vcr.as_str()
-        return 'superseded', new_doc
-    else:
-        if save_conflict:
-            new_doc.prune_conflicts(
-                vectorclock.VectorClockRev(new_doc.rev), replica_uid)
-            new_doc.add_conflict(my_doc)
-            return 'conflicted', new_doc
-        other_doc.update(new_doc)
-        return 'conflicted', None
