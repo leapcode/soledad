@@ -111,6 +111,7 @@ from leap.soledad.server.sync import (
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common.couch import CouchServerState
+from leap.soledad.server.caching import get_cache_for
 
 old_tsafe = tsafe
 
@@ -303,7 +304,8 @@ def load_configuration(file_path):
 
 def application(environ, start_response):
     conf = load_configuration('/etc/leap/soledad-server.conf')
-    state = CouchServerState(conf['couch_url'])
+    cache = get_cache_for('replica_cache')
+    state = CouchServerState(conf['couch_url'], cache=cache)
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(
         SoledadTokenAuthMiddleware(SoledadApp(state)))
