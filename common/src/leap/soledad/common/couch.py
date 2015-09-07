@@ -434,7 +434,14 @@ class CouchDatabase(CommonBackend):
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
-        self.cache = {}
+        self._cache = None
+
+    @property
+    def cache(self):
+        if self._cache is not None:
+            return self._cache
+        else:
+            return {}
 
     def ensure_ddocs_on_db(self):
         """
@@ -513,7 +520,10 @@ class CouchDatabase(CommonBackend):
         :rtype: str
         """
         if self._real_replica_uid is not None:
+            self.cache[self._url] = {'replica_uid': self._real_replica_uid}
             return self._real_replica_uid
+        if self._url in self.cache:
+            return self.cache[self._url]['replica_uid']
         try:
             # grab replica_uid from server
             doc = self._database['u1db_config']
@@ -551,10 +561,13 @@ class CouchDatabase(CommonBackend):
                                              unknown reason.
         """
         # query a couch list function
+        if self.replica_uid + '_gen' in self.cache:
+            return self.cache[self.replica_uid + '_gen']['generation']
         ddoc_path = ['_design', 'transactions', '_list', 'generation', 'log']
         res = self._database.resource(*ddoc_path)
         try:
             response = res.get_json()
+            self.cache[self.replica_uid + '_gen'] = response[2]
             return response[2]['generation']
         except ResourceNotFound as e:
             raise_missing_design_doc_error(e, ddoc_path)
@@ -582,11 +595,15 @@ class CouchDatabase(CommonBackend):
                                              design document for an yet
                                              unknown reason.
         """
+        if self.replica_uid + '_gen' in self.cache:
+            response = self.cache[self.replica_uid + '_gen']
+            return (response['generation'], response['transaction_id'])
         # query a couch list function
         ddoc_path = ['_design', 'transactions', '_list', 'generation', 'log']
         res = self._database.resource(*ddoc_path)
         try:
             response = res.get_json()
+            self.cache[self.replica_uid + '_gen'] = response[2]
             return (response[2]['generation'], response[2]['transaction_id'])
         except ResourceNotFound as e:
             raise_missing_design_doc_error(e, ddoc_path)
@@ -846,6 +863,10 @@ class CouchDatabase(CommonBackend):
                 doc.doc_id, body=buf.getvalue(), headers=envelope.headers)
         except ResourceConflict:
             raise RevisionConflict()
+        if self.replica_uid + '_gen' in self.cache:
+            gen_info = self.cache[self.replica_uid + '_gen']
+            gen_info['generation'] += 1
+            gen_info['transaction_id'] = transactions[-1][1]
 
     def put_doc(self, doc):
         """
@@ -1366,7 +1387,7 @@ class CouchServerState(ServerState):
     Inteface of the WSGI server with the CouchDB backend.
     """
 
-    def __init__(self, couch_url, cache=None):
+    def __init__(self, couch_url):
         """
         Initialize the couch server state.
 
@@ -1374,7 +1395,6 @@ class CouchServerState(ServerState):
         :type couch_url: str
         """
         self.couch_url = couch_url
-        self.cache = cache or {}
 
     def open_database(self, dbname):
         """
@@ -1390,7 +1410,6 @@ class CouchServerState(ServerState):
             self.couch_url,
             dbname,
             ensure_ddocs=False)
-        db.cache = self.cache
         return db
 
     def ensure_database(self, dbname):

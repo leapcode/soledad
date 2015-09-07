@@ -20,6 +20,7 @@ Server side synchronization infrastructure.
 from u1db import sync, Document
 from u1db.remote import http_app
 from leap.soledad.server.state import ServerSyncState
+from leap.soledad.server.caching import get_cache_for
 
 
 MAX_REQUEST_SIZE = 200  # in Mb
@@ -188,6 +189,8 @@ class SyncResource(http_app.SyncResource):
             db, self.replica_uid = self.state.ensure_database(self.dbname)
         else:
             db = self.state.open_database(self.dbname)
+        cache = get_cache_for('db-' + sync_id + db.replica_uid)
+        db._cache = cache
         # validate the information the client has about server replica
         db.validate_gen_and_trans_id(
             last_known_generation, last_known_trans_id)
