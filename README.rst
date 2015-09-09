@@ -15,15 +15,21 @@ repository:
 
 .. image:: https://badge.fury.io/py/leap.soledad.common.svg
     :target: http://badge.fury.io/py/leap.soledad.common
+.. image:: https://img.shields.io/pypi/dm/leap.soledad.common.svg
+    :target: http://badge.fury.io/py/leap.soledad.common
 
 **leap.soledad.client** where the soledad client lives.
 
 .. image:: https://badge.fury.io/py/leap.soledad.client.svg
     :target: http://badge.fury.io/py/leap.soledad.client
+.. image:: https://img.shields.io/pypi/dm/leap.soledad.client.svg
+    :target: http://badge.fury.io/py/leap.soledad.client
 
 **leap.soledad.server** oh surprise! bits needed for the soledad server.
 
 .. image:: https://badge.fury.io/py/leap.soledad.server.svg
+    :target: http://badge.fury.io/py/leap.soledad.server
+.. image:: https://img.shields.io/pypi/dm/leap.soledad.server.svg
     :target: http://badge.fury.io/py/leap.soledad.server
 
 
