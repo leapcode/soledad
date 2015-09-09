@@ -285,7 +285,8 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         A final close, only called by the shutdown trigger.
         """
         self.shutdownID = None
-        self.threadpool.stop()
+        if self.threadpool.started:
+            self.threadpool.stop()
         self.running = False
         for conn in self.connections.values():
             self._close(conn)
