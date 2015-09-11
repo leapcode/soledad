@@ -1331,10 +1331,13 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
+
+    def create_db(self, ensure=True):
+        dbname = ('test-%s' % uuid4().hex)
         self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            urljoin('http://127.0.0.1:%d' % self.couch_port, dbname),
             create=True,
-            ensure_ddocs=False)  # note that we don't enforce ddocs here
+            ensure_ddocs=ensure)
 
     def tearDown(self):
         self.db.delete_database()
@@ -1346,6 +1349,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents will raise if the
         design docs are not present.
         """
+        self.create_db(ensure=False)
         # _get_generation()
         self.assertRaises(
             errors.MissingDesignDocError,
@@ -1376,10 +1380,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents list functions
         will raise if the functions are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # erase views from _design/transactions
         transactions = self.db._database['_design/transactions']
         transactions['lists'] = {}
@@ -1406,10 +1407,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents list functions
         will raise if the functions are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # erase views from _design/transactions
         transactions = self.db._database['_design/transactions']
         del transactions['lists']
@@ -1436,10 +1434,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents' named views  will
         raise if the views are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # erase views from _design/docs
         docs = self.db._database['_design/docs']
         del docs['views']
@@ -1478,10 +1473,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents will raise if the
         design docs are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # delete _design/docs
         del self.db._database['_design/docs']
         # delete _design/syncs
