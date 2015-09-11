@@ -496,23 +496,15 @@ class LockResourceTestCase(
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
         # create the databases
-        CouchDatabase.open_database(
-            urljoin(self.couch_url, 'shared'),
+        db = CouchDatabase.open_database(
+            urljoin(self.couch_url, ('shared-%s' % (uuid4().hex))),
             create=True,
             ensure_ddocs=True)
-        CouchDatabase.open_database(
-            urljoin(self.couch_url, 'tokens'),
-            create=True,
-            ensure_ddocs=True)
+        self.addCleanup(db.delete_database)
         self._state = CouchServerState(self.couch_url)
+        self._state.open_database = mock.Mock(return_value=db)
 
     def tearDown(self):
-        # delete remote database
-        db = CouchDatabase.open_database(
-            urljoin(self.couch_url, 'shared'),
-            create=True,
-            ensure_ddocs=True)
-        db.delete_database()
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
 
