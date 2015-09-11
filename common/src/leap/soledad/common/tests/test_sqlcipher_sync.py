@@ -20,10 +20,12 @@ Test sqlcipher backend sync.
 
 
 import json
+import os
 
 from u1db import sync
 from u1db import vectorclock
 from u1db import errors
+from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 from urlparse import urljoin

@@ -63,7 +63,6 @@ class InterruptableSyncTestCase(
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
-        self.couch_url = 'http://localhost:' + str(self.wrapper.port)
 
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
@@ -177,13 +176,7 @@ class TestSoledadDbSync(
         SoledadWithCouchServerMixin.setUp(self)
         self.startTwistedServer()
         self.db = self.make_database_for_test(self, 'test1')
-        self.db2 = couch.CouchDatabase.open_database(
-            urljoin(
-                'http://localhost:' + str(self.wrapper.port),
-                'test'
-            ),
-            create=True,
-            ensure_ddocs=True)
+        self.db2 = self.request_state._create_database(replica_uid='test')
 
     def tearDown(self):
         """
@@ -199,7 +192,7 @@ class TestSoledadDbSync(
         and Token auth.
         """
         target = soledad_sync_target(
-            self, target_name,
+            self, self.db2._dbname,
             source_replica_uid=self._soledad._dbpool.replica_uid)
         self.addCleanup(target.close)
         return sync.SoledadSynchronizer(

@@ -333,7 +333,6 @@ class EncryptedSyncTestCase(
         # dependencies.
         # XXX explain better
         CouchDBTestCase.setUp(self)
-        self.couch_url = 'http://localhost:' + str(self.wrapper.port)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
 
@@ -494,7 +493,6 @@ class LockResourceTestCase(
         # dependencies.
         # XXX explain better
         CouchDBTestCase.setUp(self)
-        self.couch_url = 'http://localhost:' + str(self.wrapper.port)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
         # create the databases

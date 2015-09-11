@@ -85,13 +85,7 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
             defer_encryption=True, sync_db_key=sync_db_key)
         self.db1 = SQLCipherDatabase(self.opts)
 
-        self.db2 = couch.CouchDatabase.open_database(
-            urljoin(
-                'http://localhost:' + str(self.wrapper.port),
-                'test'
-            ),
-            create=True,
-            ensure_ddocs=True)
+        self.db2 = self.request_state._create_database('test')
 
     def tearDown(self):
         # XXX should not access "private" attrs
@@ -159,7 +153,7 @@ class TestSoledadDbSyncDeferredEncDecr(
         sync_db = self._soledad._sync_db
         sync_enc_pool = self._soledad._sync_enc_pool
         target = soledad_sync_target(
-            self, target_name,
+            self, self.db2._dbname,
             source_replica_uid=replica_uid,
             sync_db=sync_db,
             sync_enc_pool=sync_enc_pool)

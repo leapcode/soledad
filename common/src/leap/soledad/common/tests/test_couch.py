@@ -25,6 +25,7 @@ import json
 
 from urlparse import urljoin
 from couchdb.client import Server
+from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 
@@ -56,8 +57,8 @@ class TestCouchBackendImpl(CouchDBTestCase):
     def test__allocate_doc_id(self):
         db = couch.CouchDatabase.open_database(
             urljoin(
-                'http://localhost:' + str(self.wrapper.port),
-                'u1db_tests'
+                'http://localhost:' + str(self.couch_port),
+                ('test-%s' % uuid4().hex)
             ),
             create=True,
             ensure_ddocs=True)
@@ -66,6 +67,7 @@ class TestCouchBackendImpl(CouchDBTestCase):
         self.assertEqual(34, len(doc_id1))
         int(doc_id1[len('D-'):], 16)
         self.assertNotEqual(doc_id1, db._allocate_doc_id())
+        self.delete_db(db._dbname)
 
 
 # -----------------------------------------------------------------------------
@@ -73,25 +75,26 @@ class TestCouchBackendImpl(CouchDBTestCase):
 # -----------------------------------------------------------------------------
 
 def make_couch_database_for_test(test, replica_uid):
-    port = str(test.wrapper.port)
-    return couch.CouchDatabase.open_database(
-        urljoin('http://localhost:' + port, replica_uid),
+    port = str(test.couch_port)
+    dbname = ('test-%s' % uuid4().hex)
+    db = couch.CouchDatabase.open_database(
+        urljoin('http://localhost:' + port, dbname),
         create=True,
         replica_uid=replica_uid or 'test',
         ensure_ddocs=True)
 
 
 def copy_couch_database_for_test(test, db):
-    port = str(test.wrapper.port)
+    port = str(test.couch_port)
     couch_url = 'http://localhost:' + port
-    new_dbname = db._replica_uid + '_copy'
+    new_dbname = db._dbname + '_copy'
     new_db = couch.CouchDatabase.open_database(
         urljoin(couch_url, new_dbname),
         create=True,
         replica_uid=db._replica_uid or 'test')
     # copy all docs
     session = couch.Session()
-    old_couch_db = Server(couch_url, session=session)[db._replica_uid]
+    old_couch_db = Server(couch_url, session=session)[db._dbname]
     new_couch_db = Server(couch_url, session=session)[new_dbname]
     for doc_id in old_couch_db:
         doc = old_couch_db.get(doc_id)
