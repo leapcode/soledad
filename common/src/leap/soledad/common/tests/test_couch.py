@@ -82,6 +82,8 @@ def make_couch_database_for_test(test, replica_uid):
         create=True,
         replica_uid=replica_uid or 'test',
         ensure_ddocs=True)
+    test.addCleanup(test.delete_db, dbname)
+    return db
 
 
 def copy_couch_database_for_test(test, db):
@@ -146,24 +148,6 @@ class CouchTests(
 
     scenarios = COUCH_SCENARIOS
 
-    def setUp(self):
-        test_backends.AllDatabaseTests.setUp(self)
-        # save db info because of test_close
-        self._url = self.db._url
-        self._dbname = self.db._dbname
-
-    def tearDown(self):
-        # if current test is `test_close` we have to use saved objects to
-        # delete the database because the close() method will have removed the
-        # references needed to do it using the CouchDatabase.
-        if self.id().endswith('test_couch.CouchTests.test_close(couch)'):
-            session = couch.Session()
-            server = Server(url=self._url, session=session)
-            del(server[self._dbname])
-        else:
-            self.db.delete_database()
-        test_backends.AllDatabaseTests.tearDown(self)
-
 
 class CouchDatabaseTests(
         TestWithScenarios,
@@ -171,10 +155,6 @@ class CouchDatabaseTests(
         CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
-
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseTests.tearDown(self)
 
 
 class CouchValidateGenNTransIdTests(
@@ -184,10 +164,6 @@ class CouchValidateGenNTransIdTests(
 
     scenarios = COUCH_SCENARIOS
 
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseValidateGenNTransIdTests.tearDown(self)
-
 
 class CouchValidateSourceGenTests(
         TestWithScenarios,
@@ -196,10 +172,6 @@ class CouchValidateSourceGenTests(
 
     scenarios = COUCH_SCENARIOS
 
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseValidateSourceGenTests.tearDown(self)
-
 
 class CouchWithConflictsTests(
         TestWithScenarios,
@@ -207,10 +179,6 @@ class CouchWithConflictsTests(
         CouchDBTestCase):
 
         scenarios = COUCH_SCENARIOS
-
-        def tearDown(self):
-            self.db.delete_database()
-            test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
 
 
 # Notice: the CouchDB backend does not have indexing capabilities, so we do
@@ -263,8 +231,6 @@ class CouchDatabaseSyncTargetTests(
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
-        # from DatabaseBaseTests.setUp
-        self.db = self.create_database('test')
         # from TestCaseWithServer.setUp
         self.server = self.server_thread = self.port = None
         # other stuff
@@ -272,7 +238,6 @@ class CouchDatabaseSyncTargetTests(
         self.other_changes = []
 
     def tearDown(self):
-        CouchDBTestCase.tearDown(self)
         # from TestCaseWithServer.tearDown
         if self.server is not None:
             self.server.shutdown()
@@ -280,9 +245,8 @@ class CouchDatabaseSyncTargetTests(
             self.server.server_close()
         if self.port:
             self.port.stopListening()
-        # from DatabaseBaseTests.tearDown
-        if hasattr(self, 'db') and self.db is not None:
-            self.db.close()
+        self.db.close()
+        CouchDBTestCase.tearDown(self)
 
     def receive_doc(self, doc, gen, trans_id):
         self.other_changes.append(
@@ -727,17 +691,8 @@ class CouchDatabaseSyncTests(
             self.db3, self.db1_copy, self.db2_copy
         ]:
             if db is not None:
-                db.delete_database()
+                self.delete_db(db._dbname)
                 db.close()
-        for replica_uid, dbname in [
-            ('test1_copy', 'source'),
-            ('test2_copy', 'target'),
-            ('test3', 'target')
-        ]:
-            db = self.create_database(replica_uid, dbname)
-            db.delete_database()
-            # cleanup connections to avoid leaking of file descriptors
-            db.close()
         DatabaseBaseTests.tearDown(self)
 
     def assertLastExchangeLog(self, db, expected):
