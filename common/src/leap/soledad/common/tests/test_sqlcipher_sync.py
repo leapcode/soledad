@@ -731,28 +731,23 @@ class SQLCipherDatabaseSyncTests(
             errors.InvalidTransactionId, self.sync, self.db1, self.db2_copy)
 
 
-def _make_local_db_and_token_http_target(test, path='test'):
+def make_local_db_and_soledad_target(
+        test, path='test',
+        source_replica_uid=uuid4().hex):
     test.startTwistedServer()
-    # ensure remote db exists before syncing
-    db = couch.CouchDatabase.open_database(
-        urljoin(test.couch_url, 'test'),
-        create=True,
-        replica_uid='test',
-        ensure_ddocs=True)
-
-    replica_uid = test._soledad._dbpool.replica_uid
+    db = test.request_state._create_database(replica_uid=os.path.basename(path))
     sync_db = test._soledad._sync_db
     sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
-        test, path,
-        source_replica_uid=replica_uid,
+        test, db._dbname,
+        source_replica_uid=source_replica_uid,
         sync_db=sync_db,
         sync_enc_pool=sync_enc_pool)
     return db, st
 
 target_scenarios = [
     ('leap', {
-        'create_db_and_target': _make_local_db_and_token_http_target,
+        'create_db_and_target': make_local_db_and_soledad_target,
         'make_app_with_state': make_soledad_app,
         'do_sync': sync_via_synchronizer_and_soledad}),
 ]
@@ -761,8 +756,8 @@ target_scenarios = [
 class SQLCipherSyncTargetTests(
         TestWithScenarios,
         tests.DatabaseBaseTests,
-        tests.TestCaseWithServer,
-        SoledadWithCouchServerMixin):
+        SoledadWithCouchServerMixin,
+        tests.TestCaseWithServer):
 
     # TODO: implement _set_trace_hook(_shallow) in SoledadHTTPSyncTarget so
     #       skipped tests can be succesfully executed.
@@ -773,13 +768,13 @@ class SQLCipherSyncTargetTests(
     whitebox = False
 
     def setUp(self):
-        super(tests.DatabaseBaseTests, self).setUp()
+        super(SQLCipherSyncTargetTests, self).setUp()
         self.db, self.st = self.create_db_and_target(self)
         self.addCleanup(self.st.close)
         self.other_changes = []
 
     def tearDown(self):
-        super(tests.DatabaseBaseTests, self).tearDown()
+        super(SQLCipherSyncTargetTests, self).setUp()
 
     def assertLastExchangeLog(self, db, expected):
         log = getattr(db, '_last_exchange_log', None)
@@ -790,10 +785,6 @@ class SQLCipherSyncTargetTests(
     def receive_doc(self, doc, gen, trans_id):
         self.other_changes.append(
             (doc.doc_id, doc.rev, doc.get_json(), gen, trans_id))
-
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self.couch_url)
-        return self.make_app_with_state(self.request_state)
 
     def set_trace_hook(self, callback, shallow=False):
         setter = (self.st._set_trace_hook if not shallow else

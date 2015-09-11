@@ -59,6 +59,7 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
 
     def setUp(self):
         SoledadWithCouchServerMixin.setUp(self)
+        self.startTwistedServer()
         # config info
         self.db1_file = os.path.join(self.tempdir, "db1.u1db")
         os.unlink(self.db1_file)
@@ -103,8 +104,8 @@ class SyncTimeoutError(Exception):
 
 class TestSoledadDbSyncDeferredEncDecr(
         TestWithScenarios,
-        tests.TestCaseWithServer,
-        BaseSoledadDeferredEncTest):
+        BaseSoledadDeferredEncTest,
+        tests.TestCaseWithServer):
 
     """
     Test db.sync remote sync shortcut.
@@ -122,17 +123,12 @@ class TestSoledadDbSyncDeferredEncDecr(
     oauth = False
     token = True
 
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self.couch_url)
-        return self.make_app_with_state(self.request_state)
-
     def setUp(self):
         """
         Need to explicitely invoke inicialization on all bases.
         """
         BaseSoledadDeferredEncTest.setUp(self)
         self.server = self.server_thread = None
-        self.startTwistedServer()
         self.syncer = None
 
     def tearDown(self):
@@ -144,7 +140,7 @@ class TestSoledadDbSyncDeferredEncDecr(
             dbsyncer.close()
         BaseSoledadDeferredEncTest.tearDown(self)
 
-    def do_sync(self, target_name):
+    def do_sync(self):
         """
         Perform sync using SoledadSynchronizer, SoledadSyncTarget
         and Token auth.
@@ -184,7 +180,7 @@ class TestSoledadDbSyncDeferredEncDecr(
         """
         doc1 = self.db1.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
-        local_gen_before_sync = yield self.do_sync('test')
+        local_gen_before_sync = yield self.do_sync()
 
         gen, _, changes = self.db1.whats_changed(local_gen_before_sync)
         self.assertEqual(1, len(changes))

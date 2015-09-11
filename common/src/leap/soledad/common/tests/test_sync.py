@@ -147,8 +147,8 @@ class InterruptableSyncTestCase(
 
 class TestSoledadDbSync(
         TestWithScenarios,
-        tests.TestCaseWithServer,
-        SoledadWithCouchServerMixin):
+        SoledadWithCouchServerMixin,
+        tests.TestCaseWithServer):
 
     """
     Test db.sync remote sync shortcut
@@ -165,10 +165,6 @@ class TestSoledadDbSync(
     oauth = False
     token = False
 
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self.couch_url)
-        return self.make_app_with_state(self.request_state)
-
     def setUp(self):
         """
         Need to explicitely invoke inicialization on all bases.
@@ -182,11 +178,10 @@ class TestSoledadDbSync(
         """
         Need to explicitely invoke destruction on all bases.
         """
-        self.db2.delete_database()
         SoledadWithCouchServerMixin.tearDown(self)
         # tests.TestCaseWithServer.tearDown(self)
 
-    def do_sync(self, target_name):
+    def do_sync(self):
         """
         Perform sync using SoledadSynchronizer, SoledadSyncTarget
         and Token auth.
@@ -210,7 +205,7 @@ class TestSoledadDbSync(
         doc1 = self.db.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
 
-        local_gen_before_sync = yield self.do_sync('test')
+        local_gen_before_sync = yield self.do_sync()
         gen, _, changes = self.db.whats_changed(local_gen_before_sync)
         self.assertEqual(1, len(changes))
         self.assertEqual(doc2.doc_id, changes[0][0])

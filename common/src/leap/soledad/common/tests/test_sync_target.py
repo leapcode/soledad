@@ -268,7 +268,6 @@ class TestSoledadSyncTarget(
         self.patch(
             IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
         remote_target = self.getSyncTarget(
-            'test',
             source_replica_uid='replica')
         other_changes = []
 
@@ -318,7 +317,7 @@ class TestSoledadSyncTarget(
 
         This test was adapted to decrypt remote content before assert.
         """
-        remote_target = self.getSyncTarget('test')
+        remote_target = self.getSyncTarget()
         other_docs = []
         replica_uid_box = []
 
@@ -347,10 +346,9 @@ class TestSoledadSyncTarget(
 
     @defer.inlineCallbacks
     def test_get_sync_info(self):
-        db = self.request_state._create_database('test')
+        db = self.db2
         db._set_replica_gen_and_trans_id('other-id', 1, 'T-transid')
         remote_target = self.getSyncTarget(
-            'test',
             source_replica_uid='other-id')
         sync_info = yield remote_target.get_sync_info('other-id')
         self.assertEqual(
@@ -360,7 +358,6 @@ class TestSoledadSyncTarget(
     @defer.inlineCallbacks
     def test_record_sync_info(self):
         remote_target = self.getSyncTarget(
-            'test',
             source_replica_uid='other-id')
         yield remote_target.record_sync_info('other-id', 2, 'T-transid')
         self.assertEqual(
@@ -370,7 +367,7 @@ class TestSoledadSyncTarget(
     def test_sync_exchange_receive(self):
         db = self.db2
         doc = db.create_doc_from_json('{"value": "there"}')
-        remote_target = self.getSyncTarget('test')
+        remote_target = self.getSyncTarget()
         other_changes = []
 
         def receive_doc(doc, gen, trans_id):
@@ -423,10 +420,10 @@ class SoledadDatabaseSyncTargetTests(
         self.db, self.st = make_local_db_and_soledad_target(self)
 
     def tearDown(self):
-        tests.TestCaseWithServer.tearDown(self)
-        SoledadWithCouchServerMixin.tearDown(self)
         self.db.close()
         self.st.close()
+        tests.TestCaseWithServer.tearDown(self)
+        SoledadWithCouchServerMixin.tearDown(self)
 
     def set_trace_hook(self, callback, shallow=False):
         setter = (self.st._set_trace_hook if not shallow else
@@ -817,10 +814,6 @@ class TestSoledadDbSync(
 
     oauth = False
     token = False
-
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self.couch_url)
-        return self.make_app_with_state(self.request_state)
 
     def setUp(self):
         """
