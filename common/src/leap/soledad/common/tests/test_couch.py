@@ -43,7 +43,6 @@ from leap.soledad.common.tests.util import sync_via_synchronizer
 
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import DatabaseBaseTests
-from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 
 from u1db.backends.inmemory import InMemoryIndex
 
@@ -208,7 +207,6 @@ nested_doc = tests.nested_doc
 class CouchDatabaseSyncTargetTests(
         TestWithScenarios,
         DatabaseBaseTests,
-        TestCaseWithServer,
         CouchDBTestCase):
 
     # TODO: implement _set_trace_hook(_shallow) in CouchSyncTarget so
@@ -231,20 +229,11 @@ class CouchDatabaseSyncTargetTests(
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
-        # from TestCaseWithServer.setUp
-        self.server = self.server_thread = self.port = None
         # other stuff
         self.db, self.st = self.create_db_and_target(self)
         self.other_changes = []
 
     def tearDown(self):
-        # from TestCaseWithServer.tearDown
-        if self.server is not None:
-            self.server.shutdown()
-            self.server_thread.join()
-            self.server.server_close()
-        if self.port:
-            self.port.stopListening()
         self.db.close()
         CouchDBTestCase.tearDown(self)
 
