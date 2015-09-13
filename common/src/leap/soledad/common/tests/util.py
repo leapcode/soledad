@@ -356,7 +356,7 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
         """
         current_dbs = set([db for db in self.couch_server])
         remaining_dbs = current_dbs - self.previous_dbs
-        if remaining_dbs and False:
+        if remaining_dbs:
             raise Exception("tests created %s and didn't clean up!", remaining_dbs)
 
     def delete_db(self, name):

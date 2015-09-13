@@ -19,7 +19,6 @@ Test sqlcipher backend sync.
 """
 
 
-import json
 import os
 
 from u1db import sync
@@ -28,15 +27,10 @@ from u1db import errors
 from uuid import uuid4
 
 from testscenarios import TestWithScenarios
-from urlparse import urljoin
 
-from twisted.internet import defer
-
-from leap.soledad.common import couch
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.crypto import decrypt_doc_dict
-from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS
@@ -44,7 +38,6 @@ from leap.soledad.common.tests.util import make_soledad_app
 from leap.soledad.common.tests.test_sync_target import SoledadDatabaseSyncTargetTests
 from leap.soledad.common.tests.util import soledad_sync_target
 from leap.soledad.common.tests.util import BaseSoledadTest
-from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 
 
 # -----------------------------------------------------------------------------
@@ -100,23 +93,6 @@ class SQLCipherDatabaseSyncTests(
         self._use_tracking = {}
         super(tests.DatabaseBaseTests, self).setUp()
 
-    def tearDown(self):
-        super(tests.DatabaseBaseTests, self).tearDown()
-        if hasattr(self, 'db1') and isinstance(self.db1, SQLCipherDatabase):
-            self.db1.close()
-        if hasattr(self, 'db1_copy') \
-                and isinstance(self.db1_copy, SQLCipherDatabase):
-            self.db1_copy.close()
-        if hasattr(self, 'db2') \
-                and isinstance(self.db2, SQLCipherDatabase):
-            self.db2.close()
-        if hasattr(self, 'db2_copy') \
-                and isinstance(self.db2_copy, SQLCipherDatabase):
-            self.db2_copy.close()
-        if hasattr(self, 'db3') \
-                and isinstance(self.db3, SQLCipherDatabase):
-            self.db3.close()
-
     def create_database(self, replica_uid, sync_role=None):
         if replica_uid == 'test' and sync_role is None:
             # created up the chain by base class but unused
@@ -124,6 +100,7 @@ class SQLCipherDatabaseSyncTests(
         db = self.create_database_for_role(replica_uid, sync_role)
         if sync_role:
             self._use_tracking[db] = (replica_uid, sync_role)
+        self.addCleanup(db.close)
         return db
 
     def create_database_for_role(self, replica_uid, sync_role):
