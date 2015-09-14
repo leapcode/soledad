@@ -345,20 +345,9 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
         """
         Make sure we have a CouchDB instance for a test.
         """
-        server = self.couch_server = couchdb.Server()
-        self.previous_dbs = set([db for db in server])
         self.couch_port = 5984
         self.couch_url = 'http://localhost:%d' % self.couch_port
-
-    def tearDown(self):
-        """
-        Stop CouchDB instance for test.
-        """
-        current_dbs = set([db for db in self.couch_server])
-        remaining_dbs = current_dbs - self.previous_dbs
-        if remaining_dbs:
-            raise Exception("tests created %s and didn't clean up!",
-                            remaining_dbs)
+        self.couch_server = couchdb.Server(self.couch_url)
 
     def delete_db(self, name):
         try:
