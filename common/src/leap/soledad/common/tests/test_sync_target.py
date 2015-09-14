@@ -150,7 +150,8 @@ def make_local_db_and_soledad_target(
         test, path='test',
         source_replica_uid=uuid4().hex):
     test.startTwistedServer()
-    db = test.request_state._create_database(replica_uid=os.path.basename(path))
+    replica_uid = os.path.basename(path)
+    db = test.request_state._create_database(replica_uid)
     sync_db = test._soledad._sync_db
     sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
@@ -360,8 +361,8 @@ class TestSoledadSyncTarget(
         remote_target = self.getSyncTarget(
             source_replica_uid='other-id')
         yield remote_target.record_sync_info('other-id', 2, 'T-transid')
-        self.assertEqual(
-            (2, 'T-transid'), self.db2._get_replica_gen_and_trans_id('other-id'))
+        self.assertEqual((2, 'T-transid'),
+                         self.db2._get_replica_gen_and_trans_id('other-id'))
 
     @defer.inlineCallbacks
     def test_sync_exchange_receive(self):

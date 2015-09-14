@@ -35,7 +35,8 @@ from leap.soledad.client.crypto import decrypt_doc_dict
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS
 from leap.soledad.common.tests.util import make_soledad_app
-from leap.soledad.common.tests.test_sync_target import SoledadDatabaseSyncTargetTests
+from leap.soledad.common.tests.test_sync_target import \
+    SoledadDatabaseSyncTargetTests
 from leap.soledad.common.tests.util import soledad_sync_target
 from leap.soledad.common.tests.util import BaseSoledadTest
 
@@ -713,7 +714,8 @@ def make_local_db_and_soledad_target(
         test, path='test',
         source_replica_uid=uuid4().hex):
     test.startTwistedServer()
-    db = test.request_state._create_database(replica_uid=os.path.basename(path))
+    replica_uid = os.path.basename(path)
+    db = test.request_state._create_database(replica_uid)
     sync_db = test._soledad._sync_db
     sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(

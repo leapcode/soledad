@@ -1285,7 +1285,8 @@ class CouchDatabaseSyncTests(
         self.db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.assertRaises(
-            u1db_errors.InvalidTransactionId, self.sync, self.db1_copy, self.db2)
+            u1db_errors.InvalidTransactionId, self.sync,
+            self.db1_copy, self.db2)
 
     def test_sync_detects_rollback_and_divergence_in_target(self):
         self.db1 = self.create_database('test1', 'source')
@@ -1299,7 +1300,8 @@ class CouchDatabaseSyncTests(
         self.db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.assertRaises(
-            u1db_errors.InvalidTransactionId, self.sync, self.db1, self.db2_copy)
+            u1db_errors.InvalidTransactionId, self.sync,
+            self.db1, self.db2_copy)
 
     def test_optional_sync_preserve_json(self):
         self.db1 = self.create_database('test1', 'source')
