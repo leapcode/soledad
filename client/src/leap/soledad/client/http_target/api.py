@@ -32,8 +32,13 @@ class SyncTargetAPI(SyncTarget):
     Declares public methods and implements u1db.SyncTarget.
     """
 
+    @defer.inlineCallbacks
     def close(self):
-        self._http.close()
+        if self._sync_enc_pool:
+            self._sync_enc_pool.stop()
+        if self._sync_decr_pool:
+            self._sync_decr_pool.stop()
+        yield self._http.close()
 
     def set_creds(self, creds):
         """
