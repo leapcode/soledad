@@ -28,6 +28,7 @@ from couchdb.client import Server
 from uuid import uuid4
 
 from testscenarios import TestWithScenarios
+from twisted.trial import unittest
 
 from u1db import errors as u1db_errors
 from u1db import SyncTarget
@@ -1498,3 +1499,27 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
             self.db._get_transaction_log)
         self.create_db(ensure=True, dbname=self.db._dbname)
         self.db._get_transaction_log()
+
+
+class DatabaseNameValidationTest(unittest.TestCase):
+
+    def test_database_name_validation(self):
+        self.assertFalse(couch.is_db_name_valid("user-deadbeef | cat /secret"))
+        self.assertTrue(couch.is_db_name_valid("user-cafe1337"))
+
+
+class CommandBasedDBCreationTest(unittest.TestCase):
+
+    def test_ensure_db_using_custom_command(self):
+        state = couch.CouchServerState("url", create_cmd="echo")
+        state.ensure_database("user-1337")  # works
+
+    def test_raises_unauthorized_on_failure(self):
+        state = couch.CouchServerState("url", create_cmd="inexistent")
+        self.assertRaises(u1db_errors.Unauthorized,
+                          state.ensure_database, "user-1337")
+
+    def test_raises_unauthorized_by_default(self):
+        state = couch.CouchServerState("url")
+        self.assertRaises(u1db_errors.Unauthorized,
+                          state.ensure_database, "user-1337")
