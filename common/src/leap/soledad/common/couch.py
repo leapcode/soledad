@@ -60,6 +60,7 @@ from u1db.remote.server_state import ServerState
 
 
 from leap.soledad.common import ddocs, errors
+from leap.soledad.common.command import exec_validated_cmd
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -1374,13 +1375,29 @@ class CouchSyncTarget(CommonSyncTarget):
             source_replica_transaction_id)
 
 
+DB_NAME_MASK = "^user-[a-f0-9]+$"
+
+
+def is_db_name_valid(name):
+    """
+    Validate a user database using DB_NAME_MASK.
+
+    :param name: database name.
+    :type name: str
+
+    :return: boolean for name vailidity
+    :rtype: bool
+    """
+    return re.match(DB_NAME_MASK, name) is not None
+
+
 class CouchServerState(ServerState):
 
     """
     Inteface of the WSGI server with the CouchDB backend.
     """
 
-    def __init__(self, couch_url):
+    def __init__(self, couch_url, create_cmd=None):
         """
         Initialize the couch server state.
 
@@ -1388,6 +1405,7 @@ class CouchServerState(ServerState):
         :type couch_url: str
         """
         self.couch_url = couch_url
+        self.create_cmd = create_cmd
 
     def open_database(self, dbname):
         """
@@ -1409,20 +1427,26 @@ class CouchServerState(ServerState):
         """
         Ensure couch database exists.
 
-        Usually, this method is used by the server to ensure the existence of
-        a database. In our setup, the Soledad user that accesses the underlying
-        couch server should never have permission to create (or delete)
-        databases. But, in case it ever does, by raising an exception here we
-        have one more guarantee that no modified client will be able to
-        enforce creation of a database when syncing.
-
         :param dbname: The name of the database to ensure.
         :type dbname: str
 
-        :raise Unauthorized: Always, because Soledad server is not allowed to
-                             create databases.
+        :raise Unauthorized: If disabled or other error was raised.
+
+        :return: The CouchDatabase object and its replica_uid.
+        :rtype: (CouchDatabase, str)
         """
-        raise Unauthorized()
+        if not self.create_cmd:
+            raise Unauthorized()
+        else:
+            code, out = exec_validated_cmd(self.create_cmd, dbname,
+                                           validator=is_db_name_valid)
+            if code is not 0:
+                logger.error("""
+                    Error while creating database (%s) with (%s) command.
+                    Output: %s
+                    Exit code: %d
+                    """ % (dbname, self.create_cmd, out, code))
+                raise Unauthorized()
 
     def delete_database(self, dbname):
         """
