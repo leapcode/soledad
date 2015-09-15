@@ -1447,6 +1447,8 @@ class CouchServerState(ServerState):
                     Exit code: %d
                     """ % (dbname, self.create_cmd, out, code))
                 raise Unauthorized()
+        db = self.open_database(dbname)
+        return db, db.replica_uid
 
     def delete_database(self, dbname):
         """

@@ -29,6 +29,7 @@ from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 from twisted.trial import unittest
+from mock import Mock
 
 from u1db import errors as u1db_errors
 from u1db import SyncTarget
@@ -1512,7 +1513,12 @@ class CommandBasedDBCreationTest(unittest.TestCase):
 
     def test_ensure_db_using_custom_command(self):
         state = couch.CouchServerState("url", create_cmd="echo")
-        state.ensure_database("user-1337")  # works
+        mock_db = Mock()
+        mock_db.replica_uid = 'replica_uid'
+        state.open_database = Mock(return_value=mock_db)
+        db, replica_uid = state.ensure_database("user-1337")  # works
+        self.assertEquals(mock_db, db)
+        self.assertEquals(mock_db.replica_uid, replica_uid)
 
     def test_raises_unauthorized_on_failure(self):
         state = couch.CouchServerState("url", create_cmd="inexistent")
