@@ -21,7 +21,7 @@ from u1db.remote import utils
 from twisted.internet import defer
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
-from leap.soledad.client.events import emit
+from leap.soledad.client.events import emit_async
 from leap.soledad.client.crypto import is_symmetrically_encrypted
 from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.client.http_target.support import RequestBody
@@ -245,7 +245,7 @@ class HTTPDocFetcher(object):
 
 def _emit_receive_status(received_docs, total):
     content = {'received': received_docs, 'total': total}
-    emit(SOLEDAD_SYNC_RECEIVE_STATUS, content)
+    emit_async(SOLEDAD_SYNC_RECEIVE_STATUS, content)
 
     msg = "%d/%d" % (received_docs, total)
     logger.debug("Sync receive status: %s" % msg)

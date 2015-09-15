@@ -20,7 +20,7 @@
 Signaling functions.
 """
 
-from leap.common.events import emit
+from leap.common.events import emit_async
 from leap.common.events import catalog
 
 
@@ -40,7 +40,7 @@ SOLEDAD_SYNC_RECEIVE_STATUS = catalog.SOLEDAD_SYNC_RECEIVE_STATUS
 
 __all__ = [
     "catalog",
-    "emit",
+    "emit_async",
     "SOLEDAD_CREATING_KEYS",
     "SOLEDAD_DONE_CREATING_KEYS",
     "SOLEDAD_DOWNLOADING_KEYS",

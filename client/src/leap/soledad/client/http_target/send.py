@@ -17,7 +17,7 @@
 import json
 import logging
 from twisted.internet import defer
-from leap.soledad.client.events import emit
+from leap.soledad.client.events import emit_async
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.http_target.support import RequestBody
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ class HTTPDocSender(object):
 
 def _emit_send_status(idx, total):
     content = {'sent': idx, 'total': total}
-    emit(SOLEDAD_SYNC_SEND_STATUS, content)
+    emit_async(SOLEDAD_SYNC_SEND_STATUS, content)
 
     msg = "%d/%d" % (idx, total)
     logger.debug("Sync send status: %s" % msg)
