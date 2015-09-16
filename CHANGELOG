@@ -6,7 +6,7 @@ Client:
   o Improve how we send information on SOLEDAD_SYNC_SEND_STATUS and in
     SOLEDAD_SYNC_RECEIVE_STATUS. Related to Feature #7353.
   o Fix hanging sync by properly waiting db initialization on sync decrypter
-    pool. Closes #7686.
+    pool. Closes #7386.
   o Avoid double decryption of documents.
   o Fix the order of the events emited for incoming documents.
   o bugfix: move sync db and encpool creation to api.
