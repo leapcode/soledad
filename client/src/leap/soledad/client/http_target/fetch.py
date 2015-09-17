@@ -247,5 +247,6 @@ def _emit_receive_status(received_docs, total):
     content = {'received': received_docs, 'total': total}
     emit_async(SOLEDAD_SYNC_RECEIVE_STATUS, content)
 
-    msg = "%d/%d" % (received_docs, total)
-    logger.debug("Sync receive status: %s" % msg)
+    if received_docs % 20 == 0:
+        msg = "%d/%d" % (received_docs, total)
+        logger.debug("Sync receive status: %s" % msg)
