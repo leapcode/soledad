@@ -261,6 +261,16 @@ class SoledadSecrets(object):
         logger.info("Could not find a secret in local storage.")
         return False
 
+    def _maybe_set_active_secret(self, active_secret):
+        """
+        If no secret_id is already set, choose the passed active secret, or
+        just choose first secret available if none.
+        """
+        if not self._secret_id:
+            if not active_secret:
+                active_secret = self._secrets.items()[0][0]
+            self.set_secret_id(active_secret)
+
     def _load_secrets(self):
         """
         Load storage secrets from local file.
@@ -270,12 +280,7 @@ class SoledadSecrets(object):
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
         _, active_secret = self._import_recovery_document(content)
-        # choose first secret if no secret_id was given
-        if self._secret_id is None:
-            if active_secret is None:
-                self.set_secret_id(self._secrets.items()[0][0])
-            else:
-                self.set_secret_id(active_secret)
+        self._maybe_set_active_secret(active_secret)
         # enlarge secret if needed
         enlarged = False
         if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
@@ -306,12 +311,8 @@ class SoledadSecrets(object):
                 'Found cryptographic secrets in shared recovery '
                 'database.')
             _, active_secret = self._import_recovery_document(doc.content)
+            self._maybe_set_active_secret(active_secret)
             self._store_secrets()  # save new secrets in local file
-            if self._secret_id is None:
-                if active_secret is None:
-                    self.set_secret_id(self._secrets.items()[0][0])
-                else:
-                    self.set_secret_id(active_secret)
         else:
             # STAGE 3 - there are no secrets in server also, so
             # generate a secret and store it in remote db.
