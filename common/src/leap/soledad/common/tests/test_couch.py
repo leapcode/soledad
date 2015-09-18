@@ -1501,6 +1501,20 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.create_db(ensure=True, dbname=self.db._dbname)
         self.db._get_transaction_log()
 
+    def test_ensure_security_doc(self):
+        """
+        Ensure_security creates a _security ddoc to ensure that only soledad
+        will have member access to a db.
+        """
+        self.create_db(ensure=False)
+        self.assertFalse(self.db._database.security)
+        self.db.ensure_security()
+        security_ddoc = self.db._database.security
+        self.assertIn('admins', security_ddoc)
+        self.assertFalse(security_ddoc['admins']['names'])
+        self.assertIn('members', security_ddoc)
+        self.assertIn('soledad', security_ddoc['members']['names'])
+
 
 class DatabaseNameValidationTest(unittest.TestCase):
 
