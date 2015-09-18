@@ -485,13 +485,10 @@ class CouchDatabase(CommonBackend):
         Ensure that the design documents used by the backend exist on the
         couch database.
         """
-        # we check for existence of one of the files, and put all of them if
-        # that one does not exist
-        try:
-            self._database['_design/docs']
-            return
-        except ResourceNotFound:
-            for ddoc_name in ['docs', 'syncs', 'transactions']:
+        for ddoc_name in ['docs', 'syncs', 'transactions']:
+            try:
+                self._database.info(ddoc_name)
+            except ResourceNotFound:
                 ddoc = json.loads(
                     binascii.a2b_base64(
                         getattr(ddocs, ddoc_name)))

@@ -1320,8 +1320,9 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
     def setUp(self):
         CouchDBTestCase.setUp(self)
 
-    def create_db(self, ensure=True):
-        dbname = ('test-%s' % uuid4().hex)
+    def create_db(self, ensure=True, dbname=None):
+        if not dbname:
+            dbname = ('test-%s' % uuid4().hex)
         self.db = couch.CouchDatabase.open_database(
             urljoin('http://127.0.0.1:%d' % self.couch_port, dbname),
             create=True,
@@ -1492,3 +1493,16 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
             self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
+
+    def test_ensure_ddoc_independently(self):
+        """
+        Test that a missing ddocs other than _design/docs will be ensured
+        even if _design/docs is there.
+        """
+        self.create_db(ensure=True)
+        del self.db._database['_design/transactions']
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._get_transaction_log)
+        self.create_db(ensure=True, dbname=self.db._dbname)
+        self.db._get_transaction_log()
