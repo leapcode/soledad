@@ -435,6 +435,7 @@ class CouchDatabase(CommonBackend):
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
+            self.ensure_security()
         self._cache = None
 
     @property
@@ -466,6 +467,16 @@ class CouchDatabase(CommonBackend):
                     binascii.a2b_base64(
                         getattr(ddocs, ddoc_name)))
                 self._database.save(ddoc)
+
+    def ensure_security(self):
+        """
+        Make sure that only soledad user is able to access this database as
+        a member.
+        """
+        security = self._database.security
+        security['members'] = {'names': ['soledad'], 'roles': []}
+        security['admins'] = {'names': [], 'roles': []}
+        self._database.security = security
 
     def get_sync_target(self):
         """
