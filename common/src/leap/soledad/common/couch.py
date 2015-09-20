@@ -527,6 +527,7 @@ class CouchDatabase(CommonBackend):
         try:
             # grab replica_uid from server
             doc = self._database['u1db_config']
+            self.cache[self._url] = doc
             self._real_replica_uid = doc['replica_uid']
             return self._real_replica_uid
         except ResourceNotFound:
@@ -1154,6 +1155,7 @@ class CouchDatabase(CommonBackend):
         doc['generation'] = other_generation
         doc['transaction_id'] = other_transaction_id
         self._database.save(doc)
+        self.cache[other_replica_uid] = (other_generation, other_transaction_id)
 
     def _force_doc_sync_conflict(self, doc):
         """

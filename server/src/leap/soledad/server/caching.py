@@ -28,5 +28,5 @@ def setup_caching():
 _cache_manager = setup_caching()
 
 
-def get_cache_for(key):
-    return _cache_manager.get_cache(key)
+def get_cache_for(key, expire=3600):
+    return _cache_manager.get_cache(key, expire=expire)
