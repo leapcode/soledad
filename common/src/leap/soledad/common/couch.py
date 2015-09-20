@@ -357,7 +357,7 @@ def couch_server(url):
     :type url: str
     """
     session = Session(timeout=COUCH_TIMEOUT)
-    server = Server(url=url, session=session)
+    server = Server(url=url, full_commit=False, session=session)
     yield server
 
 
