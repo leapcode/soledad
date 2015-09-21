@@ -443,6 +443,15 @@ class CouchDatabase(CommonBackend):
         else:
             return {}
 
+    def init_caching(self, cache):
+        """
+        Start using cache by setting internal _cache attribute.
+
+        :param cache: the cache instance, anything that behaves like a dict
+        :type cache: dict
+        """
+        self._cache = cache
+
     def ensure_ddocs_on_db(self):
         """
         Ensure that the design documents used by the backend exist on the

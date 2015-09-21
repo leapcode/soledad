@@ -192,7 +192,7 @@ class SyncResource(http_app.SyncResource):
             db = cache['instance']
         else:
             db = self.state.open_database(self.dbname)
-        db._cache = cache
+        db.init_caching(cache)
         cache['instance'] = db
         # validate the information the client has about server replica
         db.validate_gen_and_trans_id(
