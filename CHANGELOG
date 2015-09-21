@@ -1,3 +1,19 @@
+0.7.3 Sep 22, 2015:
+Client:
+  o Bugfix: refactor code loss. Closes #7412.
+  o Bugfix: Set active secret before saving local file.
+  o Split http_target into 4 modules, separating those responsibilities.
+  o Refactor details of making an HTTP request body and headers out of the
+    send/fetch logic. This also makes it easier to enable batching.
+
+Server:
+  o Fix a bug where BadRequest could be raised after everything was persisted.
+
+Common:
+  o Refactor couch.py to separate persistence from logic while saving uploaded
+    documents. Also simplify logic while checking for conflicts.
+
+
 0.7.2 Aug 26, 2015:
 Client:
   o Remove MAC from secrets file. Closes #6980.

@@ -1,3 +1,0 @@
-  o Split http_target into 4 modules, separating those responsibilities.
-  o Refactor details of making an HTTP request body and headers out of the
-  send/fetch logic. This also makes it easier to enable batching.
