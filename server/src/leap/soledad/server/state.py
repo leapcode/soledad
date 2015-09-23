@@ -24,7 +24,8 @@ class ServerSyncState(object):
     """
     The state of one sync session, as stored on backend server.
 
-    On server side, the ongoing syncs metadata is maintained in a caching layer.
+    On server side, the ongoing syncs metadata is maintained in
+    a caching layer.
     """
 
     def __init__(self, source_replica_uid, sync_id):
@@ -38,7 +39,8 @@ class ServerSyncState(object):
         """
         self._source_replica_uid = source_replica_uid
         self._sync_id = sync_id
-        self._storage = caching.get_cache_for(source_replica_uid + sync_id)
+        caching_key = source_replica_uid + sync_id
+        self._storage = caching.get_cache_for(caching_key)
 
     def _put_dict_info(self, key, value):
         """
@@ -61,7 +63,7 @@ class ServerSyncState(object):
 
         :param seen_id: The doc_id of a document seen during sync.
         :type seen_id: str
-        :param gen: The corresponding db generation for that document.
+        :param gen: The corresponding db generation.
         :type gen: int
         """
         self._put_dict_info(
@@ -113,12 +115,9 @@ class ServerSyncState(object):
                  server.
         :rtype: tuple
         """
-        info = self._storage.get('changes_to_return') if 'changes_to_return' in self._storage else None
-        gen = None
-        trans_id = None
-        number_of_changes = None
-        if info:
-            info = info[0]
+        gen = trans_id = number_of_changes = None
+        if 'changes_to_return' in self._storage:
+            info = self._storage.get('changes_to_return')[0]
             gen = info['gen']
             trans_id = info['trans_id']
             number_of_changes = len(info['changes_to_return'])
@@ -132,12 +131,11 @@ class ServerSyncState(object):
                          received during the current sync process.
         :type received: int
         """
-        info = self._storage.get('changes_to_return') if 'changes_to_return' in self._storage else None
         gen = trans_id = next_change_to_return = None
-        if info:
-            info = info[0]
+        if 'changes_to_return' in self._storage:
+            info = self._storage.get('changes_to_return')[0]
             gen = info['gen']
             trans_id = info['trans_id']
             if received < len(info['changes_to_return']):
-                next_change_to_return = tuple(info['changes_to_return'][received])
+                next_change_to_return = (info['changes_to_return'][received])
         return gen, trans_id, next_change_to_return

@@ -719,7 +719,8 @@ class CouchDatabase(CommonBackend):
             return None
         return self.__parse_doc_from_couch(result, doc_id, check_for_conflicts)
 
-    def __parse_doc_from_couch(self, result, doc_id, check_for_conflicts=False):
+    def __parse_doc_from_couch(self, result, doc_id,
+                               check_for_conflicts=False):
         # restrict to u1db documents
         if 'u1db_rev' not in result:
             return None
@@ -1155,7 +1156,8 @@ class CouchDatabase(CommonBackend):
         :param sync_id: The id of the current sync session.
         :type sync_id: str
         """
-        self.cache[other_replica_uid] = (other_generation, other_transaction_id)
+        self.cache[other_replica_uid] = (other_generation,
+                                         other_transaction_id)
         doc_id = 'u1db_sync_%s' % other_replica_uid
         try:
             doc = self._database[doc_id]
@@ -1164,7 +1166,6 @@ class CouchDatabase(CommonBackend):
         doc['generation'] = other_generation
         doc['transaction_id'] = other_transaction_id
         self._database.save(doc)
-        self.cache[other_replica_uid] = (other_generation, other_transaction_id)
 
     def _force_doc_sync_conflict(self, doc):
         """
@@ -1175,7 +1176,8 @@ class CouchDatabase(CommonBackend):
         """
         my_doc = self._get_doc(doc.doc_id)
         self._prune_conflicts(doc, vectorclock.VectorClockRev(doc.rev))
-        doc.add_conflict(self._factory(doc.doc_id, my_doc.rev, my_doc.get_json()))
+        doc.add_conflict(self._factory(doc.doc_id, my_doc.rev,
+                                       my_doc.get_json()))
         doc.has_conflicts = True
         self._put_doc(my_doc, doc)
 
@@ -1293,8 +1295,9 @@ class CouchDatabase(CommonBackend):
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if my_doc:
             doc.set_conflicts(my_doc.get_conflicts())
-        return CommonBackend._put_doc_if_newer(self, doc, save_conflict, replica_uid,
-                                               replica_gen, replica_trans_id)
+        return CommonBackend._put_doc_if_newer(self, doc, save_conflict,
+                                               replica_uid, replica_gen,
+                                               replica_trans_id)
 
     def _put_and_update_indexes(self, cur_doc, doc):
         self._put_doc(cur_doc, doc)
