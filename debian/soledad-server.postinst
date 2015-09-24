@@ -1,0 +1,11 @@
+#!/bin/sh
+
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+id soledad-admin > /dev/null
+RET=$?
+
+if [ ! $RET -eq 0 ]; then
+	adduser --system soledad-admin --home /srv/leap/ --disabled-password --shell /bin/sh --ingroup nogroup
+fi
+
