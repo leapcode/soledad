@@ -23,6 +23,7 @@ import threading
 
 from urlparse import urljoin
 from twisted.internet import defer
+from uuid import uuid4
 
 from leap.soledad.client import Soledad
 from leap.soledad.common.couch import CouchDatabase, CouchServerState
@@ -55,7 +56,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
     sync_target = soledad_sync_target
 
-    def _soledad_instance(self, user='user-uuid', passphrase=u'123',
+    def _soledad_instance(self, user=None, passphrase=u'123',
                           prefix='',
                           secrets_path='secrets.json',
                           local_db_path='soledad.u1db', server_url='',
@@ -63,6 +64,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         """
         Instantiate Soledad.
         """
+        user = user or self.user
 
         # this callback ensures we save a document which is sent to the shared
         # db.
@@ -83,15 +85,15 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         return soledad
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url)
+        self.request_state = CouchServerState(self.couch_url)
         return self.make_app_after_state(self.request_state)
 
     def setUp(self):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
+        self.user = ('user-%s' % uuid4().hex)
         self.db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
+            urljoin(self.couch_url, 'user-' + self.user),
             create=True,
             replica_uid='replica',
             ensure_ddocs=True)

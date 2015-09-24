@@ -50,7 +50,7 @@ from leap.soledad.server.auth import URLToAuthorization
 
 def _couch_ensure_database(self, dbname):
     db = CouchDatabase.open_database(
-        self._couch_url + '/' + dbname,
+        self.couch_url + '/' + dbname,
         create=True,
         ensure_ddocs=True)
     return db, db._replica_uid
@@ -325,7 +325,7 @@ class EncryptedSyncTestCase(
             shared_db=self.get_default_shared_mock(_put_doc_side_effect))
 
     def make_app(self):
-        self.request_state = CouchServerState(self._couch_url)
+        self.request_state = CouchServerState(self.couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
@@ -333,7 +333,6 @@ class EncryptedSyncTestCase(
         # dependencies.
         # XXX explain better
         CouchDBTestCase.setUp(self)
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
 
@@ -368,7 +367,7 @@ class EncryptedSyncTestCase(
 
         # ensure remote db exists before syncing
         db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-' + user),
+            urljoin(self.couch_url, 'user-' + user),
             create=True,
             ensure_ddocs=True)
 
@@ -494,27 +493,18 @@ class LockResourceTestCase(
         # dependencies.
         # XXX explain better
         CouchDBTestCase.setUp(self)
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
         # create the databases
-        CouchDatabase.open_database(
-            urljoin(self._couch_url, 'shared'),
+        db = CouchDatabase.open_database(
+            urljoin(self.couch_url, ('shared-%s' % (uuid4().hex))),
             create=True,
             ensure_ddocs=True)
-        CouchDatabase.open_database(
-            urljoin(self._couch_url, 'tokens'),
-            create=True,
-            ensure_ddocs=True)
-        self._state = CouchServerState(self._couch_url)
+        self.addCleanup(db.delete_database)
+        self._state = CouchServerState(self.couch_url)
+        self._state.open_database = mock.Mock(return_value=db)
 
     def tearDown(self):
-        # delete remote database
-        db = CouchDatabase.open_database(
-            urljoin(self._couch_url, 'shared'),
-            create=True,
-            ensure_ddocs=True)
-        db.delete_database()
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
 

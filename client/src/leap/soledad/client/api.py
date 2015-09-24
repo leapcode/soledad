@@ -718,7 +718,7 @@ class Soledad(object):
             return failure
 
         def _emit_done_data_sync(passthrough):
-            soledad_events.emit(
+            soledad_events.emit_async(
                 soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
             return passthrough
 

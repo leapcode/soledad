@@ -261,6 +261,16 @@ class SoledadSecrets(object):
         logger.info("Could not find a secret in local storage.")
         return False
 
+    def _maybe_set_active_secret(self, active_secret):
+        """
+        If no secret_id is already set, choose the passed active secret, or
+        just choose first secret available if none.
+        """
+        if not self._secret_id:
+            if not active_secret:
+                active_secret = self._secrets.items()[0][0]
+            self.set_secret_id(active_secret)
+
     def _load_secrets(self):
         """
         Load storage secrets from local file.
@@ -270,12 +280,7 @@ class SoledadSecrets(object):
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
         _, active_secret = self._import_recovery_document(content)
-        # choose first secret if no secret_id was given
-        if self._secret_id is None:
-            if active_secret is None:
-                self.set_secret_id(self._secrets.items()[0][0])
-            else:
-                self.set_secret_id(active_secret)
+        self._maybe_set_active_secret(active_secret)
         # enlarge secret if needed
         enlarged = False
         if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
@@ -306,12 +311,8 @@ class SoledadSecrets(object):
                 'Found cryptographic secrets in shared recovery '
                 'database.')
             _, active_secret = self._import_recovery_document(doc.content)
+            self._maybe_set_active_secret(active_secret)
             self._store_secrets()  # save new secrets in local file
-            if self._secret_id is None:
-                if active_secret is None:
-                    self.set_secret_id(self._secrets.items()[0][0])
-                else:
-                    self.set_secret_id(active_secret)
         else:
             # STAGE 3 - there are no secrets in server also, so
             # generate a secret and store it in remote db.
@@ -432,13 +433,13 @@ class SoledadSecrets(object):
         :return: a document with encrypted key material in its contents
         :rtype: document.SoledadDocument
         """
-        events.emit(events.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         doc = db.get_doc(self._shared_db_doc_id())
-        events.emit(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
         return doc
 
     def _put_secrets_in_shared_db(self):
@@ -461,13 +462,13 @@ class SoledadSecrets(object):
         # fill doc with encrypted secrets
         doc.content = self._export_recovery_document()
         # upload secrets to server
-        events.emit(events.SOLEDAD_UPLOADING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_UPLOADING_KEYS, self._uuid)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         db.put_doc(doc)
-        events.emit(events.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
 
     #
     # Management of secret for symmetric encryption.
@@ -587,13 +588,13 @@ class SoledadSecrets(object):
         :return: The id of the generated secret.
         :rtype: str
         """
-        events.emit(events.SOLEDAD_CREATING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_CREATING_KEYS, self._uuid)
         # generate random secret
         secret = os.urandom(self.GEN_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         self._secrets[secret_id] = secret
         self._store_secrets()
-        events.emit(events.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
         return secret_id
 
     def _store_secrets(self):

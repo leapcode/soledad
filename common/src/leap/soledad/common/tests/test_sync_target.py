@@ -63,13 +63,12 @@ class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
 
     def setUp(self):
         SoledadWithCouchServerMixin.setUp(self)
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
         creds = {'token': {
             'uuid': 'user-uuid',
             'token': 'auth-token',
         }}
         self.target = target.SoledadHTTPSyncTarget(
-            self._couch_url,
+            self.couch_url,
             uuid4().hex,
             creds,
             self._soledad._crypto,
@@ -151,11 +150,12 @@ def make_local_db_and_soledad_target(
         test, path='test',
         source_replica_uid=uuid4().hex):
     test.startTwistedServer()
-    db = test.request_state._create_database(os.path.basename(path))
+    replica_uid = os.path.basename(path)
+    db = test.request_state._create_database(replica_uid)
     sync_db = test._soledad._sync_db
     sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
-        test, path,
+        test, db._dbname,
         source_replica_uid=source_replica_uid,
         sync_db=sync_db,
         sync_enc_pool=sync_enc_pool)
@@ -191,6 +191,8 @@ class TestSoledadSyncTarget(
             self.startTwistedServer()
         sync_db = self._soledad._sync_db
         sync_enc_pool = self._soledad._sync_enc_pool
+        if path is None:
+            path = self.db2._dbname
         target = self.sync_target(
             self, path,
             source_replica_uid=source_replica_uid,
@@ -204,11 +206,11 @@ class TestSoledadSyncTarget(
         SoledadWithCouchServerMixin.setUp(self)
         self.startTwistedServer()
         self.db1 = make_sqlcipher_database_for_test(self, 'test1')
-        self.db2 = self.request_state._create_database('test2')
+        self.db2 = self.request_state._create_database('test')
 
     def tearDown(self):
         # db2, _ = self.request_state.ensure_database('test2')
-        self.db2.delete_database()
+        self.delete_db(self.db2._dbname)
         self.db1.close()
         SoledadWithCouchServerMixin.tearDown(self)
         TestWithScenarios.tearDown(self)
@@ -220,8 +222,8 @@ class TestSoledadSyncTarget(
 
         This test was adapted to decrypt remote content before assert.
         """
-        db = self.request_state._create_database('test')
-        remote_target = self.getSyncTarget('test')
+        db = self.db2
+        remote_target = self.getSyncTarget()
         other_docs = []
 
         def receive_doc(doc, gen, trans_id):
@@ -247,7 +249,7 @@ class TestSoledadSyncTarget(
         def blackhole_getstderr(inst):
             return cStringIO.StringIO()
 
-        db = self.request_state._create_database('test')
+        db = self.db2
         _put_doc_if_newer = db._put_doc_if_newer
         trigger_ids = ['doc-here2']
 
@@ -267,7 +269,6 @@ class TestSoledadSyncTarget(
         self.patch(
             IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
         remote_target = self.getSyncTarget(
-            'test',
             source_replica_uid='replica')
         other_changes = []
 
@@ -317,7 +318,7 @@ class TestSoledadSyncTarget(
 
         This test was adapted to decrypt remote content before assert.
         """
-        remote_target = self.getSyncTarget('test')
+        remote_target = self.getSyncTarget()
         other_docs = []
         replica_uid_box = []
 
@@ -333,7 +334,7 @@ class TestSoledadSyncTarget(
             last_known_trans_id=None, insert_doc_cb=receive_doc,
             ensure_callback=ensure_cb, defer_decryption=False)
         self.assertEqual(1, new_gen)
-        db = self.request_state.open_database('test')
+        db = self.db2
         self.assertEqual(1, len(replica_uid_box))
         self.assertEqual(db._replica_uid, replica_uid_box[0])
         self.assertGetEncryptedDoc(
@@ -346,10 +347,9 @@ class TestSoledadSyncTarget(
 
     @defer.inlineCallbacks
     def test_get_sync_info(self):
-        db = self.request_state._create_database('test')
+        db = self.db2
         db._set_replica_gen_and_trans_id('other-id', 1, 'T-transid')
         remote_target = self.getSyncTarget(
-            'test',
             source_replica_uid='other-id')
         sync_info = yield remote_target.get_sync_info('other-id')
         self.assertEqual(
@@ -358,19 +358,17 @@ class TestSoledadSyncTarget(
 
     @defer.inlineCallbacks
     def test_record_sync_info(self):
-        db = self.request_state._create_database('test')
         remote_target = self.getSyncTarget(
-            'test',
             source_replica_uid='other-id')
         yield remote_target.record_sync_info('other-id', 2, 'T-transid')
-        self.assertEqual(
-            (2, 'T-transid'), db._get_replica_gen_and_trans_id('other-id'))
+        self.assertEqual((2, 'T-transid'),
+                         self.db2._get_replica_gen_and_trans_id('other-id'))
 
     @defer.inlineCallbacks
     def test_sync_exchange_receive(self):
-        db = self.request_state._create_database('test')
+        db = self.db2
         doc = db.create_doc_from_json('{"value": "there"}')
-        remote_target = self.getSyncTarget('test')
+        remote_target = self.getSyncTarget()
         other_changes = []
 
         def receive_doc(doc, gen, trans_id):
@@ -423,10 +421,10 @@ class SoledadDatabaseSyncTargetTests(
         self.db, self.st = make_local_db_and_soledad_target(self)
 
     def tearDown(self):
-        tests.TestCaseWithServer.tearDown(self)
-        SoledadWithCouchServerMixin.tearDown(self)
         self.db.close()
         self.st.close()
+        tests.TestCaseWithServer.tearDown(self)
+        SoledadWithCouchServerMixin.tearDown(self)
 
     def set_trace_hook(self, callback, shallow=False):
         setter = (self.st._set_trace_hook if not shallow else
@@ -818,10 +816,6 @@ class TestSoledadDbSync(
     oauth = False
     token = False
 
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
-        return self.make_app_with_state(self.request_state)
-
     def setUp(self):
         """
         Need to explicitely invoke inicialization on all bases.
@@ -857,13 +851,7 @@ class TestSoledadDbSync(
             defer_encryption=True, sync_db_key=sync_db_key)
         self.db1 = SQLCipherDatabase(self.opts)
 
-        self.db2 = couch.CouchDatabase.open_database(
-            urljoin(
-                'http://localhost:' + str(self.wrapper.port),
-                'test'
-            ),
-            create=True,
-            ensure_ddocs=True)
+        self.db2 = self.request_state._create_database(replica_uid='test')
 
     def tearDown(self):
         """
@@ -890,7 +878,7 @@ class TestSoledadDbSync(
                 'uuid': 'user-uuid',
                 'token': 'auth-token',
             }}
-            target_url = self.getURL(target_name)
+            target_url = self.getURL(self.db2._dbname)
 
             # get a u1db syncer
             crypto = self._soledad._crypto

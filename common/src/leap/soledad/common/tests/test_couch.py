@@ -25,6 +25,7 @@ import json
 
 from urlparse import urljoin
 from couchdb.client import Server
+from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 
@@ -42,7 +43,6 @@ from leap.soledad.common.tests.util import sync_via_synchronizer
 
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import DatabaseBaseTests
-from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 
 from u1db.backends.inmemory import InMemoryIndex
 
@@ -56,8 +56,8 @@ class TestCouchBackendImpl(CouchDBTestCase):
     def test__allocate_doc_id(self):
         db = couch.CouchDatabase.open_database(
             urljoin(
-                'http://localhost:' + str(self.wrapper.port),
-                'u1db_tests'
+                'http://localhost:' + str(self.couch_port),
+                ('test-%s' % uuid4().hex)
             ),
             create=True,
             ensure_ddocs=True)
@@ -66,6 +66,7 @@ class TestCouchBackendImpl(CouchDBTestCase):
         self.assertEqual(34, len(doc_id1))
         int(doc_id1[len('D-'):], 16)
         self.assertNotEqual(doc_id1, db._allocate_doc_id())
+        self.delete_db(db._dbname)
 
 
 # -----------------------------------------------------------------------------
@@ -73,25 +74,28 @@ class TestCouchBackendImpl(CouchDBTestCase):
 # -----------------------------------------------------------------------------
 
 def make_couch_database_for_test(test, replica_uid):
-    port = str(test.wrapper.port)
-    return couch.CouchDatabase.open_database(
-        urljoin('http://localhost:' + port, replica_uid),
+    port = str(test.couch_port)
+    dbname = ('test-%s' % uuid4().hex)
+    db = couch.CouchDatabase.open_database(
+        urljoin('http://localhost:' + port, dbname),
         create=True,
         replica_uid=replica_uid or 'test',
         ensure_ddocs=True)
+    test.addCleanup(test.delete_db, dbname)
+    return db
 
 
 def copy_couch_database_for_test(test, db):
-    port = str(test.wrapper.port)
+    port = str(test.couch_port)
     couch_url = 'http://localhost:' + port
-    new_dbname = db._replica_uid + '_copy'
+    new_dbname = db._dbname + '_copy'
     new_db = couch.CouchDatabase.open_database(
         urljoin(couch_url, new_dbname),
         create=True,
         replica_uid=db._replica_uid or 'test')
     # copy all docs
     session = couch.Session()
-    old_couch_db = Server(couch_url, session=session)[db._replica_uid]
+    old_couch_db = Server(couch_url, session=session)[db._dbname]
     new_couch_db = Server(couch_url, session=session)[new_dbname]
     for doc_id in old_couch_db:
         doc = old_couch_db.get(doc_id)
@@ -143,24 +147,6 @@ class CouchTests(
 
     scenarios = COUCH_SCENARIOS
 
-    def setUp(self):
-        test_backends.AllDatabaseTests.setUp(self)
-        # save db info because of test_close
-        self._url = self.db._url
-        self._dbname = self.db._dbname
-
-    def tearDown(self):
-        # if current test is `test_close` we have to use saved objects to
-        # delete the database because the close() method will have removed the
-        # references needed to do it using the CouchDatabase.
-        if self.id().endswith('test_couch.CouchTests.test_close(couch)'):
-            session = couch.Session()
-            server = Server(url=self._url, session=session)
-            del(server[self._dbname])
-        else:
-            self.db.delete_database()
-        test_backends.AllDatabaseTests.tearDown(self)
-
 
 class CouchDatabaseTests(
         TestWithScenarios,
@@ -168,10 +154,6 @@ class CouchDatabaseTests(
         CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
-
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseTests.tearDown(self)
 
 
 class CouchValidateGenNTransIdTests(
@@ -181,10 +163,6 @@ class CouchValidateGenNTransIdTests(
 
     scenarios = COUCH_SCENARIOS
 
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseValidateGenNTransIdTests.tearDown(self)
-
 
 class CouchValidateSourceGenTests(
         TestWithScenarios,
@@ -193,10 +171,6 @@ class CouchValidateSourceGenTests(
 
     scenarios = COUCH_SCENARIOS
 
-    def tearDown(self):
-        self.db.delete_database()
-        test_backends.LocalDatabaseValidateSourceGenTests.tearDown(self)
-
 
 class CouchWithConflictsTests(
         TestWithScenarios,
@@ -204,10 +178,6 @@ class CouchWithConflictsTests(
         CouchDBTestCase):
 
         scenarios = COUCH_SCENARIOS
-
-        def tearDown(self):
-            self.db.delete_database()
-            test_backends.LocalDatabaseWithConflictsTests.tearDown(self)
 
 
 # Notice: the CouchDB backend does not have indexing capabilities, so we do
@@ -237,7 +207,6 @@ nested_doc = tests.nested_doc
 class CouchDatabaseSyncTargetTests(
         TestWithScenarios,
         DatabaseBaseTests,
-        TestCaseWithServer,
         CouchDBTestCase):
 
     # TODO: implement _set_trace_hook(_shallow) in CouchSyncTarget so
@@ -260,26 +229,13 @@ class CouchDatabaseSyncTargetTests(
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
-        # from DatabaseBaseTests.setUp
-        self.db = self.create_database('test')
-        # from TestCaseWithServer.setUp
-        self.server = self.server_thread = self.port = None
         # other stuff
         self.db, self.st = self.create_db_and_target(self)
         self.other_changes = []
 
     def tearDown(self):
+        self.db.close()
         CouchDBTestCase.tearDown(self)
-        # from TestCaseWithServer.tearDown
-        if self.server is not None:
-            self.server.shutdown()
-            self.server_thread.join()
-            self.server.server_close()
-        if self.port:
-            self.port.stopListening()
-        # from DatabaseBaseTests.tearDown
-        if hasattr(self, 'db') and self.db is not None:
-            self.db.close()
 
     def receive_doc(self, doc, gen, trans_id):
         self.other_changes.append(
@@ -724,17 +680,8 @@ class CouchDatabaseSyncTests(
             self.db3, self.db1_copy, self.db2_copy
         ]:
             if db is not None:
-                db.delete_database()
+                self.delete_db(db._dbname)
                 db.close()
-        for replica_uid, dbname in [
-            ('test1_copy', 'source'),
-            ('test2_copy', 'target'),
-            ('test3', 'target')
-        ]:
-            db = self.create_database(replica_uid, dbname)
-            db.delete_database()
-            # cleanup connections to avoid leaking of file descriptors
-            db.close()
         DatabaseBaseTests.tearDown(self)
 
     def assertLastExchangeLog(self, db, expected):
@@ -1203,7 +1150,7 @@ class CouchDatabaseSyncTests(
         self.db1 = self.create_database('test1', 'both')
         self.db2 = self.create_database('test2', 'both')
         doc1 = self.db1.create_doc_from_json('{"a": 1}', doc_id='the-doc')
-        db3 = self.create_database('test3', 'both')
+        self.db3 = self.create_database('test3', 'both')
         self.sync(self.db2, self.db1)
         self.assertEqual(
             self.db1._get_generation_info(),
@@ -1211,20 +1158,20 @@ class CouchDatabaseSyncTests(
         self.assertEqual(
             self.db2._get_generation_info(),
             self.db1._get_replica_gen_and_trans_id(self.db2._replica_uid))
-        self.sync(db3, self.db1)
+        self.sync(self.db3, self.db1)
         # update on 2
         doc2 = self.make_document('the-doc', doc1.rev, '{"a": 2}')
         self.db2.put_doc(doc2)
-        self.sync(self.db2, db3)
-        self.assertEqual(db3.get_doc('the-doc').rev, doc2.rev)
+        self.sync(self.db2, self.db3)
+        self.assertEqual(self.db3.get_doc('the-doc').rev, doc2.rev)
         # update on 1
         doc1.set_json('{"a": 3}')
         self.db1.put_doc(doc1)
         # conflicts
         self.sync(self.db2, self.db1)
-        self.sync(db3, self.db1)
+        self.sync(self.db3, self.db1)
         self.assertTrue(self.db2.get_doc('the-doc').has_conflicts)
-        self.assertTrue(db3.get_doc('the-doc').has_conflicts)
+        self.assertTrue(self.db3.get_doc('the-doc').has_conflicts)
         # resolve
         conflicts = self.db2.get_doc_conflicts('the-doc')
         doc4 = self.make_document('the-doc', None, '{"a": 4}')
@@ -1233,38 +1180,38 @@ class CouchDatabaseSyncTests(
         doc2 = self.db2.get_doc('the-doc')
         self.assertEqual(doc4.get_json(), doc2.get_json())
         self.assertFalse(doc2.has_conflicts)
-        self.sync(self.db2, db3)
-        doc3 = db3.get_doc('the-doc')
+        self.sync(self.db2, self.db3)
+        doc3 = self.db3.get_doc('the-doc')
         self.assertEqual(doc4.get_json(), doc3.get_json())
         self.assertFalse(doc3.has_conflicts)
 
     def test_sync_supersedes_conflicts(self):
         self.db1 = self.create_database('test1', 'both')
         self.db2 = self.create_database('test2', 'target')
-        db3 = self.create_database('test3', 'both')
+        self.db3 = self.create_database('test3', 'both')
         doc1 = self.db1.create_doc_from_json('{"a": 1}', doc_id='the-doc')
         self.db2.create_doc_from_json('{"b": 1}', doc_id='the-doc')
-        db3.create_doc_from_json('{"c": 1}', doc_id='the-doc')
-        self.sync(db3, self.db1)
+        self.db3.create_doc_from_json('{"c": 1}', doc_id='the-doc')
+        self.sync(self.db3, self.db1)
         self.assertEqual(
             self.db1._get_generation_info(),
-            db3._get_replica_gen_and_trans_id(self.db1._replica_uid))
+            self.db3._get_replica_gen_and_trans_id(self.db1._replica_uid))
         self.assertEqual(
-            db3._get_generation_info(),
-            self.db1._get_replica_gen_and_trans_id(db3._replica_uid))
-        self.sync(db3, self.db2)
+            self.db3._get_generation_info(),
+            self.db1._get_replica_gen_and_trans_id(self.db3._replica_uid))
+        self.sync(self.db3, self.db2)
         self.assertEqual(
             self.db2._get_generation_info(),
-            db3._get_replica_gen_and_trans_id(self.db2._replica_uid))
+            self.db3._get_replica_gen_and_trans_id(self.db2._replica_uid))
         self.assertEqual(
-            db3._get_generation_info(),
-            self.db2._get_replica_gen_and_trans_id(db3._replica_uid))
-        self.assertEqual(3, len(db3.get_doc_conflicts('the-doc')))
+            self.db3._get_generation_info(),
+            self.db2._get_replica_gen_and_trans_id(self.db3._replica_uid))
+        self.assertEqual(3, len(self.db3.get_doc_conflicts('the-doc')))
         doc1.set_json('{"a": 2}')
         self.db1.put_doc(doc1)
-        self.sync(db3, self.db1)
+        self.sync(self.db3, self.db1)
         # original doc1 should have been removed from conflicts
-        self.assertEqual(3, len(db3.get_doc_conflicts('the-doc')))
+        self.assertEqual(3, len(self.db3.get_doc_conflicts('the-doc')))
 
     def test_sync_stops_after_get_sync_info(self):
         self.db1 = self.create_database('test1', 'source')
@@ -1283,79 +1230,78 @@ class CouchDatabaseSyncTests(
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc1')
         self.assertRaises(
             u1db_errors.InvalidReplicaUID, self.sync, self.db1, self.db2)
-        # remove the reference to db2 to avoid double deleting on tearDown
-        self.db2.close()
-        self.db2 = None
 
     def test_sync_detects_rollback_in_source(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc1')
         self.sync(self.db1, self.db2)
-        db1_copy = self.copy_database(self.db1)
+        self.db1_copy = self.copy_database(self.db1)
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            u1db_errors.InvalidGeneration, self.sync, db1_copy, self.db2)
+            u1db_errors.InvalidGeneration, self.sync, self.db1_copy, self.db2)
 
     def test_sync_detects_rollback_in_target(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
-        db2_copy = self.copy_database(self.db2)
+        self.db2_copy = self.copy_database(self.db2)
         self.db2.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            u1db_errors.InvalidGeneration, self.sync, self.db1, db2_copy)
+            u1db_errors.InvalidGeneration, self.sync, self.db1, self.db2_copy)
 
     def test_sync_detects_diverged_source(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
-        db3 = self.copy_database(self.db1)
+        self.db3 = self.copy_database(self.db1)
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
-        db3.create_doc_from_json(tests.simple_doc, doc_id="divergent")
+        self.db3.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            u1db_errors.InvalidTransactionId, self.sync, db3, self.db2)
+            u1db_errors.InvalidTransactionId, self.sync, self.db3, self.db2)
 
     def test_sync_detects_diverged_target(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
-        db3 = self.copy_database(self.db2)
-        db3.create_doc_from_json(tests.nested_doc, doc_id="divergent")
+        self.db3 = self.copy_database(self.db2)
+        self.db3.create_doc_from_json(tests.nested_doc, doc_id="divergent")
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
         self.assertRaises(
-            u1db_errors.InvalidTransactionId, self.sync, self.db1, db3)
+            u1db_errors.InvalidTransactionId, self.sync, self.db1, self.db3)
 
     def test_sync_detects_rollback_and_divergence_in_source(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc1')
         self.sync(self.db1, self.db2)
-        db1_copy = self.copy_database(self.db1)
+        self.db1_copy = self.copy_database(self.db1)
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.sync(self.db1, self.db2)
-        db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
-        db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
+        self.db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
+        self.db1_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.assertRaises(
-            u1db_errors.InvalidTransactionId, self.sync, db1_copy, self.db2)
+            u1db_errors.InvalidTransactionId, self.sync,
+            self.db1_copy, self.db2)
 
     def test_sync_detects_rollback_and_divergence_in_target(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         self.db1.create_doc_from_json(tests.simple_doc, doc_id="divergent")
         self.sync(self.db1, self.db2)
-        db2_copy = self.copy_database(self.db2)
+        self.db2_copy = self.copy_database(self.db2)
         self.db2.create_doc_from_json(tests.simple_doc, doc_id='doc2')
         self.db2.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.sync(self.db1, self.db2)
-        db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
-        db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
+        self.db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc2')
+        self.db2_copy.create_doc_from_json(tests.simple_doc, doc_id='doc3')
         self.assertRaises(
-            u1db_errors.InvalidTransactionId, self.sync, self.db1, db2_copy)
+            u1db_errors.InvalidTransactionId, self.sync,
+            self.db1, self.db2_copy)
 
     def test_optional_sync_preserve_json(self):
         self.db1 = self.create_database('test1', 'source')
@@ -1373,10 +1319,14 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
+
+    def create_db(self, ensure=True, dbname=None):
+        if not dbname:
+            dbname = ('test-%s' % uuid4().hex)
         self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
+            urljoin('http://127.0.0.1:%d' % self.couch_port, dbname),
             create=True,
-            ensure_ddocs=False)  # note that we don't enforce ddocs here
+            ensure_ddocs=ensure)
 
     def tearDown(self):
         self.db.delete_database()
@@ -1388,6 +1338,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents will raise if the
         design docs are not present.
         """
+        self.create_db(ensure=False)
         # _get_generation()
         self.assertRaises(
             errors.MissingDesignDocError,
@@ -1418,10 +1369,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents list functions
         will raise if the functions are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # erase views from _design/transactions
         transactions = self.db._database['_design/transactions']
         transactions['lists'] = {}
@@ -1448,10 +1396,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents list functions
         will raise if the functions are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # erase views from _design/transactions
         transactions = self.db._database['_design/transactions']
         del transactions['lists']
@@ -1478,10 +1423,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents' named views  will
         raise if the views are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # erase views from _design/docs
         docs = self.db._database['_design/docs']
         del docs['views']
@@ -1520,10 +1462,7 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         Test that all methods that access design documents will raise if the
         design docs are not present.
         """
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.wrapper.port, 'test'),
-            create=True,
-            ensure_ddocs=True)
+        self.create_db(ensure=True)
         # delete _design/docs
         del self.db._database['_design/docs']
         # delete _design/syncs
@@ -1554,3 +1493,16 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
             self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
+
+    def test_ensure_ddoc_independently(self):
+        """
+        Test that a missing ddocs other than _design/docs will be ensured
+        even if _design/docs is there.
+        """
+        self.create_db(ensure=True)
+        del self.db._database['_design/transactions']
+        self.assertRaises(
+            errors.MissingDesignDocDeletedError,
+            self.db._get_transaction_log)
+        self.create_db(ensure=True, dbname=self.db._dbname)
+        self.db._get_transaction_log()

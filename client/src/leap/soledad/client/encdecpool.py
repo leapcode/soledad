@@ -74,6 +74,8 @@ class SyncEncryptDecryptPool(object):
         self._started = True
 
     def stop(self):
+        if not self._started:
+            return
         self._started = False
         self._destroy_pool()
         # maybe cancel the next delayed call

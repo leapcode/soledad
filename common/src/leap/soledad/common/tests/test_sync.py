@@ -56,14 +56,13 @@ class InterruptableSyncTestCase(
     sync_target = soledad_sync_target
 
     def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
+        self.request_state = couch.CouchServerState(self.couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
-        self._couch_url = 'http://localhost:' + str(self.wrapper.port)
 
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
@@ -103,7 +102,7 @@ class InterruptableSyncTestCase(
 
         # ensure remote db exists before syncing
         db = couch.CouchDatabase.open_database(
-            urljoin(self._couch_url, 'user-user-uuid'),
+            urljoin(self.couch_url, 'user-user-uuid'),
             create=True,
             ensure_ddocs=True)
 
@@ -148,8 +147,8 @@ class InterruptableSyncTestCase(
 
 class TestSoledadDbSync(
         TestWithScenarios,
-        tests.TestCaseWithServer,
-        SoledadWithCouchServerMixin):
+        SoledadWithCouchServerMixin,
+        tests.TestCaseWithServer):
 
     """
     Test db.sync remote sync shortcut
@@ -166,10 +165,6 @@ class TestSoledadDbSync(
     oauth = False
     token = False
 
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
-        return self.make_app_with_state(self.request_state)
-
     def setUp(self):
         """
         Need to explicitely invoke inicialization on all bases.
@@ -177,29 +172,22 @@ class TestSoledadDbSync(
         SoledadWithCouchServerMixin.setUp(self)
         self.startTwistedServer()
         self.db = self.make_database_for_test(self, 'test1')
-        self.db2 = couch.CouchDatabase.open_database(
-            urljoin(
-                'http://localhost:' + str(self.wrapper.port),
-                'test'
-            ),
-            create=True,
-            ensure_ddocs=True)
+        self.db2 = self.request_state._create_database(replica_uid='test')
 
     def tearDown(self):
         """
         Need to explicitely invoke destruction on all bases.
         """
-        self.db2.delete_database()
         SoledadWithCouchServerMixin.tearDown(self)
         # tests.TestCaseWithServer.tearDown(self)
 
-    def do_sync(self, target_name):
+    def do_sync(self):
         """
         Perform sync using SoledadSynchronizer, SoledadSyncTarget
         and Token auth.
         """
         target = soledad_sync_target(
-            self, target_name,
+            self, self.db2._dbname,
             source_replica_uid=self._soledad._dbpool.replica_uid)
         self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
@@ -217,7 +205,7 @@ class TestSoledadDbSync(
         doc1 = self.db.create_doc_from_json(tests.simple_doc)
         doc2 = self.db2.create_doc_from_json(tests.nested_doc)
 
-        local_gen_before_sync = yield self.do_sync('test')
+        local_gen_before_sync = yield self.do_sync()
         gen, _, changes = self.db.whats_changed(local_gen_before_sync)
         self.assertEqual(1, len(changes))
         self.assertEqual(doc2.doc_id, changes[0][0])

@@ -27,10 +27,8 @@ import shutil
 import random
 import string
 import u1db
-import subprocess
-import time
-import re
 import traceback
+import couchdb
 
 from uuid import uuid4
 from mock import Mock
@@ -337,119 +335,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self.assertEqual(exp_doc.content, doc.content)
 
 
-# -----------------------------------------------------------------------------
-# A wrapper for running couchdb locally.
-# -----------------------------------------------------------------------------
-
-# from: https://github.com/smcq/paisley/blob/master/paisley/test/util.py
-# TODO: include license of above project.
-class CouchDBWrapper(object):
-
-    """
-    Wrapper for external CouchDB instance which is started and stopped for
-    testing.
-    """
-    BOOT_TIMEOUT_SECONDS = 5
-    RETRY_LIMIT = 3
-
-    def start(self):
-        tries = 0
-        while tries < self.RETRY_LIMIT and not hasattr(self, 'port'):
-            try:
-                self._try_start()
-                return
-            except Exception, e:
-                print traceback.format_exc()
-                self.stop()
-                tries += 1
-        raise Exception(
-            "Check your couchdb: Tried to start 3 times and failed badly")
-
-    def _try_start(self):
-        """
-        Start a CouchDB instance for a test.
-        """
-        self.tempdir = tempfile.mkdtemp(suffix='.couch.test')
-
-        path = os.path.join(os.path.dirname(__file__),
-                            'couchdb.ini.template')
-        handle = open(path)
-        conf = handle.read() % {
-            'tempdir': self.tempdir,
-        }
-        handle.close()
-
-        shutil.copy('/etc/couchdb/default.ini', self.tempdir)
-        defaultConfPath = os.path.join(self.tempdir, 'default.ini')
-
-        confPath = os.path.join(self.tempdir, 'test.ini')
-        handle = open(confPath, 'w')
-        handle.write(conf)
-        handle.close()
-
-        # create the dirs from the template
-        mkdir_p(os.path.join(self.tempdir, 'lib'))
-        mkdir_p(os.path.join(self.tempdir, 'log'))
-        args = ['/usr/bin/couchdb', '-n',
-                '-a', defaultConfPath, '-a', confPath]
-        null = open('/dev/null', 'w')
-
-        self.process = subprocess.Popen(
-            args, env=None, stdout=null.fileno(), stderr=null.fileno(),
-            close_fds=True)
-        boot_time = time.time()
-        # find port
-        logPath = os.path.join(self.tempdir, 'log', 'couch.log')
-        while not os.path.exists(logPath):
-            if self.process.poll() is not None:
-                got_stdout, got_stderr = "", ""
-                if self.process.stdout is not None:
-                    got_stdout = self.process.stdout.read()
-
-                if self.process.stderr is not None:
-                    got_stderr = self.process.stderr.read()
-                raise Exception("""
-couchdb exited with code %d.
-stdout:
-%s
-stderr:
-%s""" % (
-                    self.process.returncode, got_stdout, got_stderr))
-            time.sleep(0.01)
-            if (time.time() - boot_time) > self.BOOT_TIMEOUT_SECONDS:
-                self.stop()
-                raise Exception("Timeout starting couch")
-        while os.stat(logPath).st_size == 0:
-            time.sleep(0.01)
-            if (time.time() - boot_time) > self.BOOT_TIMEOUT_SECONDS:
-                self.stop()
-                raise Exception("Timeout starting couch")
-        PORT_RE = re.compile(
-            'Apache CouchDB has started on http://127.0.0.1:(?P<port>\d+)')
-
-        handle = open(logPath)
-        line = handle.read()
-        handle.close()
-        m = PORT_RE.search(line)
-        if not m:
-            self.stop()
-            raise Exception("Cannot find port in line %s" % line)
-        self.port = int(m.group('port'))
-
-    def stop(self):
-        """
-        Terminate the CouchDB instance.
-        """
-        try:
-            self.process.terminate()
-            self.process.communicate()
-        except:
-            # just to clean up
-            # if it can't, the process wasn't created anyway
-            pass
-        shutil.rmtree(self.tempdir)
-
-
 class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
 
     """
@@ -460,15 +345,16 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
         """
         Make sure we have a CouchDB instance for a test.
         """
-        self.wrapper = CouchDBWrapper()
-        self.wrapper.start()
-        # self.db = self.wrapper.db
+        self.couch_port = 5984
+        self.couch_url = 'http://localhost:%d' % self.couch_port
+        self.couch_server = couchdb.Server(self.couch_url)
 
-    def tearDown(self):
-        """
-        Stop CouchDB instance for test.
-        """
-        self.wrapper.stop()
+    def delete_db(self, name):
+        try:
+            self.couch_server.delete(name)
+        except:
+            # ignore if already missing
+            pass
 
 
 class CouchServerStateForTests(CouchServerState):
@@ -484,15 +370,25 @@ class CouchServerStateForTests(CouchServerState):
     which is less pleasant than allowing the db to be automatically created.
     """
 
-    def _create_database(self, dbname):
-        return CouchDatabase.open_database(
-            urljoin(self._couch_url, dbname),
+    def __init__(self, *args, **kwargs):
+        self.dbs = []
+        super(CouchServerStateForTests, self).__init__(*args, **kwargs)
+
+    def _create_database(self, replica_uid=None, dbname=None):
+        """
+        Create db and append to a list, allowing test to close it later
+        """
+        dbname = dbname or ('test-%s' % uuid4().hex)
+        db = CouchDatabase.open_database(
+            urljoin(self.couch_url, dbname),
             True,
-            replica_uid=dbname,
+            replica_uid=replica_uid or 'test',
             ensure_ddocs=True)
+        self.dbs.append(db)
+        return db
 
     def ensure_database(self, dbname):
-        db = self._create_database(dbname)
+        db = self._create_database(dbname=dbname)
         return db, db.replica_uid
 
 
@@ -506,23 +402,20 @@ class SoledadWithCouchServerMixin(
         main_test_class = getattr(self, 'main_test_class', None)
         if main_test_class is not None:
             main_test_class.setUp(self)
-        self._couch_url = 'http://localhost:%d' % self.wrapper.port
 
     def tearDown(self):
         main_test_class = getattr(self, 'main_test_class', None)
         if main_test_class is not None:
             main_test_class.tearDown(self)
         # delete the test database
-        try:
-            db = CouchDatabase(self._couch_url, 'test')
-            db.delete_database()
-        except DatabaseDoesNotExist:
-            pass
         BaseSoledadTest.tearDown(self)
         CouchDBTestCase.tearDown(self)
 
     def make_app(self):
-        couch_url = urljoin(
-            'http://localhost:' + str(self.wrapper.port), 'tests')
-        self.request_state = CouchServerStateForTests(couch_url)
+        self.request_state = CouchServerStateForTests(self.couch_url)
+        self.addCleanup(self.delete_dbs)
         return self.make_app_with_state(self.request_state)
+
+    def delete_dbs(self):
+        for db in self.request_state.dbs:
+            self.delete_db(db._dbname)

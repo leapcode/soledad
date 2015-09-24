@@ -223,7 +223,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
     def setUp(self):
         # mock signaling
         soledad.client.signal = Mock()
-        soledad.client.secrets.events.emit = Mock()
+        soledad.client.secrets.events.emit_async = Mock()
         # run parent's setUp
         BaseSoledadTest.setUp(self)
 
@@ -245,57 +245,57 @@ class SoledadSignalingTestCase(BaseSoledadTest):
           - downloading keys / done downloading keys.
           - uploading keys / done uploading keys.
         """
-        soledad.client.secrets.events.emit.reset_mock()
+        soledad.client.secrets.events.emit_async.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage3.json',
             local_db_path='alternative_stage3.u1db')
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.secrets.events.emit.mock_calls.reverse()
-        soledad.client.secrets.events.emit.call_args = \
-            soledad.client.secrets.events.emit.call_args_list[0]
-        soledad.client.secrets.events.emit.call_args_list.reverse()
+        soledad.client.secrets.events.emit_async.mock_calls.reverse()
+        soledad.client.secrets.events.emit_async.call_args = \
+            soledad.client.secrets.events.emit_async.call_args_list[0]
+        soledad.client.secrets.events.emit_async.call_args_list.reverse()
         # downloading keys signals
-        soledad.client.secrets.events.emit.assert_called_with(
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         # creating keys signals
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_CREATING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_CREATING_KEYS,
             ADDRESS,
         )
         # downloading once more (inside _put_keys_in_shared_db)
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
         # uploading keys signals
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_UPLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_UPLOADING_KEYS,
             ADDRESS,
         )
@@ -316,7 +316,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         doc.content = sol.secrets._export_recovery_document()
         sol.close()
         # reset mock
-        soledad.client.secrets.events.emit.reset_mock()
+        soledad.client.secrets.events.emit_async.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         shared_db = self.get_default_shared_mock(get_doc_return_value=doc)
         sol = self._soledad_instance(
@@ -325,17 +325,17 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             shared_db_class=shared_db)
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.secrets.events.emit.mock_calls.reverse()
-        soledad.client.secrets.events.emit.call_args = \
-            soledad.client.secrets.events.emit.call_args_list[0]
-        soledad.client.secrets.events.emit.call_args_list.reverse()
+        soledad.client.secrets.events.emit_async.mock_calls.reverse()
+        soledad.client.secrets.events.emit_async.call_args = \
+            soledad.client.secrets.events.emit_async.call_args_list[0]
+        soledad.client.secrets.events.emit_async.call_args_list.reverse()
         # assert download keys signals
-        soledad.client.secrets.events.emit.assert_called_with(
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DOWNLOADING_KEYS,
             ADDRESS,
         )
-        self._pop_mock_call(soledad.client.secrets.events.emit)
-        soledad.client.secrets.events.emit.assert_called_with(
+        self._pop_mock_call(soledad.client.secrets.events.emit_async)
+        soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
             ADDRESS,
         )
@@ -369,7 +369,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         yield sol.sync()
 
         # assert the signal has been emitted
-        soledad.client.events.emit.assert_called_with(
+        soledad.client.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_DATA_SYNC,
             ADDRESS,
         )

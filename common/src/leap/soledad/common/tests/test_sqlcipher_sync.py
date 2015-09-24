@@ -19,29 +19,26 @@ Test sqlcipher backend sync.
 """
 
 
-import json
+import os
 
 from u1db import sync
 from u1db import vectorclock
 from u1db import errors
+from uuid import uuid4
 
 from testscenarios import TestWithScenarios
-from urlparse import urljoin
 
-from twisted.internet import defer
-
-from leap.soledad.common import couch
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.crypto import decrypt_doc_dict
-from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS
 from leap.soledad.common.tests.util import make_soledad_app
+from leap.soledad.common.tests.test_sync_target import \
+    SoledadDatabaseSyncTargetTests
 from leap.soledad.common.tests.util import soledad_sync_target
 from leap.soledad.common.tests.util import BaseSoledadTest
-from leap.soledad.common.tests.util import SoledadWithCouchServerMixin
 
 
 # -----------------------------------------------------------------------------
@@ -97,23 +94,6 @@ class SQLCipherDatabaseSyncTests(
         self._use_tracking = {}
         super(tests.DatabaseBaseTests, self).setUp()
 
-    def tearDown(self):
-        super(tests.DatabaseBaseTests, self).tearDown()
-        if hasattr(self, 'db1') and isinstance(self.db1, SQLCipherDatabase):
-            self.db1.close()
-        if hasattr(self, 'db1_copy') \
-                and isinstance(self.db1_copy, SQLCipherDatabase):
-            self.db1_copy.close()
-        if hasattr(self, 'db2') \
-                and isinstance(self.db2, SQLCipherDatabase):
-            self.db2.close()
-        if hasattr(self, 'db2_copy') \
-                and isinstance(self.db2_copy, SQLCipherDatabase):
-            self.db2_copy.close()
-        if hasattr(self, 'db3') \
-                and isinstance(self.db3, SQLCipherDatabase):
-            self.db3.close()
-
     def create_database(self, replica_uid, sync_role=None):
         if replica_uid == 'test' and sync_role is None:
             # created up the chain by base class but unused
@@ -121,6 +101,7 @@ class SQLCipherDatabaseSyncTests(
         db = self.create_database_for_role(replica_uid, sync_role)
         if sync_role:
             self._use_tracking[db] = (replica_uid, sync_role)
+        self.addCleanup(db.close)
         return db
 
     def create_database_for_role(self, replica_uid, sync_role):
@@ -729,38 +710,30 @@ class SQLCipherDatabaseSyncTests(
             errors.InvalidTransactionId, self.sync, self.db1, self.db2_copy)
 
 
-def _make_local_db_and_token_http_target(test, path='test'):
+def make_local_db_and_soledad_target(
+        test, path='test',
+        source_replica_uid=uuid4().hex):
     test.startTwistedServer()
-    # ensure remote db exists before syncing
-    db = couch.CouchDatabase.open_database(
-        urljoin(test._couch_url, 'test'),
-        create=True,
-        replica_uid='test',
-        ensure_ddocs=True)
-
-    replica_uid = test._soledad._dbpool.replica_uid
+    replica_uid = os.path.basename(path)
+    db = test.request_state._create_database(replica_uid)
     sync_db = test._soledad._sync_db
     sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
-        test, path,
-        source_replica_uid=replica_uid,
+        test, db._dbname,
+        source_replica_uid=source_replica_uid,
         sync_db=sync_db,
         sync_enc_pool=sync_enc_pool)
     return db, st
 
 target_scenarios = [
     ('leap', {
-        'create_db_and_target': _make_local_db_and_token_http_target,
+        'create_db_and_target': make_local_db_and_soledad_target,
         'make_app_with_state': make_soledad_app,
         'do_sync': sync_via_synchronizer_and_soledad}),
 ]
 
 
-class SQLCipherSyncTargetTests(
-        TestWithScenarios,
-        tests.DatabaseBaseTests,
-        tests.TestCaseWithServer,
-        SoledadWithCouchServerMixin):
+class SQLCipherSyncTargetTests(SoledadDatabaseSyncTargetTests):
 
     # TODO: implement _set_trace_hook(_shallow) in SoledadHTTPSyncTarget so
     #       skipped tests can be succesfully executed.
@@ -769,368 +742,3 @@ class SQLCipherSyncTargetTests(
                                           target_scenarios))
 
     whitebox = False
-
-    def setUp(self):
-        super(tests.DatabaseBaseTests, self).setUp()
-        self.db, self.st = self.create_db_and_target(self)
-        self.addCleanup(self.st.close)
-        self.other_changes = []
-
-    def tearDown(self):
-        super(tests.DatabaseBaseTests, self).tearDown()
-
-    def assertLastExchangeLog(self, db, expected):
-        log = getattr(db, '_last_exchange_log', None)
-        if log is None:
-            return
-        self.assertEqual(expected, log)
-
-    def receive_doc(self, doc, gen, trans_id):
-        self.other_changes.append(
-            (doc.doc_id, doc.rev, doc.get_json(), gen, trans_id))
-
-    def make_app(self):
-        self.request_state = couch.CouchServerState(self._couch_url)
-        return self.make_app_with_state(self.request_state)
-
-    def set_trace_hook(self, callback, shallow=False):
-        setter = (self.st._set_trace_hook if not shallow else
-                  self.st._set_trace_hook_shallow)
-        try:
-            setter(callback)
-        except NotImplementedError:
-            self.skipTest("%s does not implement _set_trace_hook"
-                          % (self.st.__class__.__name__,))
-
-    def test_get_sync_target(self):
-        self.assertIsNot(None, self.st)
-
-    @defer.inlineCallbacks
-    def test_get_sync_info(self):
-        sync_info = yield self.st.get_sync_info('other')
-        self.assertEqual(
-            ('test', 0, '', 0, ''), sync_info)
-
-    @defer.inlineCallbacks
-    def test_create_doc_updates_sync_info(self):
-        sync_info = yield self.st.get_sync_info('other')
-        self.assertEqual(
-            ('test', 0, '', 0, ''), sync_info)
-        self.db.create_doc_from_json(tests.simple_doc)
-        sync_info = yield self.st.get_sync_info('other')
-        self.assertEqual(1, sync_info[1])
-
-    @defer.inlineCallbacks
-    def test_record_sync_info(self):
-        yield self.st.record_sync_info('replica', 10, 'T-transid')
-        sync_info = yield self.st.get_sync_info('other')
-        self.assertEqual(
-            ('test', 0, '', 10, 'T-transid'), sync_info)
-
-    @defer.inlineCallbacks
-    def test_sync_exchange(self):
-        """
-        Modified to account for possibly receiving encrypted documents from
-        sever-side.
-        """
-
-        docs_by_gen = [
-            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
-             'T-sid')]
-        new_gen, trans_id = yield self.st.sync_exchange(
-            docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertGetEncryptedDoc(
-            self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
-        self.assertTransactionLog(['doc-id'], self.db)
-        last_trans_id = self.getLastTransId(self.db)
-        self.assertEqual(([], 1, last_trans_id),
-                         (self.other_changes, new_gen, last_trans_id))
-        sync_info = yield self.st.get_sync_info('replica')
-        self.assertEqual(10, sync_info[3])
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_push_many(self):
-        """
-        Modified to account for possibly receiving encrypted documents from
-        sever-side.
-        """
-        docs_by_gen = [
-            (self.make_document(
-                'doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
-            (self.make_document('doc-id2', 'replica:1', tests.nested_doc), 11,
-             'T-2')]
-        new_gen, trans_id = yield self.st.sync_exchange(
-            docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertGetEncryptedDoc(
-            self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
-        self.assertGetEncryptedDoc(
-            self.db, 'doc-id2', 'replica:1', tests.nested_doc, False)
-        self.assertTransactionLog(['doc-id', 'doc-id2'], self.db)
-        last_trans_id = self.getLastTransId(self.db)
-        self.assertEqual(([], 2, last_trans_id),
-                         (self.other_changes, new_gen, trans_id))
-        sync_info = yield self.st.get_sync_info('replica')
-        self.assertEqual(11, sync_info[3])
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_returns_many_new_docs(self):
-        """
-        Modified to account for JSON serialization differences.
-        """
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        doc2 = self.db.create_doc_from_json(tests.nested_doc)
-        self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
-        new_gen, _ = yield self.st.sync_exchange(
-            [], 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
-        self.assertEqual(2, new_gen)
-        self.assertEqual(
-            [(doc.doc_id, doc.rev, 1),
-             (doc2.doc_id, doc2.rev, 2)],
-            [c[:2] + c[3:4] for c in self.other_changes])
-        self.assertEqual(
-            json.dumps(tests.simple_doc),
-            json.dumps(self.other_changes[0][2]))
-        self.assertEqual(
-            json.loads(tests.nested_doc),
-            json.loads(self.other_changes[1][2]))
-        if self.whitebox:
-            self.assertEqual(
-                self.db._last_exchange_log['return'],
-                {'last_gen': 2, 'docs':
-                 [(doc.doc_id, doc.rev), (doc2.doc_id, doc2.rev)]})
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_deleted(self):
-        doc = self.db.create_doc_from_json('{}')
-        edit_rev = 'replica:1|' + doc.rev
-        docs_by_gen = [
-            (self.make_document(doc.doc_id, edit_rev, None), 10, 'T-sid')]
-        new_gen, trans_id = yield self.st.sync_exchange(
-            docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertGetDocIncludeDeleted(
-            self.db, doc.doc_id, edit_rev, None, False)
-        self.assertTransactionLog([doc.doc_id, doc.doc_id], self.db)
-        last_trans_id = self.getLastTransId(self.db)
-        self.assertEqual(([], 2, last_trans_id),
-                         (self.other_changes, new_gen, trans_id))
-        sync_info = yield self.st.get_sync_info('replica')
-        self.assertEqual(10, sync_info[3])
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_refuses_conflicts(self):
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        new_doc = '{"key": "altval"}'
-        docs_by_gen = [
-            (self.make_document(doc.doc_id, 'replica:1', new_doc), 10,
-             'T-sid')]
-        new_gen, _ = yield self.st.sync_exchange(
-            docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        self.assertEqual(
-            (doc.doc_id, doc.rev, tests.simple_doc, 1),
-            self.other_changes[0][:-1])
-        self.assertEqual(1, new_gen)
-        if self.whitebox:
-            self.assertEqual(self.db._last_exchange_log['return'],
-                             {'last_gen': 1, 'docs': [(doc.doc_id, doc.rev)]})
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_ignores_convergence(self):
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        gen, txid = self.db._get_generation_info()
-        docs_by_gen = [
-            (self.make_document(
-                doc.doc_id, doc.rev, tests.simple_doc), 10, 'T-sid')]
-        new_gen, _ = yield self.st.sync_exchange(
-            docs_by_gen, 'replica', last_known_generation=gen,
-            last_known_trans_id=txid, insert_doc_cb=self.receive_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        self.assertEqual(([], 1), (self.other_changes, new_gen))
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_returns_new_docs(self):
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        new_gen, _ = yield self.st.sync_exchange(
-            [], 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        self.assertEqual(
-            (doc.doc_id, doc.rev, tests.simple_doc, 1),
-            self.other_changes[0][:-1])
-        self.assertEqual(1, new_gen)
-        if self.whitebox:
-            self.assertEqual(self.db._last_exchange_log['return'],
-                             {'last_gen': 1, 'docs': [(doc.doc_id, doc.rev)]})
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_returns_deleted_docs(self):
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.db.delete_doc(doc)
-        self.assertTransactionLog([doc.doc_id, doc.doc_id], self.db)
-        new_gen, _ = yield self.st.sync_exchange(
-            [], 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertTransactionLog([doc.doc_id, doc.doc_id], self.db)
-        self.assertEqual(
-            (doc.doc_id, doc.rev, None, 2), self.other_changes[0][:-1])
-        self.assertEqual(2, new_gen)
-        if self.whitebox:
-            self.assertEqual(self.db._last_exchange_log['return'],
-                             {'last_gen': 2, 'docs': [(doc.doc_id, doc.rev)]})
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_getting_newer_docs(self):
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        new_doc = '{"key": "altval"}'
-        docs_by_gen = [
-            (self.make_document(doc.doc_id, 'test:1|z:2', new_doc), 10,
-             'T-sid')]
-        new_gen, _ = yield self.st.sync_exchange(
-            docs_by_gen, 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertTransactionLog([doc.doc_id, doc.doc_id], self.db)
-        self.assertEqual(([], 2), (self.other_changes, new_gen))
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_with_concurrent_updates_of_synced_doc(self):
-        expected = []
-
-        def before_whatschanged_cb(state):
-            if state != 'before whats_changed':
-                return
-            cont = '{"key": "cuncurrent"}'
-            conc_rev = self.db.put_doc(
-                self.make_document(doc.doc_id, 'test:1|z:2', cont))
-            expected.append((doc.doc_id, conc_rev, cont, 3))
-
-        self.set_trace_hook(before_whatschanged_cb)
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        new_doc = '{"key": "altval"}'
-        docs_by_gen = [
-            (self.make_document(doc.doc_id, 'test:1|z:2', new_doc), 10,
-             'T-sid')]
-        new_gen, _ = yield self.st.sync_exchange(
-            docs_by_gen, 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertEqual(expected, [c[:-1] for c in self.other_changes])
-        self.assertEqual(3, new_gen)
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_with_concurrent_updates(self):
-
-        def after_whatschanged_cb(state):
-            if state != 'after whats_changed':
-                return
-            self.db.create_doc_from_json('{"new": "doc"}')
-
-        self.set_trace_hook(after_whatschanged_cb)
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        new_doc = '{"key": "altval"}'
-        docs_by_gen = [
-            (self.make_document(doc.doc_id, 'test:1|z:2', new_doc), 10,
-             'T-sid')]
-        new_gen, _ = yield self.st.sync_exchange(
-            docs_by_gen, 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertEqual(([], 2), (self.other_changes, new_gen))
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_converged_handling(self):
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        docs_by_gen = [
-            (self.make_document('new', 'other:1', '{}'), 4, 'T-foo'),
-            (self.make_document(doc.doc_id, doc.rev, doc.get_json()), 5,
-             'T-bar')]
-        new_gen, _ = yield self.st.sync_exchange(
-            docs_by_gen, 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
-        self.assertEqual(([], 2), (self.other_changes, new_gen))
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_detect_incomplete_exchange(self):
-        def before_get_docs_explode(state):
-            if state != 'before get_docs':
-                return
-            raise errors.U1DBError("fail")
-        self.set_trace_hook(before_get_docs_explode)
-        # suppress traceback printing in the wsgiref server
-        # self.patch(simple_server.ServerHandler,
-        #           'log_exception', lambda h, exc_info: None)
-        doc = self.db.create_doc_from_json(tests.simple_doc)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        with self.assertRaises((errors.U1DBError, errors.BrokenSyncStream)):
-            yield self.st.sync_exchange(
-                [], 'other-replica',
-                last_known_generation=0, last_known_trans_id=None,
-                insert_doc_cb=self.receive_doc)
-
-    @defer.inlineCallbacks
-    def test_sync_exchange_doc_ids(self):
-        sync_exchange_doc_ids = getattr(self.st, 'sync_exchange_doc_ids', None)
-        if sync_exchange_doc_ids is None:
-            self.skipTest("sync_exchange_doc_ids not implemented")
-        db2 = self.create_database('test2')
-        doc = db2.create_doc_from_json(tests.simple_doc)
-        new_gen, trans_id = sync_exchange_doc_ids(
-            db2, [(doc.doc_id, 10, 'T-sid')], 0, None,
-            insert_doc_cb=self.receive_doc)
-        self.assertGetDoc(self.db, doc.doc_id, doc.rev,
-                          tests.simple_doc, False)
-        self.assertTransactionLog([doc.doc_id], self.db)
-        last_trans_id = self.getLastTransId(self.db)
-        self.assertEqual(([], 1, last_trans_id),
-                         (self.other_changes, new_gen, trans_id))
-        self.assertEqual(10, self.st.get_sync_info(db2._replica_uid)[3])
-
-    @defer.inlineCallbacks
-    def test__set_trace_hook(self):
-        called = []
-
-        def cb(state):
-            called.append(state)
-
-        self.set_trace_hook(cb)
-        yield self.st.sync_exchange([], 'replica', 0, None, self.receive_doc)
-        yield self.st.record_sync_info('replica', 0, 'T-sid')
-        self.assertEqual(['before whats_changed',
-                          'after whats_changed',
-                          'before get_docs',
-                          'record_sync_info',
-                          ],
-                         called)
-
-    @defer.inlineCallbacks
-    def test__set_trace_hook_shallow(self):
-        if (self.st._set_trace_hook_shallow == self.st._set_trace_hook or
-            self.st._set_trace_hook_shallow.im_func ==
-                SoledadHTTPSyncTarget._set_trace_hook_shallow.im_func):
-            # shallow same as full
-            expected = ['before whats_changed',
-                        'after whats_changed',
-                        'before get_docs',
-                        'record_sync_info',
-                        ]
-        else:
-            expected = ['sync_exchange', 'record_sync_info']
-
-        called = []
-
-        def cb(state):
-            called.append(state)
-
-        self.set_trace_hook(cb, shallow=True)
-        self.st.sync_exchange([], 'replica', 0, None, self.receive_doc)
-        self.st.record_sync_info('replica', 0, 'T-sid')
-        self.assertEqual(expected, called)
