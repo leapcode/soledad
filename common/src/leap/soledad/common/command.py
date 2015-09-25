@@ -24,26 +24,27 @@ Utility to sanitize and run shell commands.
 import subprocess
 
 
-def exec_validated_cmd(cmd, args, validator=None):
+def exec_validated_cmd(cmd, argument, validator=None):
     """
-    Executes cmd, validating args with validator.
+    Executes cmd, validating argument with a validator function.
 
     :param cmd: command.
     :type dbname: str
-    :param args: arguments.
-    :type args: str
-    :param validator: optional function to validate args
+    :param argument: argument.
+    :type argument: str
+    :param validator: optional function to validate argument
     :type validator: function
 
     :return: exit code and stdout or stderr (if code != 0)
     :rtype: (int, str)
     """
-    if validator and not validator(args):
+    if validator and not validator(argument):
         return 1, "invalid argument"
     command = cmd.split(' ')
-    command.append(args)
+    command.append(argument)
     try:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
     except OSError, e:
         return 1, e
     (out, err) = process.communicate()

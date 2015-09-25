@@ -435,7 +435,7 @@ class CouchDatabase(CommonBackend):
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
-            self.ensure_security()
+            self.ensure_security_ddoc()
         self._cache = None
 
     @property
@@ -468,10 +468,15 @@ class CouchDatabase(CommonBackend):
                         getattr(ddocs, ddoc_name)))
                 self._database.save(ddoc)
 
-    def ensure_security(self):
+    def ensure_security_ddoc(self):
         """
         Make sure that only soledad user is able to access this database as
-        a member.
+        an unprivileged member, meaning that administration access will
+        be forbidden even inside an user database.
+        The goal is to make sure that only the lowest access level is given
+        to the unprivileged CouchDB user set on the server process.
+        This is achieved by creating a _security design document, see:
+        http://docs.couchdb.org/en/latest/api/database/security.html
         """
         security = self._database.security
         security['members'] = {'names': ['soledad'], 'roles': []}
@@ -1386,12 +1391,9 @@ class CouchSyncTarget(CommonSyncTarget):
             source_replica_transaction_id)
 
 
-DB_NAME_MASK = "^user-[a-f0-9]+$"
-
-
 def is_db_name_valid(name):
     """
-    Validate a user database using DB_NAME_MASK.
+    Validate a user database using a regular expression.
 
     :param name: database name.
     :type name: str
@@ -1399,7 +1401,8 @@ def is_db_name_valid(name):
     :return: boolean for name vailidity
     :rtype: bool
     """
-    return re.match(DB_NAME_MASK, name) is not None
+    db_name_regex = "^user-[a-f0-9]+$"
+    return re.match(db_name_regex, name) is not None
 
 
 class CouchServerState(ServerState):

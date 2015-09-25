@@ -1504,11 +1504,11 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
     def test_ensure_security_doc(self):
         """
         Ensure_security creates a _security ddoc to ensure that only soledad
-        will have member access to a db.
+        will have the lowest privileged access to an user db.
         """
         self.create_db(ensure=False)
         self.assertFalse(self.db._database.security)
-        self.db.ensure_security()
+        self.db.ensure_security_ddoc()
         security_ddoc = self.db._database.security
         self.assertIn('admins', security_ddoc)
         self.assertFalse(security_ddoc['admins']['names'])
