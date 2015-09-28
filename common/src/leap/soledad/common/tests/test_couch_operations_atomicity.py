@@ -35,15 +35,9 @@ from leap.soledad.common.tests.util import (
 )
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
-from leap.soledad.common.tests.test_server import _couch_ensure_database
 
 
 REPEAT_TIMES = 20
-
-
-# monkey path CouchServerState so it can ensure databases.
-
-CouchServerState.ensure_database = _couch_ensure_database
 
 
 class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
