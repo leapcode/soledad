@@ -29,7 +29,7 @@ This is meant to be used by Soledad Server.
 """
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('dbname', metavar='user-d34db33f', type=str,
-               help='database name on the format user-{uuid4}')
+                    help='database name on the format user-{uuid4}')
 NETRC_PATH = '/etc/couchdb/couchdb-admin.netrc'
 
 
@@ -40,10 +40,10 @@ def url_for_db(dbname):
     parsed_netrc = netrc.netrc(NETRC_PATH)
     host, (login, _, password) = parsed_netrc.hosts.items()[0]
     url = ('http://%(login)s:%(password)s@%(host)s:5984/%(dbname)s' % {
-           'login':login,
-           'password':password,
-           'host':host,
-           'dbname':dbname})
+           'login': login,
+           'password': password,
+           'host': host,
+           'dbname': dbname})
     return url
 
 
@@ -55,4 +55,5 @@ if __name__ == '__main__':
     url = url_for_db(args.dbname)
     db = CouchDatabase.open_database(url=url, create=True,
                                      replica_uid=None, ensure_ddocs=True)
-    print ('success! Created %s, replica_uid: %s' % (db._dbname, db.replica_uid))
+    print ('success! Created %s, replica_uid: %s' %
+           (db._dbname, db.replica_uid))
