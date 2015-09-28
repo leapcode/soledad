@@ -49,7 +49,5 @@ class ExecuteValidatedCommandTest(unittest.TestCase):
 
     def test_return_status_code_number_on_failure(self):
         status, out = exec_validated_cmd("ls", "user-bebacafe")
-        self.assertEquals(status, 2)
-        self.assertIn(
-            'ls: cannot access user-bebacafe: No such file or directory\n',
-            out)
+        self.assertNotEquals(status, 0)
+        self.assertIn('No such file or directory\n', out)
