@@ -60,6 +60,7 @@ from u1db.remote.server_state import ServerState
 
 
 from leap.soledad.common import ddocs, errors
+from leap.soledad.common.command import exec_validated_cmd
 from leap.soledad.common.document import SoledadDocument
 
 
@@ -434,6 +435,7 @@ class CouchDatabase(CommonBackend):
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
+            self.ensure_security_ddoc()
         self._cache = None
 
     @property
@@ -465,6 +467,21 @@ class CouchDatabase(CommonBackend):
                     binascii.a2b_base64(
                         getattr(ddocs, ddoc_name)))
                 self._database.save(ddoc)
+
+    def ensure_security_ddoc(self):
+        """
+        Make sure that only soledad user is able to access this database as
+        an unprivileged member, meaning that administration access will
+        be forbidden even inside an user database.
+        The goal is to make sure that only the lowest access level is given
+        to the unprivileged CouchDB user set on the server process.
+        This is achieved by creating a _security design document, see:
+        http://docs.couchdb.org/en/latest/api/database/security.html
+        """
+        security = self._database.security
+        security['members'] = {'names': ['soledad'], 'roles': []}
+        security['admins'] = {'names': [], 'roles': []}
+        self._database.security = security
 
     def get_sync_target(self):
         """
@@ -1374,13 +1391,27 @@ class CouchSyncTarget(CommonSyncTarget):
             source_replica_transaction_id)
 
 
+def is_db_name_valid(name):
+    """
+    Validate a user database using a regular expression.
+
+    :param name: database name.
+    :type name: str
+
+    :return: boolean for name vailidity
+    :rtype: bool
+    """
+    db_name_regex = "^user-[a-f0-9]+$"
+    return re.match(db_name_regex, name) is not None
+
+
 class CouchServerState(ServerState):
 
     """
     Inteface of the WSGI server with the CouchDB backend.
     """
 
-    def __init__(self, couch_url):
+    def __init__(self, couch_url, create_cmd=None):
         """
         Initialize the couch server state.
 
@@ -1388,6 +1419,7 @@ class CouchServerState(ServerState):
         :type couch_url: str
         """
         self.couch_url = couch_url
+        self.create_cmd = create_cmd
 
     def open_database(self, dbname):
         """
@@ -1409,20 +1441,28 @@ class CouchServerState(ServerState):
         """
         Ensure couch database exists.
 
-        Usually, this method is used by the server to ensure the existence of
-        a database. In our setup, the Soledad user that accesses the underlying
-        couch server should never have permission to create (or delete)
-        databases. But, in case it ever does, by raising an exception here we
-        have one more guarantee that no modified client will be able to
-        enforce creation of a database when syncing.
-
         :param dbname: The name of the database to ensure.
         :type dbname: str
 
-        :raise Unauthorized: Always, because Soledad server is not allowed to
-                             create databases.
+        :raise Unauthorized: If disabled or other error was raised.
+
+        :return: The CouchDatabase object and its replica_uid.
+        :rtype: (CouchDatabase, str)
         """
-        raise Unauthorized()
+        if not self.create_cmd:
+            raise Unauthorized()
+        else:
+            code, out = exec_validated_cmd(self.create_cmd, dbname,
+                                           validator=is_db_name_valid)
+            if code is not 0:
+                logger.error("""
+                    Error while creating database (%s) with (%s) command.
+                    Output: %s
+                    Exit code: %d
+                    """ % (dbname, self.create_cmd, out, code))
+                raise Unauthorized()
+        db = self.open_database(dbname)
+        return db, db.replica_uid
 
     def delete_database(self, dbname):
         """

@@ -28,6 +28,8 @@ from couchdb.client import Server
 from uuid import uuid4
 
 from testscenarios import TestWithScenarios
+from twisted.trial import unittest
+from mock import Mock
 
 from u1db import errors as u1db_errors
 from u1db import SyncTarget
@@ -1498,3 +1500,46 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
             self.db._get_transaction_log)
         self.create_db(ensure=True, dbname=self.db._dbname)
         self.db._get_transaction_log()
+
+    def test_ensure_security_doc(self):
+        """
+        Ensure_security creates a _security ddoc to ensure that only soledad
+        will have the lowest privileged access to an user db.
+        """
+        self.create_db(ensure=False)
+        self.assertFalse(self.db._database.security)
+        self.db.ensure_security_ddoc()
+        security_ddoc = self.db._database.security
+        self.assertIn('admins', security_ddoc)
+        self.assertFalse(security_ddoc['admins']['names'])
+        self.assertIn('members', security_ddoc)
+        self.assertIn('soledad', security_ddoc['members']['names'])
+
+
+class DatabaseNameValidationTest(unittest.TestCase):
+
+    def test_database_name_validation(self):
+        self.assertFalse(couch.is_db_name_valid("user-deadbeef | cat /secret"))
+        self.assertTrue(couch.is_db_name_valid("user-cafe1337"))
+
+
+class CommandBasedDBCreationTest(unittest.TestCase):
+
+    def test_ensure_db_using_custom_command(self):
+        state = couch.CouchServerState("url", create_cmd="echo")
+        mock_db = Mock()
+        mock_db.replica_uid = 'replica_uid'
+        state.open_database = Mock(return_value=mock_db)
+        db, replica_uid = state.ensure_database("user-1337")  # works
+        self.assertEquals(mock_db, db)
+        self.assertEquals(mock_db.replica_uid, replica_uid)
+
+    def test_raises_unauthorized_on_failure(self):
+        state = couch.CouchServerState("url", create_cmd="inexistent")
+        self.assertRaises(u1db_errors.Unauthorized,
+                          state.ensure_database, "user-1337")
+
+    def test_raises_unauthorized_by_default(self):
+        state = couch.CouchServerState("url")
+        self.assertRaises(u1db_errors.Unauthorized,
+                          state.ensure_database, "user-1337")

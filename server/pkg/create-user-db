@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# create-user-db
+# Copyright (C) 2015 LEAP
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+import os
+import sys
+import netrc
+import argparse
+from leap.soledad.common.couch import CouchDatabase
+from leap.soledad.common.couch import is_db_name_valid
+
+
+description = """
+Creates a user database.
+This is meant to be used by Soledad Server.
+"""
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('dbname', metavar='user-d34db33f', type=str,
+                    help='database name on the format user-{uuid4}')
+NETRC_PATH = '/etc/couchdb/couchdb-admin.netrc'
+
+
+def url_for_db(dbname):
+    if not os.path.exists(NETRC_PATH):
+        print ('netrc not found in %s' % NETRC_PATH)
+        sys.exit(1)
+    parsed_netrc = netrc.netrc(NETRC_PATH)
+    host, (login, _, password) = parsed_netrc.hosts.items()[0]
+    url = ('http://%(login)s:%(password)s@%(host)s:5984/%(dbname)s' % {
+           'login': login,
+           'password': password,
+           'host': host,
+           'dbname': dbname})
+    return url
+
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    if not is_db_name_valid(args.dbname):
+        print ("Invalid name! %s" % args.dbname)
+        sys.exit(1)
+    url = url_for_db(args.dbname)
+    db = CouchDatabase.open_database(url=url, create=True,
+                                     replica_uid=None, ensure_ddocs=True)
+    print ('success! Created %s, replica_uid: %s' %
+           (db._dbname, db.replica_uid))

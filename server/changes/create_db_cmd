@@ -1,0 +1,3 @@
+  o Adds a new config parameter 'create_cmd', which allows sysadmin to specify
+  which command will create a database. That command was added in
+  pkg/create-user-db and debian package automates steps needed for sudo access.
