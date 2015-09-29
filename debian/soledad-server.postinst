@@ -2,10 +2,26 @@
 
 export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
-id soledad-admin > /dev/null
+# create soledad group
+getent group soledad > /dev/null
 RET=$?
 
 if [ ! $RET -eq 0 ]; then
-	adduser --system soledad-admin --home /srv/leap/ --disabled-password --shell /bin/sh --ingroup nogroup
+    addgroup --system soledad
 fi
 
+# create soledad user
+id soledad > /dev/null 2>&1
+RET=$?
+
+if [ ! $RET -eq 0 ]; then
+  adduser --system soledad --no-create-home --home /srv/leap/ --ingroup soledad
+fi
+
+# create soledad-admin user
+id soledad-admin > /dev/null 2>&1
+RET=$?
+
+if [ ! $RET -eq 0 ]; then
+  adduser --system soledad-admin --no-create-home --home /srv/leap/ --ingroup soledad
+fi
