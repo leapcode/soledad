@@ -1,6 +1,7 @@
 soledad (0.8.0~alpha) UNRELEASED; urgency=medium
 
   * Pre-release of soledad 0.8.0
+  * Cherry-pick commits to create soledad user, add it to sudoers.
 
  -- Ben Carrillo <ben@futeisha.org>  Tue, 29 Sep 2015 10:43:00 -0400
 
