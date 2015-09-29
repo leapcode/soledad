@@ -46,18 +46,6 @@ from leap.soledad.server import LockResource
 from leap.soledad.server.auth import URLToAuthorization
 
 
-# monkey path CouchServerState so it can ensure databases.
-
-def _couch_ensure_database(self, dbname):
-    db = CouchDatabase.open_database(
-        self.couch_url + '/' + dbname,
-        create=True,
-        ensure_ddocs=True)
-    return db, db._replica_uid
-
-CouchServerState.ensure_database = _couch_ensure_database
-
-
 class ServerAuthorizationTestCase(BaseSoledadTest):
 
     """

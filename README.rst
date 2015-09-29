@@ -55,3 +55,36 @@ to run tests in development mode you must do the following::
 
 Note that to run CouchDB tests, be sure you have ``CouchDB`` installed on your
 system.
+
+
+Privileges
+-----
+In order to prevent privilege escalation, Soledad should not be run as a
+database administrator. This implies the following side effects:
+
+-----------------
+Database creation:
+-----------------
+Can be done via a script located in ``server/pkg/create-user-db``
+It reads a netrc file that should be placed on
+``/etc/couchdb/couchdb-admin.netrc``.
+That file holds the admin credentials in netrc format and should be accessible
+only by 'soledad-admin' user.
+
+The debian package will do the following in order to automate this:
+
+* create a user ``soledad-admin``
+* make this script available as ``create-user-db`` in ``/usr/bin``
+* grant restricted sudo access, that only enables user ``soledad`` to call this
+  exact command via ``soledad-admin`` user.
+
+The server side process, configured via ``/etc/leap/soledad-server.conf``, will
+then use a parameter called 'create_cmd' to know which command is used to
+allocate new databases. All steps of creation process is then handled
+automatically by the server, following the same logic as u1db server.
+
+------------------
+Database deletion:
+------------------
+No code at all handles this and privilege to do so needs to be removed as
+explained before. This can be automated via a simple cron job.

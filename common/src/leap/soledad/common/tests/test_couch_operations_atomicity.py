@@ -35,15 +35,9 @@ from leap.soledad.common.tests.util import (
 )
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
-from leap.soledad.common.tests.test_server import _couch_ensure_database
 
 
 REPEAT_TIMES = 20
-
-
-# monkey path CouchServerState so it can ensure databases.
-
-CouchServerState.ensure_database = _couch_ensure_database
 
 
 class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
@@ -163,6 +157,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
                 2,
                 len(filter(lambda t: t[0] == doc_id, transaction_log)))
 
+    @defer.inlineCallbacks
     def test_correct_sync_log_after_sequential_syncs(self):
         """
         Assert that the sync_log increases accordingly with sequential syncs.
@@ -170,21 +165,21 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         sol = self._soledad_instance(
             auth_token='auth-token',
             server_url=self.getURL())
+        source_replica_uid = sol._dbpool.replica_uid
 
-        def _create_docs(results):
+        def _create_docs():
             deferreds = []
             for i in xrange(0, REPEAT_TIMES):
                 deferreds.append(sol.create_doc({}))
-            return defer.DeferredList(deferreds)
+            return defer.gatherResults(deferreds)
 
         def _assert_transaction_and_sync_logs(results, sync_idx):
             # assert sizes of transaction and sync logs
             self.assertEqual(
                 sync_idx * REPEAT_TIMES,
                 len(self.db._get_transaction_log()))
-            self.assertEqual(
-                1 if sync_idx > 0 else 0,
-                len(self.db._database.view('syncs/log').rows))
+            gen, _ = self.db._get_replica_gen_and_trans_id(source_replica_uid)
+            self.assertEqual(sync_idx * REPEAT_TIMES, gen)
 
         def _assert_sync(results, sync_idx):
             gen, docs = results
@@ -193,40 +188,28 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
             # assert sizes of transaction and sync logs
             self.assertEqual((sync_idx + 1) * REPEAT_TIMES,
                              len(self.db._get_transaction_log()))
-            sync_log_rows = self.db._database.view('syncs/log').rows
-            sync_log = sync_log_rows[0].value
-            replica_uid = sync_log_rows[0].key
-            known_gen = sync_log['known_generation']
-            known_trans_id = sync_log['known_transaction_id']
-            # assert sync_log has exactly 1 row
-            self.assertEqual(1, len(sync_log_rows))
-            # assert it has the correct replica_uid, gen and trans_id
-            self.assertEqual(sol._dbpool.replica_uid, replica_uid)
+            target_known_gen, target_known_trans_id = \
+                self.db._get_replica_gen_and_trans_id(source_replica_uid)
+            # assert it has the correct gen and trans_id
             conn_key = sol._dbpool._u1dbconnections.keys().pop()
             conn = sol._dbpool._u1dbconnections[conn_key]
             sol_gen, sol_trans_id = conn._get_generation_info()
-            self.assertEqual(sol_gen, known_gen)
-            self.assertEqual(sol_trans_id, known_trans_id)
-
-        # create some documents
-        d = _create_docs(None)
+            self.assertEqual(sol_gen, target_known_gen)
+            self.assertEqual(sol_trans_id, target_known_trans_id)
 
         # sync first time and assert success
-        d.addCallback(_assert_transaction_and_sync_logs, 0)
-        d.addCallback(lambda _: sol.sync())
-        d.addCallback(lambda _: sol.get_all_docs())
-        d.addCallback(_assert_sync, 0)
+        results = yield _create_docs()
+        _assert_transaction_and_sync_logs(results, 0)
+        yield sol.sync()
+        results = yield sol.get_all_docs()
+        _assert_sync(results, 0)
 
         # create more docs, sync second time and assert success
-        d.addCallback(_create_docs)
-        d.addCallback(_assert_transaction_and_sync_logs, 1)
-        d.addCallback(lambda _: sol.sync())
-        d.addCallback(lambda _: sol.get_all_docs())
-        d.addCallback(_assert_sync, 1)
-
-        d.addCallback(lambda _: sol.close())
-
-        return d
+        results = yield _create_docs()
+        _assert_transaction_and_sync_logs(results, 1)
+        yield sol.sync()
+        results = yield sol.get_all_docs()
+        _assert_sync(results, 1)
 
     #
     # Concurrency tests

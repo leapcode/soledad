@@ -285,6 +285,7 @@ def load_configuration(file_path):
     """
     conf = {
         'couch_url': 'http://localhost:5984',
+        'create_cmd': None
     }
     config = configparser.ConfigParser()
     config.read(file_path)
@@ -303,7 +304,7 @@ def load_configuration(file_path):
 
 def application(environ, start_response):
     conf = load_configuration('/etc/leap/soledad-server.conf')
-    state = CouchServerState(conf['couch_url'])
+    state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(
         SoledadTokenAuthMiddleware(SoledadApp(state)))
