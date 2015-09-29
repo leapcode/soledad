@@ -1,3 +1,9 @@
+soledad (0.8.0~alpha) UNRELEASED; urgency=medium
+
+  * Pre-release of soledad 0.8.0
+
+ -- Ben Carrillo <ben@futeisha.org>  Tue, 29 Sep 2015 10:43:00 -0400
+
 soledad (0.7.3) unstable; urgency=medium
 
   * Update to 0.7.3 release
