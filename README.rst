@@ -1,9 +1,9 @@
-Soledad 
+Soledad
 ==================================================================
 *Synchronization Of Locally Encrypted Data Among Devices*
 
 Soledad is the part of LEAP that allows application data to be
-securely shared among devices. It provides, to other parts of the 
+securely shared among devices. It provides, to other parts of the
 LEAP project, an API for data storage and sync.
 
 This software is under development.
@@ -53,7 +53,7 @@ to run tests in development mode you must do the following::
   scripts/develop_mode.sh
   ./run_tests.sh
 
-Note that to run CouchDB tests, be sure you have ``CouchDB`` installed on your
+Note that to run CouchDB tests, be sure you have [CouchDB](https://couchdb.apache.org/) installed on your
 system.
 
 
