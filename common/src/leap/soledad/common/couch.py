@@ -59,9 +59,12 @@ from u1db.remote import http_app
 from u1db.remote.server_state import ServerState
 
 
-from leap.soledad.common import ddocs, errors
+from leap.soledad.common import ddocs
+from leap.soledad.common.errors import raise_server_error
+from leap.soledad.common.errors import raise_missing_design_doc_error
+from leap.soledad.common.errors import InvalidURLError
 from leap.soledad.common.command import exec_validated_cmd
-from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.document import CouchDocument
 
 
 logger = logging.getLogger(__name__)
@@ -86,191 +89,8 @@ def list_users_dbs(couch_url):
         users = [dbname for dbname in server if dbname.startswith('user-')]
     return users
 
-
-class InvalidURLError(Exception):
-
-    """
-    Exception raised when Soledad encounters a malformed URL.
-    """
-
-
-class CouchDocument(SoledadDocument):
-
-    """
-    This is the document used for maintaining the Couch backend.
-
-    A CouchDocument can fetch and manipulate conflicts and also holds a
-    reference to the couch document revision. This data is used to ensure an
-    atomic and consistent update of the database.
-    """
-
-    def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False):
-        """
-        Container for handling a document that is stored in couch backend.
-
-        :param doc_id: The unique document identifier.
-        :type doc_id: str
-        :param rev: The revision identifier of the document.
-        :type rev: str
-        :param json: The JSON string for this document.
-        :type json: str
-        :param has_conflicts: Boolean indicating if this document has conflicts
-        :type has_conflicts: bool
-        """
-        SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
-        self.couch_rev = None
-        self.transactions = None
-        self._conflicts = None
-
-    def get_conflicts(self):
-        """
-        Get the conflicted versions of the document.
-
-        :return: The conflicted versions of the document.
-        :rtype: [CouchDocument]
-        """
-        return self._conflicts or []
-
-    def set_conflicts(self, conflicts):
-        """
-        Set the conflicted versions of the document.
-
-        :param conflicts: The conflicted versions of the document.
-        :type conflicts: list
-        """
-        self._conflicts = conflicts
-        self.has_conflicts = len(self._conflicts) > 0
-
-    def add_conflict(self, doc):
-        """
-        Add a conflict to this document.
-
-        :param doc: The conflicted version to be added.
-        :type doc: CouchDocument
-        """
-        if self._conflicts is None:
-            raise Exception("Fetch conflicts first!")
-        self._conflicts.append(doc)
-        self.has_conflicts = len(self._conflicts) > 0
-
-    def delete_conflicts(self, conflict_revs):
-        """
-        Delete conflicted versions of this document.
-
-        :param conflict_revs: The conflicted revisions to be deleted.
-        :type conflict_revs: [str]
-        """
-        if self._conflicts is None:
-            raise Exception("Fetch conflicts first!")
-        self._conflicts = filter(
-            lambda doc: doc.rev not in conflict_revs,
-            self._conflicts)
-        self.has_conflicts = len(self._conflicts) > 0
-
-    def update(self, new_doc):
-        # update info
-        self.rev = new_doc.rev
-        if new_doc.is_tombstone():
-            self.is_tombstone()
-        else:
-            self.content = new_doc.content
-        self.has_conflicts = new_doc.has_conflicts
-
-    def prune_conflicts(self, doc_vcr, autoresolved_increment):
-        """
-        Prune conflicts that are older then the current document's revision, or
-        whose content match to the current document's content.
-        Originally in u1db.CommonBackend
-
-        :param doc: The document to have conflicts pruned.
-        :type doc: CouchDocument
-        :param doc_vcr: A vector clock representing the current document's
-                        revision.
-        :type doc_vcr: u1db.vectorclock.VectorClock
-        """
-        if self.has_conflicts:
-            autoresolved = False
-            c_revs_to_prune = []
-            for c_doc in self._conflicts:
-                c_vcr = vectorclock.VectorClockRev(c_doc.rev)
-                if doc_vcr.is_newer(c_vcr):
-                    c_revs_to_prune.append(c_doc.rev)
-                elif self.same_content_as(c_doc):
-                    c_revs_to_prune.append(c_doc.rev)
-                    doc_vcr.maximize(c_vcr)
-                    autoresolved = True
-            if autoresolved:
-                doc_vcr.increment(autoresolved_increment)
-                self.rev = doc_vcr.as_str()
-            self.delete_conflicts(c_revs_to_prune)
-
-
 # monkey-patch the u1db http app to use CouchDocument
 http_app.Document = CouchDocument
-
-
-def raise_missing_design_doc_error(exc, ddoc_path):
-    """
-    Raise an appropriate exception when catching a ResourceNotFound when
-    accessing a design document.
-
-    :param exc: The exception cought.
-    :type exc: ResourceNotFound
-    :param ddoc_path: A list representing the requested path.
-    :type ddoc_path: list
-
-    :raise MissingDesignDocError: Raised when tried to access a missing design
-                                  document.
-    :raise MissingDesignDocListFunctionError: Raised when trying to access a
-                                              missing list function on a
-                                              design document.
-    :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                           missing named view on a design
-                                           document.
-    :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                         deleted design document.
-    :raise MissingDesignDocUnknownError: Raised when failed to access a design
-                                         document for an yet unknown reason.
-    """
-    path = "".join(ddoc_path)
-    if exc.message[1] == 'missing':
-        raise errors.MissingDesignDocError(path)
-    elif exc.message[1] == 'missing function' or \
-            exc.message[1].startswith('missing lists function'):
-        raise errors.MissingDesignDocListFunctionError(path)
-    elif exc.message[1] == 'missing_named_view':
-        raise errors.MissingDesignDocNamedViewError(path)
-    elif exc.message[1] == 'deleted':
-        raise errors.MissingDesignDocDeletedError(path)
-    # other errors are unknown for now
-    raise errors.DesignDocUnknownError("%s: %s" % (path, str(exc.message)))
-
-
-def raise_server_error(exc, ddoc_path):
-    """
-    Raise an appropriate exception when catching a ServerError when
-    accessing a design document.
-
-    :param exc: The exception cought.
-    :type exc: ResourceNotFound
-    :param ddoc_path: A list representing the requested path.
-    :type ddoc_path: list
-
-    :raise MissingDesignDocListFunctionError: Raised when trying to access a
-                                              missing list function on a
-                                              design document.
-    :raise MissingDesignDocUnknownError: Raised when failed to access a design
-                                         document for an yet unknown reason.
-    """
-    path = "".join(ddoc_path)
-    msg = exc.message[1][0]
-    if msg == 'unnamed_error':
-        raise errors.MissingDesignDocListFunctionError(path)
-    elif msg == 'TypeError':
-        if 'point is undefined' in exc.message[1][1]:
-            raise errors.MissingDesignDocListFunctionError
-    # other errors are unknown for now
-    raise errors.DesignDocUnknownError(path)
 
 
 class MultipartWriter(object):
@@ -1389,10 +1209,31 @@ class CouchDatabase(CommonBackend):
 
     def _prune_conflicts(self, doc, doc_vcr):
         """
-        Overrides original method, but it is implemented elsewhere for
-        simplicity.
+        Prune conflicts that are older then the current document's revision, or
+        whose content match to the current document's content.
+        Originally in u1db.CommonBackend
+
+        :param doc: The document to have conflicts pruned.
+        :type doc: CouchDocument
+        :param doc_vcr: A vector clock representing the current document's
+                        revision.
+        :type doc_vcr: u1db.vectorclock.VectorClock
         """
-        doc.prune_conflicts(doc_vcr, self._replica_uid)
+        if doc.has_conflicts:
+            autoresolved = False
+            c_revs_to_prune = []
+            for c_doc in doc._conflicts:
+                c_vcr = vectorclock.VectorClockRev(c_doc.rev)
+                if doc_vcr.is_newer(c_vcr):
+                    c_revs_to_prune.append(c_doc.rev)
+                elif doc.same_content_as(c_doc):
+                    c_revs_to_prune.append(c_doc.rev)
+                    doc_vcr.maximize(c_vcr)
+                    autoresolved = True
+            if autoresolved:
+                doc_vcr.increment(self._replica_uid)
+                doc.rev = doc_vcr.as_str()
+            doc.delete_conflicts(c_revs_to_prune)
 
     def _new_resource(self, *path):
         """

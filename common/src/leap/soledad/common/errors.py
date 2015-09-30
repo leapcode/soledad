@@ -196,3 +196,74 @@ class DesignDocUnknownError(SoledadError):
 # u1db error statuses also have to be updated
 http_errors.ERROR_STATUSES = set(
     http_errors.wire_description_to_status.values())
+
+
+class InvalidURLError(Exception):
+
+    """
+    Exception raised when Soledad encounters a malformed URL.
+    """
+
+
+def raise_missing_design_doc_error(exc, ddoc_path):
+    """
+    Raise an appropriate exception when catching a ResourceNotFound when
+    accessing a design document.
+
+    :param exc: The exception cought.
+    :type exc: ResourceNotFound
+    :param ddoc_path: A list representing the requested path.
+    :type ddoc_path: list
+
+    :raise MissingDesignDocError: Raised when tried to access a missing design
+                                  document.
+    :raise MissingDesignDocListFunctionError: Raised when trying to access a
+                                              missing list function on a
+                                              design document.
+    :raise MissingDesignDocNamedViewError: Raised when trying to access a
+                                           missing named view on a design
+                                           document.
+    :raise MissingDesignDocDeletedError: Raised when trying to access a
+                                         deleted design document.
+    :raise MissingDesignDocUnknownError: Raised when failed to access a design
+                                         document for an yet unknown reason.
+    """
+    path = "".join(ddoc_path)
+    if exc.message[1] == 'missing':
+        raise MissingDesignDocError(path)
+    elif exc.message[1] == 'missing function' or \
+            exc.message[1].startswith('missing lists function'):
+        raise MissingDesignDocListFunctionError(path)
+    elif exc.message[1] == 'missing_named_view':
+        raise MissingDesignDocNamedViewError(path)
+    elif exc.message[1] == 'deleted':
+        raise MissingDesignDocDeletedError(path)
+    # other errors are unknown for now
+    raise DesignDocUnknownError("%s: %s" % (path, str(exc.message)))
+
+
+def raise_server_error(exc, ddoc_path):
+    """
+    Raise an appropriate exception when catching a ServerError when
+    accessing a design document.
+
+    :param exc: The exception cought.
+    :type exc: ResourceNotFound
+    :param ddoc_path: A list representing the requested path.
+    :type ddoc_path: list
+
+    :raise MissingDesignDocListFunctionError: Raised when trying to access a
+                                              missing list function on a
+                                              design document.
+    :raise MissingDesignDocUnknownError: Raised when failed to access a design
+                                         document for an yet unknown reason.
+    """
+    path = "".join(ddoc_path)
+    msg = exc.message[1][0]
+    if msg == 'unnamed_error':
+        raise MissingDesignDocListFunctionError(path)
+    elif msg == 'TypeError':
+        if 'point is undefined' in exc.message[1][1]:
+            raise MissingDesignDocListFunctionError
+    # other errors are unknown for now
+    raise DesignDocUnknownError(path)
