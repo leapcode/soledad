@@ -25,7 +25,6 @@ import uuid
 import logging
 import binascii
 import time
-import sys
 
 
 from StringIO import StringIO
@@ -35,6 +34,7 @@ from multiprocessing.pool import ThreadPool
 
 
 from couchdb.client import Server, Database
+from couchdb.multipart import MultipartWriter
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
@@ -91,95 +91,6 @@ def list_users_dbs(couch_url):
 
 # monkey-patch the u1db http app to use CouchDocument
 http_app.Document = CouchDocument
-
-
-class MultipartWriter(object):
-
-    """
-    A multipart writer adapted from python-couchdb's one so we can PUT
-    documents using couch's multipart PUT.
-
-    This stripped down version does not allow for nested structures, and
-    contains only the essential things we need to PUT SoledadDocuments to the
-    couch backend.
-    """
-
-    CRLF = '\r\n'
-
-    def __init__(self, fileobj, headers=None, boundary=None):
-        """
-        Initialize the multipart writer.
-        """
-        self.fileobj = fileobj
-        if boundary is None:
-            boundary = self._make_boundary()
-        self._boundary = boundary
-        self._build_headers('related', headers)
-
-    def add(self, mimetype, content, headers={}):
-        """
-        Add a part to the multipart stream.
-        """
-        self.fileobj.write('--')
-        self.fileobj.write(self._boundary)
-        self.fileobj.write(self.CRLF)
-        headers['Content-Type'] = mimetype
-        self._write_headers(headers)
-        if content:
-            # XXX: throw an exception if a boundary appears in the content??
-            self.fileobj.write(content)
-            self.fileobj.write(self.CRLF)
-
-    def close(self):
-        """
-        Close the multipart stream.
-        """
-        self.fileobj.write('--')
-        self.fileobj.write(self._boundary)
-        # be careful not to have anything after '--', otherwise old couch
-        # versions (including bigcouch) will fail.
-        self.fileobj.write('--')
-
-    def _make_boundary(self):
-        """
-        Create a boundary to discern multi parts.
-        """
-        try:
-            from uuid import uuid4
-            return '==' + uuid4().hex + '=='
-        except ImportError:
-            from random import randrange
-            token = randrange(sys.maxint)
-            format = '%%0%dd' % len(repr(sys.maxint - 1))
-            return '===============' + (format % token) + '=='
-
-    def _write_headers(self, headers):
-        """
-        Write a part header in the buffer stream.
-        """
-        if headers:
-            for name in sorted(headers.keys()):
-                value = headers[name]
-                self.fileobj.write(name)
-                self.fileobj.write(': ')
-                self.fileobj.write(value)
-                self.fileobj.write(self.CRLF)
-        self.fileobj.write(self.CRLF)
-
-    def _build_headers(self, subtype, headers):
-        """
-        Build the main headers of the multipart stream.
-
-        This is here so we can send headers separete from content using
-        python-couchdb API.
-        """
-        self.headers = {}
-        self.headers['Content-Type'] = 'multipart/%s; boundary="%s"' % \
-                                       (subtype, self._boundary)
-        if headers:
-            for name in sorted(headers.keys()):
-                value = headers[name]
-                self.headers[name] = value
 
 
 @contextmanager
@@ -729,7 +640,8 @@ class CouchDatabase(CommonBackend):
             couch_doc['_rev'] = old_doc.couch_rev
         # prepare the multipart PUT
         buf = StringIO()
-        envelope = MultipartWriter(buf)
+        headers = {}
+        envelope = MultipartWriter(buf, headers=headers, subtype='related')
         envelope.add('application/json', json.dumps(couch_doc))
         for part in parts:
             envelope.add('application/octet-stream', part)
