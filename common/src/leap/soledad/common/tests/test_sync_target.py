@@ -265,9 +265,9 @@ class TestSoledadSyncTarget(
                                      replica_trans_id=replica_trans_id,
                                      number_of_docs=number_of_docs,
                                      doc_idx=doc_idx, sync_id=sync_id)
-        from leap.soledad.common.tests.test_couch import IndexedCouchDatabase
+        from leap.soledad.common.tests.test_couch import IndexedSoledadBackend
         self.patch(
-            IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
+            IndexedSoledadBackend, '_put_doc_if_newer', bomb_put_doc_if_newer)
         remote_target = self.getSyncTarget(
             source_replica_uid='replica')
         other_changes = []

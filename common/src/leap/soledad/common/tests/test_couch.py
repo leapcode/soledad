@@ -56,7 +56,7 @@ from u1db.backends.inmemory import InMemoryIndex
 class TestCouchBackendImpl(CouchDBTestCase):
 
     def test__allocate_doc_id(self):
-        db = couch.CouchDatabase.open_database(
+        db = couch.SoledadBackend.open_database(
             urljoin(
                 'http://localhost:' + str(self.couch_port),
                 ('test-%s' % uuid4().hex)
@@ -78,7 +78,7 @@ class TestCouchBackendImpl(CouchDBTestCase):
 def make_couch_database_for_test(test, replica_uid):
     port = str(test.couch_port)
     dbname = ('test-%s' % uuid4().hex)
-    db = couch.CouchDatabase.open_database(
+    db = couch.SoledadBackend.open_database(
         urljoin('http://localhost:' + port, dbname),
         create=True,
         replica_uid=replica_uid or 'test',
@@ -91,7 +91,7 @@ def copy_couch_database_for_test(test, db):
     port = str(test.couch_port)
     couch_url = 'http://localhost:' + port
     new_dbname = db._dbname + '_copy'
-    new_db = couch.CouchDatabase.open_database(
+    new_db = couch.SoledadBackend.open_database(
         urljoin(couch_url, new_dbname),
         create=True,
         replica_uid=db._replica_uid or 'test')
@@ -150,7 +150,7 @@ class CouchTests(
     scenarios = COUCH_SCENARIOS
 
 
-class CouchDatabaseTests(
+class SoledadBackendTests(
         TestWithScenarios,
         test_backends.LocalDatabaseTests,
         CouchDBTestCase):
@@ -206,7 +206,7 @@ simple_doc = tests.simple_doc
 nested_doc = tests.nested_doc
 
 
-class CouchDatabaseSyncTargetTests(
+class SoledadBackendSyncTargetTests(
         TestWithScenarios,
         DatabaseBaseTests,
         CouchDBTestCase):
@@ -532,13 +532,10 @@ class CouchDatabaseSyncTargetTests(
 
 # The following tests need that the database have an index, so we fake one.
 
-class IndexedCouchDatabase(couch.CouchDatabase):
+class IndexedSoledadBackend(couch.SoledadBackend):
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True,
-                 database_security=None):
-        old_class.__init__(self, url, dbname, replica_uid=replica_uid,
-                           ensure_ddocs=ensure_ddocs,
-                           database_security=database_security)
+    def __init__(self, db, replica_uid=None):
+        old_class.__init__(self, db, replica_uid=replica_uid)
         self._indexes = {}
 
     def _put_doc(self, old_doc, doc):
@@ -608,11 +605,11 @@ class IndexedCouchDatabase(couch.CouchDatabase):
         return list(set([tuple(key.split('\x01')) for key in keys]))
 
 
-# monkey patch CouchDatabase (once) to include virtual indexes
-if getattr(couch.CouchDatabase, '_old_class', None) is None:
-    old_class = couch.CouchDatabase
-    IndexedCouchDatabase._old_class = old_class
-    couch.CouchDatabase = IndexedCouchDatabase
+# monkey patch SoledadBackend (once) to include virtual indexes
+if getattr(couch.SoledadBackend, '_old_class', None) is None:
+    old_class = couch.SoledadBackend
+    IndexedSoledadBackend._old_class = old_class
+    couch.SoledadBackend = IndexedSoledadBackend
 
 
 sync_scenarios = []
@@ -623,7 +620,7 @@ for name, scenario in COUCH_SCENARIOS:
     scenario = dict(scenario)
 
 
-class CouchDatabaseSyncTests(
+class SoledadBackendSyncTests(
         TestWithScenarios,
         DatabaseBaseTests,
         CouchDBTestCase):
@@ -1319,7 +1316,7 @@ class CouchDatabaseSyncTests(
         self.assertEqual(cont2, self.db1.get_doc("2").get_json())
 
 
-class CouchDatabaseExceptionsTests(CouchDBTestCase):
+class SoledadBackendExceptionsTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
@@ -1343,10 +1340,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         design docs are not present.
         """
         self.create_db(ensure=False)
-        # _get_generation()
-        self.assertRaises(
-            errors.MissingDesignDocError,
-            self.db._get_generation)
         # _get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocError,
@@ -1374,10 +1367,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         transactions['lists'] = {}
         self.db._database.save(transactions)
-        # _get_generation()
-        self.assertRaises(
-            errors.MissingDesignDocListFunctionError,
-            self.db._get_generation)
         # _get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
@@ -1401,10 +1390,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         del transactions['lists']
         self.db._database.save(transactions)
-        # _get_generation()
-        self.assertRaises(
-            errors.MissingDesignDocListFunctionError,
-            self.db._get_generation)
         # _get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
@@ -1436,10 +1421,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         del transactions['views']
         self.db._database.save(transactions)
-        # _get_generation()
-        self.assertRaises(
-            errors.MissingDesignDocNamedViewError,
-            self.db._get_generation)
         # _get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
@@ -1469,10 +1450,6 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         del self.db._database['_design/syncs']
         # delete _design/transactions
         del self.db._database['_design/transactions']
-        # _get_generation()
-        self.assertRaises(
-            errors.MissingDesignDocDeletedError,
-            self.db._get_generation)
         # _get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,

@@ -132,7 +132,7 @@ class CouldNotObtainLockError(SoledadError):
 
 
 #
-# CouchDatabase errors
+# SoledadBackend errors
 #
 
 @register_exception

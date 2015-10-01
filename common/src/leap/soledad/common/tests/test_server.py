@@ -31,7 +31,7 @@ from twisted.trial import unittest
 
 from leap.soledad.common.couch import (
     CouchServerState,
-    CouchDatabase,
+    SoledadBackend,
 )
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
@@ -358,7 +358,7 @@ class EncryptedSyncTestCase(
             passphrase=passphrase)
 
         # ensure remote db exists before syncing
-        db = CouchDatabase.open_database(
+        db = SoledadBackend.open_database(
             urljoin(self.couch_url, 'user-' + user),
             create=True,
             ensure_ddocs=True)
@@ -488,7 +488,7 @@ class LockResourceTestCase(
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
         # create the databases
-        db = CouchDatabase.open_database(
+        db = SoledadBackend.open_database(
             urljoin(self.couch_url, ('shared-%s' % (uuid4().hex))),
             create=True,
             ensure_ddocs=True)

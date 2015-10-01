@@ -102,7 +102,7 @@ class TestSyncMutex(
         self.startServer()
 
         # ensure remote db exists before syncing
-        db = couch.CouchDatabase.open_database(
+        db = couch.SoledadBackend.open_database(
             urljoin(self.couch_url, 'user-' + self.user),
             create=True,
             ensure_ddocs=True)
