@@ -283,19 +283,20 @@ def load_configuration(file_path):
     @return: A dictionary with the configuration.
     @rtype: dict
     """
-    conf = {
+    defaults = {
         'couch_url': 'http://localhost:5984',
-        'create_cmd': None
+        'create_cmd': None,
+        'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
     }
     config = configparser.ConfigParser()
     config.read(file_path)
     if 'soledad-server' in config:
-        for key in conf:
+        for key in defaults:
             if key in config['soledad-server']:
-                conf[key] = config['soledad-server'][key]
+                defaults[key] = config['soledad-server'][key]
     # TODO: implement basic parsing/sanitization of options comming from
     # config file.
-    return conf
+    return defaults
 
 
 # ----------------------------------------------------------------------------
