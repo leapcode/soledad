@@ -53,9 +53,10 @@ to run tests in development mode you must do the following::
   scripts/develop_mode.sh
   ./run_tests.sh
 
-Note that to run CouchDB tests, be sure you have [CouchDB](https://couchdb.apache.org/) installed on your
+Note that to run CouchDB tests, be sure you have `CouchDB`_ installed on your
 system.
 
+.. _`CouchDB`: https://couchdb.apache.org/
 
 Privileges
 -----
