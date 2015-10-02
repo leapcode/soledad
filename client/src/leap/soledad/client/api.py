@@ -723,7 +723,7 @@ class Soledad(object):
             return passthrough
 
         d.addCallbacks(_sync_callback, _sync_errback)
-        d.addBoth(_emit_done_data_sync)
+        d.addCallback(_emit_done_data_sync)
         return d
 
     @property
