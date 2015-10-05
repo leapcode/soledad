@@ -22,6 +22,7 @@ import logging
 from twisted.internet import defer
 
 from u1db import errors
+from leap.soledad.common.errors import MissingDesignDocError
 from u1db.sync import Synchronizer
 
 
@@ -73,8 +74,9 @@ class SoledadSynchronizer(Synchronizer):
             (self.target_replica_uid, target_gen, target_trans_id,
              target_my_gen, target_my_trans_id) = yield \
                 sync_target.get_sync_info(self.source._replica_uid)
-        except errors.DatabaseDoesNotExist:
+        except (errors.DatabaseDoesNotExist, MissingDesignDocError) as e:
             logger.debug("Database isn't ready on server. Will be created.")
+            logger.debug("Reason: %s", e.__class__)
             self.target_replica_uid = None
             target_gen, target_trans_id = 0, ''
             target_my_gen, target_my_trans_id = 0, ''
