@@ -31,7 +31,7 @@ This is meant to be used by Soledad Server.
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('dbname', metavar='user-d34db33f', type=str,
                     help='database name on the format user-{uuid4}')
-NETRC_PATH = load_configuration('/etc/leap/soledad-server.conf')['admin_netrc']
+NETRC_PATH = load_configuration('/etc/soledad/soledad-server.conf')['admin_netrc']
 
 
 def url_for_db(dbname):

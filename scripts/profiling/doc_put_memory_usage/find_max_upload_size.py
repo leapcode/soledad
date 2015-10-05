@@ -30,7 +30,7 @@ from socket import error as socket_error
 from leap.soledad.common.couch import CouchDatabase
 
 
-SOLEDAD_CONFIG_FILE = '/etc/leap/soledad-server.conf'
+SOLEDAD_CONFIG_FILE = '/etc/soledad/soledad-server.conf'
 PREFIX = '/tmp/soledad_test'
 LOG_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 RETRIES = 3  # number of times to retry uploading a document of a certain

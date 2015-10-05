@@ -79,7 +79,7 @@ The debian package will do the following in order to automate this:
 * grant restricted sudo access, that only enables user ``soledad`` to call this
   exact command via ``soledad-admin`` user.
 
-The server side process, configured via ``/etc/leap/soledad-server.conf``, will
+The server side process, configured via ``/etc/soledad/soledad-server.conf``, will
 then use a parameter called 'create_cmd' to know which command is used to
 allocate new databases. All steps of creation process is then handled
 automatically by the server, following the same logic as u1db server.
