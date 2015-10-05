@@ -404,7 +404,7 @@ class CouchDatabase(CommonBackend):
         return cls(
             url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=False):
         """
         Create a new Couch data container.
 
