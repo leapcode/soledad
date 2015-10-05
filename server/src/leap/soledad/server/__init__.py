@@ -304,7 +304,7 @@ def load_configuration(file_path):
 # ----------------------------------------------------------------------------
 
 def application(environ, start_response):
-    conf = load_configuration('/etc/leap/soledad-server.conf')
+    conf = load_configuration('/etc/soledad/soledad-server.conf')
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(

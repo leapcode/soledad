@@ -63,7 +63,7 @@ def get_url(empty):
     if empty is False:
         # get couch url
         cp = ConfigParser()
-        cp.read('/etc/leap/soledad-server.conf')
+        cp.read('/etc/soledad/soledad-server.conf')
         url = cp.get('soledad-server', 'couch_url')
     else:
         with open('/etc/couchdb/couchdb.netrc') as f:
