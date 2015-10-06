@@ -7,5 +7,5 @@ pycryptopp
 # repos instead.
 chardet
 zope.proxy
-twisted
+#twisted  # we handle specific packages in debian/control
 oauth

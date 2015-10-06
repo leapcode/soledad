@@ -2,7 +2,7 @@ configparser
 u1db
 routes
 PyOpenSSL
-twisted
+#twisted  # we don't want all twisted deps in deb!
 #pinned for wheezy compatibility
 Beaker==1.6.3 #wheezy
 couchdb==0.8 #wheezy
