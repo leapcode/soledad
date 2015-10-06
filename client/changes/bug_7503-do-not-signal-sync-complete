@@ -1,0 +1,1 @@
+o Do not signal sync completion if sync failed. Closes: #7503

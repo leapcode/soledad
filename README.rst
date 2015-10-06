@@ -1,9 +1,9 @@
-Soledad 
+Soledad
 ==================================================================
 *Synchronization Of Locally Encrypted Data Among Devices*
 
 Soledad is the part of LEAP that allows application data to be
-securely shared among devices. It provides, to other parts of the 
+securely shared among devices. It provides, to other parts of the
 LEAP project, an API for data storage and sync.
 
 This software is under development.
@@ -53,9 +53,10 @@ to run tests in development mode you must do the following::
   scripts/develop_mode.sh
   ./run_tests.sh
 
-Note that to run CouchDB tests, be sure you have ``CouchDB`` installed on your
+Note that to run CouchDB tests, be sure you have `CouchDB`_ installed on your
 system.
 
+.. _`CouchDB`: https://couchdb.apache.org/
 
 Privileges
 -----
@@ -78,7 +79,7 @@ The debian package will do the following in order to automate this:
 * grant restricted sudo access, that only enables user ``soledad`` to call this
   exact command via ``soledad-admin`` user.
 
-The server side process, configured via ``/etc/leap/soledad-server.conf``, will
+The server side process, configured via ``/etc/soledad/soledad-server.conf``, will
 then use a parameter called 'create_cmd' to know which command is used to
 allocate new databases. All steps of creation process is then handled
 automatically by the server, following the same logic as u1db server.

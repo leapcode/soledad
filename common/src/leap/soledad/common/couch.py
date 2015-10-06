@@ -404,7 +404,7 @@ class CouchDatabase(CommonBackend):
         return cls(
             url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=False):
         """
         Create a new Couch data container.
 
@@ -461,7 +461,8 @@ class CouchDatabase(CommonBackend):
         """
         for ddoc_name in ['docs', 'syncs', 'transactions']:
             try:
-                self._database.info(ddoc_name)
+                self._database.resource('_design',
+                                        ddoc_name, '_info').get_json()
             except ResourceNotFound:
                 ddoc = json.loads(
                     binascii.a2b_base64(
@@ -478,10 +479,10 @@ class CouchDatabase(CommonBackend):
         This is achieved by creating a _security design document, see:
         http://docs.couchdb.org/en/latest/api/database/security.html
         """
-        security = self._database.security
+        security = self._database.resource.get_json('_security')[2]
         security['members'] = {'names': ['soledad'], 'roles': []}
         security['admins'] = {'names': [], 'roles': []}
-        self._database.security = security
+        self._database.resource.put_json('_security', body=security)
 
     def get_sync_target(self):
         """
@@ -888,7 +889,7 @@ class CouchDatabase(CommonBackend):
         try:
             resource = self._new_resource()
             resource.put_json(
-                doc.doc_id, body=buf.getvalue(), headers=envelope.headers)
+                doc.doc_id, body=str(buf.getvalue()), headers=envelope.headers)
         except ResourceConflict:
             raise RevisionConflict()
         if self.replica_uid + '_gen' in self.cache:
@@ -1337,6 +1338,17 @@ class CouchDatabase(CommonBackend):
                  in matching doc_ids order.
         :rtype: iterable
         """
+        # Workaround for:
+        #
+        #   http://bugs.python.org/issue7980
+        #   https://leap.se/code/issues/5449
+        #
+        # python-couchdb uses time.strptime, which is not thread safe. In
+        # order to avoid the problem described on the issues above, we preload
+        # strptime here by evaluating the conversion of an arbitrary date.
+        # This will not be needed when/if we switch from python-couchdb to
+        # paisley.
+        time.strptime('Mar 8 1917', '%b %d %Y')
         get_one = lambda doc_id: self._get_doc(doc_id, check_for_conflicts)
         docs = [THREAD_POOL.apply_async(get_one, [doc_id])
                 for doc_id in doc_ids]
