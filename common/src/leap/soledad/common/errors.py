@@ -266,4 +266,4 @@ def raise_server_error(exc, ddoc_path):
         if 'point is undefined' in exc.message[1][1]:
             raise MissingDesignDocListFunctionError
     # other errors are unknown for now
-    raise DesignDocUnknownError(path)
+    raise DesignDocUnknownError("%s: %s" % (path, str(exc.message)))

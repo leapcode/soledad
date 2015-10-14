@@ -26,7 +26,8 @@ from twisted.internet import defer
 from uuid import uuid4
 
 from leap.soledad.client import Soledad
-from leap.soledad.common.couch import SoledadBackend, CouchServerState
+from leap.soledad.common.couch.state import CouchServerState
+from leap.soledad.common.couch import CouchDatabase
 
 from leap.soledad.common.tests.util import (
     make_token_soledad_app,
@@ -86,7 +87,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
         self.user = ('user-%s' % uuid4().hex)
-        self.db = SoledadBackend.open_database(
+        self.db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + self.user),
             create=True,
             replica_uid='replica',

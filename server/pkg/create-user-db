@@ -19,8 +19,8 @@ import os
 import sys
 import netrc
 import argparse
-from leap.soledad.common.couch import SoledadBackend
-from leap.soledad.common.couch import is_db_name_valid
+from leap.soledad.common.couch import CouchDatabase
+from leap.soledad.common.couch.state import is_db_name_valid
 from leap.soledad.common.couch import list_users_dbs
 from leap.soledad.server import load_configuration
 
@@ -69,7 +69,7 @@ def ensure_database(dbname):
         sys.exit(1)
     url = url_for_db(dbname)
     db_security = CONF['database-security']
-    db = SoledadBackend.open_database(url=url, create=True,
+    db = CouchDatabase.open_database(url=url, create=True,
                                      replica_uid=None, ensure_ddocs=True,
                                      database_security=db_security)
     print ('success! Ensured that database %s exists, with replica_uid: %s' %
