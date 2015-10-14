@@ -185,7 +185,7 @@ class SyncResource(http_app.SyncResource):
         :type ensure: bool
         """
         # create or open the database
-        cache = get_cache_for('db-' + sync_id + self.dbname)
+        cache = get_cache_for('db-' + sync_id + self.dbname, expire=120)
         if ensure:
             db, self.replica_uid = self.state.ensure_database(self.dbname)
         elif cache and 'instance' in cache:
