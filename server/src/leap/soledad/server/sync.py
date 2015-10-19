@@ -188,12 +188,9 @@ class SyncResource(http_app.SyncResource):
         cache = get_cache_for('db-' + sync_id + self.dbname, expire=120)
         if ensure:
             db, self.replica_uid = self.state.ensure_database(self.dbname)
-        elif cache and 'instance' in cache:
-            db = cache['instance']
         else:
             db = self.state.open_database(self.dbname)
         db.init_caching(cache)
-        cache['instance'] = db
         # validate the information the client has about server replica
         db.validate_gen_and_trans_id(
             last_known_generation, last_known_trans_id)
