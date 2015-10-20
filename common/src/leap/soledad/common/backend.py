@@ -29,7 +29,7 @@ from u1db.errors import (
 )
 from u1db.backends import CommonBackend
 from u1db.backends import CommonSyncTarget
-from leap.soledad.common.document import CouchDocument
+from leap.soledad.common.document import ServerDocument
 
 
 class SoledadBackend(CommonBackend):
@@ -48,7 +48,7 @@ class SoledadBackend(CommonBackend):
         :type replica_uid: str
         """
         # save params
-        self._factory = CouchDocument
+        self._factory = ServerDocument
         self._real_replica_uid = None
         self._cache = None
         self._dbname = database._dbname
@@ -83,7 +83,7 @@ class SoledadBackend(CommonBackend):
 
     def delete_database(self):
         """
-        Delete a U1DB CouchDB database.
+        Delete a U1DB database.
         """
         self._database.delete_database()
 
@@ -221,7 +221,7 @@ class SoledadBackend(CommonBackend):
         :type check_for_conflicts: bool
 
         :return: The document.
-        :rtype: CouchDocument
+        :rtype: ServerDocument
         """
         return self._database._get_doc(doc_id, check_for_conflicts)
 
@@ -237,7 +237,7 @@ class SoledadBackend(CommonBackend):
         :type include_deleted: bool
 
         :return: A document object.
-        :rtype: CouchDocument.
+        :rtype: ServerDocument.
         """
         doc = self._get_doc(doc_id, check_for_conflicts=True)
         if doc is None:
@@ -255,25 +255,25 @@ class SoledadBackend(CommonBackend):
                                 documents will not be included in the results.
         :type include_deleted: bool
 
-        :return: (generation, [CouchDocument])
+        :return: (generation, [ServerDocument])
             The current generation of the database, followed by a list of all
             the documents in the database.
-        :rtype: (int, [CouchDocument])
+        :rtype: (int, [ServerDocument])
         """
         return self._database.get_all_docs(include_deleted)
 
     def _put_doc(self, old_doc, doc):
         """
-        Put the document in the Couch backend database.
+        Put the document in the backend database.
 
         Note that C{old_doc} must have been fetched with the parameter
         C{check_for_conflicts} equal to True, so we can properly update the
         new document using the conflict information from the old one.
 
         :param old_doc: The old document version.
-        :type old_doc: CouchDocument
+        :type old_doc: ServerDocument
         :param doc: The document to be put.
-        :type doc: CouchDocument
+        :type doc: ServerDocument
         """
         last_transaction =\
             self._database.save_document(old_doc, doc,
@@ -348,7 +348,7 @@ class SoledadBackend(CommonBackend):
         This will also set doc.content to None.
 
         :param doc: The document to mark as deleted.
-        :type doc: CouchDocument.
+        :type doc: ServerDocument.
 
         :raise DocumentDoesNotExist: Raised if the document does not
                                             exist.
@@ -372,20 +372,17 @@ class SoledadBackend(CommonBackend):
         self._put_doc(old_doc, doc)
         return new_rev
 
-    def get_doc_conflicts(self, doc_id, couch_rev=None):
+    def get_doc_conflicts(self, doc_id):
         """
         Get the conflicted versions of a document.
 
-        If the C{couch_rev} parameter is not None, conflicts for a specific
-        document's couch revision are returned.
-
-        :param couch_rev: The couch document revision.
-        :type couch_rev: str
+        :param doc_id: The document id.
+        :type doc_id: str
 
         :return: A list of conflicted versions of the document.
         :rtype: list
         """
-        return self._database.get_doc_conflicts(doc_id, couch_rev)
+        return self._database.get_doc_conflicts(doc_id)
 
     def _get_replica_gen_and_trans_id(self, other_replica_uid):
         """
@@ -478,7 +475,7 @@ class SoledadBackend(CommonBackend):
         Add a conflict and force a document put.
 
         :param doc: The document to be put.
-        :type doc: CouchDocument
+        :type doc: ServerDocument
         """
         my_doc = self._get_doc(doc.doc_id)
         self._prune_conflicts(doc, vectorclock.VectorClockRev(doc.rev))
@@ -499,7 +496,7 @@ class SoledadBackend(CommonBackend):
         the time you GET_DOC_CONFLICTS until the point where you RESOLVE)
 
         :param doc: A Document with the new content to be inserted.
-        :type doc: CouchDocument
+        :type doc: ServerDocument
         :param conflicted_doc_revs: A list of revisions that the new content
                                     supersedes.
         :type conflicted_doc_revs: [str]
@@ -564,7 +561,7 @@ class SoledadBackend(CommonBackend):
         remote copy is never updated again.)
 
         :param doc: A document object
-        :type doc: CouchDocument
+        :type doc: ServerDocument
         :param save_conflict: If this document is a conflict, do you want to
                               save it as a conflict, or just ignore it.
         :type save_conflict: bool
@@ -596,7 +593,7 @@ class SoledadBackend(CommonBackend):
                  'converged', at_gen is the insertion/current generation.
         :rtype: (str, int)
         """
-        if not isinstance(doc, CouchDocument):
+        if not isinstance(doc, ServerDocument):
             doc = self._factory(doc.doc_id, doc.rev, doc.get_json())
         my_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         if my_doc:
@@ -636,7 +633,7 @@ class SoledadBackend(CommonBackend):
         Originally in u1db.CommonBackend
 
         :param doc: The document to have conflicts pruned.
-        :type doc: CouchDocument
+        :type doc: ServerDocument
         :param doc_vcr: A vector clock representing the current document's
                         revision.
         :type doc_vcr: u1db.vectorclock.VectorClock

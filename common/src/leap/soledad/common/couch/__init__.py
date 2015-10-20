@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# couch.py
+# __init__.py
 # Copyright (C) 2013 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -54,7 +54,7 @@ from leap.soledad.common import ddocs
 from leap.soledad.common.errors import raise_server_error
 from leap.soledad.common.errors import raise_missing_design_doc_error
 from leap.soledad.common.errors import InvalidURLError
-from leap.soledad.common.document import CouchDocument
+from leap.soledad.common.document import ServerDocument
 from leap.soledad.common.backend import SoledadBackend
 
 
@@ -78,8 +78,8 @@ def list_users_dbs(couch_url):
     return users
 
 
-# monkey-patch the u1db http app to use CouchDocument
-http_app.Document = CouchDocument
+# monkey-patch the u1db http app to use ServerDocument
+http_app.Document = ServerDocument
 
 
 @contextmanager
@@ -254,10 +254,10 @@ class CouchDatabase(object):
                                 documents will not be included in the results.
         :type include_deleted: bool
 
-        :return: (generation, [CouchDocument])
+        :return: (generation, [ServerDocument])
             The current generation of the database, followed by a list of all
             the documents in the database.
-        :rtype: (int, [CouchDocument])
+        :rtype: (int, [ServerDocument])
         """
 
         generation, _ = self._get_generation_info()
@@ -316,7 +316,7 @@ class CouchDatabase(object):
         :type check_for_conflicts: bool
 
         :return: The document.
-        :rtype: CouchDocument
+        :rtype: ServerDocument
         """
         # get document with all attachments (u1db content and eventual
         # conflicts)
@@ -333,7 +333,7 @@ class CouchDatabase(object):
         # restrict to u1db documents
         if 'u1db_rev' not in result:
             return None
-        doc = CouchDocument(doc_id, result['u1db_rev'])
+        doc = ServerDocument(doc_id, result['u1db_rev'])
         # set contents or make tombstone
         if '_attachments' not in result \
                 or 'u1db_content' not in result['_attachments']:
@@ -368,7 +368,7 @@ class CouchDatabase(object):
         """
         conflicts = []
         for doc_rev, content in attached_conflicts:
-            doc = CouchDocument(doc_id, doc_rev)
+            doc = ServerDocument(doc_id, doc_rev)
             if content is None:
                 doc.make_tombstone()
             else:
@@ -652,9 +652,9 @@ class CouchDatabase(object):
         new document using the conflict information from the old one.
 
         :param old_doc: The old document version.
-        :type old_doc: CouchDocument
+        :type old_doc: ServerDocument
         :param doc: The document to be put.
-        :type doc: CouchDocument
+        :type doc: ServerDocument
 
         :raise RevisionConflict: Raised when trying to update a document but
                                  couch revisions mismatch.
@@ -712,7 +712,7 @@ class CouchDatabase(object):
             '_attachments': attachments,
         }
         # if we are updating a doc we have to add the couch doc revision
-        if old_doc is not None:
+        if old_doc is not None and hasattr(old_doc, 'couch_rev'):
             couch_doc['_rev'] = old_doc.couch_rev
         # prepare the multipart PUT
         buf = StringIO()

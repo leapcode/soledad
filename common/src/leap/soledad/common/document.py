@@ -110,18 +110,17 @@ class SoledadDocument(Document):
         doc="Wrapper to ensure `doc.rev` is always returned as bytes.")
 
 
-class CouchDocument(SoledadDocument):
+class ServerDocument(SoledadDocument):
     """
-    This is the document used for maintaining the Couch backend.
+    This is the document used by server to hold conflicts and transactions
+    on a database.
 
-    A CouchDocument can fetch and manipulate conflicts and also holds a
-    reference to the couch document revision. This data is used to ensure an
-    atomic and consistent update of the database.
+    The goal is to ensure an atomic and consistent update of the database.
     """
 
     def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False):
         """
-        Container for handling a document that is stored in couch backend.
+        Container for handling a document that stored on server.
 
         :param doc_id: The unique document identifier.
         :type doc_id: str
@@ -133,7 +132,6 @@ class CouchDocument(SoledadDocument):
         :type has_conflicts: bool
         """
         SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
-        self.couch_rev = None
         self.transactions = None
         self._conflicts = None
 
@@ -142,7 +140,7 @@ class CouchDocument(SoledadDocument):
         Get the conflicted versions of the document.
 
         :return: The conflicted versions of the document.
-        :rtype: [CouchDocument]
+        :rtype: [ServerDocument]
         """
         return self._conflicts or []
 
@@ -161,7 +159,7 @@ class CouchDocument(SoledadDocument):
         Add a conflict to this document.
 
         :param doc: The conflicted version to be added.
-        :type doc: CouchDocument
+        :type doc: Document
         """
         if self._conflicts is None:
             raise Exception("Fetch conflicts first!")
@@ -181,12 +179,3 @@ class CouchDocument(SoledadDocument):
             lambda doc: doc.rev not in conflict_revs,
             self._conflicts)
         self.has_conflicts = len(self._conflicts) > 0
-
-    def update(self, new_doc):
-        # update info
-        self.rev = new_doc.rev
-        if new_doc.is_tombstone():
-            self.is_tombstone()
-        else:
-            self.content = new_doc.content
-        self.has_conflicts = new_doc.has_conflicts

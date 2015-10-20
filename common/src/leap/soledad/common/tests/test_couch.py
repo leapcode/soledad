@@ -36,7 +36,7 @@ from u1db import SyncTarget
 from u1db import vectorclock
 
 from leap.soledad.common import couch
-from leap.soledad.common import backend
+from leap.soledad.common.document import ServerDocument
 from leap.soledad.common import errors
 
 from leap.soledad.common.tests import u1db_tests as tests
@@ -46,8 +46,6 @@ from leap.soledad.common.tests.util import sync_via_synchronizer
 
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import DatabaseBaseTests
-
-from u1db.backends.inmemory import InMemoryIndex
 
 
 # -----------------------------------------------------------------------------
@@ -134,7 +132,7 @@ def copy_couch_database_for_test(test, db):
 
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
-    return couch.CouchDocument(
+    return ServerDocument(
         doc_id, rev, content, has_conflicts=has_conflicts)
 
 
