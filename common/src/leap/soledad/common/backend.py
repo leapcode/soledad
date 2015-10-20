@@ -141,19 +141,7 @@ class SoledadBackend(CommonBackend):
         :return: The current generation.
         :rtype: int
 
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
+        :raise SoledadError: Raised by database on operation failure
         """
         return self._get_generation_info()[0]
 
@@ -164,24 +152,12 @@ class SoledadBackend(CommonBackend):
         :return: A tuple containing the current generation and transaction id.
         :rtype: (int, str)
 
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
+        :raise SoledadError: Raised by database on operation failure
         """
         if self.replica_uid + '_gen' in self.cache:
             response = self.cache[self.replica_uid + '_gen']
             return response
-        cur_gen, newest_trans_id = self._database._get_generation_info()
+        cur_gen, newest_trans_id = self._database.get_generation_info()
         self.cache[self.replica_uid + '_gen'] = (cur_gen, newest_trans_id)
         return (cur_gen, newest_trans_id)
 
@@ -195,8 +171,10 @@ class SoledadBackend(CommonBackend):
         :return: The transaction id for C{generation}.
         :rtype: str
 
+        :raise InvalidGeneration: Raised when the generation does not exist.
+
         """
-        return self._database._get_trans_id_for_gen(generation)
+        return self._database.get_trans_id_for_gen(generation)
 
     def _get_transaction_log(self):
         """
@@ -206,7 +184,7 @@ class SoledadBackend(CommonBackend):
         :rtype: [(str, str)]
 
         """
-        return self._database._get_transaction_log()
+        return self._database.get_transaction_log()
 
     def _get_doc(self, doc_id, check_for_conflicts=False):
         """
@@ -223,7 +201,7 @@ class SoledadBackend(CommonBackend):
         :return: The document.
         :rtype: ServerDocument
         """
-        return self._database._get_doc(doc_id, check_for_conflicts)
+        return self._database.get_doc(doc_id, check_for_conflicts)
 
     def get_doc(self, doc_id, include_deleted=False):
         """
@@ -403,12 +381,10 @@ class SoledadBackend(CommonBackend):
                  synchronized with the replica, this is (0, '').
         :rtype: (int, str)
         """
-        return self._database._get_replica_gen_and_trans_id(other_replica_uid)
+        return self._database.get_replica_gen_and_trans_id(other_replica_uid)
 
     def _set_replica_gen_and_trans_id(self, other_replica_uid,
-                                      other_generation, other_transaction_id,
-                                      number_of_docs=None, doc_idx=None,
-                                      sync_id=None):
+                                      other_generation, other_transaction_id):
         """
         Set the last-known generation and transaction id for the other
         database replica.
@@ -424,30 +400,18 @@ class SoledadBackend(CommonBackend):
         :param other_transaction_id: The transaction id associated with the
             generation.
         :type other_transaction_id: str
-        :param number_of_docs: The total amount of documents sent on this sync
-                               session.
-        :type number_of_docs: int
-        :param doc_idx: The index of the current document being sent.
-        :type doc_idx: int
-        :param sync_id: The id of the current sync session.
-        :type sync_id: str
         """
         if other_replica_uid is not None and other_generation is not None:
-            self._do_set_replica_gen_and_trans_id(
-                other_replica_uid, other_generation, other_transaction_id,
-                number_of_docs=number_of_docs, doc_idx=doc_idx,
-                sync_id=sync_id)
+            self.cache[other_replica_uid] = (other_generation,
+                                             other_transaction_id)
+            self._database.set_replica_gen_and_trans_id(other_replica_uid,
+                                                        other_generation,
+                                                        other_transaction_id)
 
     def _do_set_replica_gen_and_trans_id(
-            self, other_replica_uid, other_generation, other_transaction_id,
-            number_of_docs=None, doc_idx=None, sync_id=None):
+            self, other_replica_uid, other_generation, other_transaction_id):
         """
-        Set the last-known generation and transaction id for the other
-        database replica.
-
-        We have just performed some synchronization, and we want to track what
-        generation the other replica was at. See also
-        _get_replica_gen_and_trans_id.
+        _put_doc_if_newer from super class is calling it. So we declare this.
 
         :param other_replica_uid: The U1DB identifier for the other replica.
         :type other_replica_uid: str
@@ -456,19 +420,10 @@ class SoledadBackend(CommonBackend):
         :param other_transaction_id: The transaction id associated with the
                                      generation.
         :type other_transaction_id: str
-        :param number_of_docs: The total amount of documents sent on this sync
-                               session.
-        :type number_of_docs: int
-        :param doc_idx: The index of the current document being sent.
-        :type doc_idx: int
-        :param sync_id: The id of the current sync session.
-        :type sync_id: str
         """
-        self.cache[other_replica_uid] = (other_generation,
-                                         other_transaction_id)
-        self._database._do_set_replica_gen_and_trans_id(other_replica_uid,
-                                                        other_generation,
-                                                        other_transaction_id)
+        self._set_replica_gen_and_trans_id(other_replica_uid,
+                                           other_generation,
+                                           other_transaction_id)
 
     def _force_doc_sync_conflict(self, doc):
         """
@@ -501,19 +456,7 @@ class SoledadBackend(CommonBackend):
                                     supersedes.
         :type conflicted_doc_revs: [str]
 
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
+        :raise SoledadError: Raised by database on operation failure
         """
         cur_doc = self._get_doc(doc.doc_id, check_for_conflicts=True)
         new_rev = self._ensure_maximal_rev(cur_doc.rev,

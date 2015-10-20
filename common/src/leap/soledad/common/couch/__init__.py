@@ -51,8 +51,8 @@ from u1db.remote import http_app
 
 
 from leap.soledad.common import ddocs
-from leap.soledad.common.errors import raise_server_error
-from leap.soledad.common.errors import raise_missing_design_doc_error
+from .errors import raise_server_error
+from .errors import raise_missing_design_doc_error
 from leap.soledad.common.errors import InvalidURLError
 from leap.soledad.common.document import ServerDocument
 from leap.soledad.common.backend import SoledadBackend
@@ -260,7 +260,7 @@ class CouchDatabase(object):
         :rtype: (int, [ServerDocument])
         """
 
-        generation, _ = self._get_generation_info()
+        generation, _ = self.get_generation_info()
         results = list(self.get_docs(self._database,
                                      include_deleted=include_deleted))
         return (generation, results)
@@ -294,7 +294,7 @@ class CouchDatabase(object):
         # This will not be needed when/if we switch from python-couchdb to
         # paisley.
         time.strptime('Mar 8 1917', '%b %d %Y')
-        get_one = lambda doc_id: self._get_doc(doc_id, check_for_conflicts)
+        get_one = lambda doc_id: self.get_doc(doc_id, check_for_conflicts)
         docs = [THREAD_POOL.apply_async(get_one, [doc_id])
                 for doc_id in doc_ids]
         for doc in docs:
@@ -303,7 +303,7 @@ class CouchDatabase(object):
                 continue
             yield doc
 
-    def _get_doc(self, doc_id, check_for_conflicts=False):
+    def get_doc(self, doc_id, check_for_conflicts=False):
         """
         Extract the document from storage.
 
@@ -376,7 +376,7 @@ class CouchDatabase(object):
             conflicts.append(doc)
         return conflicts
 
-    def _get_trans_id_for_gen(self, generation):
+    def get_trans_id_for_gen(self, generation):
         """
         Get the transaction id corresponding to a particular generation.
 
@@ -418,7 +418,7 @@ class CouchDatabase(object):
         except ServerError as e:
             raise_server_error(e, ddoc_path)
 
-    def _get_replica_gen_and_trans_id(self, other_replica_uid):
+    def get_replica_gen_and_trans_id(self, other_replica_uid):
         """
         Return the last known generation and transaction id for the other db
         replica.
@@ -470,7 +470,7 @@ class CouchDatabase(object):
             params['rev'] = couch_rev  # restric document's couch revision
         else:
             # TODO: move into resource logic!
-            first_entry = self._get_doc(doc_id, check_for_conflicts=True)
+            first_entry = self.get_doc(doc_id, check_for_conflicts=True)
             conflicts.append(first_entry)
         resource = self._database.resource(doc_id, 'u1db_conflicts')
         try:
@@ -480,16 +480,15 @@ class CouchDatabase(object):
         except ResourceNotFound:
             return []
 
-    def _do_set_replica_gen_and_trans_id(
-            self, other_replica_uid, other_generation, other_transaction_id,
-            number_of_docs=None, doc_idx=None, sync_id=None):
+    def set_replica_gen_and_trans_id(
+            self, other_replica_uid, other_generation, other_transaction_id):
         """
         Set the last-known generation and transaction id for the other
         database replica.
 
         We have just performed some synchronization, and we want to track what
         generation the other replica was at. See also
-        _get_replica_gen_and_trans_id.
+        get_replica_gen_and_trans_id.
 
         :param other_replica_uid: The U1DB identifier for the other replica.
         :type other_replica_uid: str
@@ -498,13 +497,6 @@ class CouchDatabase(object):
         :param other_transaction_id: The transaction id associated with the
                                      generation.
         :type other_transaction_id: str
-        :param number_of_docs: The total amount of documents sent on this sync
-                               session.
-        :type number_of_docs: int
-        :param doc_idx: The index of the current document being sent.
-        :type doc_idx: int
-        :param sync_id: The id of the current sync session.
-        :type sync_id: str
         """
         doc_id = 'u1db_sync_%s' % other_replica_uid
         try:
@@ -515,7 +507,7 @@ class CouchDatabase(object):
         doc['transaction_id'] = other_transaction_id
         self._database.save(doc)
 
-    def _get_transaction_log(self):
+    def get_transaction_log(self):
         """
         This is only for the test suite, it is not part of the api.
 
@@ -603,7 +595,7 @@ class CouchDatabase(object):
                 newest_trans_id = changes[0][2]
                 changes.reverse()
             else:
-                cur_gen, newest_trans_id = self._get_generation_info()
+                cur_gen, newest_trans_id = self.get_generation_info()
 
             return cur_gen, newest_trans_id, changes
         except ResourceNotFound as e:
@@ -611,7 +603,7 @@ class CouchDatabase(object):
         except ServerError as e:
             raise_server_error(e, ddoc_path)
 
-    def _get_generation_info(self):
+    def get_generation_info(self):
         """
         Return the current generation.
 

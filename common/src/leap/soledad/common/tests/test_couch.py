@@ -37,7 +37,7 @@ from u1db import vectorclock
 
 from leap.soledad.common import couch
 from leap.soledad.common.document import ServerDocument
-from leap.soledad.common import errors
+from leap.soledad.common.couch import errors
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.util import CouchDBTestCase
@@ -1257,18 +1257,18 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
         design docs are not present.
         """
         self.create_db(ensure=False)
-        # _get_generation_info()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocError,
-            self.db._get_generation_info)
-        # _get_trans_id_for_gen()
+            self.db.get_generation_info)
+        # get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocError,
-            self.db._get_trans_id_for_gen, 1)
-        # _get_transaction_log()
+            self.db.get_trans_id_for_gen, 1)
+        # get_transaction_log()
         self.assertRaises(
             errors.MissingDesignDocError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocError,
@@ -1284,14 +1284,14 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         transactions['lists'] = {}
         self.db._database.save(transactions)
-        # _get_generation_info()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_generation_info)
-        # _get_trans_id_for_gen()
+            self.db.get_generation_info)
+        # get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_trans_id_for_gen, 1)
+            self.db.get_trans_id_for_gen, 1)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
@@ -1307,14 +1307,14 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         del transactions['lists']
         self.db._database.save(transactions)
-        # _get_generation_info()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_generation_info)
+            self.db.get_generation_info)
         # _get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_trans_id_for_gen, 1)
+            self.db.get_trans_id_for_gen, 1)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
@@ -1338,18 +1338,18 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         del transactions['views']
         self.db._database.save(transactions)
-        # _get_generation_info()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
-            self.db._get_generation_info)
+            self.db.get_generation_info)
         # _get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
-            self.db._get_trans_id_for_gen, 1)
+            self.db.get_trans_id_for_gen, 1)
         # _get_transaction_log()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
@@ -1367,18 +1367,18 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
         del self.db._database['_design/syncs']
         # delete _design/transactions
         del self.db._database['_design/transactions']
-        # _get_generation_info()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_generation_info)
-        # _get_trans_id_for_gen()
+            self.db.get_generation_info)
+        # get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_trans_id_for_gen, 1)
-        # _get_transaction_log()
+            self.db.get_trans_id_for_gen, 1)
+        # get_transaction_log()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
@@ -1393,9 +1393,9 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
         del self.db._database['_design/transactions']
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         self.create_db(ensure=True, dbname=self.db._dbname)
-        self.db._get_transaction_log()
+        self.db.get_transaction_log()
 
     def test_ensure_security_doc(self):
         """

@@ -22,7 +22,7 @@ import logging
 from twisted.internet import defer
 
 from u1db import errors
-from leap.soledad.common.errors import MissingDesignDocError
+from leap.soledad.common.couch.errors import MissingDesignDocError
 from u1db.sync import Synchronizer
 
 
