@@ -22,10 +22,12 @@ import tempfile
 import mock
 import time
 import binascii
+import pkg_resources
 from uuid import uuid4
 
 from urlparse import urljoin
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from leap.soledad.common.couch import (
     CouchServerState,
@@ -43,6 +45,8 @@ from leap.soledad.common.tests.util import (
 from leap.soledad.common import crypto
 from leap.soledad.client import Soledad
 from leap.soledad.server import LockResource
+from leap.soledad.server import load_configuration
+from leap.soledad.server import CONFIG_DEFAULTS
 from leap.soledad.server.auth import URLToAuthorization
 
 
@@ -587,3 +591,35 @@ class LockResourceTestCase(
         self.assertIsNotNone(lr._shared_db.get_doc('lock-' + lock_uuid))
         responder.send_response_json.assert_called_with(
             401, error='unlock unauthorized')
+
+
+class ConfigurationParsingTest(unittest.TestCase):
+
+    def setUp(self):
+        self.maxDiff = None
+
+    def test_use_defaults_on_failure(self):
+        config = load_configuration('this file will never exist')
+        expected = CONFIG_DEFAULTS
+        self.assertEquals(expected, config)
+
+    def test_security_values_configuration(self):
+        # given
+        config_path = pkg_resources.resource_filename('leap.soledad.common.tests',
+                                                      'fixture_soledad.conf')
+        # when
+        config = load_configuration(config_path)
+
+        # then
+        expected = {'soledad-server': {
+                    'couch_url': 'http://soledad:passwd@localhost:5984',
+                    'create_cmd': 'sudo -u soledad-admin /usr/bin/create-user-db',
+                    'admin_netrc': '/etc/couchdb/couchdb-soledad-admin.netrc',
+                    },
+                    'database-security': {
+                    'members': ['user1', 'user2'],
+                    'members_roles': ['role1', 'role2'],
+                    'admins': ['user3', 'user4'],
+                    'admins_roles': ['role3', 'role3'],
+        }}
+        self.assertDictEqual(expected, config)

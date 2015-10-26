@@ -372,7 +372,8 @@ class CouchDatabase(CommonBackend):
     """
 
     @classmethod
-    def open_database(cls, url, create, replica_uid=None, ensure_ddocs=False):
+    def open_database(cls, url, create, replica_uid=None, ensure_ddocs=False,
+                      database_security=None):
         """
         Open a U1DB database using CouchDB as backend.
 
@@ -402,9 +403,11 @@ class CouchDatabase(CommonBackend):
                     raise DatabaseDoesNotExist()
                 server.create(dbname)
         return cls(
-            url, dbname, replica_uid=replica_uid, ensure_ddocs=ensure_ddocs)
+            url, dbname, replica_uid=replica_uid,
+            ensure_ddocs=ensure_ddocs, database_security=database_security)
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=False):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=False,
+                 database_security=None):
         """
         Create a new Couch data container.
 
@@ -435,7 +438,7 @@ class CouchDatabase(CommonBackend):
             self._set_replica_uid(replica_uid)
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
-            self.ensure_security_ddoc()
+            self.ensure_security_ddoc(database_security)
         self._cache = None
 
     @property
@@ -469,7 +472,7 @@ class CouchDatabase(CommonBackend):
                         getattr(ddocs, ddoc_name)))
                 self._database.save(ddoc)
 
-    def ensure_security_ddoc(self):
+    def ensure_security_ddoc(self, security_config=None):
         """
         Make sure that only soledad user is able to access this database as
         an unprivileged member, meaning that administration access will
@@ -478,10 +481,18 @@ class CouchDatabase(CommonBackend):
         to the unprivileged CouchDB user set on the server process.
         This is achieved by creating a _security design document, see:
         http://docs.couchdb.org/en/latest/api/database/security.html
+
+        :param database_security: security configuration parsed from conf file
+        :type cache: dict
         """
+        security_config = security_config or {}
         security = self._database.resource.get_json('_security')[2]
-        security['members'] = {'names': ['soledad'], 'roles': []}
+        security['members'] = {'names': [], 'roles': []}
+        security['members']['names'] = security_config.get('members', ['soledad'])
+        security['members']['roles'] = security_config.get('members_roles', [])
         security['admins'] = {'names': [], 'roles': []}
+        security['admins']['names'] = security_config.get('admins', [])
+        security['admins']['roles'] = security_config.get('admins_roles', [])
         self._database.resource.put_json('_security', body=security)
 
     def get_sync_target(self):

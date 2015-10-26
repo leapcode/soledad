@@ -31,7 +31,8 @@ This is meant to be used by Soledad Server.
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('dbname', metavar='user-d34db33f', type=str,
                     help='database name on the format user-{uuid4}')
-NETRC_PATH = load_configuration('/etc/soledad/soledad-server.conf')['admin_netrc']
+CONF = load_configuration('/etc/soledad/soledad-server.conf')
+NETRC_PATH = CONF['soledad-server']['admin_netrc']
 
 
 def url_for_db(dbname):
@@ -54,7 +55,9 @@ if __name__ == '__main__':
         print ("Invalid name! %s" % args.dbname)
         sys.exit(1)
     url = url_for_db(args.dbname)
+    db_security = CONF['database-security']
     db = CouchDatabase.open_database(url=url, create=True,
-                                     replica_uid=None, ensure_ddocs=True)
+                                     replica_uid=None, ensure_ddocs=True,
+                                     database_security=db_security)
     print ('success! Created %s, replica_uid: %s' %
            (db._dbname, db.replica_uid))

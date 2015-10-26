@@ -534,9 +534,11 @@ class CouchDatabaseSyncTargetTests(
 
 class IndexedCouchDatabase(couch.CouchDatabase):
 
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
+    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True,
+                 database_security=None):
         old_class.__init__(self, url, dbname, replica_uid=replica_uid,
-                           ensure_ddocs=ensure_ddocs)
+                           ensure_ddocs=ensure_ddocs,
+                           database_security=database_security)
         self._indexes = {}
 
     def _put_doc(self, old_doc, doc):
@@ -1514,6 +1516,24 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.assertFalse(security_ddoc['admins']['names'])
         self.assertIn('members', security_ddoc)
         self.assertIn('soledad', security_ddoc['members']['names'])
+
+    def test_ensure_security_from_configuration(self):
+        """
+        Given a configuration, follow it to create the security document
+        """
+        self.create_db(ensure=False)
+        configuration = {'members': ['user1', 'user2'],
+                         'members_roles': ['role1', 'role2'],
+                         'admins': ['admin'],
+                         'admins_roles': ['administrators']
+                         }
+        self.db.ensure_security_ddoc(configuration)
+
+        security_ddoc = self.db._database.resource.get_json('_security')[2]
+        self.assertEquals(configuration['admins'], security_ddoc['admins']['names'])
+        self.assertEquals(configuration['admins_roles'], security_ddoc['admins']['roles'])
+        self.assertEquals(configuration['members'], security_ddoc['members']['names'])
+        self.assertEquals(configuration['members_roles'], security_ddoc['members']['roles'])
 
 
 class DatabaseNameValidationTest(unittest.TestCase):

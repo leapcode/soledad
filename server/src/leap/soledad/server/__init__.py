@@ -272,6 +272,20 @@ http_app.HTTPInvocationByMethodWithBody = HTTPInvocationByMethodWithBody
 # ----------------------------------------------------------------------------
 # Auxiliary functions
 # ----------------------------------------------------------------------------
+CONFIG_DEFAULTS = {
+    'soledad-server': {
+        'couch_url': 'http://localhost:5984',
+        'create_cmd': None,
+        'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
+    },
+    'database-security': {
+        'members': ['soledad'],
+        'members_roles': [],
+        'admins': [],
+        'admins_roles': []
+    }
+}
+
 
 def load_configuration(file_path):
     """
@@ -283,17 +297,18 @@ def load_configuration(file_path):
     @return: A dictionary with the configuration.
     @rtype: dict
     """
-    defaults = {
-        'couch_url': 'http://localhost:5984',
-        'create_cmd': None,
-        'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
-    }
+    defaults = dict(CONFIG_DEFAULTS)
     config = configparser.ConfigParser()
     config.read(file_path)
-    if 'soledad-server' in config:
-        for key in defaults:
-            if key in config['soledad-server']:
-                defaults[key] = config['soledad-server'][key]
+    for section in defaults.keys():
+        if section in config:
+            for key in defaults[section]:
+                if key in config[section]:
+                    defaults[section][key] = config[section][key]
+    for key, value in defaults['database-security'].iteritems():
+        if type(value) is not unicode: continue
+        defaults['database-security'][key] = \
+                [item.strip() for item in value.split(',')]
     # TODO: implement basic parsing/sanitization of options comming from
     # config file.
     return defaults
@@ -305,6 +320,7 @@ def load_configuration(file_path):
 
 def application(environ, start_response):
     conf = load_configuration('/etc/soledad/soledad-server.conf')
+    conf = conf['soledad-server']
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(
