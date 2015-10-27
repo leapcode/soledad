@@ -94,12 +94,6 @@ from u1db.remote import http_app, utils
 
 from ._version import get_versions
 
-# Keep OpenSSL's tsafe before importing Twisted submodules so we can put
-# it back if Twisted==12.0.0 messes with it.
-from OpenSSL import tsafe
-
-from twisted import version
-
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
 from leap.soledad.server.lock_resource import LockResource
@@ -111,13 +105,6 @@ from leap.soledad.server.sync import (
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common.couch import CouchServerState
-
-old_tsafe = tsafe
-
-if version.base() == "12.0.0":
-    # Put OpenSSL's tsafe back into place. This can probably be removed if we
-    # come to use Twisted>=12.3.0.
-    sys.modules['OpenSSL.tsafe'] = old_tsafe
 
 # ----------------------------------------------------------------------------
 # Soledad WSGI application
