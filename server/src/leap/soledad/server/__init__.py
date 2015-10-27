@@ -306,7 +306,8 @@ def load_configuration(file_path):
                 if key in config[section]:
                     defaults[section][key] = config[section][key]
     for key, value in defaults['database-security'].iteritems():
-        if type(value) is not unicode: continue
+        if type(value) is not unicode:
+            continue
         defaults['database-security'][key] = \
                 [item.strip() for item in value.split(',')]
     # TODO: implement basic parsing/sanitization of options comming from

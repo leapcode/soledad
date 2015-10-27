@@ -488,7 +488,8 @@ class CouchDatabase(CommonBackend):
         security_config = security_config or {}
         security = self._database.resource.get_json('_security')[2]
         security['members'] = {'names': [], 'roles': []}
-        security['members']['names'] = security_config.get('members', ['soledad'])
+        security['members']['names'] = security_config.get('members',
+                                                           ['soledad'])
         security['members']['roles'] = security_config.get('members_roles', [])
         security['admins'] = {'names': [], 'roles': []}
         security['admins']['names'] = security_config.get('admins', [])

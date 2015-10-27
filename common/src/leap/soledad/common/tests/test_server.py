@@ -22,7 +22,7 @@ import tempfile
 import mock
 import time
 import binascii
-import pkg_resources
+from pkg_resources import resource_filename
 from uuid import uuid4
 
 from urlparse import urljoin
@@ -605,16 +605,19 @@ class ConfigurationParsingTest(unittest.TestCase):
 
     def test_security_values_configuration(self):
         # given
-        config_path = pkg_resources.resource_filename('leap.soledad.common.tests',
-                                                      'fixture_soledad.conf')
+        config_path = resource_filename('leap.soledad.common.tests',
+                                        'fixture_soledad.conf')
         # when
         config = load_configuration(config_path)
 
         # then
         expected = {'soledad-server': {
-                    'couch_url': 'http://soledad:passwd@localhost:5984',
-                    'create_cmd': 'sudo -u soledad-admin /usr/bin/create-user-db',
-                    'admin_netrc': '/etc/couchdb/couchdb-soledad-admin.netrc',
+                    'couch_url':
+                        'http://soledad:passwd@localhost:5984',
+                    'create_cmd':
+                        'sudo -u soledad-admin /usr/bin/create-user-db',
+                    'admin_netrc':
+                        '/etc/couchdb/couchdb-soledad-admin.netrc',
                     },
                     'database-security': {
                     'members': ['user1', 'user2'],

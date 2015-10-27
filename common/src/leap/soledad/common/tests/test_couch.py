@@ -1530,10 +1530,14 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         self.db.ensure_security_ddoc(configuration)
 
         security_ddoc = self.db._database.resource.get_json('_security')[2]
-        self.assertEquals(configuration['admins'], security_ddoc['admins']['names'])
-        self.assertEquals(configuration['admins_roles'], security_ddoc['admins']['roles'])
-        self.assertEquals(configuration['members'], security_ddoc['members']['names'])
-        self.assertEquals(configuration['members_roles'], security_ddoc['members']['roles'])
+        self.assertEquals(configuration['admins'],
+                          security_ddoc['admins']['names'])
+        self.assertEquals(configuration['admins_roles'],
+                          security_ddoc['admins']['roles'])
+        self.assertEquals(configuration['members'],
+                          security_ddoc['members']['names'])
+        self.assertEquals(configuration['members_roles'],
+                          security_ddoc['members']['roles'])
 
 
 class DatabaseNameValidationTest(unittest.TestCase):
