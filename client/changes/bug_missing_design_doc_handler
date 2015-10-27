@@ -1,1 +1,0 @@
-o Handle missing design doc at GET (get_sync_info). Soledad server can handle this during sync.
