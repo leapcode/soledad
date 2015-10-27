@@ -70,6 +70,23 @@ logger = logging.getLogger(__name__)
 COUCH_TIMEOUT = 120  # timeout for transfers between Soledad server and Couch
 
 
+def list_users_dbs(couch_url):
+    """
+    Retrieves a list with all databases that starts with 'user-' on CouchDB.
+    Those databases belongs to users. So, the list will contain all the
+    database names in the form of 'user-{uuid4}'.
+
+    :param couch_url: The couch url with needed credentials
+    :type couch_url: str
+
+    :return: The list of all database names from users.
+    :rtype: [str]
+    """
+    with couch_server(couch_url) as server:
+        users = [dbname for dbname in server if dbname.startswith('user-')]
+    return users
+
+
 class InvalidURLError(Exception):
 
     """
