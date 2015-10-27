@@ -19,11 +19,14 @@ Server state using CouchDatabase as backend.
 """
 import re
 import logging
+import time
 from urlparse import urljoin
+from hashlib import sha512
 
 from u1db.remote.server_state import ServerState
 from leap.soledad.common.command import exec_validated_cmd
 from leap.soledad.common.couch import CouchDatabase
+from leap.soledad.common.couch import couch_server
 from u1db.errors import Unauthorized
 
 
@@ -49,6 +52,12 @@ class CouchServerState(ServerState):
     """
     Inteface of the WSGI server with the CouchDB backend.
     """
+
+    TOKENS_DB_PREFIX = "tokens_"
+    TOKENS_DB_EXPIRE = 30 * 24 * 3600  # 30 days in seconds
+    TOKENS_TYPE_KEY = "type"
+    TOKENS_TYPE_DEF = "Token"
+    TOKENS_USER_ID_KEY = "user_id"
 
     def __init__(self, couch_url, create_cmd=None):
         """
@@ -112,3 +121,40 @@ class CouchServerState(ServerState):
                              delete databases.
         """
         raise Unauthorized()
+
+    def verify_token(self, uuid, token):
+        """
+        Query couchdb to decide if C{token} is valid for C{uuid}.
+
+        @param uuid: The user uuid.
+        @type uuid: str
+        @param token: The token.
+        @type token: str
+        """
+        with couch_server(self.couch_url) as server:
+            # the tokens db rotates every 30 days, and the current db name is
+            # "tokens_NNN", where NNN is the number of seconds since epoch divided
+            # by the rotate period in seconds. When rotating, old and new tokens
+            # db coexist during a certain window of time and valid tokens are
+            # replicated from the old db to the new one. See:
+            # https://leap.se/code/issues/6785
+            dbname = self._tokens_dbname()
+            db = server[dbname]
+        # lookup key is a hash of the token to prevent timing attacks.
+        token = db.get(sha512(token).hexdigest())
+        if token is None:
+            return False
+        # we compare uuid hashes to avoid possible timing attacks that
+        # might exploit python's builtin comparison operator behaviour,
+        # which fails immediatelly when non-matching bytes are found.
+        couch_uuid_hash = sha512(token[self.TOKENS_USER_ID_KEY]).digest()
+        req_uuid_hash = sha512(uuid).digest()
+        if token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF \
+                or couch_uuid_hash != req_uuid_hash:
+            return False
+        return True
+
+    def _tokens_dbname(self):
+        dbname = self.TOKENS_DB_PREFIX + \
+            str(int(time.time() / self.TOKENS_DB_EXPIRE))
+        return dbname
