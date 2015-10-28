@@ -132,7 +132,6 @@ class ServerDocument(SoledadDocument):
         :type has_conflicts: bool
         """
         SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
-        self.transactions = None
         self._conflicts = None
 
     def get_conflicts(self):

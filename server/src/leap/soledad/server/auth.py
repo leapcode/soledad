@@ -189,7 +189,6 @@ class SoledadAuthMiddleware(object):
         @type prefix: str
         """
         self._app = app
-        self._state = app.state
 
     def _error(self, start_response, status, description, message=None):
         """
@@ -349,6 +348,10 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
     """
 
     TOKEN_AUTH_ERROR_STRING = "Incorrect address or token."
+
+    def __init__(self, app):
+        self._state = app.state
+        super(SoledadTokenAuthMiddleware, self).__init__(app)
 
     def _verify_authentication_scheme(self, scheme):
         """
