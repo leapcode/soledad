@@ -381,6 +381,8 @@ class SoledadBackend(CommonBackend):
                  synchronized with the replica, this is (0, '').
         :rtype: (int, str)
         """
+        if other_replica_uid in self.cache:
+            return self.cache[other_replica_uid]
         return self._database.get_replica_gen_and_trans_id(other_replica_uid)
 
     def _set_replica_gen_and_trans_id(self, other_replica_uid,
