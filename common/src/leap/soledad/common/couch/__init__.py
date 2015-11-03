@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # __init__.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2015 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -126,6 +126,8 @@ class CouchDatabase(object):
 
         :return: the database instance
         :rtype: SoledadBackend
+
+        :raise DatabaseDoesNotExist: Raised if database does not exist.
         """
         # get database from url
         m = re.match('(^https?://[^/]+)/(.+)$', url)
@@ -134,12 +136,11 @@ class CouchDatabase(object):
         url = m.group(1)
         dbname = m.group(2)
         with couch_server(url) as server:
-            try:
-                server[dbname]
-            except ResourceNotFound:
-                if not create:
+            if dbname not in server:
+                if create:
+                    server.create(dbname)
+                else:
                     raise DatabaseDoesNotExist()
-                server.create(dbname)
         db = cls(url,
                  dbname, ensure_ddocs=ensure_ddocs,
                  database_security=database_security)
@@ -151,13 +152,31 @@ class CouchDatabase(object):
         self._session = Session(timeout=COUCH_TIMEOUT)
         self._url = url
         self._dbname = dbname
-        self._database = Database(
-            urljoin(url, dbname),
-            self._session)
-        self._database.info()
+        self._database = self.get_couch_database(url, dbname)
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
             self.ensure_security_ddoc(database_security)
+
+    def get_couch_database(self, url, dbname):
+        """
+        Generate a couchdb.Database instance given a url and dbname.
+
+        :param url: CouchDB's server url with credentials
+        :type url: str
+        :param dbname: Database name
+        :type dbname: str
+
+        :return: couch library database instance
+        :rtype: couchdb.Database
+
+        :raise DatabaseDoesNotExist: Raised if database does not exist.
+        """
+        try:
+            return Database(
+                urljoin(url, dbname),
+                self._session)
+        except ResourceNotFound:
+            raise DatabaseDoesNotExist()
 
     def ensure_ddocs_on_db(self):
         """

@@ -101,7 +101,7 @@ class InterruptableSyncTestCase(
             user='user-uuid', server_url=self.getURL())
 
         # ensure remote db exists before syncing
-        db = couch.SoledadBackend.open_database(
+        db = couch.CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-user-uuid'),
             create=True,
             ensure_ddocs=True)

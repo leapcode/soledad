@@ -935,7 +935,6 @@ class SoledadBackendSyncTests(
         doc1 = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc1.doc_id
         doc1_rev = doc1.rev
-        # self.db1.create_index('test-idx', 'key')
         new_doc = '{"key": "altval"}'
         doc2 = self.db2.create_doc_from_json(new_doc, doc_id=doc_id)
         doc2_rev = doc2.rev
@@ -951,12 +950,6 @@ class SoledadBackendSyncTests(
         self.assertTransactionLog([doc_id, doc_id], self.db1)
         self.assertGetDoc(self.db1, doc_id, doc2_rev, new_doc, True)
         self.assertGetDoc(self.db2, doc_id, doc2_rev, new_doc, False)
-        # soledad doesnt support index due to encryption
-        # from_idx = self.db1.get_from_index('test-idx', 'altval')[0]
-        # self.assertEqual(doc2.doc_id, from_idx.doc_id)
-        # self.assertEqual(doc2.rev, from_idx.rev)
-        # self.assertTrue(from_idx.has_conflicts)
-        # self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
 
     def test_sync_sees_remote_delete_conflicted(self):
         self.db1 = self.create_database('test1', 'source')
@@ -989,7 +982,6 @@ class SoledadBackendSyncTests(
         doc = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc.doc_id
         doc1_rev = doc.rev
-        # self.db1.create_index('test-idx', 'key')
         self.sync(self.db1, self.db2)
         content1 = '{"key": "localval"}'
         content2 = '{"key": "altval"}'
@@ -1008,22 +1000,13 @@ class SoledadBackendSyncTests(
         self.sync(self.db1, self.db2, trace_hook=after_whatschanged)
         self.assertEqual([True], triggered)
         self.assertGetDoc(self.db1, doc_id, doc2_rev2, content2, True)
-        # soledad doesnt support indexing due to encryption
-        # from_idx = self.db1.get_from_index('test-idx', 'altval')[0]
-        # self.assertEqual(doc.doc_id, from_idx.doc_id)
-        # self.assertEqual(doc.rev, from_idx.rev)
-        # self.assertTrue(from_idx.has_conflicts)
-        # self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
-        # self.assertEqual([], self.db1.get_from_index('test-idx', 'localval'))
 
     def test_sync_propagates_deletes(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'both')
         doc1 = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc1.doc_id
-        # self.db1.create_index('test-idx', 'key')
         self.sync(self.db1, self.db2)
-        # self.db2.create_index('test-idx', 'key')
         self.db3 = self.create_database('test3', 'target')
         self.sync(self.db1, self.db3)
         self.db1.delete_doc(doc1)
@@ -1039,8 +1022,6 @@ class SoledadBackendSyncTests(
             self.db1, doc_id, deleted_rev, None, False)
         self.assertGetDocIncludeDeleted(
             self.db2, doc_id, deleted_rev, None, False)
-        # self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
-        # self.assertEqual([], self.db2.get_from_index('test-idx', 'value'))
         self.sync(self.db2, self.db3)
         self.assertLastExchangeLog(
             self.db3,
