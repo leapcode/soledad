@@ -133,10 +133,10 @@ class CouchServerState(ServerState):
         """
         with couch_server(self.couch_url) as server:
             # the tokens db rotates every 30 days, and the current db name is
-            # "tokens_NNN", where NNN is the number of seconds since epoch divided
-            # by the rotate period in seconds. When rotating, old and new tokens
-            # db coexist during a certain window of time and valid tokens are
-            # replicated from the old db to the new one. See:
+            # "tokens_NNN", where NNN is the number of seconds since epoch
+            # divide dby the rotate period in seconds. When rotating, old and
+            # new tokens db coexist during a certain window of time and valid
+            # tokens are replicated from the old db to the new one. See:
             # https://leap.se/code/issues/6785
             dbname = self._tokens_dbname()
             db = server[dbname]

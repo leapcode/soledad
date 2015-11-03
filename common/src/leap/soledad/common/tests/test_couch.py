@@ -1437,7 +1437,8 @@ class SoledadBackendExceptionsTests(CouchDBTestCase):
 class DatabaseNameValidationTest(unittest.TestCase):
 
     def test_database_name_validation(self):
-        self.assertFalse(couch.state.is_db_name_valid("user-deadbeef | cat /secret"))
+        inject = couch.state.is_db_name_valid("user-deadbeef | cat /secret")
+        self.assertFalse(inject)
         self.assertTrue(couch.state.is_db_name_valid("user-cafe1337"))
 
 
