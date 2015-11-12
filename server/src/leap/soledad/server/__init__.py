@@ -104,7 +104,7 @@ from leap.soledad.server.sync import (
 )
 
 from leap.soledad.common import SHARED_DB_NAME
-from leap.soledad.common.couch import CouchServerState
+from leap.soledad.common.couch.state import CouchServerState
 
 # ----------------------------------------------------------------------------
 # Soledad WSGI application

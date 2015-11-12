@@ -32,7 +32,7 @@ class SyncExchange(sync.SyncExchange):
     def __init__(self, db, source_replica_uid, last_known_generation, sync_id):
         """
         :param db: The target syncing database.
-        :type db: CouchDatabase
+        :type db: SoledadBackend
         :param source_replica_uid: The uid of the source syncing replica.
         :type source_replica_uid: str
         :param last_known_generation: The last target replica generation the

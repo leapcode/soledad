@@ -26,7 +26,8 @@ from twisted.internet import defer
 from uuid import uuid4
 
 from leap.soledad.client import Soledad
-from leap.soledad.common.couch import CouchDatabase, CouchServerState
+from leap.soledad.common.couch.state import CouchServerState
+from leap.soledad.common.couch import CouchDatabase
 
 from leap.soledad.common.tests.util import (
     make_token_soledad_app,

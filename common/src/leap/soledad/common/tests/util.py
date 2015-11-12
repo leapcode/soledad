@@ -27,7 +27,6 @@ import shutil
 import random
 import string
 import u1db
-import traceback
 import couchdb
 
 from uuid import uuid4
@@ -37,17 +36,17 @@ from StringIO import StringIO
 from pysqlcipher import dbapi2
 
 from u1db import sync
-from u1db.errors import DatabaseDoesNotExist
 from u1db.remote import http_database
 
 from twisted.trial import unittest
 
-from leap.common.files import mkdir_p
 from leap.common.testing.basetest import BaseLeapTest
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.couch import CouchDatabase, CouchServerState
+from leap.soledad.common.couch import CouchDatabase
+from leap.soledad.common.couch.state import CouchServerState
+
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 
 from leap.soledad.client import Soledad

@@ -29,7 +29,6 @@ from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 from twisted.internet import defer
-from urlparse import urljoin
 
 from leap.soledad.client import http_target as target
 from leap.soledad.client import crypto
@@ -37,7 +36,6 @@ from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
-from leap.soledad.common import couch
 from leap.soledad.common.document import SoledadDocument
 
 from leap.soledad.common.tests import u1db_tests as tests
@@ -265,9 +263,9 @@ class TestSoledadSyncTarget(
                                      replica_trans_id=replica_trans_id,
                                      number_of_docs=number_of_docs,
                                      doc_idx=doc_idx, sync_id=sync_id)
-        from leap.soledad.common.tests.test_couch import IndexedCouchDatabase
+        from leap.soledad.common.backend import SoledadBackend
         self.patch(
-            IndexedCouchDatabase, '_put_doc_if_newer', bomb_put_doc_if_newer)
+            SoledadBackend, '_put_doc_if_newer', bomb_put_doc_if_newer)
         remote_target = self.getSyncTarget(
             source_replica_uid='replica')
         other_changes = []

@@ -33,7 +33,8 @@ from twisted.internet import defer
 
 from leap.soledad.client.sync import SoledadSynchronizer
 
-from leap.soledad.common import couch
+from leap.soledad.common.couch.state import CouchServerState
+from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 
@@ -84,7 +85,7 @@ class TestSyncMutex(
     sync_target = soledad_sync_target
 
     def make_app(self):
-        self.request_state = couch.CouchServerState(self.couch_url)
+        self.request_state = CouchServerState(self.couch_url)
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
@@ -102,7 +103,7 @@ class TestSyncMutex(
         self.startServer()
 
         # ensure remote db exists before syncing
-        db = couch.CouchDatabase.open_database(
+        db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + self.user),
             create=True,
             ensure_ddocs=True)

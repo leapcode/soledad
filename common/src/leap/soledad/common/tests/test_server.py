@@ -24,15 +24,14 @@ import time
 import binascii
 from pkg_resources import resource_filename
 from uuid import uuid4
+from hashlib import sha512
 
 from urlparse import urljoin
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from leap.soledad.common.couch import (
-    CouchServerState,
-    CouchDatabase,
-)
+from leap.soledad.common.couch.state import CouchServerState
+from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.util import (
@@ -48,6 +47,36 @@ from leap.soledad.server import LockResource
 from leap.soledad.server import load_configuration
 from leap.soledad.server import CONFIG_DEFAULTS
 from leap.soledad.server.auth import URLToAuthorization
+from leap.soledad.server.auth import SoledadTokenAuthMiddleware
+
+
+class ServerAuthenticationMiddlewareTestCase(CouchDBTestCase):
+
+    def setUp(self):
+        super(ServerAuthenticationMiddlewareTestCase, self).setUp()
+        app = mock.Mock()
+        self._state = CouchServerState(self.couch_url)
+        app.state = self._state
+        self.auth_middleware = SoledadTokenAuthMiddleware(app)
+        self._authorize('valid-uuid', 'valid-token')
+
+    def _authorize(self, uuid, token):
+        token_doc = {}
+        token_doc['_id'] = sha512(token).hexdigest()
+        token_doc[self._state.TOKENS_USER_ID_KEY] = uuid
+        token_doc[self._state.TOKENS_TYPE_KEY] = \
+            self._state.TOKENS_TYPE_DEF
+        dbname = self._state._tokens_dbname()
+        db = self.couch_server.create(dbname)
+        db.save(token_doc)
+        self.addCleanup(self.delete_db, db.name)
+
+    def test_authorized_user(self):
+        is_authorized = self.auth_middleware._verify_authentication_data
+        self.assertTrue(is_authorized('valid-uuid', 'valid-token'))
+        self.assertFalse(is_authorized('valid-uuid', 'invalid-token'))
+        self.assertFalse(is_authorized('invalid-uuid', 'valid-token'))
+        self.assertFalse(is_authorized('eve', 'invalid-token'))
 
 
 class ServerAuthorizationTestCase(BaseSoledadTest):
