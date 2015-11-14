@@ -60,9 +60,15 @@ class SoledadBackend(CommonBackend):
     def batch_start(self):
         self.batching = True
         self.after_batch_callbacks = {}
+        self._database.batch_start()
+        if not self._cache:
+            # batching needs cache
+            self._cache = {}
+        self._get_generation()  # warm up gen info
 
     def batch_end(self):
         self.batching = False
+        self._database.batch_end()
         for name in self.after_batch_callbacks:
             self.after_batch_callbacks[name]()
         self.after_batch_callbacks = None

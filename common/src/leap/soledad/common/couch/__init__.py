@@ -153,9 +153,21 @@ class CouchDatabase(object):
         self._url = url
         self._dbname = dbname
         self._database = self.get_couch_database(url, dbname)
+        self.batching = False
+        self.batch_docs = []
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
             self.ensure_security_ddoc(database_security)
+
+    def batch_start(self):
+        self.batching = True
+        ids = set(row.id for row in self._database.view('_all_docs'))
+        self.batched_ids = ids
+
+    def batch_end(self):
+        self.batching = False
+        self._database.update(self.batch_docs)
+        self.batch_docs = []
 
     def get_couch_database(self, url, dbname):
         """
@@ -339,6 +351,8 @@ class CouchDatabase(object):
         """
         # get document with all attachments (u1db content and eventual
         # conflicts)
+        if self.batching and doc_id not in self.batched_ids:
+            return None
         if doc_id not in self._database:
             return None
         result = self.json_from_resource([doc_id], attachments=True)
@@ -691,20 +705,29 @@ class CouchDatabase(object):
         if old_doc is not None and hasattr(old_doc, 'couch_rev'):
             couch_doc['_rev'] = old_doc.couch_rev
         # prepare the multipart PUT
-        buf = StringIO()
-        envelope = MultipartWriter(buf)
-        envelope.add('application/json', json.dumps(couch_doc))
-        for part in parts:
-            envelope.add('application/octet-stream', part)
-        envelope.close()
-        # try to save and fail if there's a revision conflict
-        try:
-            resource = self._new_resource()
-            resource.put_json(
-                doc.doc_id, body=str(buf.getvalue()),
-                headers=envelope.headers)
-        except ResourceConflict:
-            raise RevisionConflict()
+        if not self.batching:
+            buf = StringIO()
+            envelope = MultipartWriter(buf)
+            envelope.add('application/json', json.dumps(couch_doc))
+            for part in parts:
+                envelope.add('application/octet-stream', part)
+            envelope.close()
+            # try to save and fail if there's a revision conflict
+            try:
+                resource = self._new_resource()
+                resource.put_json(
+                    doc.doc_id, body=str(buf.getvalue()),
+                    headers=envelope.headers)
+            except ResourceConflict:
+                raise RevisionConflict()
+        else:
+            for name, attachment in attachments.items():
+                del attachment['follows']
+                del attachment['length']
+                index = 0 if name is 'u1db_content' else 1
+                attachment['data'] = binascii.b2a_base64(parts[index]).strip()
+            couch_doc['attachments'] = attachments
+            self.batch_docs.append(couch_doc)
         return transactions[-1][1]
 
     def _new_resource(self, *path):
