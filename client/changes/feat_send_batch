@@ -1,0 +1,1 @@
+o Client will now send documents at a limited size batch due to changes on SyncTarget. The default limit is 500kB.

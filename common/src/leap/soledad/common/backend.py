@@ -53,8 +53,19 @@ class SoledadBackend(CommonBackend):
         self._cache = None
         self._dbname = database._dbname
         self._database = database
+        self.batching = False
         if replica_uid is not None:
             self._set_replica_uid(replica_uid)
+
+    def batch_start(self):
+        self.batching = True
+        self.after_batch_callbacks = {}
+
+    def batch_end(self):
+        self.batching = False
+        for name in self.after_batch_callbacks:
+            self.after_batch_callbacks[name]()
+        self.after_batch_callbacks = None
 
     @property
     def cache(self):
@@ -373,7 +384,10 @@ class SoledadBackend(CommonBackend):
         """
         if other_replica_uid in self.cache:
             return self.cache[other_replica_uid]
-        return self._database.get_replica_gen_and_trans_id(other_replica_uid)
+        gen, trans_id = \
+            self._database.get_replica_gen_and_trans_id(other_replica_uid)
+        self.cache[other_replica_uid] = (gen, trans_id)
+        return (gen, trans_id)
 
     def _set_replica_gen_and_trans_id(self, other_replica_uid,
                                       other_generation, other_transaction_id):
@@ -413,9 +427,13 @@ class SoledadBackend(CommonBackend):
                                      generation.
         :type other_transaction_id: str
         """
-        self._set_replica_gen_and_trans_id(other_replica_uid,
-                                           other_generation,
-                                           other_transaction_id)
+        function = self._set_replica_gen_and_trans_id
+        args = [other_replica_uid, other_generation, other_transaction_id]
+        callback = lambda: function(*args)
+        if self.batching:
+            self.after_batch_callbacks['set_source_info'] = callback
+        else:
+            callback()
 
     def _force_doc_sync_conflict(self, doc):
         """
