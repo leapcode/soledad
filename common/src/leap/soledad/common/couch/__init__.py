@@ -33,7 +33,6 @@ from multiprocessing.pool import ThreadPool
 
 
 from couchdb.client import Server, Database
-from couchdb.multipart import MultipartWriter
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
@@ -53,6 +52,7 @@ from u1db.remote import http_app
 from leap.soledad.common import ddocs
 from .errors import raise_server_error
 from .errors import raise_missing_design_doc_error
+from .support import MultipartWriter
 from leap.soledad.common.errors import InvalidURLError
 from leap.soledad.common.document import ServerDocument
 from leap.soledad.common.backend import SoledadBackend
@@ -692,8 +692,7 @@ class CouchDatabase(object):
             couch_doc['_rev'] = old_doc.couch_rev
         # prepare the multipart PUT
         buf = StringIO()
-        headers = {}
-        envelope = MultipartWriter(buf, headers=headers, subtype='related')
+        envelope = MultipartWriter(buf)
         envelope.add('application/json', json.dumps(couch_doc))
         for part in parts:
             envelope.add('application/octet-stream', part)
@@ -702,7 +701,8 @@ class CouchDatabase(object):
         try:
             resource = self._new_resource()
             resource.put_json(
-                doc.doc_id, body=str(buf.getvalue()), headers=headers)
+                doc.doc_id, body=str(buf.getvalue()),
+                headers=envelope.headers)
         except ResourceConflict:
             raise RevisionConflict()
         return transactions[-1][1]
