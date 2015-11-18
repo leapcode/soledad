@@ -104,6 +104,7 @@ from leap.soledad.server.sync import (
 )
 
 from leap.soledad.common import SHARED_DB_NAME
+from leap.soledad.common.backend import SoledadBackend
 from leap.soledad.common.couch.state import CouchServerState
 
 # ----------------------------------------------------------------------------
@@ -264,6 +265,7 @@ CONFIG_DEFAULTS = {
         'couch_url': 'http://localhost:5984',
         'create_cmd': None,
         'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
+        'batching': True
     },
     'database-security': {
         'members': ['soledad'],
@@ -285,18 +287,20 @@ def load_configuration(file_path):
     @rtype: dict
     """
     defaults = dict(CONFIG_DEFAULTS)
-    config = configparser.ConfigParser()
+    config = configparser.SafeConfigParser()
     config.read(file_path)
-    for section in defaults.keys():
-        if section in config:
-            for key in defaults[section]:
-                if key in config[section]:
-                    defaults[section][key] = config[section][key]
-    for key, value in defaults['database-security'].iteritems():
-        if type(value) is not unicode:
+    for section in defaults:
+        if not config.has_section(section):
             continue
-        defaults['database-security'][key] = \
-                [item.strip() for item in value.split(',')]
+        for key, value in defaults[section].items():
+            if type(value) == bool:
+                defaults[section][key] = config.getboolean(section, key)
+            elif type(value) == list:
+                values = config.get(section, key).split(',')
+                values = [v.strip() for v in values]
+                defaults[section][key] = values
+            else:
+                defaults[section][key] = config.get(section, key)
     # TODO: implement basic parsing/sanitization of options comming from
     # config file.
     return defaults
@@ -310,6 +314,7 @@ def application(environ, start_response):
     conf = load_configuration('/etc/soledad/soledad-server.conf')
     conf = conf['soledad-server']
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
+    SoledadBackend.BATCH_SUPPORT = conf['batching']
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(
         SoledadTokenAuthMiddleware(SoledadApp(state)))

@@ -640,18 +640,25 @@ class ConfigurationParsingTest(unittest.TestCase):
         config = load_configuration(config_path)
 
         # then
-        expected = {'soledad-server': {
-                    'couch_url':
-                        'http://soledad:passwd@localhost:5984',
-                    'create_cmd':
-                        'sudo -u soledad-admin /usr/bin/create-user-db',
-                    'admin_netrc':
-                        '/etc/couchdb/couchdb-soledad-admin.netrc',
-                    },
-                    'database-security': {
-                    'members': ['user1', 'user2'],
+        expected = {'members': ['user1', 'user2'],
                     'members_roles': ['role1', 'role2'],
                     'admins': ['user3', 'user4'],
-                    'admins_roles': ['role3', 'role3'],
-        }}
-        self.assertDictEqual(expected, config)
+                    'admins_roles': ['role3', 'role3']}
+        self.assertDictEqual(expected, config['database-security'])
+
+    def test_server_values_configuration(self):
+        # given
+        config_path = resource_filename('leap.soledad.common.tests',
+                                        'fixture_soledad.conf')
+        # when
+        config = load_configuration(config_path)
+
+        # then
+        expected = {'couch_url':
+                    'http://soledad:passwd@localhost:5984',
+                    'create_cmd':
+                    'sudo -u soledad-admin /usr/bin/create-user-db',
+                    'admin_netrc':
+                    '/etc/couchdb/couchdb-soledad-admin.netrc',
+                    'batching': False}
+        self.assertDictEqual(expected, config['soledad-server'])

@@ -33,6 +33,7 @@ from leap.soledad.common.document import ServerDocument
 
 
 class SoledadBackend(CommonBackend):
+    BATCH_SUPPORT = True
 
     """
     A U1DB backend implementation.
@@ -58,6 +59,8 @@ class SoledadBackend(CommonBackend):
             self._set_replica_uid(replica_uid)
 
     def batch_start(self):
+        if not self.BATCH_SUPPORT:
+            return
         self.batching = True
         self.after_batch_callbacks = {}
         self._database.batch_start()
@@ -67,6 +70,8 @@ class SoledadBackend(CommonBackend):
         self._get_generation()  # warm up gen info
 
     def batch_end(self):
+        if not self.BATCH_SUPPORT:
+            return
         self.batching = False
         self._database.batch_end()
         for name in self.after_batch_callbacks:
