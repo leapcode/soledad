@@ -108,3 +108,73 @@ class SoledadDocument(Document):
         _get_rev,
         _set_rev,
         doc="Wrapper to ensure `doc.rev` is always returned as bytes.")
+
+
+class ServerDocument(SoledadDocument):
+    """
+    This is the document used by server to hold conflicts and transactions
+    on a database.
+
+    The goal is to ensure an atomic and consistent update of the database.
+    """
+
+    def __init__(self, doc_id=None, rev=None, json='{}', has_conflicts=False):
+        """
+        Container for handling a document that stored on server.
+
+        :param doc_id: The unique document identifier.
+        :type doc_id: str
+        :param rev: The revision identifier of the document.
+        :type rev: str
+        :param json: The JSON string for this document.
+        :type json: str
+        :param has_conflicts: Boolean indicating if this document has conflicts
+        :type has_conflicts: bool
+        """
+        SoledadDocument.__init__(self, doc_id, rev, json, has_conflicts)
+        self._conflicts = None
+
+    def get_conflicts(self):
+        """
+        Get the conflicted versions of the document.
+
+        :return: The conflicted versions of the document.
+        :rtype: [ServerDocument]
+        """
+        return self._conflicts or []
+
+    def set_conflicts(self, conflicts):
+        """
+        Set the conflicted versions of the document.
+
+        :param conflicts: The conflicted versions of the document.
+        :type conflicts: list
+        """
+        self._conflicts = conflicts
+        self.has_conflicts = len(self._conflicts) > 0
+
+    def add_conflict(self, doc):
+        """
+        Add a conflict to this document.
+
+        :param doc: The conflicted version to be added.
+        :type doc: Document
+        """
+        if self._conflicts is None:
+            raise Exception("Fetch conflicts first!")
+        self._conflicts.append(doc)
+        self.has_conflicts = len(self._conflicts) > 0
+
+    def delete_conflicts(self, conflict_revs):
+        """
+        Delete conflicted versions of this document.
+
+        :param conflict_revs: The conflicted revisions to be deleted.
+        :type conflict_revs: [str]
+        """
+        if self._conflicts is None:
+            raise Exception("Fetch conflicts first!")
+        self._conflicts = filter(
+            lambda doc: doc.rev not in conflict_revs,
+            self._conflicts)
+        self.has_conflicts = len(self._conflicts) > 0

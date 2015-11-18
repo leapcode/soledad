@@ -1,3 +1,12 @@
+0.7.4 Oct 28, 2015:
+Client:
+  o Do not signal sync completion if sync failed. Closes: #7503
+  o Handle missing design doc at GET (get_sync_info). Soledad server can handle
+    this during sync.
+  o Increase http request timeout time to 90s. Related: #7382.
+  o Handle DatabaseDoesNotExist during sync.
+  o Handle MissingDesignDocError after get_sync_info.
+
 0.7.3 Sep 22, 2015:
 Client:
   o Bugfix: refactor code loss. Closes #7412.

@@ -94,12 +94,6 @@ from u1db.remote import http_app, utils
 
 from ._version import get_versions
 
-# Keep OpenSSL's tsafe before importing Twisted submodules so we can put
-# it back if Twisted==12.0.0 messes with it.
-from OpenSSL import tsafe
-
-from twisted import version
-
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
 from leap.soledad.server.lock_resource import LockResource
@@ -110,14 +104,7 @@ from leap.soledad.server.sync import (
 )
 
 from leap.soledad.common import SHARED_DB_NAME
-from leap.soledad.common.couch import CouchServerState
-
-old_tsafe = tsafe
-
-if version.base() == "12.0.0":
-    # Put OpenSSL's tsafe back into place. This can probably be removed if we
-    # come to use Twisted>=12.3.0.
-    sys.modules['OpenSSL.tsafe'] = old_tsafe
+from leap.soledad.common.couch.state import CouchServerState
 
 # ----------------------------------------------------------------------------
 # Soledad WSGI application
@@ -272,6 +259,20 @@ http_app.HTTPInvocationByMethodWithBody = HTTPInvocationByMethodWithBody
 # ----------------------------------------------------------------------------
 # Auxiliary functions
 # ----------------------------------------------------------------------------
+CONFIG_DEFAULTS = {
+    'soledad-server': {
+        'couch_url': 'http://localhost:5984',
+        'create_cmd': None,
+        'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
+    },
+    'database-security': {
+        'members': ['soledad'],
+        'members_roles': [],
+        'admins': [],
+        'admins_roles': []
+    }
+}
+
 
 def load_configuration(file_path):
     """
@@ -283,17 +284,19 @@ def load_configuration(file_path):
     @return: A dictionary with the configuration.
     @rtype: dict
     """
-    defaults = {
-        'couch_url': 'http://localhost:5984',
-        'create_cmd': None,
-        'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
-    }
+    defaults = dict(CONFIG_DEFAULTS)
     config = configparser.ConfigParser()
     config.read(file_path)
-    if 'soledad-server' in config:
-        for key in defaults:
-            if key in config['soledad-server']:
-                defaults[key] = config['soledad-server'][key]
+    for section in defaults.keys():
+        if section in config:
+            for key in defaults[section]:
+                if key in config[section]:
+                    defaults[section][key] = config[section][key]
+    for key, value in defaults['database-security'].iteritems():
+        if type(value) is not unicode:
+            continue
+        defaults['database-security'][key] = \
+                [item.strip() for item in value.split(',')]
     # TODO: implement basic parsing/sanitization of options comming from
     # config file.
     return defaults
@@ -305,6 +308,7 @@ def load_configuration(file_path):
 
 def application(environ, start_response):
     conf = load_configuration('/etc/soledad/soledad-server.conf')
+    conf = conf['soledad-server']
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
     # WSGI application that may be used by `twistd -web`
     application = GzipMiddleware(

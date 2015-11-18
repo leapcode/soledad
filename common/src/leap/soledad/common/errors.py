@@ -132,67 +132,14 @@ class CouldNotObtainLockError(SoledadError):
 
 
 #
-# CouchDatabase errors
-#
-
-@register_exception
-class MissingDesignDocError(SoledadError):
-
-    """
-    Raised when trying to access a missing couch design document.
-    """
-
-    wire_description = "missing design document"
-    status = 500
-
-
-@register_exception
-class MissingDesignDocNamedViewError(SoledadError):
-
-    """
-    Raised when trying to access a missing named view on a couch design
-    document.
-    """
-
-    wire_description = "missing design document named function"
-    status = 500
-
-
-@register_exception
-class MissingDesignDocListFunctionError(SoledadError):
-
-    """
-    Raised when trying to access a missing list function on a couch design
-    document.
-    """
-
-    wire_description = "missing design document list function"
-    status = 500
-
-
-@register_exception
-class MissingDesignDocDeletedError(SoledadError):
-
-    """
-    Raised when trying to access a deleted couch design document.
-    """
-
-    wire_description = "design document was deleted"
-    status = 500
-
-
-@register_exception
-class DesignDocUnknownError(SoledadError):
-
-    """
-    Raised when trying to access a couch design document and getting an
-    unknown error.
-    """
-
-    wire_description = "missing design document unknown error"
-    status = 500
-
-
+# SoledadBackend errors
 # u1db error statuses also have to be updated
 http_errors.ERROR_STATUSES = set(
     http_errors.wire_description_to_status.values())
+
+
+class InvalidURLError(Exception):
+
+    """
+    Exception raised when Soledad encounters a malformed URL.
+    """
