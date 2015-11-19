@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from leap.soledad.common.errors import SoledadError
+from leap.soledad.common.errors import SoledadError, BackendNotReadyError
 from leap.soledad.common.errors import register_exception
 
 """
@@ -23,7 +23,7 @@ Specific errors that can be raised by CouchDatabase.
 
 
 @register_exception
-class MissingDesignDocError(SoledadError):
+class MissingDesignDocError(BackendNotReadyError):
 
     """
     Raised when trying to access a missing couch design document.

@@ -143,3 +143,11 @@ class InvalidURLError(Exception):
     """
     Exception raised when Soledad encounters a malformed URL.
     """
+
+
+@register_exception
+class BackendNotReadyError(SoledadError):
+    """
+    Generic exception raised when the backend is not ready to dispatch a client
+    request.
+    """
