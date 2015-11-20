@@ -150,3 +150,5 @@ class BackendNotReadyError(SoledadError):
     Generic exception raised when the backend is not ready to dispatch a client
     request.
     """
+    wire_description = "backend not ready"
+    status = 500
