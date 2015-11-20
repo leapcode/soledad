@@ -145,7 +145,6 @@ class InvalidURLError(Exception):
     """
 
 
-@register_exception
 class BackendNotReadyError(SoledadError):
     """
     Generic exception raised when the backend is not ready to dispatch a client
