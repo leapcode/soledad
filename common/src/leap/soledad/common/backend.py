@@ -154,11 +154,7 @@ class SoledadBackend(CommonBackend):
 
         :raise SoledadError: Raised by database on operation failure
         """
-        if self.replica_uid + '_gen' in self.cache:
-            response = self.cache[self.replica_uid + '_gen']
-            return response
         cur_gen, newest_trans_id = self._database.get_generation_info()
-        self.cache[self.replica_uid + '_gen'] = (cur_gen, newest_trans_id)
         return (cur_gen, newest_trans_id)
 
     def _get_trans_id_for_gen(self, generation):
@@ -253,14 +249,8 @@ class SoledadBackend(CommonBackend):
         :param doc: The document to be put.
         :type doc: ServerDocument
         """
-        last_transaction =\
-            self._database.save_document(old_doc, doc,
-                                         self._allocate_transaction_id())
-        if self.replica_uid + '_gen' in self.cache:
-            gen, trans = self.cache[self.replica_uid + '_gen']
-            gen += 1
-            trans = last_transaction
-            self.cache[self.replica_uid + '_gen'] = (gen, trans)
+        self._database.save_document(old_doc, doc,
+                                     self._allocate_transaction_id())
 
     def put_doc(self, doc):
         """
