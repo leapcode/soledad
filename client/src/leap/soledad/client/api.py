@@ -187,6 +187,7 @@ class Soledad(object):
         self._defer_encryption = defer_encryption
         self._secrets_path = None
         self._sync_enc_pool = None
+        self._dbsyncer = None
 
         self.shared_db = shared_db
 
@@ -217,6 +218,7 @@ class Soledad(object):
     #
     # initialization/destruction methods
     #
+
     def _init_config_with_defaults(self):
         """
         Initialize configuration using default values for missing params.
@@ -658,6 +660,21 @@ class Soledad(object):
     # ISyncableStorage
     #
 
+    def set_syncable(self, syncable):
+        """
+        Toggle the syncable state for this database.
+
+        This can be used to start a database with offline state and switch it
+        online afterwards. Or the opposite: stop syncs when connection is lost.
+
+        :param syncable: new status for syncable.
+        :type syncable: bool
+        """
+        # TODO should check that we've got a token!
+        self.shared_db.syncable = syncable
+        if syncable and not self._dbsyncer:
+            self._init_u1db_syncer()
+
     def sync(self, defer_decryption=True):
         """
         Synchronize documents with the server replica.
@@ -753,6 +770,14 @@ class Soledad(object):
         :rtype: bool
         """
         return self.sync_lock.locked
+
+    @property
+    def syncable(self):
+        if self.shared_db:
+            return self.shared_db.syncable
+        else:
+            return False
+
 
     def _set_token(self, token):
         """
