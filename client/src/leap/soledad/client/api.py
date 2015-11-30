@@ -102,11 +102,11 @@ class Soledad(object):
             soledad starts to retrieve keys from server.
         SOLEDAD_DONE_DOWNLOADING_KEYS: emitted during bootstrap sequence when
             soledad finishes downloading keys from server.
-        SOLEDAD_NEW_DATA_TO_SYNC: emitted upon call to C{need_sync()} when
-          there's indeed new data to be synchronized between local database
-          replica and server's replica.
         SOLEDAD_DONE_DATA_SYNC: emitted inside C{sync()} method when it has
             finished synchronizing with remote replica.
+        SOLEDAD_NEW_DATA_TO_SYNC: emitted upon call to C{need_sync()} when
+          there's indeed new data to be synchronized between local database
+          replica and server's replica. --- not used right now.
     """
     implements(soledad_interfaces.ILocalStorage,
                soledad_interfaces.ISyncableStorage,

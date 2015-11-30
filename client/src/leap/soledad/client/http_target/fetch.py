@@ -39,6 +39,12 @@ class HTTPDocFetcher(object):
               So we parse, decrypt and insert locally as they arrive.
     """
 
+    # The uuid of the local replica.
+    # Any class inheriting from this one should provide a meaningful attribute
+    # if the sync status event is meant to be used somewhere else.
+
+    uuid = 'undefined'
+
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
                       ensure_callback, sync_id, defer_decryption):
@@ -176,7 +182,7 @@ class HTTPDocFetcher(object):
             # end of symmetric decryption
             # -------------------------------------------------------------
         self._received_docs += 1
-        _emit_receive_status(self._received_docs, total)
+        _emit_receive_status(self.uuid, self._received_docs, total)
         return number_of_changes, new_generation, new_transaction_id
 
     def _parse_received_doc_response(self, response):
@@ -243,9 +249,9 @@ class HTTPDocFetcher(object):
                 source_replica_uid=self.source_replica_uid)
 
 
-def _emit_receive_status(received_docs, total):
+def _emit_receive_status(uuid, received_docs, total):
     content = {'received': received_docs, 'total': total}
-    emit_async(SOLEDAD_SYNC_RECEIVE_STATUS, content)
+    emit_async(SOLEDAD_SYNC_RECEIVE_STATUS, uuid, content)
 
     if received_docs % 20 == 0:
         msg = "%d/%d" % (received_docs, total)
