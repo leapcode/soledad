@@ -768,7 +768,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         async_results = self._async_results[:]
         for res in async_results:
             if res.ready():
-                yield self._decrypt_doc_cb(res.get())  # might raise an exception!
+                # XXX: might raise an exception!
+                yield self._decrypt_doc_cb(res.get())
                 self._async_results.remove(res)
 
     @defer.inlineCallbacks
