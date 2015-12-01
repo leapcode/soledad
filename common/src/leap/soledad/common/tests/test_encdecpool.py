@@ -171,11 +171,21 @@ class TestSyncDecrypterPool(BaseSoledadTest):
             DOC_ID, DOC_REV, encrypted_content, 1, "trans_id", 1)
 
         def _assert_doc_was_decrypted_and_inserted(_):
+            self.assertEqual(1, len(self._inserted_docs))
             self.assertEqual(self._inserted_docs, [(doc, 1, u"trans_id")])
 
         self._pool.deferred.addCallback(
             _assert_doc_was_decrypted_and_inserted)
         return self._pool.deferred
+
+    @inlineCallbacks
+    def test_pool_reuse(self):
+        """
+        The pool is reused between syncs, this test verifies that
+        reusing is fine.
+        """
+        for _ in xrange(5):
+            yield self.test_insert_encrypted_received_doc()
 
     def test_insert_encrypted_received_doc_many(self):
         """
