@@ -807,6 +807,6 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             self._finish()
 
     def _finish(self):
-        self._deferred.callback(None)
         self._processed_docs = 0
         self._last_inserted_idx = 0
+        self._deferred.callback(None)
