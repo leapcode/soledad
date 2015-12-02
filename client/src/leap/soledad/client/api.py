@@ -32,6 +32,7 @@ import logging
 import os
 import socket
 import ssl
+import uuid
 import urlparse
 
 try:
@@ -44,11 +45,11 @@ from StringIO import StringIO
 from collections import defaultdict
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
+from twisted.internet.defer import DeferredLock, returnValue, inlineCallbacks
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
-from twisted.internet.defer import DeferredLock
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
@@ -942,6 +943,38 @@ class Soledad(object):
         deferred that will be fired with None.
         """
         return self._dbpool.runOperation(*args, **kw)
+
+    #
+    # Service authentication
+    #
+
+    @inlineCallbacks
+    def get_or_create_service_token(self, service):
+        """
+        Return the stored token for a given service, or generates and stores a
+        random one if it does not exist.
+
+        These tokens can be used to authenticate services.
+        """
+        # FIXME this could use the local sqlcipher database, to avoid
+        # problems with different replicas creating different tokens.
+
+        yield self.create_index('by-servicetoken', 'type', 'service')
+        docs = yield self._get_token_for_service(service)
+        if docs:
+            doc = docs[0]
+            returnValue(doc.content['token'])
+        else:
+            token = str(uuid.uuid4()).replace('-', '')[-24:]
+            yield self._set_token_for_service(service, token)
+            returnValue(token)
+
+    def _get_token_for_service(self, service):
+        return self.get_from_index('by-servicetoken', 'servicetoken', service)
+
+    def _set_token_for_service(self, service, token):
+        doc = {'type': 'servicetoken', 'service': service, 'token': token}
+        return self.create_doc(doc)
 
 
 def _convert_to_unicode(content):
