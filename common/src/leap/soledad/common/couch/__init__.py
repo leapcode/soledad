@@ -154,6 +154,7 @@ class CouchDatabase(object):
         self._dbname = dbname
         self._database = self.get_couch_database(url, dbname)
         self.batching = False
+        self.batch_generation = None
         self.batch_docs = {}
         if ensure_ddocs:
             self.ensure_ddocs_on_db()
@@ -161,11 +162,13 @@ class CouchDatabase(object):
 
     def batch_start(self):
         self.batching = True
+        self.batch_generation = self.get_generation_info()
         ids = set(row.id for row in self._database.view('_all_docs'))
         self.batched_ids = ids
 
     def batch_end(self):
         self.batching = False
+        self.batch_generation = None
         self.__perform_batch()
 
     def get_couch_database(self, url, dbname):
@@ -619,6 +622,8 @@ class CouchDatabase(object):
         :return: A tuple containing the current generation and transaction id.
         :rtype: (int, str)
         """
+        if self.batching and self.batch_generation:
+            return self.batch_generation
         # query a couch list function
         ddoc_path = ['_design', 'transactions', '_list', 'generation', 'log']
         info = self.json_from_resource(ddoc_path)
@@ -762,6 +767,8 @@ class CouchDatabase(object):
                 attachment['data'] = binascii.b2a_base64(parts[index]).strip()
             couch_doc['_attachments'] = attachments
             self.batch_docs[doc.doc_id] = couch_doc
+            last_gen, last_trans_id = self.batch_generation
+            self.batch_generation = (last_gen + 1, transaction_id)
         return transactions[-1][1]
 
     def _new_resource(self, *path):
