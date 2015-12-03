@@ -33,7 +33,7 @@ from leap.soledad.common.document import ServerDocument
 
 
 class SoledadBackend(CommonBackend):
-    BATCH_SUPPORT = True
+    BATCH_SUPPORT = False
 
     """
     A U1DB backend implementation.

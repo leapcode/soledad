@@ -29,7 +29,7 @@ class HTTPDocSender(object):
     They need to be encrypted and metadata prepared before sending.
     """
 
-    MAX_BATCH_SIZE = 500 * 1000  # 500kB by default
+    MAX_BATCH_SIZE = 0  # disabled by now, this is being tested yet
 
     @defer.inlineCallbacks
     def _send_docs(self, docs_by_generation, last_known_generation,
