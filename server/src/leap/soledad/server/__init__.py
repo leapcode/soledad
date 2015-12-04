@@ -293,7 +293,9 @@ def load_configuration(file_path):
         if not config.has_section(section):
             continue
         for key, value in defaults[section].items():
-            if type(value) == bool:
+            if not config.has_option(section, key):
+                continue
+            elif type(value) == bool:
                 defaults[section][key] = config.getboolean(section, key)
             elif type(value) == list:
                 values = config.get(section, key).split(',')
