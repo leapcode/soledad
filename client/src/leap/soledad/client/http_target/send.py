@@ -29,6 +29,8 @@ class HTTPDocSender(object):
     They need to be encrypted and metadata prepared before sending.
     """
 
+    MAX_BATCH_SIZE = 0  # disabled by now, this is being tested yet
+
     @defer.inlineCallbacks
     def _send_docs(self, docs_by_generation, last_known_generation,
                    last_known_trans_id, sync_id):
@@ -43,25 +45,41 @@ class HTTPDocSender(object):
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
         total = len(docs_by_generation)
-        for idx, entry in enumerate(docs_by_generation, 1):
-            yield self._prepare_one_doc(entry, body, idx, total)
-            result = yield self._http_request(
-                self._url,
-                method='POST',
-                body=body.pop(1),
-                content_type='application/x-soledad-sync-put')
-            if self._defer_encryption:
-                self._delete_sent(idx, docs_by_generation)
-            _emit_send_status(idx, total)
+        while body.consumed < total:
+            result = yield self._send_batch(total, body, docs_by_generation)
         response_dict = json.loads(result)[0]
         gen_after_send = response_dict['new_generation']
         trans_id_after_send = response_dict['new_transaction_id']
         defer.returnValue([gen_after_send, trans_id_after_send])
 
-    def _delete_sent(self, idx, docs_by_generation):
-        doc = docs_by_generation[idx - 1][0]
-        self._sync_enc_pool.delete_encrypted_doc(
-            doc.doc_id, doc.rev)
+    def _delete_sent(self, docs):
+        for doc, gen, trans_id in docs:
+            self._sync_enc_pool.delete_encrypted_doc(
+                doc.doc_id, doc.rev)
+
+    @defer.inlineCallbacks
+    def _send_batch(self, total, body, docs):
+        sent = []
+        missing = total - body.consumed
+        for i in xrange(1, missing + 1):
+            if body.pending_size > self.MAX_BATCH_SIZE:
+                break
+            idx = body.consumed + i
+            entry = docs[idx - 1]
+            sent.append(entry)
+            yield self._prepare_one_doc(entry, body, idx, total)
+        result = yield self._send_request(body.pop())
+        if self._defer_encryption:
+            self._delete_sent(sent)
+        _emit_send_status(body.consumed, total)
+        defer.returnValue(result)
+
+    def _send_request(self, body):
+        return self._http_request(
+            self._url,
+            method='POST',
+            body=body,
+            content_type='application/x-soledad-sync-put')
 
     @defer.inlineCallbacks
     def _prepare_one_doc(self, entry, body, idx, total):

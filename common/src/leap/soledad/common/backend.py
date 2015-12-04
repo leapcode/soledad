@@ -33,6 +33,7 @@ from leap.soledad.common.document import ServerDocument
 
 
 class SoledadBackend(CommonBackend):
+    BATCH_SUPPORT = False
 
     """
     A U1DB backend implementation.
@@ -53,8 +54,29 @@ class SoledadBackend(CommonBackend):
         self._cache = None
         self._dbname = database._dbname
         self._database = database
+        self.batching = False
         if replica_uid is not None:
             self._set_replica_uid(replica_uid)
+
+    def batch_start(self):
+        if not self.BATCH_SUPPORT:
+            return
+        self.batching = True
+        self.after_batch_callbacks = {}
+        self._database.batch_start()
+        if not self._cache:
+            # batching needs cache
+            self._cache = {}
+        self._get_generation()  # warm up gen info
+
+    def batch_end(self):
+        if not self.BATCH_SUPPORT:
+            return
+        self.batching = False
+        self._database.batch_end()
+        for name in self.after_batch_callbacks:
+            self.after_batch_callbacks[name]()
+        self.after_batch_callbacks = None
 
     @property
     def cache(self):
@@ -154,11 +176,7 @@ class SoledadBackend(CommonBackend):
 
         :raise SoledadError: Raised by database on operation failure
         """
-        if self.replica_uid + '_gen' in self.cache:
-            response = self.cache[self.replica_uid + '_gen']
-            return response
         cur_gen, newest_trans_id = self._database.get_generation_info()
-        self.cache[self.replica_uid + '_gen'] = (cur_gen, newest_trans_id)
         return (cur_gen, newest_trans_id)
 
     def _get_trans_id_for_gen(self, generation):
@@ -253,14 +271,8 @@ class SoledadBackend(CommonBackend):
         :param doc: The document to be put.
         :type doc: ServerDocument
         """
-        last_transaction =\
-            self._database.save_document(old_doc, doc,
-                                         self._allocate_transaction_id())
-        if self.replica_uid + '_gen' in self.cache:
-            gen, trans = self.cache[self.replica_uid + '_gen']
-            gen += 1
-            trans = last_transaction
-            self.cache[self.replica_uid + '_gen'] = (gen, trans)
+        self._database.save_document(old_doc, doc,
+                                     self._allocate_transaction_id())
 
     def put_doc(self, doc):
         """
@@ -383,7 +395,10 @@ class SoledadBackend(CommonBackend):
         """
         if other_replica_uid in self.cache:
             return self.cache[other_replica_uid]
-        return self._database.get_replica_gen_and_trans_id(other_replica_uid)
+        gen, trans_id = \
+            self._database.get_replica_gen_and_trans_id(other_replica_uid)
+        self.cache[other_replica_uid] = (gen, trans_id)
+        return (gen, trans_id)
 
     def _set_replica_gen_and_trans_id(self, other_replica_uid,
                                       other_generation, other_transaction_id):
@@ -423,9 +438,13 @@ class SoledadBackend(CommonBackend):
                                      generation.
         :type other_transaction_id: str
         """
-        self._set_replica_gen_and_trans_id(other_replica_uid,
-                                           other_generation,
-                                           other_transaction_id)
+        function = self._set_replica_gen_and_trans_id
+        args = [other_replica_uid, other_generation, other_transaction_id]
+        callback = lambda: function(*args)
+        if self.batching:
+            self.after_batch_callbacks['set_source_info'] = callback
+        else:
+            callback()
 
     def _force_doc_sync_conflict(self, doc):
         """

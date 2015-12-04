@@ -1,0 +1,1 @@
+o Added two methods to start and finish a batch on backend. They can be used to change database behaviour, allowing batch operations to be optimized.
