@@ -125,7 +125,8 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, defer_encryption=False, syncable=True):
+                 auth_token=None, defer_encryption=False, syncable=True,
+                 userid=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -179,6 +180,7 @@ class Soledad(object):
         """
         # store config params
         self._uuid = uuid
+        self._userid = userid
         self._passphrase = passphrase
         self._local_db_path = local_db_path
         self._server_url = server_url
@@ -648,6 +650,10 @@ class Soledad(object):
     def uuid(self):
         return self._uuid
 
+    @property
+    def userid(self):
+        return self._userid
+
     #
     # ISyncableStorage
     #
@@ -718,8 +724,9 @@ class Soledad(object):
             return failure
 
         def _emit_done_data_sync(passthrough):
+            user_data = {'uuid': self.uuid, 'userid': self.userid}
             soledad_events.emit_async(
-                soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
+                soledad_events.SOLEDAD_DONE_DATA_SYNC, user_data)
             return passthrough
 
         d.addCallbacks(_sync_callback, _sync_errback)

@@ -147,7 +147,7 @@ class SoledadSecrets(object):
     Keys used to access storage secrets in recovery documents.
     """
 
-    def __init__(self, uuid, passphrase, secrets_path, shared_db):
+    def __init__(self, uuid, passphrase, secrets_path, shared_db, userid=None):
         """
         Initialize the secrets manager.
 
@@ -167,6 +167,7 @@ class SoledadSecrets(object):
         # param secret_id: The id of the storage secret to be used.
 
         self._uuid = uuid
+        self._userid = userid
         self._passphrase = passphrase
         self._secrets_path = secrets_path
         self._shared_db = shared_db
@@ -433,7 +434,8 @@ class SoledadSecrets(object):
         :return: a document with encrypted key material in its contents
         :rtype: document.SoledadDocument
         """
-        events.emit_async(events.SOLEDAD_DOWNLOADING_KEYS, self._uuid)
+        user_data = self._get_user_data()
+        events.emit_async(events.SOLEDAD_DOWNLOADING_KEYS, user_data)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
@@ -462,13 +464,14 @@ class SoledadSecrets(object):
         # fill doc with encrypted secrets
         doc.content = self._export_recovery_document()
         # upload secrets to server
-        events.emit_async(events.SOLEDAD_UPLOADING_KEYS, self._uuid)
+        user_data = self._get_user_data()
+        events.emit_async(events.SOLEDAD_UPLOADING_KEYS, user_data)
         db = self._shared_db
         if not db:
             logger.warning('No shared db found')
             return
         db.put_doc(doc)
-        events.emit_async(events.SOLEDAD_DONE_UPLOADING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_DONE_UPLOADING_KEYS, user_data)
 
     #
     # Management of secret for symmetric encryption.
@@ -588,13 +591,14 @@ class SoledadSecrets(object):
         :return: The id of the generated secret.
         :rtype: str
         """
-        events.emit_async(events.SOLEDAD_CREATING_KEYS, self._uuid)
+        user_data = self._get_user_data()
+        events.emit_async(events.SOLEDAD_CREATING_KEYS, user_data)
         # generate random secret
         secret = os.urandom(self.GEN_SECRET_LENGTH)
         secret_id = sha256(secret).hexdigest()
         self._secrets[secret_id] = secret
         self._store_secrets()
-        events.emit_async(events.SOLEDAD_DONE_CREATING_KEYS, self._uuid)
+        events.emit_async(events.SOLEDAD_DONE_CREATING_KEYS, user_data)
         return secret_id
 
     def _store_secrets(self):
@@ -738,3 +742,6 @@ class SoledadSecrets(object):
             salt=self._get_sync_db_salt(),
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
+
+    def _get_user_data(self):
+        return {'uuid': self._uuid, 'userid': self._userid}

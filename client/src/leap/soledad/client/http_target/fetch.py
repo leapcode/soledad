@@ -44,6 +44,7 @@ class HTTPDocFetcher(object):
     # if the sync status event is meant to be used somewhere else.
 
     uuid = 'undefined'
+    userid = 'undefined'
 
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
@@ -182,7 +183,8 @@ class HTTPDocFetcher(object):
             # end of symmetric decryption
             # -------------------------------------------------------------
         self._received_docs += 1
-        _emit_receive_status(self.uuid, self._received_docs, total)
+        user_data = {'uuid': self.uuid, 'userid': self.userid}
+        _emit_receive_status(user_data, self._received_docs, total)
         return number_of_changes, new_generation, new_transaction_id
 
     def _parse_received_doc_response(self, response):
@@ -249,9 +251,9 @@ class HTTPDocFetcher(object):
                 source_replica_uid=self.source_replica_uid)
 
 
-def _emit_receive_status(uuid, received_docs, total):
+def _emit_receive_status(user_data, received_docs, total):
     content = {'received': received_docs, 'total': total}
-    emit_async(SOLEDAD_SYNC_RECEIVE_STATUS, uuid, content)
+    emit_async(SOLEDAD_SYNC_RECEIVE_STATUS, user_data, content)
 
     if received_docs % 20 == 0:
         msg = "%d/%d" % (received_docs, total)

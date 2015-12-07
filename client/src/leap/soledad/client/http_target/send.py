@@ -36,6 +36,7 @@ class HTTPDocSender(object):
     # if the sync status event is meant to be used somewhere else.
 
     uuid = 'undefined'
+    userid = 'undefined'
 
     @defer.inlineCallbacks
     def _send_docs(self, docs_by_generation, last_known_generation,
@@ -78,6 +79,7 @@ class HTTPDocSender(object):
         if self._defer_encryption:
             self._delete_sent(sent)
 
+        user_data = {'uuid': self.uuid, 'userid': self.userid}
         _emit_send_status(self.uuid, body.consumed, total)
         defer.returnValue(result)
 
@@ -119,9 +121,9 @@ class HTTPDocSender(object):
         return d
 
 
-def _emit_send_status(uuid, idx, total):
+def _emit_send_status(user_data, idx, total):
     content = {'sent': idx, 'total': total}
-    emit_async(SOLEDAD_SYNC_SEND_STATUS, uuid, content)
+    emit_async(SOLEDAD_SYNC_SEND_STATUS, user_data, content)
 
     msg = "%d/%d" % (idx, total)
     logger.debug("Sync send status: %s" % msg)
