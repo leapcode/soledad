@@ -1,4 +1,4 @@
-soledad (0.8.0~alpha3) unstable; urgency=medium
+soledad (0.8.0~alpha+3) unstable; urgency=medium
 
   * Pre-release of soledad 0.8.0
   * Cherry-pick commits to create soledad user, add it to sudoers.
