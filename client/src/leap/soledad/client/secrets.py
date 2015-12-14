@@ -441,7 +441,8 @@ class SoledadSecrets(object):
             logger.warning('No shared db found')
             return
         doc = db.get_doc(self._shared_db_doc_id())
-        events.emit_async(events.SOLEDAD_DONE_DOWNLOADING_KEYS, self._uuid)
+        user_data = {'userid': self._userid, 'uuid': self._uuid}
+        events.emit_async(events.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data)
         return doc
 
     def _put_secrets_in_shared_db(self):

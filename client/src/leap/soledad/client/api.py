@@ -252,7 +252,7 @@ class Soledad(object):
         """
         self._secrets = SoledadSecrets(
             self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db)
+            self.shared_db, userid=self._userid)
         self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):

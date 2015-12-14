@@ -249,55 +249,51 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage3.json',
-            local_db_path='alternative_stage3.u1db')
+            local_db_path='alternative_stage3.u1db',
+            userid=ADDRESS)
         # reverse call order so we can verify in the order the signals were
         # expected
         soledad.client.secrets.events.emit_async.mock_calls.reverse()
         soledad.client.secrets.events.emit_async.call_args = \
             soledad.client.secrets.events.emit_async.call_args_list[0]
         soledad.client.secrets.events.emit_async.call_args_list.reverse()
+
+        user_data = {'userid': ADDRESS, 'uuid': ADDRESS}
+
         # downloading keys signals
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DOWNLOADING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_DOWNLOADING_KEYS, user_data
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data
         )
         # creating keys signals
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_CREATING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_CREATING_KEYS, user_data
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_CREATING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_DONE_CREATING_KEYS, user_data
         )
         # downloading once more (inside _put_keys_in_shared_db)
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DOWNLOADING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_DOWNLOADING_KEYS, user_data
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data 
         )
         # uploading keys signals
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_UPLOADING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_UPLOADING_KEYS, user_data 
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_UPLOADING_KEYS,
-            ADDRESS,
+            catalog.SOLEDAD_DONE_UPLOADING_KEYS, user_data 
         )
         # assert db was locked and unlocked
         sol.shared_db.lock.assert_called_with()
@@ -332,12 +328,12 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # assert download keys signals
         soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DOWNLOADING_KEYS,
-            ADDRESS,
+            {'userid': ADDRESS, 'uuid': ADDRESS}
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
-            ADDRESS,
+            {'userid': ADDRESS, 'uuid': ADDRESS},
         )
         sol.close()
 
@@ -371,6 +367,6 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # assert the signal has been emitted
         soledad.client.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_DATA_SYNC,
-            ADDRESS,
+            {'userid': ADDRESS, 'uuid': ADDRESS},
         )
         sol.close()
