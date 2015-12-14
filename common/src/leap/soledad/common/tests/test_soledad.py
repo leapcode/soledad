@@ -284,16 +284,16 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data 
+            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data
         )
         # uploading keys signals
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_UPLOADING_KEYS, user_data 
+            catalog.SOLEDAD_UPLOADING_KEYS, user_data
         )
         self._pop_mock_call(soledad.client.secrets.events.emit_async)
         soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_UPLOADING_KEYS, user_data 
+            catalog.SOLEDAD_DONE_UPLOADING_KEYS, user_data
         )
         # assert db was locked and unlocked
         sol.shared_db.lock.assert_called_with()
