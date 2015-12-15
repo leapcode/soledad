@@ -779,7 +779,6 @@ class Soledad(object):
         else:
             return False
 
-
     def _set_token(self, token):
         """
         Set the authentication token for remote database access.
