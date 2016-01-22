@@ -28,6 +28,7 @@ import json
 import logging
 
 from twisted.internet import reactor
+from twisted.internet import threads
 from twisted.internet import defer
 from twisted.python import log
 
@@ -687,7 +688,11 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         """
         insertable = yield self._get_insertable_docs()
         for doc_fields in insertable:
-            self._insert_decrypted_local_doc(*doc_fields)
+            method = self._insert_decrypted_local_doc
+            # FIXME: This is used only because SQLCipherU1DBSync is synchronous
+            # When adbapi is used there is no need for an external thread
+            # Without this the reactor can freeze and fail docs download
+            yield threads.deferToThread(method, *doc_fields)
         defer.returnValue(insertable)
 
     def _delete_processed_docs(self, inserted):

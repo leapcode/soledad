@@ -148,6 +148,8 @@ class TestSoledadDbSyncDeferredEncDecr(
         replica_uid = self._soledad._dbpool.replica_uid
         sync_db = self._soledad._sync_db
         sync_enc_pool = self._soledad._sync_enc_pool
+        dbsyncer = self._soledad._dbsyncer  # Soledad.sync uses the dbsyncer
+
         target = soledad_sync_target(
             self, self.db2._dbname,
             source_replica_uid=replica_uid,
@@ -155,7 +157,7 @@ class TestSoledadDbSyncDeferredEncDecr(
             sync_enc_pool=sync_enc_pool)
         self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
-            self.db1,
+            dbsyncer,
             target).sync(defer_decryption=True)
 
     def wait_for_sync(self):
