@@ -1,7 +1,6 @@
 pysqlcipher>2.6.3
 u1db
 scrypt
-pycryptopp
 cchardet
 zope.proxy
 twisted
