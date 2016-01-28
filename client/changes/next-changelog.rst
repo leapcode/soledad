@@ -21,6 +21,7 @@ Bugfixes
 
 Misc
 ~~~~
+- `#7195 <https://leap.se/code/issues/7195>`_: Use cryptography instead of pycryptopp.
 - `#1236 <https://leap.se/code/issues/1236>`_: Description of the new feature corresponding with issue #1236.
 - Some change without issue number.
 
