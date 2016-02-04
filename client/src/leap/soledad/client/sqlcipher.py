@@ -278,7 +278,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         doc_rev = sqlite_backend.SQLitePartialExpandDatabase.put_doc(self, doc)
         if self.defer_encryption:
             # TODO move to api?
-            self._sync_enc_pool.enqueue_doc_for_encryption(doc)
+            self._sync_enc_pool.encrypt_doc(doc)
         return doc_rev
 
     #

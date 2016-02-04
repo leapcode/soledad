@@ -19,7 +19,6 @@ import json
 from u1db import errors
 from u1db.remote import utils
 from twisted.internet import defer
-from twisted.internet import threads
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
@@ -76,7 +75,7 @@ class HTTPDocFetcher(object):
             last_known_generation, last_known_trans_id,
             sync_id, 0)
         self._received_docs = 0
-        number_of_changes, ngen, ntrans = yield self._insert_received_doc(doc, 1, 1)
+        number_of_changes, ngen, ntrans = self._insert_received_doc(doc, 1, 1)
 
         if ngen:
             new_generation = ngen
@@ -138,7 +137,6 @@ class HTTPDocFetcher(object):
             body=str(body),
             content_type='application/x-soledad-sync-get')
 
-    @defer.inlineCallbacks
     def _insert_received_doc(self, response, idx, total):
         """
         Insert a received document into the local replica.
@@ -152,8 +150,7 @@ class HTTPDocFetcher(object):
         """
         new_generation, new_transaction_id, number_of_changes, doc_id, \
             rev, content, gen, trans_id = \
-            (yield threads.deferToThread(self._parse_received_doc_response,
-                                         response))
+            self._parse_received_doc_response(response)
         if doc_id is not None:
             # decrypt incoming document and insert into local database
             # -------------------------------------------------------------
@@ -188,7 +185,7 @@ class HTTPDocFetcher(object):
         self._received_docs += 1
         user_data = {'uuid': self.uuid, 'userid': self.userid}
         _emit_receive_status(user_data, self._received_docs, total)
-        defer.returnValue((number_of_changes, new_generation, new_transaction_id))
+        return number_of_changes, new_generation, new_transaction_id
 
     def _parse_received_doc_response(self, response):
         """

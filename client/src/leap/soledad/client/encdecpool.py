@@ -25,7 +25,7 @@ during synchronization.
 import json
 import logging
 
-from twisted.internet import reactor
+from twisted.internet.task import LoopingCall
 from twisted.internet import threads
 from twisted.internet import defer
 from twisted.python import log
@@ -167,25 +167,13 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
 
         SyncEncryptDecryptPool.stop(self)
 
-    def enqueue_doc_for_encryption(self, doc):
+    def encrypt_doc(self, doc):
         """
-        Enqueue a document for encryption.
+        Encrypt document asynchronously then insert it on
+        local staging database.
 
         :param doc: The document to be encrypted.
         :type doc: SoledadDocument
-        """
-        self._encrypt_doc(doc)
-
-    def _encrypt_doc(self, doc):
-        """
-        Symmetrically encrypt a document.
-
-        :param doc: The document with contents to be encrypted.
-        :type doc: SoledadDocument
-
-        :param workers: Whether to defer the decryption to the multiprocess
-                        pool of workers. Useful for debugging purposes.
-        :type workers: bool
         """
         soledad_assert(self._crypto is not None, "need a crypto object")
         docstr = doc.get_json()
@@ -276,8 +264,8 @@ def decrypt_doc_task(doc_id, doc_rev, content, gen, trans_id, key, secret,
     :type doc_id: str
     :param doc_rev: The document revision.
     :type doc_rev: str
-    :param content: The encrypted content of the document.
-    :type content: str
+    :param content: The encrypted content of the document as JSON dict.
+    :type content: dict
     :param gen: The generation corresponding to the modification of that
                 document.
     :type gen: int
@@ -294,7 +282,6 @@ def decrypt_doc_task(doc_id, doc_rev, content, gen, trans_id, key, secret,
     :return: A tuple containing the doc id, revision and encrypted content.
     :rtype: tuple(str, str, str)
     """
-    content = json.loads(content) if type(content) == str else content
     decrypted_content = decrypt_doc_dict(content, doc_id, doc_rev, key, secret)
     return doc_id, doc_rev, decrypted_content, gen, trans_id, idx
 
@@ -356,14 +343,12 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         self._processed_docs = 0
         self._last_inserted_idx = 0
 
-        # a list that holds the asynchronous decryption results so they can be
-        # collected when they are ready
-        self._async_results = []
-
         # initialize db and make sure any database operation happens after
         # db initialization
         self._deferred_init = self._init_db()
         self._wait_init_db('_runOperation', '_runQuery')
+        self._loop = LoopingCall(self._decrypt_and_recurse)
+        self._decrypted_docs_indexes = set()
 
     def _wait_init_db(self, *methods):
         """
@@ -408,11 +393,13 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         SyncEncryptDecryptPool.start(self)
         self._docs_to_process = docs_to_process
         self._deferred = defer.Deferred()
-        reactor.callWhenRunning(self._launch_decrypt_and_recurse)
+        self._loop.start(self.DECRYPT_LOOP_PERIOD)
 
-    def _launch_decrypt_and_recurse(self):
-        d = self._decrypt_and_recurse()
-        d.addErrback(self._errback)
+    def stop(self):
+        if self._loop.running:
+            self._loop.stop()
+        self._finish()
+        SyncEncryptDecryptPool.stop(self)
 
     def _errback(self, failure):
         log.err(failure)
@@ -431,8 +418,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
     def insert_encrypted_received_doc(
             self, doc_id, doc_rev, content, gen, trans_id, idx):
         """
-        Insert a received message with encrypted content, to be decrypted later
-        on.
+        Decrypt and insert a received document into local staging area to be
+        processed later on.
 
         :param doc_id: The document ID.
         :type doc_id: str
@@ -447,11 +434,19 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :param idx: The index of this document in the current sync process.
         :type idx: int
 
-        :return: A deferred that will fire when the operation in the database
-                 has finished.
+        :return: A deferred that will fire after the decrypted document has
+                 been inserted in the sync db.
         :rtype: twisted.internet.defer.Deferred
         """
-        return self._async_decrypt_doc(doc_id, doc_rev, content, gen, trans_id, idx)
+        soledad_assert(self._crypto is not None, "need a crypto object")
+
+        key = self._crypto.doc_passphrase(doc_id)
+        secret = self._crypto.secret
+        args = doc_id, doc_rev, content, gen, trans_id, key, secret, idx
+        # decrypt asynchronously
+        doc = decrypt_doc_task(*args)
+        # callback will insert it for later processing
+        return self._decrypt_doc_cb(doc)
 
     def insert_received_doc(
             self, doc_id, doc_rev, content, gen, trans_id, idx):
@@ -481,52 +476,26 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             content = json.dumps(content)
         query = "INSERT OR REPLACE INTO '%s' VALUES (?, ?, ?, ?, ?, ?, ?)" \
                 % self.TABLE_NAME
-        return self._runOperation(
+        d = self._runOperation(
             query, (doc_id, doc_rev, content, gen, trans_id, 0, idx))
+        d.addCallback(lambda _: self._decrypted_docs_indexes.add(idx))
+        return d
 
-    def _delete_received_doc(self, doc_id):
+    def _delete_received_docs(self, doc_ids):
         """
-        Delete a received doc after it was inserted into the local db.
+        Delete a list of received docs after get them inserted into the db.
 
-        :param doc_id: Document ID.
-        :type doc_id: str
+        :param doc_id: Document ID list.
+        :type doc_id: list
 
         :return: A deferred that will fire when the operation in the database
                  has finished.
         :rtype: twisted.internet.defer.Deferred
         """
-        query = "DELETE FROM '%s' WHERE doc_id=?" \
-                % self.TABLE_NAME
-        return self._runOperation(query, (doc_id,))
-
-    def _async_decrypt_doc(self, doc_id, rev, content, gen, trans_id, idx):
-        """
-        Dispatch an asynchronous document decrypting routine and save the
-        result object.
-
-        :param doc_id: The ID for the document with contents to be encrypted.
-        :type doc: str
-        :param rev: The revision of the document.
-        :type rev: str
-        :param content: The serialized content of the document.
-        :type content: str
-        :param gen: The generation corresponding to the modification of that
-                    document.
-        :type gen: int
-        :param trans_id: The transaction id corresponding to the modification
-                         of that document.
-        :type trans_id: str
-        :param idx: The index of this document in the current sync process.
-        :type idx: int
-        """
-        soledad_assert(self._crypto is not None, "need a crypto object")
-
-        key = self._crypto.doc_passphrase(doc_id)
-        secret = self._crypto.secret
-        args = doc_id, rev, content, gen, trans_id, key, secret, idx
-        # decrypt asynchronously
-        d = threads.deferToThread(decrypt_doc_task, *args)
-        d.addCallback(self._decrypt_doc_cb)
+        placeholders = ', '.join('?' for _ in doc_ids)
+        query = "DELETE FROM '%s' WHERE doc_id in (%s)" \
+                % (self.TABLE_NAME, placeholders)
+        return self._runOperation(query, (doc_ids))
 
     def _decrypt_doc_cb(self, result):
         """
@@ -547,7 +516,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         return self.insert_received_doc(
             doc_id, rev, content, gen, trans_id, idx)
 
-    def _get_docs(self, encrypted=None, order_by='idx', order='ASC'):
+    def _get_docs(self, encrypted=None, order_by='idx', order='ASC',
+                  sequence=None):
         """
         Get documents from the received docs table in the sync db.
 
@@ -565,8 +535,13 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         """
         query = "SELECT doc_id, rev, content, gen, trans_id, encrypted, " \
                 "idx FROM %s" % self.TABLE_NAME
-        if encrypted is not None:
-            query += " WHERE encrypted = %d" % int(encrypted)
+        if encrypted or sequence:
+            query += " WHERE"
+        if encrypted:
+            query += " encrypted = %d" % int(encrypted)
+        if sequence:
+            query += " idx in (" + ', '.join(sequence) + ")"
+
         query += " ORDER BY %s %s" % (order_by, order)
         return self._runQuery(query)
 
@@ -579,18 +554,19 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
                  documents.
         :rtype: twisted.internet.defer.Deferred
         """
-        # here, we fetch the list of decrypted documents and compare with the
-        # index of the last succesfully processed document.
-        decrypted_docs = yield self._get_docs(encrypted=False)
-        insertable = []
-        last_idx = self._last_inserted_idx
-        for doc_id, rev, content, gen, trans_id, encrypted, idx in \
-                decrypted_docs:
-            if (idx != last_idx + 1):
-                break
-            insertable.append((doc_id, rev, content, gen, trans_id, idx))
-            last_idx += 1
-        defer.returnValue(insertable)
+        # Here, check in memory what are the insertable indexes that can
+        # form a sequence starting from the last inserted index
+        sequence = []
+        insertable_docs = []
+        next_index = self._last_inserted_idx + 1
+        while next_index in self._decrypted_docs_indexes:
+            sequence.append(str(next_index))
+            next_index += 1
+        # Then fetch all the ones ready for insertion.
+        if sequence:
+            insertable_docs = yield self._get_docs(encrypted=False,
+                                                   sequence=sequence)
+        defer.returnValue(insertable_docs)
 
     @defer.inlineCallbacks
     def _process_decrypted_docs(self):
@@ -603,36 +579,18 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :rtype: twisted.internet.defer.Deferred
         """
         insertable = yield self._get_insertable_docs()
+        processed_docs_ids = []
         for doc_fields in insertable:
             method = self._insert_decrypted_local_doc
             # FIXME: This is used only because SQLCipherU1DBSync is synchronous
             # When adbapi is used there is no need for an external thread
             # Without this the reactor can freeze and fail docs download
             yield threads.deferToThread(method, *doc_fields)
-        defer.returnValue(insertable)
-
-    def _delete_processed_docs(self, inserted):
-        """
-        Delete from the sync db documents that have been processed.
-
-        :param inserted: List of documents inserted in the previous process
-                         step.
-        :type inserted: list
-
-        :return: A list of deferreds that will fire when each operation in the
-                 database has finished.
-        :rtype: twisted.internet.defer.DeferredList
-        """
-        deferreds = []
-        for doc_id, doc_rev, _, _, _, _ in inserted:
-            deferreds.append(
-                self._delete_received_doc(doc_id))
-        if not deferreds:
-            return defer.succeed(None)
-        return defer.gatherResults(deferreds)
+            processed_docs_ids.append(doc_fields[0])
+        yield self._delete_received_docs(processed_docs_ids)
 
     def _insert_decrypted_local_doc(self, doc_id, doc_rev, content,
-                                    gen, trans_id, idx):
+                                    gen, trans_id, encrypted, idx):
         """
         Insert the decrypted document into the local replica.
 
@@ -693,20 +651,19 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
                  delete operations have been executed.
         :rtype: twisted.internet.defer.Deferred
         """
+        if not self.running:
+            defer.returnValue(None)
         processed = self._processed_docs
         pending = self._docs_to_process
 
         if processed < pending:
-            docs = yield self._process_decrypted_docs()
-            yield self._delete_processed_docs(docs)
-            # recurse
-            self._delayed_call = reactor.callLater(
-                self.DECRYPT_LOOP_PERIOD,
-                self._launch_decrypt_and_recurse)
+            yield self._process_decrypted_docs()
         else:
             self._finish()
 
     def _finish(self):
         self._processed_docs = 0
         self._last_inserted_idx = 0
-        self._deferred.callback(None)
+        self._decrypted_docs_indexes = set()
+        if not self._deferred.called:
+            self._deferred.callback(None)

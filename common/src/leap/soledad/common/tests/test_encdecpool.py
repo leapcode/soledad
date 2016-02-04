@@ -57,13 +57,13 @@ class TestSyncEncrypterPool(BaseSoledadTest):
         self.assertIsNone(doc)
 
     @inlineCallbacks
-    def test_enqueue_doc_for_encryption_and_get_encrypted_doc(self):
+    def test_encrypt_doc_and_get_it_back(self):
         """
         Test that the pool actually encrypts a document added to the queue.
         """
         doc = SoledadDocument(
             doc_id=DOC_ID, rev=DOC_REV, json=json.dumps(DOC_CONTENT))
-        self._pool.enqueue_doc_for_encryption(doc)
+        self._pool.encrypt_doc(doc)
 
         # exhaustivelly attempt to get the encrypted document
         encrypted = None
@@ -116,6 +116,16 @@ class TestSyncDecrypterPool(BaseSoledadTest):
 
         self._pool.deferred.addCallback(_assert_doc_was_inserted)
         return self._pool.deferred
+
+    def test_looping_control(self):
+        """
+        Start and stop cleanly.
+        """
+        self._pool.start(10)
+        self.assertTrue(self._pool.running)
+        self._pool.stop()
+        self.assertFalse(self._pool.running)
+        self.assertTrue(self._pool.deferred.called)
 
     def test_insert_received_doc_many(self):
         """
@@ -179,6 +189,38 @@ class TestSyncDecrypterPool(BaseSoledadTest):
             _assert_doc_was_decrypted_and_inserted)
         return self._pool.deferred
 
+    @inlineCallbacks
+    def test_processing_order(self):
+        """
+        This test ensures that processing of documents only occur if there is
+        a sequence in place.
+        """
+        crypto = self._soledad._crypto
+        docs = []
+        for i in xrange(1, 10):
+            i = str(i)
+            doc = SoledadDocument(
+                doc_id=DOC_ID + i, rev=DOC_REV + i,
+                json=json.dumps(DOC_CONTENT))
+            encrypted_content = json.loads(crypto.encrypt_doc(doc))
+            docs.append((doc, encrypted_content))
+
+        # insert the encrypted document in the pool
+        self._pool.start(10)  # pool is expecting to process 10 docs
+        # first three arrives, forming a sequence
+        for i, (doc, encrypted_content) in enumerate(docs[:3]):
+            gen = idx = i + 1
+            yield self._pool.insert_encrypted_received_doc(
+                doc.doc_id, doc.rev, encrypted_content, gen, "trans_id", idx)
+        # last one arrives alone, so it can't be processed
+        doc, encrypted_content = docs[-1]
+        yield self._pool.insert_encrypted_received_doc(
+            doc.doc_id, doc.rev, encrypted_content, 10, "trans_id", 10)
+
+        yield self._pool._decrypt_and_recurse()
+
+        self.assertEqual(3, self._pool._processed_docs)
+
     def test_insert_encrypted_received_doc_many(self, many=100):
         """
         Test that many encrypted documents added to the pool are decrypted and
@@ -241,3 +283,4 @@ class TestSyncDecrypterPool(BaseSoledadTest):
             decrypted_docs = yield self._pool._get_docs(encrypted=False)
             # check that decrypted docs staging is clean
             self.assertEquals([], decrypted_docs)
+            self._pool.stop()
