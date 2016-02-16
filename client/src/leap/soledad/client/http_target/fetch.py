@@ -81,9 +81,6 @@ class HTTPDocFetcher(object):
             new_generation = ngen
             new_transaction_id = ntrans
 
-        if defer_decryption:
-            self._sync_decr_pool.start(number_of_changes)
-
         # ---------------------------------------------------------------------
         # maybe receive the rest of the documents
         # ---------------------------------------------------------------------
@@ -151,6 +148,10 @@ class HTTPDocFetcher(object):
         new_generation, new_transaction_id, number_of_changes, doc_id, \
             rev, content, gen, trans_id = \
             self._parse_received_doc_response(response)
+
+        if self._sync_decr_pool and not self._sync_decr_pool.running:
+            self._sync_decr_pool.start(number_of_changes)
+
         if doc_id is not None:
             # decrypt incoming document and insert into local database
             # -------------------------------------------------------------
