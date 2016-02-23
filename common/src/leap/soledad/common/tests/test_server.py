@@ -369,6 +369,9 @@ class EncryptedSyncTestCase(
         self.startTwistedServer()
         user = 'user-' + uuid4().hex
 
+        # this will store all docs ids to avoid get_all_docs
+        created_ids = []
+
         # instantiate soledad and create a document
         sol1 = self._soledad_instance(
             user=user,
@@ -399,34 +402,32 @@ class EncryptedSyncTestCase(
             deferreds = []
             for i in xrange(number_of_docs):
                 content = binascii.hexlify(os.urandom(doc_size / 2))
-                deferreds.append(sol1.create_doc({'data': content}))
+                d = sol1.create_doc({'data': content})
+                d.addCallback(created_ids.append)
+                deferreds.append(d)
             return defer.DeferredList(deferreds)
 
         def _db1AssertDocsSyncedToServer(results):
-            _, sol_doclist = results
-            self.assertEqual(number_of_docs, len(sol_doclist))
-            # assert doc was sent to couch db
-            _, couch_doclist = db.get_all_docs()
-            self.assertEqual(number_of_docs, len(couch_doclist))
-            for i in xrange(number_of_docs):
-                soldoc = sol_doclist.pop()
-                couchdoc = couch_doclist.pop()
+            self.assertEqual(number_of_docs, len(created_ids))
+            for soldoc in created_ids:
+                couchdoc = db.get_doc(soldoc.doc_id)
+                self.assertTrue(couchdoc)
                 # assert document structure in couch server
                 self.assertEqual(soldoc.doc_id, couchdoc.doc_id)
                 self.assertEqual(soldoc.rev, couchdoc.rev)
-                self.assertEqual(6, len(couchdoc.content))
-                self.assertTrue(crypto.ENC_JSON_KEY in couchdoc.content)
-                self.assertTrue(crypto.ENC_SCHEME_KEY in couchdoc.content)
-                self.assertTrue(crypto.ENC_METHOD_KEY in couchdoc.content)
-                self.assertTrue(crypto.ENC_IV_KEY in couchdoc.content)
-                self.assertTrue(crypto.MAC_KEY in couchdoc.content)
-                self.assertTrue(crypto.MAC_METHOD_KEY in couchdoc.content)
+                couch_content = couchdoc.content.keys()
+                self.assertEqual(6, len(couch_content))
+                self.assertTrue(crypto.ENC_JSON_KEY in couch_content)
+                self.assertTrue(crypto.ENC_SCHEME_KEY in couch_content)
+                self.assertTrue(crypto.ENC_METHOD_KEY in couch_content)
+                self.assertTrue(crypto.ENC_IV_KEY in couch_content)
+                self.assertTrue(crypto.MAC_KEY in couch_content)
+                self.assertTrue(crypto.MAC_METHOD_KEY in couch_content)
 
         d = sol1.get_all_docs()
         d.addCallback(_db1AssertEmptyDocList)
         d.addCallback(_db1CreateDocs)
         d.addCallback(lambda _: sol1.sync())
-        d.addCallback(lambda _: sol1.get_all_docs())
         d.addCallback(_db1AssertDocsSyncedToServer)
 
         def _db2AssertEmptyDocList(results):
