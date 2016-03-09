@@ -25,7 +25,8 @@ import json
 import logging
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.backends.multibackend import MultiBackend
+from cryptography.hazmat.backends.openssl.backend import Backend as OpenSSLBackend
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
@@ -57,7 +58,7 @@ def encrypt_sym(data, key):
         (len(key) * 8))
 
     iv = os.urandom(16)
-    backend = default_backend()
+    backend = MultiBackend([OpenSSLBackend()])
     cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(data) + encryptor.finalize()
@@ -85,7 +86,7 @@ def decrypt_sym(data, key, iv):
     soledad_assert(
         len(key) == 32,  # 32 x 8 = 256 bits.
         'Wrong key size: %s (must be 256 bits long).' % len(key))
-    backend = default_backend()
+    backend = MultiBackend([OpenSSLBackend()])
     iv = binascii.a2b_base64(iv)
     cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
     decryptor = cipher.decryptor()
