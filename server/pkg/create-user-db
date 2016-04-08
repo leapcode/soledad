@@ -25,6 +25,9 @@ from leap.soledad.common.couch import list_users_dbs
 from leap.soledad.server import load_configuration
 
 
+BYPASS_AUTH = os.environ.get('SOLEDAD_BYPASS_AUTH', False)
+
+
 description = """
 Creates a user database.
 This is meant to be used by Soledad Server.
@@ -40,16 +43,23 @@ NETRC_PATH = CONF['soledad-server']['admin_netrc']
 
 
 def url_for_db(dbname):
-    if not os.path.exists(NETRC_PATH):
-        print ('netrc not found in %s' % NETRC_PATH)
-        sys.exit(1)
-    parsed_netrc = netrc.netrc(NETRC_PATH)
-    host, (login, _, password) = parsed_netrc.hosts.items()[0]
-    url = ('http://%(login)s:%(password)s@%(host)s:5984/%(dbname)s' % {
-           'login': login,
-           'password': password,
-           'host': host,
-           'dbname': dbname})
+    if BYPASS_AUTH:
+        login = ''
+        password = ''
+        host = 'localhost'
+        url = 'http://localhost:5984/%(dbname)s' % {
+            'dbname': dbname}
+    else:
+        if not os.path.exists(NETRC_PATH):
+            print ('netrc not found in %s' % NETRC_PATH)
+            sys.exit(1)
+        parsed_netrc = netrc.netrc(NETRC_PATH)
+        host, (login, _, password) = parsed_netrc.hosts.items()[0]
+        url = ('http://%(login)s:%(password)s@%(host)s:5984/%(dbname)s' % {
+               'login': login,
+               'password': password,
+               'host': host,
+               'dbname': dbname})
     return url
 
 
