@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+Example of usage:
+    time ./profile-sync.py --no-stats --send-num 5 --payload-file sample \
+    --repeat-payload -p password -b /tmp/foobarsync \
+    test_soledad_sync_001@cdev.bitmask.net
+"""
 
 import argparse
 import commands
@@ -13,7 +19,9 @@ from twisted.internet import reactor
 
 from util import StatsLogger, ValidateUserHandle
 from client_side_db import _get_soledad_instance, _get_soledad_info
+
 from leap.common.events import flags
+from leap.soledad.client.api import Soledad
 
 flags.set_events_enabled(False)
 
@@ -70,6 +78,23 @@ def create_docs(soledad, args):
                 payload = fmap.read(docsize * 1024)
             s.create_doc({payload: payload})
 
+
+def _get_soledad_instance_from_uuid(uuid, passphrase, basedir, server_url,
+                                    cert_file, token):
+    secrets_path = os.path.join(basedir, '%s.secret' % uuid)
+    local_db_path = os.path.join(basedir, '%s.db' % uuid)
+    return Soledad(
+        uuid,
+        unicode(passphrase),
+        secrets_path=secrets_path,
+        local_db_path=local_db_path,
+        server_url=server_url,
+        cert_file=cert_file,
+        auth_token=token,
+        defer_encryption=True,
+        syncable=True)
+
+
 # main program
 
 if __name__ == '__main__':
@@ -78,6 +103,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'user@provider', action=ValidateUserHandle, help='the user handle')
+    parser.add_argument(
+        '-u', dest='uuid', required=False, default=None,
+        help='uuid for local tests')
     parser.add_argument(
         '-b', dest='basedir', required=False, default=None,
         help='soledad base directory')
@@ -102,6 +130,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--payload-file', dest="payload_f", default=None,
         help='path to a sample file to use for the payloads')
+
     parser.add_argument(
         '--no-stats', dest='do_stats', action='store_false',
         help='skip system stats')
@@ -132,12 +161,20 @@ if __name__ == '__main__':
         basedir = tempfile.mkdtemp()
     logger.info('Using %s as base directory.' % basedir)
 
-    uuid, server_url, cert_file, token = \
-        _get_soledad_info(
-            args.username, args.provider, passphrase, basedir)
-    # get the soledad instance
-    s = _get_soledad_instance(
-        uuid, passphrase, basedir, server_url, cert_file, token)
+    if args.uuid:
+        # We got an uuid. This is a local test, and we bypass
+        # authentication and encryption.
+        s = _get_soledad_instance_from_uuid(
+            args.uuid, passphrase, basedir, 'http://localhost:2323', '', '')
+
+    else:
+        # Remote server. First, get remote info...
+        uuid, server_url, cert_file, token = \
+            _get_soledad_info(
+                args.username, args.provider, passphrase, basedir)
+        # ...and then get the soledad instance
+        s = _get_soledad_instance(
+            uuid, passphrase, basedir, server_url, cert_file, token)
 
     if args.do_send:
         create_docs(s, args)
