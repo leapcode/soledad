@@ -249,8 +249,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage3.json',
-            local_db_path='alternative_stage3.u1db',
-            userid=ADDRESS)
+            local_db_path='alternative_stage3.u1db')
         # reverse call order so we can verify in the order the signals were
         # expected
         soledad.client.secrets.events.emit_async.mock_calls.reverse()

@@ -284,8 +284,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                           server_url='https://127.0.0.1/',
                           cert_file=None,
                           shared_db_class=None,
-                          auth_token='auth-token',
-                          userid=ADDRESS):
+                          auth_token='auth-token'):
 
         def _put_doc_side_effect(doc):
             self._doc_put = doc
@@ -307,8 +306,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
             cert_file=cert_file,
             defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),
-            auth_token=auth_token,
-            userid=userid)
+            auth_token=auth_token)
         self.addCleanup(soledad.close)
         return soledad
 

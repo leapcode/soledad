@@ -126,8 +126,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, defer_encryption=False, syncable=True,
-                 userid=None):
+                 auth_token=None, defer_encryption=False, syncable=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -181,7 +180,6 @@ class Soledad(object):
         """
         # store config params
         self._uuid = uuid
-        self._userid = userid
         self._passphrase = passphrase
         self._local_db_path = local_db_path
         self._server_url = server_url
@@ -255,7 +253,7 @@ class Soledad(object):
         """
         self._secrets = SoledadSecrets(
             self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db, userid=self._userid)
+            self.shared_db, userid=self.userid)
         self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):
@@ -655,7 +653,7 @@ class Soledad(object):
 
     @property
     def userid(self):
-        return self._userid
+        return self.uuid
 
     #
     # ISyncableStorage
