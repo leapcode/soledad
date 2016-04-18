@@ -1,4 +1,4 @@
-0.8.0 - xxx
+0.8.0 - ...
 +++++++++++++++++++++++++++++++
 
 Please add lines to this file, they will be moved to the CHANGELOG.rst during
@@ -15,7 +15,6 @@ Features
 
 Bugfixes
 ~~~~~~~~
-- `#7626 <https://leap.se/code/issues/7626>`_: Subclass a leaky leap.common.couch exception to avoid depending on couch.
 - `#1235 <https://leap.se/code/issues/1235>`_: Description for the fixed stuff corresponding with issue #1235.
 - Bugfix without related issue number.
 

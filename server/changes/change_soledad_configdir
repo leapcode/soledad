@@ -1,2 +1,0 @@
-o Moves config directory from /etc/leap to /etc/soledad
-  resolves #7509
