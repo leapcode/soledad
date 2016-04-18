@@ -1,5 +1,0 @@
-o 'create-user-db' script now can be configured from soledad-server.conf
-  when generating the user's security document.
-o Migrating a user's database to newest design documents is now possible by
-  using a parameter '--migrate-all' on 'create-user-db' script.
-o Remove tsafe monkeypatch from SSL lib, as it was needed for Twisted <12
