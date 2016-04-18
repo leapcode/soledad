@@ -27,7 +27,6 @@ import shutil
 import random
 import string
 import u1db
-import traceback
 import couchdb
 
 from uuid import uuid4
@@ -37,17 +36,17 @@ from StringIO import StringIO
 from pysqlcipher import dbapi2
 
 from u1db import sync
-from u1db.errors import DatabaseDoesNotExist
 from u1db.remote import http_database
 
 from twisted.trial import unittest
 
-from leap.common.files import mkdir_p
 from leap.common.testing.basetest import BaseLeapTest
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common.couch import CouchDatabase, CouchServerState
+from leap.soledad.common.couch import CouchDatabase
+from leap.soledad.common.couch.state import CouchServerState
+
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 
 from leap.soledad.client import Soledad
@@ -246,6 +245,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         # each local db.
         self.rand_prefix = ''.join(
             map(lambda x: random.choice(string.ascii_letters), range(6)))
+
         # initialize soledad by hand so we can control keys
         # XXX check if this soledad is actually used
         self._soledad = self._soledad_instance(
@@ -286,7 +286,8 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                           server_url='https://127.0.0.1/',
                           cert_file=None,
                           shared_db_class=None,
-                          auth_token='auth-token'):
+                          auth_token='auth-token',
+                          userid=ADDRESS):
 
         def _put_doc_side_effect(doc):
             self._doc_put = doc
@@ -308,7 +309,8 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
             cert_file=cert_file,
             defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),
-            auth_token=auth_token)
+            auth_token=auth_token,
+            userid=userid)
         self.addCleanup(soledad.close)
         return soledad
 

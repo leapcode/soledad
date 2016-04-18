@@ -152,6 +152,8 @@ class RequestBody(object):
         """
         self.headers = header_dict
         self.entries = []
+        self.consumed = 0
+        self.pending_size = 0
 
     def insert_info(self, **entry_dict):
         """
@@ -165,11 +167,11 @@ class RequestBody(object):
         """
         entry = json.dumps(entry_dict)
         self.entries.append(entry)
-        return len(entry)
+        self.pending_size += len(entry)
 
-    def pop(self, number=1):
+    def pop(self):
         """
-        Removes an amount of entries and returns it formatted and ready
+        Removes all entries and returns it formatted and ready
         to be sent.
 
         :param number: number of entries to pop and format
@@ -178,7 +180,10 @@ class RequestBody(object):
         :return: formatted body ready to be sent
         :rtype: str
         """
-        entries = [self.entries.pop(0) for i in xrange(number)]
+        entries = self.entries[:]
+        self.entries = []
+        self.pending_size = 0
+        self.consumed += len(entries)
         return self.entries_to_str(entries)
 
     def __str__(self):

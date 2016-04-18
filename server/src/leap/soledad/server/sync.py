@@ -32,7 +32,7 @@ class SyncExchange(sync.SyncExchange):
     def __init__(self, db, source_replica_uid, last_known_generation, sync_id):
         """
         :param db: The target syncing database.
-        :type db: CouchDatabase
+        :type db: SoledadBackend
         :param source_replica_uid: The uid of the source syncing replica.
         :type source_replica_uid: str
         :param last_known_generation: The last target replica generation the
@@ -111,6 +111,14 @@ class SyncExchange(sync.SyncExchange):
             changed_doc_id, gen, trans_id = self.change_to_return
             doc = self._db.get_doc(changed_doc_id, include_deleted=True)
             return_doc_cb(doc, gen, trans_id)
+
+    def batched_insert_from_source(self, entries, sync_id):
+        self._db.batch_start()
+        for entry in entries:
+            doc, gen, trans_id, number_of_docs, doc_idx = entry
+            self.insert_doc_from_source(doc, gen, trans_id, number_of_docs,
+                                        doc_idx, sync_id)
+        self._db.batch_end()
 
     def insert_doc_from_source(
             self, doc, source_gen, trans_id,
@@ -198,6 +206,7 @@ class SyncResource(http_app.SyncResource):
         self.sync_exch = self.sync_exchange_class(
             db, self.source_replica_uid, last_known_generation, sync_id)
         self._sync_id = sync_id
+        self._staging = []
 
     @http_app.http_method(content_as_args=True)
     def post_put(
@@ -225,9 +234,7 @@ class SyncResource(http_app.SyncResource):
         :type doc_idx: int
         """
         doc = Document(id, rev, content)
-        self.sync_exch.insert_doc_from_source(
-            doc, gen, trans_id, number_of_docs=number_of_docs,
-            doc_idx=doc_idx, sync_id=self._sync_id)
+        self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
 
     @http_app.http_method(received=int, content_as_args=True)
     def post_get(self, received):
@@ -266,6 +273,7 @@ class SyncResource(http_app.SyncResource):
         Return the current generation and transaction_id after inserting one
         incoming document.
         """
+        self.sync_exch.batched_insert_from_source(self._staging, self._sync_id)
         self.responder.content_type = 'application/x-soledad-sync-response'
         self.responder.start_response(200)
         self.responder.start_stream(),
