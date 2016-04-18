@@ -1,2 +1,0 @@
-  o Add a sanitized command executor for database creation and re-enable
-  user database creation on CouchServerState via command line.
