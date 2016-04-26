@@ -49,9 +49,7 @@ synchronization is handled by the `leap.soledad.server.auth` module.
 Shared database
 ---------------
 
-Each user may store password-encrypted recovery data in the shared database,
-as well as obtain a lock on the shared database in order to prevent creation
-of multiple secrets in parallel.
+Each user may store password-encrypted recovery data in the shared database.
 
 Recovery documents are stored in the database without any information that
 may identify the user. In order to achieve this, the doc_id of recovery
@@ -77,13 +75,8 @@ This has some implications:
   * Because of the above, it is recommended that recovery documents expire
     (not implemented yet) to prevent excess storage.
 
-Lock documents, on the other hand, may be more thoroughly protected by the
-server. Their doc_id's are calculated from the SHARED_DB_LOCK_DOC_ID_PREFIX
-and the user's uid.
-
 The authorization for creating, updating, deleting and retrieving recovery
-and lock documents on the shared database is handled by
-`leap.soledad.server.auth` module.
+documents on the shared database is handled by `leap.soledad.server.auth` module.
 """
 
 import configparser
@@ -96,7 +89,6 @@ from ._version import get_versions
 
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
-from leap.soledad.server.lock_resource import LockResource
 from leap.soledad.server.sync import (
     SyncResource,
     MAX_REQUEST_SIZE,
@@ -155,7 +147,6 @@ http_app.url_to_resource.register(http_app.DocsResource)
 http_app.url_to_resource.register(http_app.DocResource)
 
 # register Soledad's new or modified resources
-http_app.url_to_resource.register(LockResource)
 http_app.url_to_resource.register(SyncResource)
 
 

@@ -101,7 +101,6 @@ class URLToAuthorization(object):
             /shared-db/docs               | -
             /shared-db/doc/{any_id}       | GET, PUT, DELETE
             /shared-db/sync-from/{source} | -
-            /shared-db/lock/{uuid}        | PUT, DELETE
             /user-db                      | GET, PUT, DELETE
             /user-db/docs                 | -
             /user-db/doc/{id}             | -
@@ -118,10 +117,6 @@ class URLToAuthorization(object):
             '/%s/doc/{id:.*}' % SHARED_DB_NAME,
             [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
              self.HTTP_METHOD_DELETE])
-        # auth info for shared-db lock resource
-        self._register(
-            '/%s/lock/%s' % (SHARED_DB_NAME, self._uuid),
-            [self.HTTP_METHOD_PUT, self.HTTP_METHOD_DELETE])
         # auth info for user-db database resource
         self._register(
             '/%s' % self._user_db_name,
