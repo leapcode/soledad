@@ -50,7 +50,7 @@ def _parse_args():
 def _get_url():
     # get couch url
     cp = ConfigParser()
-    cp.read('/etc/leap/soledad-server.conf')
+    cp.read('/etc/soledad/soledad-server.conf')
     url = urlparse(cp.get('soledad-server', 'couch_url'))
     # get admin password
     netloc = re.sub('^.*@', '', url.netloc)

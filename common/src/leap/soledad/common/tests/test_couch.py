@@ -28,13 +28,16 @@ from couchdb.client import Server
 from uuid import uuid4
 
 from testscenarios import TestWithScenarios
+from twisted.trial import unittest
+from mock import Mock
 
 from u1db import errors as u1db_errors
 from u1db import SyncTarget
 from u1db import vectorclock
 
 from leap.soledad.common import couch
-from leap.soledad.common import errors
+from leap.soledad.common.document import ServerDocument
+from leap.soledad.common.couch import errors
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.util import CouchDBTestCase
@@ -43,8 +46,6 @@ from leap.soledad.common.tests.util import sync_via_synchronizer
 
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import DatabaseBaseTests
-
-from u1db.backends.inmemory import InMemoryIndex
 
 
 # -----------------------------------------------------------------------------
@@ -131,7 +132,7 @@ def copy_couch_database_for_test(test, db):
 
 
 def make_document_for_test(test, doc_id, rev, content, has_conflicts=False):
-    return couch.CouchDocument(
+    return ServerDocument(
         doc_id, rev, content, has_conflicts=has_conflicts)
 
 
@@ -148,7 +149,7 @@ class CouchTests(
     scenarios = COUCH_SCENARIOS
 
 
-class CouchDatabaseTests(
+class SoledadBackendTests(
         TestWithScenarios,
         test_backends.LocalDatabaseTests,
         CouchDBTestCase):
@@ -204,7 +205,7 @@ simple_doc = tests.simple_doc
 nested_doc = tests.nested_doc
 
 
-class CouchDatabaseSyncTargetTests(
+class SoledadBackendSyncTargetTests(
         TestWithScenarios,
         DatabaseBaseTests,
         CouchDBTestCase):
@@ -527,90 +528,6 @@ class CouchDatabaseSyncTargetTests(
         self.st.record_sync_info('replica', 0, 'T-sid')
         self.assertEqual(expected, called)
 
-
-# The following tests need that the database have an index, so we fake one.
-
-class IndexedCouchDatabase(couch.CouchDatabase):
-
-    def __init__(self, url, dbname, replica_uid=None, ensure_ddocs=True):
-        old_class.__init__(self, url, dbname, replica_uid=replica_uid,
-                           ensure_ddocs=ensure_ddocs)
-        self._indexes = {}
-
-    def _put_doc(self, old_doc, doc):
-        for index in self._indexes.itervalues():
-            if old_doc is not None and not old_doc.is_tombstone():
-                index.remove_json(old_doc.doc_id, old_doc.get_json())
-            if not doc.is_tombstone():
-                index.add_json(doc.doc_id, doc.get_json())
-        old_class._put_doc(self, old_doc, doc)
-
-    def create_index(self, index_name, *index_expressions):
-        if index_name in self._indexes:
-            if self._indexes[index_name]._definition == list(
-                    index_expressions):
-                return
-            raise u1db_errors.IndexNameTakenError
-        index = InMemoryIndex(index_name, list(index_expressions))
-        _, all_docs = self.get_all_docs()
-        for doc in all_docs:
-            index.add_json(doc.doc_id, doc.get_json())
-        self._indexes[index_name] = index
-
-    def delete_index(self, index_name):
-        del self._indexes[index_name]
-
-    def list_indexes(self):
-        definitions = []
-        for idx in self._indexes.itervalues():
-            definitions.append((idx._name, idx._definition))
-        return definitions
-
-    def get_from_index(self, index_name, *key_values):
-        try:
-            index = self._indexes[index_name]
-        except KeyError:
-            raise u1db_errors.IndexDoesNotExist
-        doc_ids = index.lookup(key_values)
-        result = []
-        for doc_id in doc_ids:
-            result.append(self._get_doc(doc_id, check_for_conflicts=True))
-        return result
-
-    def get_range_from_index(self, index_name, start_value=None,
-                             end_value=None):
-        """Return all documents with key values in the specified range."""
-        try:
-            index = self._indexes[index_name]
-        except KeyError:
-            raise u1db_errors.IndexDoesNotExist
-        if isinstance(start_value, basestring):
-            start_value = (start_value,)
-        if isinstance(end_value, basestring):
-            end_value = (end_value,)
-        doc_ids = index.lookup_range(start_value, end_value)
-        result = []
-        for doc_id in doc_ids:
-            result.append(self._get_doc(doc_id, check_for_conflicts=True))
-        return result
-
-    def get_index_keys(self, index_name):
-        try:
-            index = self._indexes[index_name]
-        except KeyError:
-            raise u1db_errors.IndexDoesNotExist
-        keys = index.keys()
-        # XXX inefficiency warning
-        return list(set([tuple(key.split('\x01')) for key in keys]))
-
-
-# monkey patch CouchDatabase (once) to include virtual indexes
-if getattr(couch.CouchDatabase, '_old_class', None) is None:
-    old_class = couch.CouchDatabase
-    IndexedCouchDatabase._old_class = old_class
-    couch.CouchDatabase = IndexedCouchDatabase
-
-
 sync_scenarios = []
 for name, scenario in COUCH_SCENARIOS:
     scenario = dict(scenario)
@@ -619,7 +536,7 @@ for name, scenario in COUCH_SCENARIOS:
     scenario = dict(scenario)
 
 
-class CouchDatabaseSyncTests(
+class SoledadBackendSyncTests(
         TestWithScenarios,
         DatabaseBaseTests,
         CouchDBTestCase):
@@ -920,7 +837,6 @@ class CouchDatabaseSyncTests(
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         doc = self.db2.create_doc_from_json(simple_doc)
-        self.db1.create_index('test-idx', 'key')
         self.assertEqual(0, self.sync(self.db1, self.db2))
         self.assertGetDoc(self.db1, doc.doc_id, doc.rev, simple_doc, False)
         self.assertEqual(1, self.db1._get_replica_gen_and_trans_id('test2')[0])
@@ -930,7 +846,7 @@ class CouchDatabaseSyncTests(
             {'receive': {'docs': [], 'last_known_gen': 0},
              'return': {'docs': [(doc.doc_id, doc.rev)],
                         'last_gen': 1}})
-        self.assertEqual([doc], self.db1.get_from_index('test-idx', 'value'))
+        self.assertGetDoc(self.db2, doc.doc_id, doc.rev, simple_doc, False)
 
     def test_sync_pulling_doesnt_update_other_if_changed(self):
         self.db1 = self.create_database('test1', 'source')
@@ -1019,7 +935,6 @@ class CouchDatabaseSyncTests(
         doc1 = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc1.doc_id
         doc1_rev = doc1.rev
-        self.db1.create_index('test-idx', 'key')
         new_doc = '{"key": "altval"}'
         doc2 = self.db2.create_doc_from_json(new_doc, doc_id=doc_id)
         doc2_rev = doc2.rev
@@ -1035,18 +950,12 @@ class CouchDatabaseSyncTests(
         self.assertTransactionLog([doc_id, doc_id], self.db1)
         self.assertGetDoc(self.db1, doc_id, doc2_rev, new_doc, True)
         self.assertGetDoc(self.db2, doc_id, doc2_rev, new_doc, False)
-        from_idx = self.db1.get_from_index('test-idx', 'altval')[0]
-        self.assertEqual(doc2.doc_id, from_idx.doc_id)
-        self.assertEqual(doc2.rev, from_idx.rev)
-        self.assertTrue(from_idx.has_conflicts)
-        self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
 
     def test_sync_sees_remote_delete_conflicted(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'target')
         doc1 = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc1.doc_id
-        self.db1.create_index('test-idx', 'key')
         self.sync(self.db1, self.db2)
         doc2 = self.make_document(doc1.doc_id, doc1.rev, doc1.get_json())
         new_doc = '{"key": "altval"}'
@@ -1066,7 +975,6 @@ class CouchDatabaseSyncTests(
         self.assertGetDocIncludeDeleted(self.db1, doc_id, doc2.rev, None, True)
         self.assertGetDocIncludeDeleted(
             self.db2, doc_id, doc2.rev, None, False)
-        self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
 
     def test_sync_local_race_conflicted(self):
         self.db1 = self.create_database('test1', 'source')
@@ -1074,7 +982,6 @@ class CouchDatabaseSyncTests(
         doc = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc.doc_id
         doc1_rev = doc.rev
-        self.db1.create_index('test-idx', 'key')
         self.sync(self.db1, self.db2)
         content1 = '{"key": "localval"}'
         content2 = '{"key": "altval"}'
@@ -1093,21 +1000,13 @@ class CouchDatabaseSyncTests(
         self.sync(self.db1, self.db2, trace_hook=after_whatschanged)
         self.assertEqual([True], triggered)
         self.assertGetDoc(self.db1, doc_id, doc2_rev2, content2, True)
-        from_idx = self.db1.get_from_index('test-idx', 'altval')[0]
-        self.assertEqual(doc.doc_id, from_idx.doc_id)
-        self.assertEqual(doc.rev, from_idx.rev)
-        self.assertTrue(from_idx.has_conflicts)
-        self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
-        self.assertEqual([], self.db1.get_from_index('test-idx', 'localval'))
 
     def test_sync_propagates_deletes(self):
         self.db1 = self.create_database('test1', 'source')
         self.db2 = self.create_database('test2', 'both')
         doc1 = self.db1.create_doc_from_json(simple_doc)
         doc_id = doc1.doc_id
-        self.db1.create_index('test-idx', 'key')
         self.sync(self.db1, self.db2)
-        self.db2.create_index('test-idx', 'key')
         self.db3 = self.create_database('test3', 'target')
         self.sync(self.db1, self.db3)
         self.db1.delete_doc(doc1)
@@ -1123,8 +1022,6 @@ class CouchDatabaseSyncTests(
             self.db1, doc_id, deleted_rev, None, False)
         self.assertGetDocIncludeDeleted(
             self.db2, doc_id, deleted_rev, None, False)
-        self.assertEqual([], self.db1.get_from_index('test-idx', 'value'))
-        self.assertEqual([], self.db2.get_from_index('test-idx', 'value'))
         self.sync(self.db2, self.db3)
         self.assertLastExchangeLog(
             self.db3,
@@ -1315,7 +1212,7 @@ class CouchDatabaseSyncTests(
         self.assertEqual(cont2, self.db1.get_doc("2").get_json())
 
 
-class CouchDatabaseExceptionsTests(CouchDBTestCase):
+class SoledadBackendExceptionsTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
@@ -1323,9 +1220,11 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
     def create_db(self, ensure=True, dbname=None):
         if not dbname:
             dbname = ('test-%s' % uuid4().hex)
-        self.db = couch.CouchDatabase.open_database(
-            urljoin('http://127.0.0.1:%d' % self.couch_port, dbname),
-            create=True,
+        if dbname not in self.couch_server:
+            self.couch_server.create(dbname)
+        self.db = couch.CouchDatabase(
+            ('http://127.0.0.1:%d' % self.couch_port),
+            dbname,
             ensure_ddocs=ensure)
 
     def tearDown(self):
@@ -1339,30 +1238,22 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         design docs are not present.
         """
         self.create_db(ensure=False)
-        # _get_generation()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocError,
-            self.db._get_generation)
-        # _get_generation_info()
+            self.db.get_generation_info)
+        # get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocError,
-            self.db._get_generation_info)
-        # _get_trans_id_for_gen()
+            self.db.get_trans_id_for_gen, 1)
+        # get_transaction_log()
         self.assertRaises(
             errors.MissingDesignDocError,
-            self.db._get_trans_id_for_gen, 1)
-        # _get_transaction_log()
-        self.assertRaises(
-            errors.MissingDesignDocError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocError,
             self.db.whats_changed)
-        # _do_set_replica_gen_and_trans_id()
-        self.assertRaises(
-            errors.MissingDesignDocError,
-            self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
 
     def test_missing_design_doc_functions_raises(self):
         """
@@ -1374,18 +1265,14 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         transactions['lists'] = {}
         self.db._database.save(transactions)
-        # _get_generation()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_generation)
-        # _get_generation_info()
+            self.db.get_generation_info)
+        # get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_generation_info)
-        # _get_trans_id_for_gen()
-        self.assertRaises(
-            errors.MissingDesignDocListFunctionError,
-            self.db._get_trans_id_for_gen, 1)
+            self.db.get_trans_id_for_gen, 1)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
@@ -1401,18 +1288,14 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         del transactions['lists']
         self.db._database.save(transactions)
-        # _get_generation()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_generation)
-        # _get_generation_info()
-        self.assertRaises(
-            errors.MissingDesignDocListFunctionError,
-            self.db._get_generation_info)
+            self.db.get_generation_info)
         # _get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
-            self.db._get_trans_id_for_gen, 1)
+            self.db.get_trans_id_for_gen, 1)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocListFunctionError,
@@ -1436,22 +1319,18 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         transactions = self.db._database['_design/transactions']
         del transactions['views']
         self.db._database.save(transactions)
-        # _get_generation()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
-            self.db._get_generation)
-        # _get_generation_info()
-        self.assertRaises(
-            errors.MissingDesignDocNamedViewError,
-            self.db._get_generation_info)
+            self.db.get_generation_info)
         # _get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
-            self.db._get_trans_id_for_gen, 1)
+            self.db.get_trans_id_for_gen, 1)
         # _get_transaction_log()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocNamedViewError,
@@ -1469,30 +1348,22 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         del self.db._database['_design/syncs']
         # delete _design/transactions
         del self.db._database['_design/transactions']
-        # _get_generation()
+        # get_generation_info()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_generation)
-        # _get_generation_info()
+            self.db.get_generation_info)
+        # get_trans_id_for_gen()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_generation_info)
-        # _get_trans_id_for_gen()
+            self.db.get_trans_id_for_gen, 1)
+        # get_transaction_log()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_trans_id_for_gen, 1)
-        # _get_transaction_log()
-        self.assertRaises(
-            errors.MissingDesignDocDeletedError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         # whats_changed()
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
             self.db.whats_changed)
-        # _do_set_replica_gen_and_trans_id()
-        self.assertRaises(
-            errors.MissingDesignDocDeletedError,
-            self.db._do_set_replica_gen_and_trans_id, 1, 2, 3)
 
     def test_ensure_ddoc_independently(self):
         """
@@ -1503,6 +1374,72 @@ class CouchDatabaseExceptionsTests(CouchDBTestCase):
         del self.db._database['_design/transactions']
         self.assertRaises(
             errors.MissingDesignDocDeletedError,
-            self.db._get_transaction_log)
+            self.db.get_transaction_log)
         self.create_db(ensure=True, dbname=self.db._dbname)
-        self.db._get_transaction_log()
+        self.db.get_transaction_log()
+
+    def test_ensure_security_doc(self):
+        """
+        Ensure_security creates a _security ddoc to ensure that only soledad
+        will have the lowest privileged access to an user db.
+        """
+        self.create_db(ensure=False)
+        self.assertFalse(self.db._database.resource.get_json('_security')[2])
+        self.db.ensure_security_ddoc()
+        security_ddoc = self.db._database.resource.get_json('_security')[2]
+        self.assertIn('admins', security_ddoc)
+        self.assertFalse(security_ddoc['admins']['names'])
+        self.assertIn('members', security_ddoc)
+        self.assertIn('soledad', security_ddoc['members']['names'])
+
+    def test_ensure_security_from_configuration(self):
+        """
+        Given a configuration, follow it to create the security document
+        """
+        self.create_db(ensure=False)
+        configuration = {'members': ['user1', 'user2'],
+                         'members_roles': ['role1', 'role2'],
+                         'admins': ['admin'],
+                         'admins_roles': ['administrators']
+                         }
+        self.db.ensure_security_ddoc(configuration)
+
+        security_ddoc = self.db._database.resource.get_json('_security')[2]
+        self.assertEquals(configuration['admins'],
+                          security_ddoc['admins']['names'])
+        self.assertEquals(configuration['admins_roles'],
+                          security_ddoc['admins']['roles'])
+        self.assertEquals(configuration['members'],
+                          security_ddoc['members']['names'])
+        self.assertEquals(configuration['members_roles'],
+                          security_ddoc['members']['roles'])
+
+
+class DatabaseNameValidationTest(unittest.TestCase):
+
+    def test_database_name_validation(self):
+        inject = couch.state.is_db_name_valid("user-deadbeef | cat /secret")
+        self.assertFalse(inject)
+        self.assertTrue(couch.state.is_db_name_valid("user-cafe1337"))
+
+
+class CommandBasedDBCreationTest(unittest.TestCase):
+
+    def test_ensure_db_using_custom_command(self):
+        state = couch.state.CouchServerState("url", create_cmd="echo")
+        mock_db = Mock()
+        mock_db.replica_uid = 'replica_uid'
+        state.open_database = Mock(return_value=mock_db)
+        db, replica_uid = state.ensure_database("user-1337")  # works
+        self.assertEquals(mock_db, db)
+        self.assertEquals(mock_db.replica_uid, replica_uid)
+
+    def test_raises_unauthorized_on_failure(self):
+        state = couch.state.CouchServerState("url", create_cmd="inexistent")
+        self.assertRaises(u1db_errors.Unauthorized,
+                          state.ensure_database, "user-1337")
+
+    def test_raises_unauthorized_by_default(self):
+        state = couch.state.CouchServerState("url")
+        self.assertRaises(u1db_errors.Unauthorized,
+                          state.ensure_database, "user-1337")

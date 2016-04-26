@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# create-user-db
+# Copyright (C) 2015 LEAP
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+import os
+import sys
+import netrc
+import argparse
+from leap.soledad.common.couch import CouchDatabase
+from leap.soledad.common.couch.state import is_db_name_valid
+from leap.soledad.common.couch import list_users_dbs
+from leap.soledad.server import load_configuration
+
+
+description = """
+Creates a user database.
+This is meant to be used by Soledad Server.
+"""
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('dbname', metavar='user-d34db33f', type=str,
+                    default='', nargs='?',
+                    help='database name on the format user-{uuid4}')
+parser.add_argument('--migrate-all', action='store_true',
+                    help="recreate all design docs for all existing account")
+CONF = load_configuration('/etc/soledad/soledad-server.conf')
+NETRC_PATH = CONF['soledad-server']['admin_netrc']
+
+
+def url_for_db(dbname):
+    if not os.path.exists(NETRC_PATH):
+        print ('netrc not found in %s' % NETRC_PATH)
+        sys.exit(1)
+    parsed_netrc = netrc.netrc(NETRC_PATH)
+    host, (login, _, password) = parsed_netrc.hosts.items()[0]
+    url = ('http://%(login)s:%(password)s@%(host)s:5984/%(dbname)s' % {
+           'login': login,
+           'password': password,
+           'host': host,
+           'dbname': dbname})
+    return url
+
+
+def ensure_database(dbname):
+    """
+    This method will ensure that a database named `dbname` will exist
+    or created if it doesn't. Calling it twice will ensure that design
+    documents are present and updated.
+    The database name has to match this criteria to be considered valid:
+    user-[a-f0-9]+
+
+    :param dbname: name of the user database
+    :type dbname: str
+    """
+    if not is_db_name_valid(dbname):
+        print ("Invalid name! %s" % dbname)
+        sys.exit(1)
+    url = url_for_db(dbname)
+    db_security = CONF['database-security']
+    db = CouchDatabase.open_database(url=url, create=True,
+                                     replica_uid=None, ensure_ddocs=True,
+                                     database_security=db_security)
+    print ('success! Ensured that database %s exists, with replica_uid: %s' %
+           (db._dbname, db.replica_uid))
+
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    if args.migrate_all:
+        couch_url = url_for_db('')
+        for dbname in list_users_dbs(couch_url):
+            ensure_database(dbname)
+    else:
+        ensure_database(args.dbname)

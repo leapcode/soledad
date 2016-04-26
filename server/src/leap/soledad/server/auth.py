@@ -21,20 +21,16 @@ Authentication facilities for Soledad Server.
 """
 
 
-import time
 import httplib
 import json
 
 from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
-from couchdb.client import Server
 from twisted.python import log
-from hashlib import sha512
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import USER_DB_PREFIX
-from leap.soledad.common.errors import InvalidAuthTokenError
 
 
 class URLToAuthorization(object):
@@ -351,13 +347,11 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
     Token based authentication.
     """
 
-    TOKENS_DB_PREFIX = "tokens_"
-    TOKENS_DB_EXPIRE = 30 * 24 * 3600  # 30 days in seconds
-    TOKENS_TYPE_KEY = "type"
-    TOKENS_TYPE_DEF = "Token"
-    TOKENS_USER_ID_KEY = "user_id"
-
     TOKEN_AUTH_ERROR_STRING = "Incorrect address or token."
+
+    def __init__(self, app):
+        self._state = app.state
+        super(SoledadTokenAuthMiddleware, self).__init__(app)
 
     def _verify_authentication_scheme(self, scheme):
         """
@@ -391,49 +385,10 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         """
         token = auth_data  # we expect a cleartext token at this point
         try:
-            return self._verify_token_in_couch(uuid, token)
-        except InvalidAuthTokenError:
-            raise
+            return self._state.verify_token(uuid, token)
         except Exception as e:
             log.err(e)
             return False
-
-    def _verify_token_in_couch(self, uuid, token):
-        """
-        Query couchdb to decide if C{token} is valid for C{uuid}.
-
-        @param uuid: The user uuid.
-        @type uuid: str
-        @param token: The token.
-        @type token: str
-
-        @raise InvalidAuthTokenError: Raised when token received from user is
-                                      either missing in the tokens db or is
-                                      invalid.
-        """
-        server = Server(url=self._app.state.couch_url)
-        # the tokens db rotates every 30 days, and the current db name is
-        # "tokens_NNN", where NNN is the number of seconds since epoch divided
-        # by the rotate period in seconds. When rotating, old and new tokens
-        # db coexist during a certain window of time and valid tokens are
-        # replicated from the old db to the new one. See:
-        # https://leap.se/code/issues/6785
-        dbname = self.TOKENS_DB_PREFIX + \
-            str(int(time.time() / self.TOKENS_DB_EXPIRE))
-        db = server[dbname]
-        # lookup key is a hash of the token to prevent timing attacks.
-        token = db.get(sha512(token).hexdigest())
-        if token is None:
-            raise InvalidAuthTokenError()
-        # we compare uuid hashes to avoid possible timing attacks that
-        # might exploit python's builtin comparison operator behaviour,
-        # which fails immediatelly when non-matching bytes are found.
-        couch_uuid_hash = sha512(token[self.TOKENS_USER_ID_KEY]).digest()
-        req_uuid_hash = sha512(uuid).digest()
-        if token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF \
-                or couch_uuid_hash != req_uuid_hash:
-            raise InvalidAuthTokenError()
-        return True
 
     def _get_auth_error_string(self):
         """

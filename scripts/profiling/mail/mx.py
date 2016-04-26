@@ -5,7 +5,7 @@ import timeit
 
 
 from leap.keymanager import openpgp
-from leap.soledad.common.couch import CouchDocument
+from leap.soledad.common.document import ServerDocument
 from leap.soledad.common.crypto import (
     EncryptionSchemes,
     ENC_JSON_KEY,
@@ -47,7 +47,7 @@ def get_enc_json(pubkey, message):
 
 
 def get_new_doc(enc_json):
-    doc = CouchDocument(doc_id=str(uuid.uuid4()))
+    doc = ServerDocument(doc_id=str(uuid.uuid4()))
     doc.content = {
         'incoming': True,
         ENC_SCHEME_KEY: EncryptionSchemes.PUBKEY,
@@ -71,6 +71,7 @@ def put_lots_of_messages(db, number):
     log("Populating database with %d encrypted messages... "
         % number, line_break=False)
     pubkey = get_pubkey()
+
     def _put_one_message():
         put_one_message(pubkey, db)
     time = timeit.timeit(_put_one_message, number=number)

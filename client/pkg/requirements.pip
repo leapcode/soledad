@@ -1,8 +1,6 @@
 #pysqlcipher>2.6.3
 u1db
 scrypt
-pycryptopp
-
 # cchardet not packaged, we need python-chardet from the
 # repos instead.
 chardet

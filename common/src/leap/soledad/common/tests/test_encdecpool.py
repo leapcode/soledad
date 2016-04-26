@@ -18,6 +18,7 @@
 Tests for encryption and decryption pool.
 """
 import json
+from random import shuffle
 
 from twisted.internet.defer import inlineCallbacks
 
@@ -171,20 +172,21 @@ class TestSyncDecrypterPool(BaseSoledadTest):
             DOC_ID, DOC_REV, encrypted_content, 1, "trans_id", 1)
 
         def _assert_doc_was_decrypted_and_inserted(_):
+            self.assertEqual(1, len(self._inserted_docs))
             self.assertEqual(self._inserted_docs, [(doc, 1, u"trans_id")])
 
         self._pool.deferred.addCallback(
             _assert_doc_was_decrypted_and_inserted)
         return self._pool.deferred
 
-    def test_insert_encrypted_received_doc_many(self):
+    def test_insert_encrypted_received_doc_many(self, many=100):
         """
         Test that many encrypted documents added to the pool are decrypted and
         inserted using the callback.
         """
         crypto = self._soledad._crypto
-        many = 100
         self._pool.start(many)
+        docs = []
 
         # insert many encrypted docs in the pool
         for i in xrange(many):
@@ -198,9 +200,12 @@ class TestSyncDecrypterPool(BaseSoledadTest):
                 doc_id=doc_id, rev=rev, json=json.dumps(content))
 
             encrypted_content = json.loads(crypto.encrypt_doc(doc))
+            docs.append((doc_id, rev, encrypted_content, gen,
+                         trans_id, idx))
+        shuffle(docs)
 
-            self._pool.insert_encrypted_received_doc(
-                doc_id, rev, encrypted_content, gen, trans_id, idx)
+        for doc in docs:
+            self._pool.insert_encrypted_received_doc(*doc)
 
         def _assert_docs_were_decrypted_and_inserted(_):
             self.assertEqual(many, len(self._inserted_docs))
@@ -223,3 +228,16 @@ class TestSyncDecrypterPool(BaseSoledadTest):
         self._pool.deferred.addCallback(
             _assert_docs_were_decrypted_and_inserted)
         return self._pool.deferred
+
+    @inlineCallbacks
+    def test_pool_reuse(self):
+        """
+        The pool is reused between syncs, this test verifies that
+        reusing is fine.
+        """
+        for i in xrange(3):
+            yield self.test_insert_encrypted_received_doc_many(5)
+            self._inserted_docs = []
+            decrypted_docs = yield self._pool._get_docs(encrypted=False)
+            # check that decrypted docs staging is clean
+            self.assertEquals([], decrypted_docs)

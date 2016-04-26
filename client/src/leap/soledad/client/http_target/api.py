@@ -40,6 +40,10 @@ class SyncTargetAPI(SyncTarget):
             self._sync_decr_pool.stop()
         yield self._http.close()
 
+    @property
+    def uuid(self):
+        return self._uuid
+
     def set_creds(self, creds):
         """
         Update credentials.
@@ -49,6 +53,7 @@ class SyncTargetAPI(SyncTarget):
         """
         uuid = creds['token']['uuid']
         token = creds['token']['token']
+        self._uuid = uuid
         auth = '%s:%s' % (uuid, token)
         b64_token = base64.b64encode(auth)
         self._auth_header = {'Authorization': ['Token %s' % b64_token]}

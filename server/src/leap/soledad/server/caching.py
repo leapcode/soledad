@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# __init__.py
-# Copyright (C) 2013 LEAP
+# caching.py
+# Copyright (C) 2015 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,40 +14,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-from leap.common.check import leap_assert as soledad_assert
-from leap.common.check import leap_assert_type as soledad_assert_type
-
-from ._version import get_versions
-
 """
-Soledad routines common to client and server.
+Server side caching. Using beaker for now.
 """
+from beaker.cache import CacheManager
 
 
-#
-# Global constants
-#
-
-SHARED_DB_NAME = 'shared'
-SHARED_DB_LOCK_DOC_ID_PREFIX = 'lock-'
-USER_DB_PREFIX = 'user-'
+def setup_caching():
+    _cache_manager = CacheManager(type='memory')
+    return _cache_manager
 
 
-#
-# Global functions
-#
-
-__version__ = get_versions()['version']
-del get_versions
+_cache_manager = setup_caching()
 
 
-__all__ = [
-    "soledad_assert",
-    "soledad_assert_type",
-    "__version__",
-]
-
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+def get_cache_for(key, expire=3600):
+    return _cache_manager.get_cache(key, expire=expire)

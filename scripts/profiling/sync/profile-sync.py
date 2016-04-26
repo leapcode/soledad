@@ -57,15 +57,17 @@ def create_docs(soledad, args):
         bail('--payload-file does not exist!')
         return
 
-    numdocs = args.send_num
-    docsize = args.send_size
+    numdocs = int(args.send_num)
+    docsize = int(args.send_size)
 
     # XXX this will FAIL if the payload source is smaller to size * num
     # XXX could use a cycle iterator
     with open(sample_path, "r+b") as sample_f:
         fmap = mmap.mmap(sample_f.fileno(), 0, prot=mmap.PROT_READ)
+        payload = fmap.read(docsize * 1024)
         for index in xrange(numdocs):
-            payload = fmap.read(docsize * 1024)
+            if not args.repeat_payload:
+                payload = fmap.read(docsize * 1024)
             s.create_doc({payload: payload})
 
 # main program
@@ -94,6 +96,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--send-num', dest='send_num', default=10,
         help='number of docs to send (default: 10)')
+    parser.add_argument(
+        '--repeat-payload', dest='repeat_payload', action='store_true',
+        default=False)
     parser.add_argument(
         '--payload-file', dest="payload_f", default=None,
         help='path to a sample file to use for the payloads')

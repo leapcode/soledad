@@ -1,10 +1,9 @@
 configparser
-couchdb
 u1db
 routes
 PyOpenSSL
-twisted
-# XXX -- fix me!
-# oauth is not strictly needed by us, but we need it until u1db adds it to its
-# release as a dep.
+twisted>=12.3.0
+Beaker
+couchdb
+
 oauth

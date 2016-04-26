@@ -32,6 +32,7 @@ import logging
 import os
 import socket
 import ssl
+import uuid
 import urlparse
 
 try:
@@ -44,11 +45,11 @@ from StringIO import StringIO
 from collections import defaultdict
 from u1db.remote import http_client
 from u1db.remote.ssl_match_hostname import match_hostname
+from twisted.internet.defer import DeferredLock, returnValue, inlineCallbacks
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
-from twisted.internet.defer import DeferredLock
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
@@ -102,11 +103,11 @@ class Soledad(object):
             soledad starts to retrieve keys from server.
         SOLEDAD_DONE_DOWNLOADING_KEYS: emitted during bootstrap sequence when
             soledad finishes downloading keys from server.
-        SOLEDAD_NEW_DATA_TO_SYNC: emitted upon call to C{need_sync()} when
-          there's indeed new data to be synchronized between local database
-          replica and server's replica.
         SOLEDAD_DONE_DATA_SYNC: emitted inside C{sync()} method when it has
             finished synchronizing with remote replica.
+        SOLEDAD_NEW_DATA_TO_SYNC: emitted upon call to C{need_sync()} when
+          there's indeed new data to be synchronized between local database
+          replica and server's replica. --- not used right now.
     """
     implements(soledad_interfaces.ILocalStorage,
                soledad_interfaces.ISyncableStorage,
@@ -125,7 +126,8 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, defer_encryption=False, syncable=True):
+                 auth_token=None, defer_encryption=False, syncable=True,
+                 userid=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -179,12 +181,14 @@ class Soledad(object):
         """
         # store config params
         self._uuid = uuid
+        self._userid = userid
         self._passphrase = passphrase
         self._local_db_path = local_db_path
         self._server_url = server_url
         self._defer_encryption = defer_encryption
         self._secrets_path = None
         self._sync_enc_pool = None
+        self._dbsyncer = None
 
         self.shared_db = shared_db
 
@@ -215,6 +219,7 @@ class Soledad(object):
     #
     # initialization/destruction methods
     #
+
     def _init_config_with_defaults(self):
         """
         Initialize configuration using default values for missing params.
@@ -250,7 +255,7 @@ class Soledad(object):
         """
         self._secrets = SoledadSecrets(
             self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db)
+            self.shared_db, userid=self._userid)
         self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):
@@ -648,9 +653,28 @@ class Soledad(object):
     def uuid(self):
         return self._uuid
 
+    @property
+    def userid(self):
+        return self._userid
+
     #
     # ISyncableStorage
     #
+
+    def set_syncable(self, syncable):
+        """
+        Toggle the syncable state for this database.
+
+        This can be used to start a database with offline state and switch it
+        online afterwards. Or the opposite: stop syncs when connection is lost.
+
+        :param syncable: new status for syncable.
+        :type syncable: bool
+        """
+        # TODO should check that we've got a token!
+        self.shared_db.syncable = syncable
+        if syncable and not self._dbsyncer:
+            self._init_u1db_syncer()
 
     def sync(self, defer_decryption=True):
         """
@@ -718,8 +742,9 @@ class Soledad(object):
             return failure
 
         def _emit_done_data_sync(passthrough):
+            user_data = {'uuid': self.uuid, 'userid': self.userid}
             soledad_events.emit_async(
-                soledad_events.SOLEDAD_DONE_DATA_SYNC, self.uuid)
+                soledad_events.SOLEDAD_DONE_DATA_SYNC, user_data)
             return passthrough
 
         d.addCallbacks(_sync_callback, _sync_errback)
@@ -746,6 +771,13 @@ class Soledad(object):
         :rtype: bool
         """
         return self.sync_lock.locked
+
+    @property
+    def syncable(self):
+        if self.shared_db:
+            return self.shared_db.syncable
+        else:
+            return False
 
     def _set_token(self, token):
         """
@@ -910,6 +942,38 @@ class Soledad(object):
         deferred that will be fired with None.
         """
         return self._dbpool.runOperation(*args, **kw)
+
+    #
+    # Service authentication
+    #
+
+    @inlineCallbacks
+    def get_or_create_service_token(self, service):
+        """
+        Return the stored token for a given service, or generates and stores a
+        random one if it does not exist.
+
+        These tokens can be used to authenticate services.
+        """
+        # FIXME this could use the local sqlcipher database, to avoid
+        # problems with different replicas creating different tokens.
+
+        yield self.create_index('by-servicetoken', 'type', 'service')
+        docs = yield self._get_token_for_service(service)
+        if docs:
+            doc = docs[0]
+            returnValue(doc.content['token'])
+        else:
+            token = str(uuid.uuid4()).replace('-', '')[-24:]
+            yield self._set_token_for_service(service, token)
+            returnValue(token)
+
+    def _get_token_for_service(self, service):
+        return self.get_from_index('by-servicetoken', 'servicetoken', service)
+
+    def _set_token_for_service(self, service, token):
+        doc = {'type': 'servicetoken', 'service': service, 'token': token}
+        return self.create_doc(doc)
 
 
 def _convert_to_unicode(content):

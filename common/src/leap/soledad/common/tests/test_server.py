@@ -22,15 +22,16 @@ import tempfile
 import mock
 import time
 import binascii
+from pkg_resources import resource_filename
 from uuid import uuid4
+from hashlib import sha512
 
 from urlparse import urljoin
 from twisted.internet import defer
+from twisted.trial import unittest
 
-from leap.soledad.common.couch import (
-    CouchServerState,
-    CouchDatabase,
-)
+from leap.soledad.common.couch.state import CouchServerState
+from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.tests.u1db_tests import TestCaseWithServer
 from leap.soledad.common.tests.test_couch import CouchDBTestCase
 from leap.soledad.common.tests.util import (
@@ -43,19 +44,39 @@ from leap.soledad.common.tests.util import (
 from leap.soledad.common import crypto
 from leap.soledad.client import Soledad
 from leap.soledad.server import LockResource
+from leap.soledad.server import load_configuration
+from leap.soledad.server import CONFIG_DEFAULTS
 from leap.soledad.server.auth import URLToAuthorization
+from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
-# monkey path CouchServerState so it can ensure databases.
+class ServerAuthenticationMiddlewareTestCase(CouchDBTestCase):
 
-def _couch_ensure_database(self, dbname):
-    db = CouchDatabase.open_database(
-        self.couch_url + '/' + dbname,
-        create=True,
-        ensure_ddocs=True)
-    return db, db._replica_uid
+    def setUp(self):
+        super(ServerAuthenticationMiddlewareTestCase, self).setUp()
+        app = mock.Mock()
+        self._state = CouchServerState(self.couch_url)
+        app.state = self._state
+        self.auth_middleware = SoledadTokenAuthMiddleware(app)
+        self._authorize('valid-uuid', 'valid-token')
 
-CouchServerState.ensure_database = _couch_ensure_database
+    def _authorize(self, uuid, token):
+        token_doc = {}
+        token_doc['_id'] = sha512(token).hexdigest()
+        token_doc[self._state.TOKENS_USER_ID_KEY] = uuid
+        token_doc[self._state.TOKENS_TYPE_KEY] = \
+            self._state.TOKENS_TYPE_DEF
+        dbname = self._state._tokens_dbname()
+        db = self.couch_server.create(dbname)
+        db.save(token_doc)
+        self.addCleanup(self.delete_db, db.name)
+
+    def test_authorized_user(self):
+        is_authorized = self.auth_middleware._verify_authentication_data
+        self.assertTrue(is_authorized('valid-uuid', 'valid-token'))
+        self.assertFalse(is_authorized('valid-uuid', 'invalid-token'))
+        self.assertFalse(is_authorized('invalid-uuid', 'valid-token'))
+        self.assertFalse(is_authorized('eve', 'invalid-token'))
 
 
 class ServerAuthorizationTestCase(BaseSoledadTest):
@@ -599,3 +620,45 @@ class LockResourceTestCase(
         self.assertIsNotNone(lr._shared_db.get_doc('lock-' + lock_uuid))
         responder.send_response_json.assert_called_with(
             401, error='unlock unauthorized')
+
+
+class ConfigurationParsingTest(unittest.TestCase):
+
+    def setUp(self):
+        self.maxDiff = None
+
+    def test_use_defaults_on_failure(self):
+        config = load_configuration('this file will never exist')
+        expected = CONFIG_DEFAULTS
+        self.assertEquals(expected, config)
+
+    def test_security_values_configuration(self):
+        # given
+        config_path = resource_filename('leap.soledad.common.tests',
+                                        'fixture_soledad.conf')
+        # when
+        config = load_configuration(config_path)
+
+        # then
+        expected = {'members': ['user1', 'user2'],
+                    'members_roles': ['role1', 'role2'],
+                    'admins': ['user3', 'user4'],
+                    'admins_roles': ['role3', 'role3']}
+        self.assertDictEqual(expected, config['database-security'])
+
+    def test_server_values_configuration(self):
+        # given
+        config_path = resource_filename('leap.soledad.common.tests',
+                                        'fixture_soledad.conf')
+        # when
+        config = load_configuration(config_path)
+
+        # then
+        expected = {'couch_url':
+                    'http://soledad:passwd@localhost:5984',
+                    'create_cmd':
+                    'sudo -u soledad-admin /usr/bin/create-user-db',
+                    'admin_netrc':
+                    '/etc/couchdb/couchdb-soledad-admin.netrc',
+                    'batching': False}
+        self.assertDictEqual(expected, config['soledad-server'])

@@ -79,6 +79,7 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self._url = str(url) + "/sync-from/" + str(source_replica_uid)
         self.source_replica_uid = source_replica_uid
         self._auth_header = None
+        self._uuid = None
         self.set_creds(creds)
         self._crypto = crypto
         self._sync_db = sync_db

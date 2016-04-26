@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # This script gives server-side access to one Soledad user database by using
-# the configuration stored in /etc/leap/soledad-server.conf.
+# the configuration stored in /etc/soledad/soledad-server.conf.
 #
 # Use it like this:
 # 
@@ -20,7 +20,7 @@ uuid = sys.argv[1]
 
 # get couch url
 cp = ConfigParser()
-cp.read('/etc/leap/soledad-server.conf')
+cp.read('/etc/soledad/soledad-server.conf')
 url = cp.get('soledad-server', 'couch_url')
 
 # access user db
