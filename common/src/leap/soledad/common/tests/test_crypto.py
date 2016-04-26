@@ -133,15 +133,6 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         self.assertTrue(
             sol.secrets._has_secret(),
             "Should have a secret at this point")
-        # setting secret id to None should not interfere in the fact we have a
-        # secret.
-        sol.secrets.set_secret_id(None)
-        self.assertTrue(
-            sol.secrets._has_secret(),
-            "Should have a secret at this point")
-        # but not being able to decrypt correctly should
-        sol.secrets._secrets[sol.secrets.secret_id] = None
-        self.assertFalse(sol.secrets._has_secret())
         sol.close()
 
 

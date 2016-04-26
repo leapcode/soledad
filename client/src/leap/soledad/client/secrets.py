@@ -190,21 +190,33 @@ class SoledadSecrets(object):
             storage on server sequence has failed for some reason.
         """
         # STAGE 1 - verify if secrets exist locally
-        if not self._has_secret():  # try to load from local storage.
+        try:
+            logger.info("Trying to load secrets from local storage...")
+            self._load_secrets_from_local_file()
+            logger.info("Found secrets in local storage.")
+            return
+        except NoStorageSecret:
+            logger.info("Could not find secrets in local storage.")
 
-            # STAGE 2 - there are no secrets in local storage and this is the
-            #           first time we are running soledad with the specified
-            #           secrets_path. Try to fetch encrypted secrets from
-            #           server.
+        # STAGE 2 - there are no secrets in local storage and this is the
+        #           first time we are running soledad with the specified
+        #           secrets_path. Try to fetch encrypted secrets from
+        #           server.
+        try:
+            logger.info('Trying to fetch secrets from remote storage...')
             self._download_crypto_secrets()
+            logger.info('Found secrets in remote storage.')
+            return
+        except NoStorageSecret:
+            logger.info("Could not find secrets in remote storage.")
 
-            if not self._has_secret():
-
-                # STAGE 3 - there are no secrets in server also, so we want to
-                #           generate the secrets and store them in the remote
-                #           db.
-                self._gen_crypto_secrets()
-                self._upload_crypto_secrets()
+        # STAGE 3 - there are no secrets in server also, so we want to
+        #           generate the secrets and store them in the remote
+        #           db.
+        logger.info("Generating secrets...")
+        self._gen_crypto_secrets()
+        logger.info("Uploading secrets...")
+        self._upload_crypto_secrets()
 
     def _has_secret(self):
         """
@@ -213,21 +225,7 @@ class SoledadSecrets(object):
         :return: Whether there's a storage secret for symmetric encryption.
         :rtype: bool
         """
-        logger.info("Checking if there's a secret in local storage...")
-        if (self._secret_id is None or self._secret_id not in self._secrets) \
-                and os.path.isfile(self._secrets_path):
-            try:
-                self._load_secrets()  # try to load from disk
-            except IOError as e:
-                logger.warning(
-                    'IOError while loading secrets from disk: %s' % str(e))
-
-        if self.storage_secret is not None:
-            logger.info("Found a secret in local storage.")
-            return True
-
-        logger.info("Could not find a secret in local storage.")
-        return False
+        return self.storage_secret is not None
 
     def _maybe_set_active_secret(self, active_secret):
         """
@@ -239,10 +237,16 @@ class SoledadSecrets(object):
                 active_secret = self._secrets.items()[0][0]
             self.set_secret_id(active_secret)
 
-    def _load_secrets(self):
+    def _load_secrets_from_local_file(self):
         """
         Load storage secrets from local file.
+        :raise NoStorageSecret: Raised if there are no secrets available in
+                                local storage.
         """
+        # check if secrets file exists and we can read it
+        if not os.path.isfile(self._secrets_path):
+            raise NoStorageSecret
+
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
@@ -264,24 +268,21 @@ class SoledadSecrets(object):
 
     def _download_crypto_secrets(self):
         """
-        Downloads the crypto secrets.
-        """
-        logger.info(
-            'Trying to fetch cryptographic secrets from shared recovery '
-            'database...')
+        Download crypto secrets.
 
+        :raise NoStorageSecret: Raised if there are no secrets available in
+                                remote storage.
+        """
+        doc = None
         if self._shared_db.syncable:
             doc = self._get_secrets_from_shared_db()
-        else:
-            doc = None
 
-        if doc is not None:
-            logger.info(
-                'Found cryptographic secrets in shared recovery '
-                'database.')
-            _, active_secret = self._import_recovery_document(doc.content)
-            self._maybe_set_active_secret(active_secret)
-            self._store_secrets()  # save new secrets in local file
+        if doc is None:
+            raise NoStorageSecret
+
+        _, active_secret = self._import_recovery_document(doc.content)
+        self._maybe_set_active_secret(active_secret)
+        self._store_secrets()  # save new secrets in local file
 
     def _gen_crypto_secrets(self):
         """
