@@ -174,8 +174,6 @@ class MockedSharedDBTest(object):
         class defaultMockSharedDB(object):
             get_doc = Mock(return_value=get_doc_return_value)
             put_doc = Mock(side_effect=put_doc_side_effect)
-            lock = Mock(return_value=('atoken', 300))
-            unlock = Mock(return_value=True)
             open = Mock(return_value=None)
             close = Mock(return_value=None)
             syncable = True

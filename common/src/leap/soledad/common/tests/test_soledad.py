@@ -295,9 +295,6 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         soledad.client.secrets.events.emit_async.assert_called_with(
             catalog.SOLEDAD_DONE_UPLOADING_KEYS, user_data
         )
-        # assert db was locked and unlocked
-        sol.shared_db.lock.assert_called_with()
-        sol.shared_db.unlock.assert_called_with('atoken')
         sol.close()
 
     def test_stage2_bootstrap_signals(self):
