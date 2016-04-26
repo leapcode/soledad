@@ -253,18 +253,6 @@ class SoledadSecrets(object):
             content = json.loads(f.read())
         _, active_secret = self._import_recovery_document(content)
         self._maybe_set_active_secret(active_secret)
-        # enlarge secret if needed
-        enlarged = False
-        if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
-            gen_len = self.GEN_SECRET_LENGTH \
-                - len(self._secrets[self._secret_id])
-            new_piece = os.urandom(gen_len)
-            self._secrets[self._secret_id] += new_piece
-            enlarged = True
-        # store and save in shared db if needed
-        if enlarged:
-            self._store_secrets()
-            self._put_secrets_in_shared_db()
 
     def _download_crypto_secrets(self):
         """
