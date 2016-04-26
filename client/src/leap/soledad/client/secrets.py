@@ -33,7 +33,6 @@ from hashlib import sha256
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
-from leap.soledad.common import errors
 from leap.soledad.client import events
 from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
 
@@ -80,6 +79,7 @@ class BootstrapSequenceError(SecretsException):
 #
 # Secrets handler
 #
+
 
 class SoledadSecrets(object):
 
@@ -162,17 +162,12 @@ class SoledadSecrets(object):
         :param shared_db: The shared database that stores user secrets.
         :type shared_db: leap.soledad.client.shared_db.SoledadSharedDatabase
         """
-        # XXX removed since not in use
-        # We will pick the first secret available.
-        # param secret_id: The id of the storage secret to be used.
-
         self._uuid = uuid
         self._userid = userid
         self._passphrase = passphrase
         self._secrets_path = secrets_path
         self._shared_db = shared_db
         self._secrets = {}
-
         self._secret_id = None
 
     def bootstrap(self):
@@ -197,47 +192,19 @@ class SoledadSecrets(object):
         # STAGE 1 - verify if secrets exist locally
         if not self._has_secret():  # try to load from local storage.
 
-            # STAGE 2 - there are no secrets in local storage, so try to fetch
-            # encrypted secrets from server.
-            logger.info(
-                'Trying to fetch cryptographic secrets from shared recovery '
-                'database...')
+            # STAGE 2 - there are no secrets in local storage and this is the
+            #           first time we are running soledad with the specified
+            #           secrets_path. Try to fetch encrypted secrets from
+            #           server.
+            self._download_crypto_secrets()
 
-            # --- start of atomic operation in shared db ---
+            if not self._has_secret():
 
-            # obtain lock on shared db
-            token = timeout = None
-            try:
-                token, timeout = self._shared_db.lock()
-            except errors.AlreadyLockedError:
-                raise BootstrapSequenceError('Database is already locked.')
-            except errors.LockTimedOutError:
-                raise BootstrapSequenceError('Lock operation timed out.')
-
-            self._get_or_gen_crypto_secrets()
-
-            # release the lock on shared db
-            try:
-                self._shared_db.unlock(token)
-                self._shared_db.close()
-            except errors.NotLockedError:
-                # for some reason the lock expired. Despite that, secret
-                # loading or generation/storage must have been executed
-                # successfully, so we pass.
-                pass
-            except errors.InvalidTokenError:
-                # here, our lock has not only expired but also some other
-                # client application has obtained a new lock and is currently
-                # doing its thing in the shared database. Using the same
-                # reasoning as above, we assume everything went smooth and
-                # pass.
-                pass
-            except Exception as e:
-                logger.error("Unhandled exception when unlocking shared "
-                             "database.")
-                logger.exception(e)
-
-            # --- end of atomic operation in shared db ---
+                # STAGE 3 - there are no secrets in server also, so we want to
+                #           generate the secrets and store them in the remote
+                #           db.
+                self._gen_crypto_secrets()
+                self._upload_crypto_secrets()
 
     def _has_secret(self):
         """
@@ -295,13 +262,14 @@ class SoledadSecrets(object):
             self._store_secrets()
             self._put_secrets_in_shared_db()
 
-    def _get_or_gen_crypto_secrets(self):
+    def _download_crypto_secrets(self):
         """
-        Retrieves or generates the crypto secrets.
+        Downloads the crypto secrets.
+        """
+        logger.info(
+            'Trying to fetch cryptographic secrets from shared recovery '
+            'database...')
 
-        :raises BootstrapSequenceError: Raised when unable to store secrets in
-                                        shared database.
-        """
         if self._shared_db.syncable:
             doc = self._get_secrets_from_shared_db()
         else:
@@ -314,31 +282,39 @@ class SoledadSecrets(object):
             _, active_secret = self._import_recovery_document(doc.content)
             self._maybe_set_active_secret(active_secret)
             self._store_secrets()  # save new secrets in local file
-        else:
-            # STAGE 3 - there are no secrets in server also, so
-            # generate a secret and store it in remote db.
-            logger.info(
-                'No cryptographic secrets found, creating new '
-                ' secrets...')
-            self.set_secret_id(self._gen_secret())
 
-            if self._shared_db.syncable:
+    def _gen_crypto_secrets(self):
+        """
+        Generate the crypto secrets.
+        """
+        logger.info('No cryptographic secrets found, creating new secrets...')
+        secret_id = self._gen_secret()
+        self.set_secret_id(secret_id)
+
+    def _upload_crypto_secrets(self):
+        """
+        Send crypto secrets to shared db.
+
+        :raises BootstrapSequenceError: Raised when unable to store secrets in
+                                        shared database.
+        """
+        if self._shared_db.syncable:
+            try:
+                self._put_secrets_in_shared_db()
+            except Exception as ex:
+                # storing generated secret in shared db failed for
+                # some reason, so we erase the generated secret and
+                # raise.
                 try:
-                    self._put_secrets_in_shared_db()
-                except Exception as ex:
-                    # storing generated secret in shared db failed for
-                    # some reason, so we erase the generated secret and
-                    # raise.
-                    try:
-                        os.unlink(self._secrets_path)
-                    except OSError as e:
-                        if e.errno != errno.ENOENT:
-                            # no such file or directory
-                            logger.exception(e)
-                    logger.exception(ex)
-                    raise BootstrapSequenceError(
-                        'Could not store generated secret in the shared '
-                        'database, bailing out...')
+                    os.unlink(self._secrets_path)
+                except OSError as e:
+                    if e.errno != errno.ENOENT:
+                        # no such file or directory
+                        logger.exception(e)
+                logger.exception(ex)
+                raise BootstrapSequenceError(
+                    'Could not store generated secret in the shared '
+                    'database, bailing out...')
 
     #
     # Shared DB related methods

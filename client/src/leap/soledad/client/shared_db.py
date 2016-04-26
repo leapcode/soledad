@@ -151,33 +151,3 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         http_database.HTTPDatabase.__init__(self, url, document_factory,
                                             creds)
         self._uuid = uuid
-
-    def lock(self):
-        """
-        Obtain a lock on document with id C{doc_id}.
-
-        :return: A tuple containing the token to unlock and the timeout until
-                 lock expiration.
-        :rtype: (str, float)
-
-        :raise HTTPError: Raised if any HTTP error occurs.
-        """
-        if self.syncable:
-            res, headers = self._request_json(
-                'PUT', ['lock', self._uuid], body={})
-            return res['token'], res['timeout']
-        else:
-            return None, None
-
-    def unlock(self, token):
-        """
-        Release the lock on shared database.
-
-        :param token: The token returned by a previous call to lock().
-        :type token: str
-
-        :raise HTTPError:
-        """
-        if self.syncable:
-            _, _ = self._request_json(
-                'DELETE', ['lock', self._uuid], params={'token': token})

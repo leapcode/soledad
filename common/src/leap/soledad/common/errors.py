@@ -71,67 +71,6 @@ class InvalidAuthTokenError(errors.Unauthorized):
 
 
 #
-# LockResource errors
-#
-
-@register_exception
-class InvalidTokenError(SoledadError):
-
-    """
-    Exception raised when trying to unlock shared database with invalid token.
-    """
-
-    wire_description = "unlock unauthorized"
-    status = 401
-
-
-@register_exception
-class NotLockedError(SoledadError):
-
-    """
-    Exception raised when trying to unlock shared database when it is not
-    locked.
-    """
-
-    wire_description = "lock not found"
-    status = 404
-
-
-@register_exception
-class AlreadyLockedError(SoledadError):
-
-    """
-    Exception raised when trying to lock shared database but it is already
-    locked.
-    """
-
-    wire_description = "lock is locked"
-    status = 403
-
-
-@register_exception
-class LockTimedOutError(SoledadError):
-
-    """
-    Exception raised when timing out while trying to lock the shared database.
-    """
-
-    wire_description = "lock timed out"
-    status = 408
-
-
-@register_exception
-class CouldNotObtainLockError(SoledadError):
-
-    """
-    Exception raised when timing out while trying to lock the shared database.
-    """
-
-    wire_description = "error obtaining lock"
-    status = 500
-
-
-#
 # SoledadBackend errors
 # u1db error statuses also have to be updated
 http_errors.ERROR_STATUSES = set(
