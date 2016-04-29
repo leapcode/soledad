@@ -20,6 +20,7 @@ Tests for encryption and decryption pool.
 import json
 from random import shuffle
 
+from mock import MagicMock
 from twisted.internet.defer import inlineCallbacks
 
 from leap.soledad.client.encdecpool import SyncEncrypterPool
@@ -27,7 +28,7 @@ from leap.soledad.client.encdecpool import SyncDecrypterPool
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.tests.util import BaseSoledadTest
-
+from twisted.internet import defer
 
 DOC_ID = "mydoc"
 DOC_REV = "rev"
@@ -84,14 +85,18 @@ class TestSyncDecrypterPool(BaseSoledadTest):
         """
         self._inserted_docs.append((doc, gen, trans_id))
 
+    def _setup_pool(self, sync_db=None):
+        sync_db = sync_db or self._soledad._sync_db
+        return SyncDecrypterPool(
+            self._soledad._crypto,
+            sync_db,
+            source_replica_uid=self._soledad._dbpool.replica_uid,
+            insert_doc_cb=self._insert_doc_cb)
+
     def setUp(self):
         BaseSoledadTest.setUp(self)
         # setup the pool
-        self._pool = SyncDecrypterPool(
-            self._soledad._crypto,
-            self._soledad._sync_db,
-            source_replica_uid=self._soledad._dbpool.replica_uid,
-            insert_doc_cb=self._insert_doc_cb)
+        self._pool = self._setup_pool()
         # reset the inserted docs mock
         self._inserted_docs = []
 
@@ -126,6 +131,23 @@ class TestSyncDecrypterPool(BaseSoledadTest):
         self._pool.stop()
         self.assertFalse(self._pool.running)
         self.assertTrue(self._pool.deferred.called)
+
+    def test_sync_id_column_is_created_if_non_existing_in_docs_received_table(self):
+        """
+        Test that docs_received table is migrated, and has the sync_id column
+        """
+        mock_run_query = MagicMock(return_value=defer.succeed(None))
+        mock_sync_db = MagicMock()
+        mock_sync_db.runQuery = mock_run_query
+        pool = self._setup_pool(mock_sync_db)
+        d = pool.start(10)
+        pool.stop()
+
+        def assert_trial_to_create_sync_id_column(_):
+            mock_run_query.assert_called_once_with("ALTER TABLE docs_received ADD COLUMN sync_id")
+
+        d.addCallback(assert_trial_to_create_sync_id_column)
+        return d
 
     def test_insert_received_doc_many(self):
         """

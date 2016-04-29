@@ -369,14 +369,22 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
     def _init_db(self):
         """
+        Ensure sync_id column is present then
         Empty the received docs table of the sync database.
 
         :return: A deferred that will fire when the operation in the database
                  has finished.
         :rtype: twisted.internet.defer.Deferred
         """
-        query = "DELETE FROM %s WHERE sync_id <> ?" % (self.TABLE_NAME,)
-        return self._runOperation(query, (self._sync_id,))
+        ensure_sync_id_column = "ALTER TABLE %s ADD COLUMN sync_id" % self.TABLE_NAME
+        d = self._runQuery(ensure_sync_id_column)
+
+        def empty_received_docs(_):
+            query = "DELETE FROM %s WHERE sync_id <> ?" % (self.TABLE_NAME,)
+            return self._runOperation(query, (self._sync_id,))
+
+        d.addCallbacks(empty_received_docs, empty_received_docs)
+        return d
 
     def _errback(self, failure):
         log.err(failure)
