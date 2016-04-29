@@ -17,8 +17,8 @@
 """The synchronization utilities for U1DB."""
 from itertools import izip
 
-import u1db
-from u1db import errors
+from leap.soledad.common import l2db
+from leap.soledad.common.l2db import errors
 
 
 class Synchronizer(object):
@@ -275,11 +275,10 @@ class SyncExchange(object):
         # for tests
         self._db._last_exchange_log['return'] = {
             'docs': _outgoing_trace,
-            'last_gen': self.new_gen
-            }
+            'last_gen': self.new_gen}
 
 
-class LocalSyncTarget(u1db.SyncTarget):
+class LocalSyncTarget(l2db.SyncTarget):
     """Common sync target implementation logic for all local sync targets."""
 
     def __init__(self, db):

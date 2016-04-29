@@ -22,7 +22,7 @@ they can do token-based auth requests to the Soledad server.
 """
 import base64
 
-from u1db import errors
+from leap.soledad.common.l2db import errors
 
 
 class TokenBasedAuth(object):

@@ -1,4 +1,5 @@
 # Copyright 2011 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -14,7 +15,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""A U1DB implementation that uses SQLite as its persistence layer."""
+"""
+A L2DB implementation that uses SQLite as its persistence layer.
+"""
 
 import errno
 import os
@@ -29,13 +32,10 @@ import uuid
 
 import pkg_resources
 
-from u1db.backends import CommonBackend, CommonSyncTarget
-from u1db import (
-    Document,
-    errors,
-    query_parser,
-    vectorclock,
-    )
+from leap.soledad.common.l2db.backends import CommonBackend, CommonSyncTarget
+from leap.soledad.common.l2db import (
+    Document, errors,
+    query_parser, vectorclock)
 
 
 class SQLiteDatabase(CommonBackend):

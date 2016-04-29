@@ -26,10 +26,10 @@ import shutil
 from pysqlcipher import dbapi2
 from testscenarios import TestWithScenarios
 
-# u1db stuff.
-from u1db import errors
-from u1db import query_parser
-from u1db.backends.sqlite_backend import SQLitePartialExpandDatabase
+# l2db stuff.
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db import query_parser
+from leap.soledad.common.l2db.backends.sqlite_backend import SQLitePartialExpandDatabase
 
 # soledad stuff.
 from leap.soledad.common import soledad_assert

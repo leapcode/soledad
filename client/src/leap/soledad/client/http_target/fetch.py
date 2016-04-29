@@ -16,15 +16,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import logging
 import json
-from u1db import errors
-from u1db.remote import utils
+
 from twisted.internet import defer
-from leap.soledad.common.document import SoledadDocument
+
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.crypto import is_symmetrically_encrypted
 from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.client.http_target.support import RequestBody
+from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.remote import utils
 
 logger = logging.getLogger(__name__)
 

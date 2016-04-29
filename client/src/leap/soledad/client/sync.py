@@ -23,9 +23,9 @@ import logging
 
 from twisted.internet import defer
 
-from u1db import errors
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.sync import Synchronizer
 from leap.soledad.common.errors import BackendNotReadyError
-from u1db.sync import Synchronizer
 
 
 logger = logging.getLogger(__name__)

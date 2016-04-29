@@ -36,13 +36,13 @@ from twisted.web.server import Site
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
 
-from u1db import errors
-from u1db import Document
-from u1db.backends import inmemory
-from u1db.backends import sqlite_backend
-from u1db.remote import server_state
-from u1db.remote import http_app
-from u1db.remote import http_target
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db import Document
+from leap.soledad.common.l2db.backends import inmemory
+from leap.soledad.common.l2db.backends import sqlite_backend
+from leap.soledad.common.l2db.remote import server_state
+from leap.soledad.common.l2db.remote import http_app
+from leap.soledad.common.l2db.remote import http_target
 
 
 class TestCase(unittest.TestCase):

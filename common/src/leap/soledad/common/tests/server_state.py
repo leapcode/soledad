@@ -26,7 +26,7 @@ import errno
 import tempfile
 
 
-from u1db.remote.server_state import ServerState
+from leap.soledad.common.l2db.remote.server_state import ServerState
 from leap.soledad.common.tests.util import (
     copy_sqlcipher_database_for_test,
 )

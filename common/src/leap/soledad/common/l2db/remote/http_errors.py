@@ -1,4 +1,5 @@
 # Copyright 2011-2012 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -14,11 +15,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Information about the encoding of errors over HTTP."""
+"""
+Information about the encoding of errors over HTTP.
+"""
 
-from u1db import (
-    errors,
-    )
+from leap.soledad.common.l2db import errors
 
 
 # error wire descriptions mapping to HTTP status codes
@@ -37,7 +38,7 @@ wire_description_to_status = dict([
     (errors.InvalidReplicaUID.wire_description, 409),
     (errors.InvalidTransactionId.wire_description, 409),
     (errors.Unavailable.wire_description, 503),
-# without matching exception
+    # without matching exception
     (errors.DOCUMENT_DELETED, 404)
 ])
 

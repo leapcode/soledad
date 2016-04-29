@@ -39,8 +39,7 @@ from itertools import chain
 
 from StringIO import StringIO
 from collections import defaultdict
-from u1db.remote import http_client
-from u1db.remote.ssl_match_hostname import match_hostname
+
 from twisted.internet.defer import DeferredLock, returnValue, inlineCallbacks
 from zope.interface import implements
 
@@ -50,6 +49,8 @@ from leap.common.plugins import collect_plugins
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
+from leap.soledad.common.l2db.remote import http_client
+from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
 
 from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events

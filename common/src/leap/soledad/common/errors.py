@@ -20,9 +20,8 @@
 Soledad errors.
 """
 
-
-from u1db import errors
-from u1db.remote import http_errors
+from .l2db import errors
+from .l2db.remote import http_errors
 
 
 def register_exception(cls):

@@ -21,13 +21,10 @@ try:
 except ImportError:
     import json  # noqa
 
-from u1db import (
-    Document,
-    errors,
-    query_parser,
-    vectorclock,
-    )
-from u1db.backends import CommonBackend, CommonSyncTarget
+from leap.soledad.common.l2db import (
+    Document, errors,
+    query_parser, vectorclock)
+from leap.soledad.common.l2db.backends import CommonBackend, CommonSyncTarget
 
 
 def get_prefix(value):

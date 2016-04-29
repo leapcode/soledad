@@ -21,17 +21,10 @@ try:
 except ImportError:
     import json  # noqa
 
-from u1db import (
-    Document,
-    SyncTarget,
-    )
-from u1db.errors import (
-    BrokenSyncStream,
-    )
-from u1db.remote import (
-    http_client,
-    utils,
-    )
+from leap.soledad.common.l2db import Document, SyncTarget
+from leap.soledad.common.l2db.errors import BrokenSyncStream
+from leap.soledad.common.l2db.remote import (
+    http_client, utils)
 
 
 class HTTPSyncTarget(http_client.HTTPClientBase, SyncTarget):

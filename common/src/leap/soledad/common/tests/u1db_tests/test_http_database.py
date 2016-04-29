@@ -21,11 +21,10 @@ import json
 
 from unittest import skip
 
-from u1db import errors
-from u1db import Document
-from u1db.remote import http_database
-from u1db.remote import http_target
-
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db import Document
+from leap.soledad.common.l2db.remote import http_database
+from leap.soledad.common.l2db.remote import http_target
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.u1db_tests import make_http_app
 

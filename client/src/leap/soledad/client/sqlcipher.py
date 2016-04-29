@@ -44,10 +44,6 @@ handled by Soledad should be created by SQLCipher >= 2.0.
 import logging
 import os
 import json
-import u1db
-
-from u1db import errors as u1db_errors
-from u1db.backends import sqlite_backend
 
 from hashlib import sha256
 from functools import partial
@@ -58,11 +54,14 @@ from twisted.internet import reactor
 from twisted.internet import defer
 from twisted.enterprise import adbapi
 
+from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common import l2db
+from leap.soledad.common.l2db import errors as u1db_errors
+from leap.soledad.common.l2db.backends import sqlite_backend
+
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
-
 from leap.soledad.client import pragmas
-from leap.soledad.common.document import SoledadDocument
 
 
 logger = logging.getLogger(__name__)

@@ -22,16 +22,14 @@ except ImportError:
     import json  # noqa
 import uuid
 
-from u1db import (
+from leap.soledad.common.l2db import (
     Database,
     Document,
-    errors,
-    )
-from u1db.remote import (
+    errors)
+from leap.soledad.common.l2db.remote import (
     http_client,
     http_errors,
-    http_target,
-    )
+    http_target)
 
 
 DOCUMENT_DELETED_STATUS = http_errors.wire_description_to_status[
@@ -152,8 +150,8 @@ class HTTPDatabase(http_client.HTTPClientBase, Database):
         if doc.doc_id is None:
             raise errors.InvalidDocId()
         params = {'old_rev': doc.rev}
-        res, headers = self._request_json('DELETE',
-            ['doc', doc.doc_id], params)
+        res, headers = self._request_json(
+            'DELETE', ['doc', doc.doc_id], params)
         doc.make_tombstone()
         doc.rev = res['rev']
 

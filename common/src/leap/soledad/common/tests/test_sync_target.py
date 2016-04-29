@@ -21,7 +21,6 @@ import cStringIO
 import os
 import time
 import json
-import u1db
 import random
 import string
 import shutil
@@ -36,8 +35,9 @@ from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
 
-from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common import l2db
 
+from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.util import make_sqlcipher_database_for_test
 from leap.soledad.common.tests.util import make_soledad_app
@@ -90,53 +90,53 @@ class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
             doc.get_json(), doc.doc_id, doc.rev,
             key, secret)
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("[\r\n{},\r\n]")
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response(
                 ('[\r\n{},\r\n{"id": "i", "rev": "r", ' +
                  '"content": %s, "gen": 3, "trans_id": "T-sid"}' +
                  ',\r\n]') % json.dumps(enc_json))
 
     def test_wrong_start(self):
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("{}\r\n]")
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("\r\n{}\r\n]")
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("")
 
     def test_wrong_end(self):
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("[\r\n{}")
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("[\r\n")
 
     def test_missing_comma(self):
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response(
                 '[\r\n{}\r\n{"id": "i", "rev": "r", '
                 '"content": "c", "gen": 3}\r\n]')
 
     def test_no_entries(self):
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response("[\r\n]")
 
     def test_error_in_stream(self):
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response(
                 '[\r\n{"new_generation": 0},'
                 '\r\n{"error": "unavailable"}\r\n')
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response(
                 '[\r\n{"error": "unavailable"}\r\n')
 
-        with self.assertRaises(u1db.errors.BrokenSyncStream):
+        with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.target._parse_received_doc_response('[\r\n{"error": "?"}\r\n')
 
 #
@@ -256,7 +256,7 @@ class TestSoledadSyncTarget(
                                   replica_trans_id=None, number_of_docs=None,
                                   doc_idx=None, sync_id=None):
             if doc.doc_id in trigger_ids:
-                raise u1db.errors.U1DBError
+                raise l2db.errors.U1DBError
             return _put_doc_if_newer(doc, save_conflict=save_conflict,
                                      replica_uid=replica_uid,
                                      replica_gen=replica_gen,
@@ -278,7 +278,7 @@ class TestSoledadSyncTarget(
         doc2 = self.make_document('doc-here2', 'replica:1',
                                   '{"value": "here2"}')
 
-        with self.assertRaises(u1db.errors.U1DBError):
+        with self.assertRaises(l2db.errors.U1DBError):
             yield remote_target.sync_exchange(
                 [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
                 'replica',
@@ -706,7 +706,7 @@ class SoledadDatabaseSyncTargetTests(
         def before_get_docs_explode(state):
             if state != 'before get_docs':
                 return
-            raise u1db.errors.U1DBError("fail")
+            raise l2db.errors.U1DBError("fail")
         self.set_trace_hook(before_get_docs_explode)
         # suppress traceback printing in the wsgiref server
         # self.patch(simple_server.ServerHandler,
@@ -714,7 +714,7 @@ class SoledadDatabaseSyncTargetTests(
         doc = self.db.create_doc_from_json(tests.simple_doc)
         self.assertTransactionLog([doc.doc_id], self.db)
         self.assertRaises(
-            (u1db.errors.U1DBError, u1db.errors.BrokenSyncStream),
+            (l2db.errors.U1DBError, l2db.errors.BrokenSyncStream),
             self.st.sync_exchange, [], 'other-replica',
             last_known_generation=0, last_known_trans_id=None,
             insert_doc_cb=self.receive_doc)

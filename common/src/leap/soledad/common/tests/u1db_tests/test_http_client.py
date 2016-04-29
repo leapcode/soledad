@@ -1,4 +1,5 @@
 # Copyright 2011-2012 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -14,22 +15,17 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Tests for HTTPDatabase"""
-
-from oauth import oauth
+"""
+Tests for HTTPDatabase
+"""
 import json
-
-from u1db import (
-    errors,
-)
 
 from unittest import skip
 
-from leap.soledad.common.tests import u1db_tests as tests
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.remote import http_client
 
-from u1db.remote import (
-    http_client,
-)
+from leap.soledad.common.tests import u1db_tests as tests
 
 
 @skip("Skiping tests imported from U1DB.")

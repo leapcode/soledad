@@ -1,4 +1,5 @@
 # Copyright 2011-2012 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -14,7 +15,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""HTTP Application exposing U1DB."""
+"""
+HTTP Application exposing U1DB.
+"""
+
+# TODO -- deprecate, use twisted/txaio.
 
 import functools
 import httplib
@@ -28,17 +33,11 @@ import urlparse
 
 import routes.mapper
 
-from u1db import (
+from leap.soledad.common.l2db import (
     __version__ as _u1db_version,
-    DBNAME_CONSTRAINTS,
-    Document,
-    errors,
-    sync,
-    )
-from u1db.remote import (
-    http_errors,
-    utils,
-    )
+    DBNAME_CONSTRAINTS, Document,
+    errors, sync)
+from leap.soledad.common.l2db.remote import http_errors, utils
 
 
 def parse_bool(expression):

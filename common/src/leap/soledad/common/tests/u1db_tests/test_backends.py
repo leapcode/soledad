@@ -1,8 +1,9 @@
 # Copyright 2011 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
-# This file is part of u1db.
+# This file is part of leap.soledad.common
 #
-# u1db is free software: you can redistribute it and/or modify
+# leap.soledad.common is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License version 3
 # as published by the Free Software Foundation.
 #
@@ -14,20 +15,20 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""The backend class for U1DB. This deals with hiding storage details."""
+"""
+The backend class for L2DB. This deals with hiding storage details.
+"""
 
 import json
 
-from u1db import DocumentBase
-from u1db import errors
-from u1db import vectorclock
+from leap.soledad.common.l2db import DocumentBase
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db import vectorclock
+from leap.soledad.common.l2db.remote import http_database
 
 from leap.soledad.common.tests import u1db_tests as tests
-
 from leap.soledad.common.tests.u1db_tests import make_http_app
 from leap.soledad.common.tests.u1db_tests import make_oauth_http_app
-
-from u1db.remote import http_database
 
 from unittest import skip
 

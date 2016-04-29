@@ -17,7 +17,7 @@
 """
 A shared database for storing/retrieving encrypted key material.
 """
-from u1db.remote import http_database
+from leap.soledad.common.l2db.remote import http_database
 
 from leap.soledad.client.auth import TokenBasedAuth
 

@@ -84,9 +84,7 @@ import configparser
 import urlparse
 import sys
 
-from u1db.remote import http_app, utils
-
-from ._version import get_versions
+from leap.soledad.common.l2db.remote import http_app, utils
 
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
@@ -99,6 +97,8 @@ from leap.soledad.server.sync import (
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common.backend import SoledadBackend
 from leap.soledad.common.couch.state import CouchServerState
+
+from ._version import get_versions
 
 # ----------------------------------------------------------------------------
 # Soledad WSGI application

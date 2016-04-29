@@ -1,10 +1,5 @@
 pysqlcipher>2.6.3
-u1db
 scrypt
 zope.proxy
 twisted
 
-# XXX -- fix me!
-# oauth is not strictly needed by us, but we need it until u1db adds it to its
-# release as a dep.
-oauth

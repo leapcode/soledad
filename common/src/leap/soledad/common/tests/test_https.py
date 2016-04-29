@@ -14,19 +14,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Test Leap backend bits: https
 """
-
-
-from u1db.remote import http_client
-
-from leap.soledad import client
+from unittest import skip
 
 from testscenarios import TestWithScenarios
 
+from leap.soledad import client
+
+from leap.soledad.common.l2db.remote import http_client
 from leap.soledad.common.tests.u1db_tests import test_backends
 from leap.soledad.common.tests.u1db_tests import test_https
 from leap.soledad.common.tests.util import (
@@ -65,14 +62,16 @@ def token_leap_https_sync_target(test, host, path, cert_file=None):
     return st
 
 
+@skip("Skiping tests imported from U1DB.")
 class TestSoledadHTTPSyncTargetHttpsSupport(
         TestWithScenarios,
-        test_https.TestHttpSyncTargetHttpsSupport,
+        # test_https.TestHttpSyncTargetHttpsSupport,
         BaseSoledadTest):
 
     scenarios = [
         ('token_soledad_https',
-            {'server_def': test_https.https_server_def,
+            {
+             #'server_def': test_https.https_server_def,
              'make_app_with_state': make_token_soledad_app,
              'make_document_for_test': make_soledad_document_for_test,
              'sync_target': token_leap_https_sync_target}),

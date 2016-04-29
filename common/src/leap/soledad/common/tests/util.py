@@ -26,7 +26,6 @@ import tempfile
 import shutil
 import random
 import string
-import u1db
 import couchdb
 
 from uuid import uuid4
@@ -35,12 +34,13 @@ from urlparse import urljoin
 from StringIO import StringIO
 from pysqlcipher import dbapi2
 
-from u1db import sync
-from u1db.remote import http_database
-
 from twisted.trial import unittest
 
 from leap.common.testing.basetest import BaseLeapTest
+
+from leap.soledad.common import l2db
+from leap.soledad.common.l2db import sync
+from leap.soledad.common.l2db.remote import http_database
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
@@ -234,9 +234,9 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self.db2_file = os.path.join(self.tempdir, "db2.u1db")
         self.email = ADDRESS
         # open test dbs
-        self._db1 = u1db.open(self.db1_file, create=True,
+        self._db1 = l2db.open(self.db1_file, create=True,
                               document_factory=SoledadDocument)
-        self._db2 = u1db.open(self.db2_file, create=True,
+        self._db2 = l2db.open(self.db2_file, create=True,
                               document_factory=SoledadDocument)
         # get a random prefix for each test, so we do not mess with
         # concurrency during initialization and shutting down of

@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
-"""U1DB"""
+"""L2DB"""
 
 try:
     import simplejson as json
 except ImportError:
     import json  # noqa
 
-from u1db.errors import InvalidJSON, InvalidContent
+from leap.soledad.common.l2db.errors import InvalidJSON, InvalidContent
 
 __version_info__ = (13, 9)
 __version__ = '.'.join(map(lambda x: '%02d' % x, __version_info__))
@@ -40,7 +40,7 @@ def open(path, create, document_factory=None):
         parameters as Document.__init__.
     :return: An instance of Database.
     """
-    from u1db.backends import sqlite_backend
+    from leap.soledad.common.l2db.backends import sqlite_backend
     return sqlite_backend.SQLiteDatabase.open_database(
         path, create=create, document_factory=document_factory)
 

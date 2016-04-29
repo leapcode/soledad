@@ -42,12 +42,12 @@ from couchdb.http import (
     urljoin as couch_urljoin,
     Resource,
 )
-from u1db.errors import (
+from leap.soledad.common.l2db.errors import (
     DatabaseDoesNotExist,
     InvalidGeneration,
     RevisionConflict,
 )
-from u1db.remote import http_app
+from leap.soledad.common.l2db.remote import http_app
 
 
 from leap.soledad.common import ddocs

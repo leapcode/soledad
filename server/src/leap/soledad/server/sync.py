@@ -17,10 +17,10 @@
 """
 Server side synchronization infrastructure.
 """
-from u1db import sync, Document
-from u1db.remote import http_app
-from leap.soledad.server.state import ServerSyncState
+from leap.soledad.common.l2db import sync, Document
+from leap.soledad.common.l2db.remote import http_app
 from leap.soledad.server.caching import get_cache_for
+from leap.soledad.server.state import ServerSyncState
 
 
 MAX_REQUEST_SIZE = 200  # in Mb

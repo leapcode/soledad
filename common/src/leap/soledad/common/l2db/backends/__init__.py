@@ -23,22 +23,20 @@ except ImportError:
     import json  # noqa
 import uuid
 
-import u1db
-from u1db import (
-    errors,
-)
-import u1db.sync
-from u1db.vectorclock import VectorClockRev
+from leap.soledad.common import l2db
+from leap.soledad.common.l2db import sync as l2db_sync
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.vectorclock import VectorClockRev
 
 
-check_doc_id_re = re.compile("^" + u1db.DOC_ID_CONSTRAINTS + "$", re.UNICODE)
+check_doc_id_re = re.compile("^" + l2db.DOC_ID_CONSTRAINTS + "$", re.UNICODE)
 
 
-class CommonSyncTarget(u1db.sync.LocalSyncTarget):
+class CommonSyncTarget(l2db_sync.LocalSyncTarget):
     pass
 
 
-class CommonBackend(u1db.Database):
+class CommonBackend(l2db.Database):
 
     document_size_limit = 0
 

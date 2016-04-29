@@ -17,16 +17,17 @@
 """
 Tests for server-related functionality.
 """
+import binascii
+import mock
 import os
 import tempfile
-import mock
 import time
-import binascii
-from pkg_resources import resource_filename
-from uuid import uuid4
-from hashlib import sha512
 
+from hashlib import sha512
+from pkg_resources import resource_filename
 from urlparse import urljoin
+from uuid import uuid4
+
 from twisted.internet import defer
 from twisted.trial import unittest
 

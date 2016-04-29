@@ -14,21 +14,17 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Authentication facilities for Soledad Server.
 """
-
-
 import httplib
 import json
 
-from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
 from twisted.python import log
 
+from leap.soledad.common.l2db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import USER_DB_PREFIX
 

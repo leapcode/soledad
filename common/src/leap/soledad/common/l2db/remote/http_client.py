@@ -1,4 +1,5 @@
 # Copyright 2011-2012 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -29,17 +30,12 @@ import urlparse
 import urllib
 
 from time import sleep
-from u1db import (
-    errors,
-    )
-from u1db.remote import (
-    http_errors,
-    )
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.remote import http_errors
 
-from u1db.remote.ssl_match_hostname import (  # noqa
+from leap.soledad.common.l2db.remote.ssl_match_hostname import (  # noqa
     CertificateError,
-    match_hostname,
-    )
+    match_hostname)
 
 # Ubuntu/debian
 # XXX other...

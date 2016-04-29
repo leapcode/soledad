@@ -1,4 +1,5 @@
 # Copyright 2011 Canonical Ltd.
+# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -13,13 +14,13 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
-
-"""Code for parsing Index definitions."""
+"""
+Code for parsing Index definitions.
+"""
 
 import re
-from u1db import (
-    errors,
-    )
+
+from leap.soledad.common.l2db import errors
 
 
 class Getter(object):

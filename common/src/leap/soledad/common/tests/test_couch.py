@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # test_couch.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013-2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,26 +14,23 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Test ObjectStore and Couch backend bits.
 """
-
-
 import json
 
-from urlparse import urljoin
-from couchdb.client import Server
 from uuid import uuid4
+from urlparse import urljoin
+
+from couchdb.client import Server
 
 from testscenarios import TestWithScenarios
 from twisted.trial import unittest
 from mock import Mock
 
-from u1db import errors as u1db_errors
-from u1db import SyncTarget
-from u1db import vectorclock
+from leap.soledad.common.l2db import errors as u1db_errors
+from leap.soledad.common.l2db import SyncTarget
+from leap.soledad.common.l2db import vectorclock
 
 from leap.soledad.common import couch
 from leap.soledad.common.document import ServerDocument

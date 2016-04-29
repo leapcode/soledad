@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # test_http_client.py
-# Copyright (C) 2013, 2014 LEAP
+# Copyright (C) 2013-2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,11 +19,10 @@ Test Leap backend bits: sync target
 """
 import json
 
-from u1db.remote import http_client
-
 from testscenarios import TestWithScenarios
 
 from leap.soledad.client import auth
+from leap.soledad.common.l2db.remote import http_client
 from leap.soledad.common.tests.u1db_tests import test_http_client
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 

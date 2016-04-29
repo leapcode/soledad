@@ -17,10 +17,10 @@
 """
 Test Leap backend bits: test http database
 """
-from u1db.remote import http_database
 
 from leap.soledad.client import auth
 from leap.soledad.common.tests.u1db_tests import test_http_database
+from leap.soledad.common.l2db.remote import http_database
 
 
 # -----------------------------------------------------------------------------

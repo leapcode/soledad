@@ -20,13 +20,13 @@ import json
 import base64
 
 from uuid import uuid4
-from u1db import SyncTarget
 
 from twisted.web.error import Error
 from twisted.internet import defer
 
-from leap.soledad.common.errors import InvalidAuthTokenError
 from leap.soledad.client.http_target.support import readBody
+from leap.soledad.common.errors import InvalidAuthTokenError
+from leap.soledad.common.l2db import SyncTarget
 
 
 # we may want to collect statistics from the sync process

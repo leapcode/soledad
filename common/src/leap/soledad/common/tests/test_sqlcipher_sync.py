@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # test_sqlcipher.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2013-2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,20 +17,19 @@
 """
 Test sqlcipher backend sync.
 """
-
-
 import os
 
-from u1db import sync
-from u1db import vectorclock
-from u1db import errors
 from uuid import uuid4
 
 from testscenarios import TestWithScenarios
 
+from leap.soledad.common.l2db import sync
+from leap.soledad.common.l2db import vectorclock
+from leap.soledad.common.l2db import errors
+
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
-from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.crypto import decrypt_doc_dict
+from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 
 from leap.soledad.common.tests import u1db_tests as tests
 from leap.soledad.common.tests.test_sqlcipher import SQLCIPHER_SCENARIOS

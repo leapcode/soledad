@@ -14,13 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Test ObjectStore and Couch backend bits.
 """
-
-
 from testscenarios import TestWithScenarios
 
 from leap.soledad.common.tests.util import BaseSoledadTest
