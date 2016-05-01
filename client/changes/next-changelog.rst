@@ -22,6 +22,7 @@ Bugfixes
 
 Misc
 ~~~~
+- Add script for setting up develop environment.
 - Refactor bootstrap to remove shared db lock.
 - `#1236 <https://leap.se/code/issues/1236>`_: Description of the new feature corresponding with issue #1236.
 - Some change without issue number.
