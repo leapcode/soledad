@@ -72,6 +72,12 @@ logger = logging.getLogger(__name__)
 sqlite_backend.dbapi2 = sqlcipher_dbapi2
 
 
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
+
+
 def initialize_sqlcipher_db(opts, on_init=None, check_same_thread=True):
     """
     Initialize a SQLCipher database.
@@ -453,6 +459,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         self.shutdownID = None
 
+        if DO_STATS:
+            self.sync_phase = None
+
     @property
     def _replica_uid(self):
         return str(self.__replica_uid)
@@ -497,6 +506,10 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :rtype: Deferred
         """
         syncer = self._get_syncer(url, creds=creds)
+        if DO_STATS:
+            self.sync_phase = syncer.sync_phase
+            self.syncer = syncer
+            self.sync_exchange_phase = syncer.sync_exchange_phase
         local_gen_before_sync = yield syncer.sync(
             defer_decryption=defer_decryption)
         self.received_docs = syncer.received_docs

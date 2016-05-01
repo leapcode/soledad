@@ -62,6 +62,13 @@ from leap.soledad.client import encdecpool
 
 logger = logging.getLogger(name=__name__)
 
+
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
+
+
 #
 # Constants
 #
@@ -296,6 +303,16 @@ class Soledad(object):
             defer_encryption=self._defer_encryption,
             sync_db=self._sync_db,
             sync_enc_pool=self._sync_enc_pool)
+
+    def sync_stats(self):
+        sync_phase = 0
+        if getattr(self._dbsyncer, 'sync_phase', None):
+            sync_phase = self._dbsyncer.sync_phase[0]
+        sync_exchange_phase = 0
+        if getattr(self._dbsyncer, 'syncer', None):
+            if getattr(self._dbsyncer.syncer, 'sync_exchange_phase', None):
+                sync_exchange_phase = self._dbsyncer.syncer.sync_exchange_phase[0]
+        return sync_phase, sync_exchange_phase
 
     #
     # Closing methods
