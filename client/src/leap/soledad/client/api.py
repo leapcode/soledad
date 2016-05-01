@@ -35,10 +35,6 @@ import ssl
 import uuid
 import urlparse
 
-try:
-    import cchardet as chardet
-except ImportError:
-    import chardet
 from itertools import chain
 
 from StringIO import StringIO
@@ -357,7 +353,6 @@ class Soledad(object):
             also be updated.
         :rtype: twisted.internet.defer.Deferred
         """
-        doc.content = _convert_to_unicode(doc.content)
         return self._defer("put_doc", doc)
 
     def delete_doc(self, doc):
@@ -452,8 +447,7 @@ class Soledad(object):
         # create_doc (and probably to put_doc too). There are cases (mail
         # payloads for example) in which we already have the encoding in the
         # headers, so we don't need to guess it.
-        return self._defer(
-            "create_doc", _convert_to_unicode(content), doc_id=doc_id)
+        return self._defer("create_doc", content, doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -972,44 +966,6 @@ class Soledad(object):
     def _set_token_for_service(self, service, token):
         doc = {'type': 'servicetoken', 'service': service, 'token': token}
         return self.create_doc(doc)
-
-
-def _convert_to_unicode(content):
-    """
-    Convert content to unicode (or all the strings in content).
-
-    NOTE: Even though this method supports any type, it will
-    currently ignore contents of lists, tuple or any other
-    iterable than dict. We don't need support for these at the
-    moment
-
-    :param content: content to convert
-    :type content: object
-
-    :rtype: object
-    """
-    # Chardet doesn't guess very well with some smallish payloads.
-    # This parameter might need some empirical tweaking.
-    CUTOFF_CONFIDENCE = 0.90
-
-    if isinstance(content, unicode):
-        return content
-    elif isinstance(content, str):
-        encoding = "utf-8"
-        result = chardet.detect(content)
-        if result["confidence"] > CUTOFF_CONFIDENCE:
-            encoding = result["encoding"]
-        try:
-            content = content.decode(encoding)
-        except UnicodeError as e:
-            logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
-            content = content.decode(encoding, 'replace')
-        return content
-    else:
-        if isinstance(content, dict):
-            for key in content.keys():
-                content[key] = _convert_to_unicode(content[key])
-    return content
 
 
 def create_path_if_not_exists(path):

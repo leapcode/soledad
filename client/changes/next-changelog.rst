@@ -16,6 +16,8 @@ Features
 Bugfixes
 ~~~~~~~~
 - `#1235 <https://leap.se/code/issues/1235>`_: Description for the fixed stuff corresponding with issue #1235.
+- Remove document content conversion to unicode. Users of API are responsible
+  for only passing valid JSON to Soledad for storage.
 - Bugfix without related issue number.
 
 Misc
