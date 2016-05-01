@@ -24,9 +24,9 @@ import sys
 import logging
 
 from functools import partial
-from threading import BoundedSemaphore
 
 from twisted.enterprise import adbapi
+from twisted.internet.defer import DeferredSemaphore
 from twisted.python import log
 from zope.proxy import ProxyBase, setProxiedObject
 from pysqlcipher.dbapi2 import OperationalError
@@ -204,7 +204,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         :rtype: twisted.internet.defer.Deferred
         """
         meth = "u1db_%s" % meth
-        semaphore = BoundedSemaphore(SQLCIPHER_MAX_RETRIES - 1)
+        semaphore = DeferredSemaphore(SQLCIPHER_MAX_RETRIES - 1)
 
         def _run_interaction():
             return self.runInteraction(
