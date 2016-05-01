@@ -17,6 +17,8 @@
 """
 Soledad synchronization utilities.
 """
+import os
+import time
 import logging
 
 from twisted.internet import defer
@@ -27,6 +29,12 @@ from u1db.sync import Synchronizer
 
 
 logger = logging.getLogger(__name__)
+
+
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
 
 
 class SoledadSynchronizer(Synchronizer):
@@ -41,6 +49,12 @@ class SoledadSynchronizer(Synchronizer):
     Also modified to allow for interrupting the synchronization process.
     """
     received_docs = []
+
+    def __init__(self, *args, **kwargs):
+        Synchronizer.__init__(self, *args, **kwargs)
+        if DO_STATS:
+            self.sync_phase = [0]
+            self.sync_exchange_phase = None
 
     @defer.inlineCallbacks
     def sync(self, defer_decryption=True):
@@ -64,8 +78,15 @@ class SoledadSynchronizer(Synchronizer):
                  the local generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
+
         sync_target = self.sync_target
         self.received_docs = []
+
+        # ---------- phase 1: get sync info from server ----------------------
+        if DO_STATS:
+            self.sync_phase[0] += 1
+            self.sync_exchange_phase = self.sync_target.sync_exchange_phase
+        # --------------------------------------------------------------------
 
         # get target identifier, its current generation,
         # and its last-seen database generation for this source
@@ -106,6 +127,11 @@ class SoledadSynchronizer(Synchronizer):
         self.source.validate_gen_and_trans_id(
             target_my_gen, target_my_trans_id)
 
+        # ---------- phase 2: what's changed ---------------------------------
+        if DO_STATS:
+            self.sync_phase[0] += 1
+        # --------------------------------------------------------------------
+
         # what's changed since that generation and this current gen
         my_gen, _, changes = self.source.whats_changed(target_my_gen)
         logger.debug("Soledad sync: there are %d documents to send."
@@ -129,6 +155,11 @@ class SoledadSynchronizer(Synchronizer):
             if target_trans_id != target_last_known_trans_id:
                 raise errors.InvalidTransactionId
             defer.returnValue(my_gen)
+
+        # ---------- phase 3: sync exchange ----------------------------------
+        if DO_STATS:
+            self.sync_phase[0] += 1
+        # --------------------------------------------------------------------
 
         # prepare to send all the changed docs
         changed_doc_ids = [doc_id for doc_id, _, _ in changes]
@@ -162,6 +193,12 @@ class SoledadSynchronizer(Synchronizer):
             "my_gen": my_gen
         }
         self._syncing_info = info
+
+        # ---------- phase 4: complete sync ----------------------------------
+        if DO_STATS:
+            self.sync_phase[0] += 1
+        # --------------------------------------------------------------------
+
         yield self.complete_sync()
 
         _, _, changes = self.source.whats_changed(target_my_gen)
@@ -169,6 +206,11 @@ class SoledadSynchronizer(Synchronizer):
 
         just_received = list(set(changed_doc_ids) - set(ids_sent))
         self.received_docs = just_received
+
+        # ---------- phase 5: sync is over -----------------------------------
+        if DO_STATS:
+            self.sync_phase[0] += 1
+        # --------------------------------------------------------------------
 
         defer.returnValue(my_gen)
 

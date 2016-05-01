@@ -23,6 +23,7 @@ Bugfixes
 
 Misc
 ~~~~
+- Add ability to get information about sync phases for profiling purposes.
 - Add script for setting up develop environment.
 - Refactor bootstrap to remove shared db lock.
 - `#1236 <https://leap.se/code/issues/1236>`_: Description of the new feature corresponding with issue #1236.

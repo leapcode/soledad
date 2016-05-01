@@ -22,6 +22,7 @@ after receiving.
 """
 
 
+import os
 import logging
 
 from leap.common.http import HTTPClient
@@ -31,6 +32,12 @@ from leap.soledad.client.http_target.fetch import HTTPDocFetcher
 
 
 logger = logging.getLogger(__name__)
+
+
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
 
 
 class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
@@ -93,3 +100,6 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         # the duplicated syncing bug. This could be reduced to the 30s default
         # after implementing Cancellable Sync. See #7382
         self._http = HTTPClient(cert_file, timeout=90)
+
+        if DO_STATS:
+            self.sync_exchange_phase = [0]
