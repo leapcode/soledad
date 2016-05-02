@@ -204,7 +204,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         :rtype: twisted.internet.defer.Deferred
         """
         meth = "u1db_%s" % meth
-        semaphore = DeferredSemaphore(SQLCIPHER_MAX_RETRIES - 1)
+        semaphore = DeferredSemaphore(SQLCIPHER_MAX_RETRIES)
 
         def _run_interaction():
             return self.runInteraction(
@@ -213,7 +213,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         def _errback(failure):
             failure.trap(OperationalError)
             if failure.getErrorMessage() == "database is locked":
-                should_retry = semaphore.acquire(False)
+                should_retry = semaphore.acquire()
                 if should_retry:
                     logger.warning(
                         "Database operation timed out while waiting for "
