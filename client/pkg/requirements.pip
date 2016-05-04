@@ -5,5 +5,4 @@ scrypt
 # repos instead.
 chardet
 zope.proxy
-twisted
 oauth

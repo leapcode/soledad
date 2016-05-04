@@ -2,7 +2,7 @@ configparser
 u1db
 routes
 PyOpenSSL
-twisted>=12.3.0
+
 Beaker
 couchdb
 
