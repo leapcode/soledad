@@ -31,6 +31,13 @@ class HTTPDocSender(object):
 
     MAX_BATCH_SIZE = 0  # disabled by now, this is being tested yet
 
+    # The uuid of the local replica.
+    # Any class inheriting from this one should provide a meaningful attribute
+    # if the sync status event is meant to be used somewhere else.
+
+    uuid = 'undefined'
+    userid = 'undefined'
+
     @defer.inlineCallbacks
     def _send_docs(self, docs_by_generation, last_known_generation,
                    last_known_trans_id, sync_id):
@@ -71,7 +78,9 @@ class HTTPDocSender(object):
         result = yield self._send_request(body.pop())
         if self._defer_encryption:
             self._delete_sent(sent)
-        _emit_send_status(body.consumed, total)
+
+        user_data = {'uuid': self.uuid, 'userid': self.userid}
+        _emit_send_status(self.uuid, body.consumed, total)
         defer.returnValue(result)
 
     def _send_request(self, body):
@@ -112,9 +121,9 @@ class HTTPDocSender(object):
         return d
 
 
-def _emit_send_status(idx, total):
+def _emit_send_status(user_data, idx, total):
     content = {'sent': idx, 'total': total}
-    emit_async(SOLEDAD_SYNC_SEND_STATUS, content)
+    emit_async(SOLEDAD_SYNC_SEND_STATUS, user_data, content)
 
     msg = "%d/%d" % (idx, total)
     logger.debug("Sync send status: %s" % msg)

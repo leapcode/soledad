@@ -123,6 +123,8 @@ class CouchDatabase(object):
         :type replica_uid: str
         :param ensure_ddocs: Ensure that the design docs exist on server.
         :type ensure_ddocs: bool
+        :param database_security: security rules as CouchDB security doc
+        :type database_security: dict
 
         :return: the database instance
         :rtype: SoledadBackend
@@ -149,6 +151,16 @@ class CouchDatabase(object):
 
     def __init__(self, url, dbname, ensure_ddocs=True,
                  database_security=None):
+        """
+        :param url: Couch server URL with necessary credentials
+        :type url: string
+        :param dbname: Couch database name
+        :type dbname: string
+        :param ensure_ddocs: Ensure that the design docs exist on server.
+        :type ensure_ddocs: bool
+        :param database_security: security rules as CouchDB security doc
+        :type database_security: dict
+        """
         self._session = Session(timeout=COUCH_TIMEOUT)
         self._url = url
         self._dbname = dbname
@@ -218,8 +230,8 @@ class CouchDatabase(object):
         This is achieved by creating a _security design document, see:
         http://docs.couchdb.org/en/latest/api/database/security.html
 
-        :param database_security: security configuration parsed from conf file
-        :type cache: dict
+        :param security_config: security configuration parsed from conf file
+        :type security_config: dict
         """
         security_config = security_config or {}
         security = self._database.resource.get_json('_security')[2]

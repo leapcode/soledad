@@ -245,6 +245,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         # each local db.
         self.rand_prefix = ''.join(
             map(lambda x: random.choice(string.ascii_letters), range(6)))
+
         # initialize soledad by hand so we can control keys
         # XXX check if this soledad is actually used
         self._soledad = self._soledad_instance(
@@ -285,7 +286,8 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                           server_url='https://127.0.0.1/',
                           cert_file=None,
                           shared_db_class=None,
-                          auth_token='auth-token'):
+                          auth_token='auth-token',
+                          userid=ADDRESS):
 
         def _put_doc_side_effect(doc):
             self._doc_put = doc
@@ -307,7 +309,8 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
             cert_file=cert_file,
             defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),
-            auth_token=auth_token)
+            auth_token=auth_token,
+            userid=userid)
         self.addCleanup(soledad.close)
         return soledad
 

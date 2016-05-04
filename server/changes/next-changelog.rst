@@ -1,5 +1,5 @@
-0.8.0 - ...
-+++++++++++++++++++++++++++++++
+0.8.1 - ...
+++++++++++++++++++++
 
 Please add lines to this file, they will be moved to the CHANGELOG.rst during
 the next release.

@@ -24,7 +24,9 @@ import hashlib
 import json
 import logging
 
-from pycryptopp.cipher.aes import AES
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends.multibackend import MultiBackend
+from cryptography.hazmat.backends.openssl.backend import Backend as OpenSSLBackend
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
@@ -56,7 +58,10 @@ def encrypt_sym(data, key):
         (len(key) * 8))
 
     iv = os.urandom(16)
-    ciphertext = AES(key=key, iv=iv).process(data)
+    backend = MultiBackend([OpenSSLBackend()])
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(data) + encryptor.finalize()
 
     return binascii.b2a_base64(iv), ciphertext
 
@@ -81,8 +86,11 @@ def decrypt_sym(data, key, iv):
     soledad_assert(
         len(key) == 32,  # 32 x 8 = 256 bits.
         'Wrong key size: %s (must be 256 bits long).' % len(key))
-    return AES(
-        key=key, iv=binascii.a2b_base64(iv)).process(data)
+    backend = MultiBackend([OpenSSLBackend()])
+    iv = binascii.a2b_base64(iv)
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    decryptor = cipher.decryptor()
+    return decryptor.update(data) + decryptor.finalize()
 
 
 def doc_mac_key(doc_id, secret):
