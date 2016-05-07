@@ -100,6 +100,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         self.assertEqual('value_1', sol._server_url)
         sol.close()
 
+    @defer.inlineCallbacks
     def test_change_passphrase(self):
         """
         Test if passphrase can be changed.
@@ -111,38 +112,25 @@ class AuxMethodsTestCase(BaseSoledadTest):
             prefix=prefix,
         )
 
-        def _change_passphrase(doc1):
-            self._doc1 = doc1
-            sol.change_passphrase(u'654321')
-            sol.close()
+        doc1 = yield sol.create_doc({'simple': 'doc'})
+        sol.change_passphrase(u'654321')
+        sol.close()
 
-        def _assert_wrong_password_raises(results):
-            with self.assertRaises(DatabaseAccessError):
-                self._soledad_instance(
-                    'leap@leap.se',
-                    passphrase=u'123',
-                    prefix=prefix)
-
-        def _instantiate_with_new_passphrase(results):
-            sol2 = self._soledad_instance(
+        with self.assertRaises(DatabaseAccessError):
+            self._soledad_instance(
                 'leap@leap.se',
-                passphrase=u'654321',
+                passphrase=u'123',
                 prefix=prefix)
-            self._sol2 = sol2
-            return sol2.get_doc(self._doc1.doc_id)
 
-        def _assert_docs_are_equal(doc2):
-            self.assertEqual(self._doc1, doc2)
-            self._sol2.close()
+        sol2 = self._soledad_instance(
+            'leap@leap.se',
+            passphrase=u'654321',
+            prefix=prefix)
+        doc2 = yield sol2.get_doc(doc1.doc_id)
 
-        d = sol.create_doc({'simple': 'doc'})
-        d.addCallback(_change_passphrase)
-        d.addCallback(_assert_wrong_password_raises)
-        d.addCallback(_instantiate_with_new_passphrase)
-        d.addCallback(_assert_docs_are_equal)
-        d.addCallback(lambda _: sol.close())
+        self.assertEqual(doc1, doc2)
 
-        return d
+        sol2.close()
 
     def test_change_passphrase_with_short_passphrase_raises(self):
         """
