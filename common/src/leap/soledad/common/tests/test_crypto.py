@@ -26,7 +26,6 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.tests.util import BaseSoledadTest
 from leap.soledad.common.crypto import WrongMacError
 from leap.soledad.common.crypto import UnknownMacMethodError
-from leap.soledad.common.crypto import EncryptionMethods
 from leap.soledad.common.crypto import ENC_JSON_KEY
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.common.crypto import MAC_KEY
@@ -67,7 +66,7 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         rd = self._soledad.secrets._export_recovery_document()
         secret_id = rd[self._soledad.secrets.STORAGE_SECRETS_KEY].items()[0][0]
         # assert exported secret is the same
-        secret = self._soledad.secrets._decrypt_storage_secret(
+        secret = self._soledad.secrets._decrypt_storage_secret_version_1(
             rd[self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id])
         self.assertEqual(secret_id, self._soledad.secrets._secret_id)
         self.assertEqual(secret, self._soledad.secrets._secrets[secret_id])
@@ -93,47 +92,58 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
 
 class SoledadSecretsTestCase(BaseSoledadTest):
 
-    def test__gen_secret(self):
-        # instantiate and save secret_id
-        sol = self._soledad_instance(user='user@leap.se')
-        self.assertTrue(len(sol.secrets._secrets) == 1)
-        secret_id_1 = sol.secrets.secret_id
-        # assert id is hash of secret
+    def test_new_soledad_instance_generates_one_secret(self):
         self.assertTrue(
-            secret_id_1 == hashlib.sha256(sol.storage_secret).hexdigest())
+            self._soledad.storage_secret is not None,
+            "Expected secret to be something different than None")
+        number_of_secrets = len(self._soledad.secrets._secrets)
+        self.assertTrue(
+            number_of_secrets == 1,
+            "Expected exactly 1 secret, got %d instead." % number_of_secrets)
+
+    def test_generated_secret_is_of_correct_type(self):
+        expected_type = str
+        self.assertIsInstance(
+            self._soledad.storage_secret, expected_type,
+            "Expected secret to be of type %s" % expected_type)
+
+    def test_generated_secret_has_correct_lengt(self):
+        expected_length = self._soledad.secrets.GEN_SECRET_LENGTH
+        actual_length = len(self._soledad.storage_secret)
+        self.assertTrue(
+            expected_length == actual_length,
+            "Expected secret with length %d, got %d instead."
+            % (expected_length, actual_length))
+
+    def test_generated_secret_id_is_sha256_hash_of_secret(self):
+        generated = self._soledad.secrets.secret_id
+        expected = hashlib.sha256(self._soledad.storage_secret).hexdigest()
+        self.assertTrue(
+            generated == expected,
+            "Expeceted generated secret id to be sha256 hash, got something "
+            "else instead.")
+
+    def test_generate_new_secret_generates_different_secret_id(self):
         # generate new secret
-        secret_id_2 = sol.secrets._gen_secret()
-        self.assertTrue(secret_id_1 != secret_id_2)
-        sol.close()
-        # re-instantiate
-        sol = self._soledad_instance(user='user@leap.se')
-        sol.secrets.set_secret_id(secret_id_1)
-        # assert ids are valid
-        self.assertTrue(len(sol.secrets._secrets) == 2)
-        self.assertTrue(secret_id_1 in sol.secrets._secrets)
-        self.assertTrue(secret_id_2 in sol.secrets._secrets)
-        # assert format of secret 1
-        self.assertTrue(sol.storage_secret is not None)
-        self.assertIsInstance(sol.storage_secret, str)
-        secret_length = sol.secrets.GEN_SECRET_LENGTH
-        self.assertTrue(len(sol.storage_secret) == secret_length)
-        # assert format of secret 2
-        sol.secrets.set_secret_id(secret_id_2)
-        self.assertTrue(sol.storage_secret is not None)
-        self.assertIsInstance(sol.storage_secret, str)
-        self.assertTrue(len(sol.storage_secret) == secret_length)
-        # assert id is hash of new secret
+        secret_id_1 = self._soledad.secrets.secret_id
+        secret_id_2 = self._soledad.secrets._gen_secret()
         self.assertTrue(
-            secret_id_2 == hashlib.sha256(sol.storage_secret).hexdigest())
-        sol.close()
+            len(self._soledad.secrets._secrets) == 2,
+            "Expected exactly 2 secrets.")
+        self.assertTrue(
+            secret_id_1 != secret_id_2,
+            "Expected IDs of secrets to be distinct.")
+        self.assertTrue(
+            secret_id_1 in self._soledad.secrets._secrets,
+            "Expected to find ID of first secret in Soledad Secrets.")
+        self.assertTrue(
+            secret_id_2 in self._soledad.secrets._secrets,
+            "Expected to find ID of second secret in Soledad Secrets.")
 
     def test__has_secret(self):
-        sol = self._soledad_instance(
-            user='user@leap.se', prefix=self.rand_prefix)
         self.assertTrue(
-            sol.secrets._has_secret(),
+            self._soledad._secrets._has_secret(),
             "Should have a secret at this point")
-        sol.close()
 
 
 class MacAuthTestCase(BaseSoledadTest):
