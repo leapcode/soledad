@@ -10,6 +10,7 @@ I've added a new category `Misc` so we can track doc/style/packaging stuff.
 
 Features
 ~~~~~~~~
+- Add recovery document format version for future migrations.
 - Use DeferredLock instead of its locking cousin.
 - `#1234 <https://leap.se/code/issues/1234>`_: Description of the new feature corresponding with issue #1234.
 - New feature without related issue number.
