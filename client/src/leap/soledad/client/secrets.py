@@ -30,8 +30,6 @@ import json
 
 from hashlib import sha256
 
-from leap.soledad.common import soledad_assert
-from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
 from leap.soledad.client import events
 from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
@@ -396,7 +394,6 @@ class SoledadSecrets(object):
                  document format version.
         :rtype: (int, str, int)
         """
-        soledad_assert(self.STORAGE_SECRETS_KEY in data)
         # determine version of recovery document in order to use correct
         # loading method. Assume version is 1 if no version is present.
         version = data.get(self.RECOVERY_DOC_VERSION_KEY, 1)
@@ -477,10 +474,6 @@ class SoledadSecrets(object):
         in the remote db, assert that that data is the same as local data.
         Otherwise, upload keys to shared recovery database.
         """
-        soledad_assert(
-            self._has_secret(),
-            'Tried to send keys to server but they don\'t exist in local '
-            'storage.')
         # try to get secrets doc from server, otherwise create it
         doc = self._get_secrets_from_shared_db()
         if doc is None:
@@ -654,7 +647,6 @@ class SoledadSecrets(object):
         """
         # TODO: maybe we want to add more checks to guarantee passphrase is
         # reasonable?
-        soledad_assert_type(new_passphrase, unicode)
         if len(new_passphrase) < self.MINIMUM_PASSPHRASE_LENGTH:
             raise PassphraseTooShort(
                 'Passphrase must be at least %d characters long!' %
