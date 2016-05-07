@@ -294,7 +294,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         sol = self._soledad_instance()
         # create a document with secrets
         doc = SoledadDocument(doc_id=sol.secrets._shared_db_doc_id())
-        doc.content = sol.secrets._export_recovery_document()
+        doc.content = sol.secrets._dump_recovery_document()
         sol.close()
         # reset mock
         soledad.client.secrets.events.emit_async.reset_mock()

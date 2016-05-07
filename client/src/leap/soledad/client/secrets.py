@@ -265,7 +265,7 @@ class SoledadSecrets(object):
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        _, active_secret, version = self._import_recovery_document(content)
+        _, active_secret, version = self._load_recovery_document(content)
 
         self._maybe_set_active_secret(active_secret)
 
@@ -287,7 +287,7 @@ class SoledadSecrets(object):
         if doc is None:
             raise NoStorageSecret
 
-        _, active_secret, version = self._import_recovery_document(doc.content)
+        _, active_secret, version = self._load_recovery_document(doc.content)
         self._maybe_set_active_secret(active_secret)
 
         return version
@@ -341,9 +341,9 @@ class SoledadSecrets(object):
             '%s%s' %
             (self._passphrase_as_string(), self._uuid)).hexdigest()
 
-    def _export_recovery_document(self):
+    def _dump_recovery_document(self):
         """
-        Export the storage secrets.
+        Dump the storage secrets.
 
         Current format of recovery document has the following structure:
 
@@ -378,18 +378,18 @@ class SoledadSecrets(object):
         }
         return data
 
-    def _import_recovery_document(self, data):
+    def _load_recovery_document(self, data):
         """
-        Import storage secrets for symmetric encryption from a recovery
+        Load storage secrets for symmetric encryption from a recovery
         document.
 
-        Note that this method does not store the imported data on disk. For
+        Note that this method does not store the loaded data on disk. For
         that, use C{self._store_secrets()}.
 
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets, the
+        :return: A tuple containing the number of loaded secrets, the
                  secret_id of the last active secret, and the recovery
                  document format version.
         :rtype: (int, str, int)
@@ -397,13 +397,13 @@ class SoledadSecrets(object):
         # determine version of recovery document in order to use correct
         # loading method. Assume version is 1 if no version is present.
         version = data.get(self.RECOVERY_DOC_VERSION_KEY, 1)
-        meth = getattr(self, '_import_recovery_document_version_%d' % version)
+        meth = getattr(self, '_load_recovery_document_version_%d' % version)
         secret_count, active_secret = meth(data)
         return secret_count, active_secret, version
 
-    def _import_recovery_document_version_1(self, data):
+    def _load_recovery_document_version_1(self, data):
         """
-        Import storage secrets for symmetric encryption from a recovery
+        Load storage secrets for symmetric encryption from a recovery
         document with format version 1.
 
         Version 1 of recovery document has the following structure:
@@ -423,7 +423,7 @@ class SoledadSecrets(object):
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets, the
+        :return: A tuple containing the number of loaded secrets, the
                  secret_id of the last active secret, and the recovery
                  document format version.
         :rtype: (int, str, int)
@@ -480,7 +480,7 @@ class SoledadSecrets(object):
             doc = document.SoledadDocument(
                 doc_id=self._shared_db_doc_id())
         # fill doc with encrypted secrets
-        doc.content = self._export_recovery_document()
+        doc.content = self._dump_recovery_document()
         # upload secrets to server
         user_data = self._get_user_data()
         events.emit_async(events.SOLEDAD_UPLOADING_KEYS, user_data)
@@ -634,7 +634,7 @@ class SoledadSecrets(object):
         with open(self._secrets_path, 'w') as f:
             f.write(
                 json.dumps(
-                    self._export_recovery_document()))
+                    self._dump_recovery_document()))
 
     def change_passphrase(self, new_passphrase):
         """

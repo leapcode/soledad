@@ -62,8 +62,8 @@ class EncryptedSyncTestCase(BaseSoledadTest):
 
 class RecoveryDocumentTestCase(BaseSoledadTest):
 
-    def test_export_recovery_document_raw(self):
-        rd = self._soledad.secrets._export_recovery_document()
+    def test_dump_recovery_document_raw(self):
+        rd = self._soledad.secrets._dump_recovery_document()
         secret_id = rd[self._soledad.secrets.STORAGE_SECRETS_KEY].items()[0][0]
         # assert exported secret is the same
         secret = self._soledad.secrets._decrypt_storage_secret_version_1(
@@ -79,10 +79,10 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertTrue(self._soledad.secrets.LENGTH_KEY in encrypted_secret)
         self.assertTrue(self._soledad.secrets.SECRET_KEY in encrypted_secret)
 
-    def test_import_recovery_document(self):
-        rd = self._soledad.secrets._export_recovery_document()
+    def test_load_recovery_document(self):
+        rd = self._soledad.secrets._dump_recovery_document()
         s = self._soledad_instance()
-        s.secrets._import_recovery_document(rd)
+        s.secrets._load_recovery_document(rd)
         s.secrets.set_secret_id(self._soledad.secrets._secret_id)
         self.assertEqual(self._soledad.storage_secret,
                          s.storage_secret,
