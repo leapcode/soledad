@@ -143,6 +143,8 @@ class SoledadSecrets(object):
     KDF_LENGTH_KEY = 'kdf_length'
     KDF_SCRYPT = 'scrypt'
     CIPHER_AES256 = 'aes256'
+    RECOVERY_DOC_VERSION_KEY = 'version'
+    RECOVERY_DOC_VERSION = 1
     """
     Keys used to access storage secrets in recovery documents.
     """
@@ -192,9 +194,15 @@ class SoledadSecrets(object):
         # STAGE 1 - verify if secrets exist locally
         try:
             logger.info("Trying to load secrets from local storage...")
-            self._load_secrets_from_local_file()
+            version = self._load_secrets_from_local_file()
+            # eventually migrate local and remote stored documents from old
+            # format version
+            if version < self.RECOVERY_DOC_VERSION:
+                self._store_secrets()
+                self._upload_crypto_secrets()
             logger.info("Found secrets in local storage.")
             return
+
         except NoStorageSecret:
             logger.info("Could not find secrets in local storage.")
 
@@ -204,7 +212,12 @@ class SoledadSecrets(object):
         #           server.
         try:
             logger.info('Trying to fetch secrets from remote storage...')
-            self._download_crypto_secrets()
+            version = self._download_crypto_secrets()
+            self._store_secrets()
+            # eventually migrate remote stored document from old format
+            # version
+            if version < self.RECOVERY_DOC_VERSION:
+                self._upload_crypto_secrets()
             logger.info('Found secrets in remote storage.')
             return
         except NoStorageSecret:
@@ -240,6 +253,9 @@ class SoledadSecrets(object):
     def _load_secrets_from_local_file(self):
         """
         Load storage secrets from local file.
+
+        :return version: The version of the locally stored recovery document.
+
         :raise NoStorageSecret: Raised if there are no secrets available in
                                 local storage.
         """
@@ -251,12 +267,17 @@ class SoledadSecrets(object):
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        _, active_secret = self._import_recovery_document(content)
+        _, active_secret, version = self._import_recovery_document(content)
+
         self._maybe_set_active_secret(active_secret)
+
+        return version
 
     def _download_crypto_secrets(self):
         """
         Download crypto secrets.
+
+        :return version: The version of the remotelly stored recovery document.
 
         :raise NoStorageSecret: Raised if there are no secrets available in
                                 remote storage.
@@ -268,9 +289,10 @@ class SoledadSecrets(object):
         if doc is None:
             raise NoStorageSecret
 
-        _, active_secret = self._import_recovery_document(doc.content)
+        _, active_secret, version = self._import_recovery_document(doc.content)
         self._maybe_set_active_secret(active_secret)
-        self._store_secrets()  # save new secrets in local file
+
+        return version
 
     def _gen_crypto_secrets(self):
         """
@@ -325,7 +347,7 @@ class SoledadSecrets(object):
         """
         Export the storage secrets.
 
-        A recovery document has the following structure:
+        Current format of recovery document has the following structure:
 
             {
                 'storage_secrets': {
@@ -336,6 +358,7 @@ class SoledadSecrets(object):
                     },
                 },
                 'active_secret': '<secret_id>',
+                'version': '<recovery document format version>',
             }
 
         Note that multiple storage secrets might be stored in one recovery
@@ -353,13 +376,14 @@ class SoledadSecrets(object):
         data = {
             self.STORAGE_SECRETS_KEY: encrypted_secrets,
             self.ACTIVE_SECRET_KEY: self._secret_id,
+            self.RECOVERY_DOC_VERSION_KEY: self.RECOVERY_DOC_VERSION,
         }
         return data
 
     def _import_recovery_document(self, data):
         """
-        Import storage secrets for symmetric encryption and uuid (if present)
-        from a recovery document.
+        Import storage secrets for symmetric encryption from a recovery
+        document.
 
         Note that this method does not store the imported data on disk. For
         that, use C{self._store_secrets()}.
@@ -367,11 +391,44 @@ class SoledadSecrets(object):
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets and the
-                 secret_id of the last active secret.
-        :rtype: (int, str)
+        :return: A tuple containing the number of imported secrets, the
+                 secret_id of the last active secret, and the recovery
+                 document format version.
+        :rtype: (int, str, int)
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
+        version = data.get(self.RECOVERY_DOC_VERSION_KEY, 1)
+        meth = getattr(self, '_import_recovery_document_version_%d' % version)
+        secret_count, active_secret = meth(data)
+        return secret_count, active_secret, version
+
+    def _import_recovery_document_version_1(self, data):
+        """
+        Import storage secrets for symmetric encryption from a recovery
+        document with format version 1.
+
+        Version 1 of recovery document has the following structure:
+
+            {
+                'storage_secrets': {
+                    '<storage_secret id>': {
+                        'cipher': 'aes256',
+                        'length': <secret length>,
+                        'secret': '<encrypted storage_secret>',
+                    },
+                },
+                'active_secret': '<secret_id>',
+                'version': '<recovery document format version>',
+            }
+
+        :param data: The recovery document.
+        :type data: dict
+
+        :return: A tuple containing the number of imported secrets, the
+                 secret_id of the last active secret, and the recovery
+                 document format version.
+        :rtype: (int, str, int)
+        """
         # include secrets in the secret pool.
         secret_count = 0
         secrets = data[self.STORAGE_SECRETS_KEY].items()
@@ -384,7 +441,7 @@ class SoledadSecrets(object):
             if secret_id not in self._secrets:
                 try:
                     self._secrets[secret_id] = \
-                        self._decrypt_storage_secret(encrypted_secret)
+                        self._decrypt_storage_secret_version_1(encrypted_secret)
                     secret_count += 1
                 except SecretsException as e:
                     logger.error("Failed to decrypt storage secret: %s"
@@ -443,12 +500,20 @@ class SoledadSecrets(object):
     # Management of secret for symmetric encryption.
     #
 
-    def _decrypt_storage_secret(self, encrypted_secret_dict):
+    def _decrypt_storage_secret_version_1(self, encrypted_secret_dict):
         """
         Decrypt the storage secret.
 
         Storage secret is encrypted before being stored. This method decrypts
         and returns the decrypted storage secret.
+
+        Version 1 of storage secret format has the following structure:
+
+            '<storage_secret id>': {
+                'cipher': 'aes256',
+                'length': <secret length>,
+                'secret': '<encrypted storage_secret>',
+            },
 
         :param encrypted_secret_dict: The encrypted storage secret.
         :type encrypted_secret_dict:  dict
