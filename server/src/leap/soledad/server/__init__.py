@@ -76,7 +76,8 @@ This has some implications:
     (not implemented yet) to prevent excess storage.
 
 The authorization for creating, updating, deleting and retrieving recovery
-documents on the shared database is handled by `leap.soledad.server.auth` module.
+documents on the shared database is handled by `leap.soledad.server.auth`
+module.
 """
 
 import configparser

@@ -26,7 +26,8 @@ import logging
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends.multibackend import MultiBackend
-from cryptography.hazmat.backends.openssl.backend import Backend as OpenSSLBackend
+from cryptography.hazmat.backends.openssl.backend \
+    import Backend as OpenSSLBackend
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
