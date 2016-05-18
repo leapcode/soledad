@@ -1,15 +1,14 @@
 soledad (0.8.0) unstable; urgency=medium
 
-  * Release of soledad 0.8.0
+  * Update to 0.8.0 release
 
- -- Ben Carrillo <ben@futeisha.org>  Wed, 04 May 2016 11:36:35 -0400
+ -- Ben Carrillo <ben@futeisha.org>  Mon, 25 Apr 2016 21:08:20 -0400
 
-soledad (0.8.0~alpha+3) unstable; urgency=medium
+soledad (0.7.4) unstable; urgency=medium
 
-  * Pre-release of soledad 0.8.0
-  * Cherry-pick commits to create soledad user, add it to sudoers.
+  * Update to 0.7.4 release 
 
- -- Ben Carrillo <ben@futeisha.org>  Tue, 29 Sep 2015 10:43:00 -0400
+ -- Ben Carrillo <ben@futeisha.org>  Thu, 29 Oct 2015 12:11:02 -0400
 
 soledad (0.7.3) unstable; urgency=medium
 

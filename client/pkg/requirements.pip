@@ -1,6 +1,8 @@
 #pysqlcipher>2.6.3
 u1db
 scrypt
-cchardet
+# cchardet not packaged, we need python-chardet from the
+# repos instead.
+chardet
 zope.proxy
 oauth

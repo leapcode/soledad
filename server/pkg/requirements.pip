@@ -2,12 +2,8 @@ configparser
 u1db
 routes
 PyOpenSSL
-#twisted  # we don't want all twisted deps in deb!
-#pinned for wheezy compatibility
-Beaker==1.6.3 #wheezy
-couchdb==0.8 #wheezy
 
-# XXX -- fix me!
-# oauth is not strictly needed by us, but we need it until u1db adds it to its
-# release as a dep.
+Beaker
+couchdb
+
 oauth
