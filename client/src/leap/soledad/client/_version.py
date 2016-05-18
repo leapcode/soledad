@@ -5,10 +5,17 @@
 # unpacked source archive. Distribution tarballs contain a pre-generated copy
 # of this file.
 
-version_version = '0.8.0'
-full_revisionid = 'f25d2e4fa3b51575f4989ac74eade7213966ce4b'
+import json
+import sys
 
+version_json = '''
+{
+ "dirty": false,
+ "error": null,
+ "full-revisionid": "91cbf6c084569a24c4186f3ff745448d3c51756a",
+ "version": "0.8.0"
+}
+'''  # END VERSION_JSON
 
-def get_versions(default={}, verbose=False):
-        return {'version': version_version,
-                'full-revisionid': full_revisionid}
+def get_versions():
+    return json.loads(version_json)
