@@ -1,0 +1,3 @@
+run_tests:
+  script:
+    - /home/gitlab-runner/soledad/scripts/gitlab/run_tests.sh
