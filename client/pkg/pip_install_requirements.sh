@@ -80,5 +80,5 @@ insecure_flags=`return_insecure_flags`
 packages=`return_packages`
 
 pip install -U wheel
-pip install $install_options pip
+pip install -U pip
 pip install $install_options $insecure_flags $packages
