@@ -1,0 +1,3 @@
+- limit resources of containers (mem and cpu)
+- add a file to run tests inside container
+- use server ip to run test
