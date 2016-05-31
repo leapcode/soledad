@@ -18,7 +18,7 @@
 
 """A U1DB generic backend."""
 
-
+import functools
 from u1db import vectorclock
 from u1db.errors import (
     RevisionConflict,
@@ -438,9 +438,8 @@ class SoledadBackend(CommonBackend):
                                      generation.
         :type other_transaction_id: str
         """
-        function = self._set_replica_gen_and_trans_id
         args = [other_replica_uid, other_generation, other_transaction_id]
-        callback = lambda: function(*args)
+        callback = functools.partial(self._set_replica_gen_and_trans_id, *args)
         if self.batching:
             self.after_batch_callbacks['set_source_info'] = callback
         else:
