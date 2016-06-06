@@ -623,7 +623,7 @@ def run_cli():
         (['--uuid', '-u'], {'default': SOLEDAD_CLIENT_UUID}),
         (['--passphrase', '-k'], {'default': SOLEDAD_CLIENT_PASS}),
         (['--basedir', '-b'], {'default': SOLEDAD_CLIENT_BASEDIR}),
-        (['--server_url', '-s'], {'default': SOLEDAD_SERVER_URL}),
+        (['--server-url', '-s'], {'default': SOLEDAD_SERVER_URL}),
         (['--cert-key', '-C'], {'default': os.path.join(
             SOLEDAD_SERVER_BASEDIR,
             SOLEDAD_SERVER_CERTKEY)}),
