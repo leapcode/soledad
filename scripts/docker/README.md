@@ -27,4 +27,7 @@ a specific branch on the soledad repository:
 
 Example:
 
-  docker run leap/soledad:1.0 /usr/local/soledad/start-server.sh
+  docker run \
+    --env="SOLEDAD_REMOTE=https://0xacab.org/leap/soledad.git" \
+    --env="SOLEDAD_BRANCH=develop" \
+    leap/soledad:1.0 /usr/local/soledad/start-server.sh
