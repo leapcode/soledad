@@ -18,15 +18,25 @@ RUN apt-get -y install libssl-dev
 RUN apt-get -y install libzmq3-dev
 RUN apt-get -y install python-pip
 RUN apt-get -y install couchdb
+RUN apt-get -y install python-srp
+RUN apt-get -y install python-scrypt
+RUN apt-get -y install leap-keymanager
+RUN apt-get -y install python-tz
+RUN apt-get -y install curl
+RUN apt-get -y install python-ipdb
 
 # copy over files to help setup the environment and run soledad
 RUN mkdir -p /usr/local/soledad
 RUN mkdir -p /usr/local/soledad/conf
 
+# setup the enviroment for running soledad client and server
 COPY files/setup-env.sh /usr/local/soledad/
-COPY files/test-env.py /usr/local/soledad/
-COPY files/start-server.sh /usr/local/soledad/
-COPY files/conf/* /usr/local/soledad/conf/
-
-# clone repos and install dependencies from leap wheels using pip
 RUN /usr/local/soledad/setup-env.sh
+
+# copy runtime files for running server, client, tests, etc on a container
+COPY files/test-env.py /usr/local/soledad/
+COPY files/client_side_db.py /usr/local/soledad/
+COPY files/util.py /usr/local/soledad/
+COPY files/start-server.sh /usr/local/soledad/
+COPY files/start-client-test.sh /usr/local/soledad/
+COPY files/conf/* /usr/local/soledad/conf/
