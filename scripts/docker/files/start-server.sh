@@ -21,5 +21,6 @@ ${CMD} couch start
 ${CMD} user-db create
 ${CMD} token-db create
 ${CMD} token-db insert-token
+${CMD} shared-db create
 ${CMD} cert create
 ${CMD} soledad-server start --no-daemonize
