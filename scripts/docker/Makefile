@@ -26,3 +26,6 @@ run-client-test: image
 	  --env="SOLEDAD_SERVER_URL=http://$${server_ip}:2424" \
 	  $(IMAGE_NAME) \
 	  /usr/local/soledad/start-client-test.sh
+
+rm-all-containers:
+	docker ps -a | cut -d" " -f 1 | tail -n +2 | xargs docker rm -f
