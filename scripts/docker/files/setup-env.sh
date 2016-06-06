@@ -12,7 +12,7 @@ BASEURL="https://github.com/leapcode"
 mkdir -p ${BASEDIR}
 
 # clone repositories
-repos="soledad leap_pycommon"
+repos="soledad leap_pycommon soledad-perf"
 
 for repo in ${repos}; do
   repodir=${BASEDIR}/${repo}
