@@ -50,6 +50,13 @@ run-client-test:
 	  $(IMAGE_NAME) \
 	  /usr/local/soledad/start-client-test.sh
 
+run-trial-test:
+	docker run -t -i \
+	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
+	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  $(IMAGE_NAME) \
+	  /usr/local/soledad/start-trial-test.sh
+
 run-shell: image
 	docker run -t -i $(IMAGE_NAME) /bin/bash
 

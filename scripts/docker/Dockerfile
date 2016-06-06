@@ -39,4 +39,5 @@ COPY files/client_side_db.py /usr/local/soledad/
 COPY files/util.py /usr/local/soledad/
 COPY files/start-server.sh /usr/local/soledad/
 COPY files/start-client-test.sh /usr/local/soledad/
+COPY files/start-trial-test.sh /usr/local/soledad/
 COPY files/conf/* /usr/local/soledad/conf/
