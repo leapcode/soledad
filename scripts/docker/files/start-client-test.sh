@@ -1,6 +1,9 @@
 #!/bin/bash
 
-# Run Soledad tests.
+# Run a Soledad client connection test.
+#
+# This script is meant to be copied to the docker container and run upon
+# container start.
 
 CMD="/usr/local/soledad/test-env.py"
 REPO="/var/local/soledad"

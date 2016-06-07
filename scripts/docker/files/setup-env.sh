@@ -3,6 +3,17 @@
 # Clone soledad repository and install soledad dependencies needed to run
 # client and server in a test environment.
 #
+# In details, this script does the following:
+#
+#   - clone a series of python package repositories into /var/local/soledad.
+#   - install dependencies for those packages from the requirements files in
+#     each of the repositories, using python wheels when possible.
+#   - install the python packages in development mode
+#
+# The cloned git repositories might have a remote configured and a branch
+# checked out on runtime, before a server, client or test instance is actually
+# run. Check the other scripts in this directory.
+#
 # This script is meant to be copied to the docker container and run after
 # system dependencies have been installed.
 
