@@ -12,16 +12,28 @@
 #   make run-server CONTAINER_ID_FILE=/tmp/container-id.txt
 #   make run-client-test CONTAINER_ID_FILE=/tmp/container-id.txt
 
+#####################################################################
+# Some configurations you might override when calling this makefile #
+#####################################################################
 
-IMAGE_NAME        ?= "leap/soledad:1.0"
-SOLEDAD_REMOTE    ?= "https://0xacab.org/leap/soledad.git"
-SOLEDAD_BRANCH    ?= "develop"
+IMAGE_NAME           ?= "leap/soledad:1.0"
+SOLEDAD_REMOTE       ?= "https://0xacab.org/leap/soledad.git"
+SOLEDAD_BRANCH       ?= "develop"
+SOLEDAD_PRELOAD_NUM  ?= "100"
+SOLEDAD_PRELOAD_SIZE ?= "500"
 
+##############################################
+# Docker image generation (main make target) #
+##############################################
 
 all: image
 
 image:
 	docker build -t $(IMAGE_NAME) .
+
+##################################################
+# Run a Soledad Server inside a docker container #
+##################################################
 
 run-server:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
@@ -31,6 +43,8 @@ run-server:
 	docker run \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  --env="SOLEDAD_PRELOAD_NUM=$(SOLEDAD_PRELOAD_NUM)" \
+	  --env="SOLEDAD_PRELOAD_SIZE=$(SOLEDAD_PRELOAD_SIZE)" \
 	  --cidfile=$(CONTAINER_ID_FILE) \
 	  --detach \
 	  $(IMAGE_NAME) \
@@ -50,6 +64,10 @@ run-client-test:
 	  $(IMAGE_NAME) \
 	  /usr/local/soledad/start-client-test.sh
 
+#################################################
+# Run all trial tests inside a docker container #
+#################################################
+
 run-trial-test:
 	docker run -t -i \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
@@ -57,8 +75,49 @@ run-trial-test:
 	  $(IMAGE_NAME) \
 	  /usr/local/soledad/start-trial-test.sh
 
+############################################
+# Performance tests and graphic generation #
+############################################
+
+run-perf:
+	helper/run-test.sh perf
+
+run-perf-test:
+	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
+	  echo "Error: you have to pass a value to CONTAINER_ID_FILE."; \
+	  exit 2; \
+	fi
+	container_id=`cat $(CONTAINER_ID_FILE)`; \
+	server_ip=`./helper/get-container-ip.sh $${container_id}`; \
+	docker run -t -i \
+	  --cidfile=$(CONTAINER_ID_FILE)-perf \
+	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
+	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  --env="SOLEDAD_PERF_REMOTE=https://0xacab.org/drebs/soledad-perf.git" \
+	  --env="SOLEDAD_PERF_BRANCH=bug/ensure-events-server" \
+	  --env="SOLEDAD_PRELOAD_NUM=$(SOLEDAD_PRELOAD_NUM)" \
+	  --env="SOLEDAD_PRELOAD_SIZE=$(SOLEDAD_PRELOAD_SIZE)" \
+	  --env="SOLEDAD_STATS=1" \
+	  --env="SOLEDAD_SERVER_URL=http://$${server_ip}:2424" \
+	  $(IMAGE_NAME) \
+	  /usr/local/soledad/run-perf-test.sh
+
+cp-perf-result:
+	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
+	  echo "Error: you have to pass a value to CONTAINER_ID_FILE."; \
+	  exit 2; \
+	fi
+	perf_id=`cat $(CONTAINER_ID_FILE)-perf`; \
+	docker cp $${perf_id}:/var/local/soledad-perf/out/sync-stats.png /tmp/; \
+	docker cp $${perf_id}:/var/local/soledad-perf/out/series.log /tmp/
+
+########################
+# Other helper targets #
+########################
+
 run-shell: image
 	docker run -t -i $(IMAGE_NAME) /bin/bash
 
 rm-all-containers:
-	docker ps -a | cut -d" " -f 1 | tail -n +2 | xargs docker rm -f
+	containers=`docker ps -a | cut -d" " -f 1 | tail -n +2 | xargs`; \
+	if [ ! -z ${containers} ]; then docker rm -f $${containers}; fi
