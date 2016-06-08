@@ -108,4 +108,5 @@ if __name__ == '__main__':
         ddoc_filename = "%s.json" % ddoc
         with open(join(args.target, ddoc_filename), 'w') as f:
             f.write("%s" % json.dumps(ddocs[ddoc], indent=3))
-        print "Wrote _design/%s content in %s" % (ddoc, join(args.target, ddoc_filename,))
+        print "Wrote _design/%s content in %s" \
+              % (ddoc, join(args.target, ddoc_filename,))
