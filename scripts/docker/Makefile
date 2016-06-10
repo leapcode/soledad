@@ -16,11 +16,12 @@
 # Some configurations you might override when calling this makefile #
 #####################################################################
 
-IMAGE_NAME           ?= "leap/soledad:1.0"
-SOLEDAD_REMOTE       ?= "https://0xacab.org/leap/soledad.git"
-SOLEDAD_BRANCH       ?= "develop"
-SOLEDAD_PRELOAD_NUM  ?= "100"
-SOLEDAD_PRELOAD_SIZE ?= "500"
+IMAGE_NAME           ?= leap/soledad:1.0
+SOLEDAD_REMOTE       ?= https://0xacab.org/leap/soledad.git
+SOLEDAD_BRANCH       ?= develop
+SOLEDAD_PRELOAD_NUM  ?= 100
+SOLEDAD_PRELOAD_SIZE ?= 500
+MEMORY               ?= 512m
 
 ##############################################
 # Docker image generation (main make target) #
@@ -41,6 +42,7 @@ run-server:
 	  exit 2; \
 	fi
 	docker run \
+	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
 	  --env="SOLEDAD_PRELOAD_NUM=$(SOLEDAD_PRELOAD_NUM)" \
@@ -58,6 +60,7 @@ run-client-test:
 	container_id=`cat $(CONTAINER_ID_FILE)`; \
 	server_ip=`./helper/get-container-ip.sh $${container_id}`; \
 	docker run -t -i \
+	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
 	  --env="SOLEDAD_SERVER_URL=http://$${server_ip}:2424" \
@@ -70,6 +73,7 @@ run-client-test:
 
 run-trial-test:
 	docker run -t -i \
+	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
 	  $(IMAGE_NAME) \
@@ -90,6 +94,7 @@ run-perf-test:
 	container_id=`cat $(CONTAINER_ID_FILE)`; \
 	server_ip=`./helper/get-container-ip.sh $${container_id}`; \
 	docker run -t -i \
+	  --memory="$(MEMORY)" \
 	  --cidfile=$(CONTAINER_ID_FILE)-perf \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
@@ -116,8 +121,11 @@ cp-perf-result:
 ########################
 
 run-shell: image
-	docker run -t -i $(IMAGE_NAME) /bin/bash
+	docker run -t -i \
+	  --memory="$(MEMORY)" \
+	  $(IMAGE_NAME) \
+	  /bin/bash
 
 rm-all-containers:
 	containers=`docker ps -a | cut -d" " -f 1 | tail -n +2 | xargs`; \
-	if [ ! -z ${containers} ]; then docker rm -f $${containers}; fi
+	if [ ! -z "$${containers}" ]; then docker rm -f $${containers}; fi
