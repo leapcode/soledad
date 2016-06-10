@@ -371,6 +371,7 @@ CERT_CONFIG_FILE = os.path.join(
 def cert_create(args):
     private_key = os.path.join(args.basedir, args.private_key)
     cert_key = os.path.join(args.basedir, args.cert_key)
+    os.mkdir(args.basedir)
     call([
         'openssl',
         'req',
