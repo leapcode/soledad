@@ -20,11 +20,14 @@ if [ ${#} -ne 1 ]; then
   exit 1
 fi
 
-TEST=${1}
+test=${1}
+
+# make sure the image is up to date
+make image
 
 # get script name and path
-SCRIPT=$(readlink -f "$0")
-SCRIPTPATH=$(dirname "$SCRIPT")
+script=$(readlink -f "$0")
+scriptpath=$(dirname "${script}")
 
 # run the server
 tempfile=`mktemp -u`
@@ -32,7 +35,7 @@ make run-server CONTAINER_ID_FILE=${tempfile}
 
 # get server container info
 container_id=`cat ${tempfile}`
-server_ip=`${SCRIPTPATH}/get-container-ip.sh ${container_id}`
+server_ip=`${scriptpath}/get-container-ip.sh ${container_id}`
 
 # wait for server until timeout
 start=`date +%s`
@@ -41,7 +44,7 @@ elapsed=0
 echo "Waiting for soledad server container to come up..."
 
 while [ ${elapsed} -lt ${TIMEOUT} ]; do
-  result=`curl -s http://${server_ip}:2424`
+  curl -s http://${server_ip}:2424 > /dev/null
   if [ ${?} -eq 0 ]; then
     echo "Soledad server container is up!"
     break
@@ -58,10 +61,12 @@ if [ ${elapsed} -ge ${TIMEOUT} ]; then
   exit 1
 fi
 
+set -e
+
 # run the client
-if [ "${TEST}" = "connect" ]; then
+if [ "${test}" = "connect" ]; then
   make run-client-test CONTAINER_ID_FILE=${tempfile}
-elif [ "${TEST}" = "perf" ]; then
+elif [ "${test}" = "perf" ]; then
   make run-perf-test CONTAINER_ID_FILE=${tempfile}
   make cp-perf-result CONTAINER_ID_FILE=${tempfile}
 fi
