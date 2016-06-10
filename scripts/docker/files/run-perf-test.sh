@@ -32,8 +32,8 @@ TIMEOUT=20
 #-----------------------------------------------------------------------------
 
 if [ ! -z "${SOLEDAD_REMOTE}" ]; then
-  git -C ${REPO} remote add test ${SOLEDAD_REMOTE}
-  git -C ${REPO} fetch test
+  git -C ${REPO} remote set-url origin ${SOLEDAD_REMOTE}
+  git -C ${REPO} fetch origin
 fi
 
 if [ ! -z "${SOLEDAD_BRANCH}" ]; then
@@ -41,8 +41,8 @@ if [ ! -z "${SOLEDAD_BRANCH}" ]; then
 fi
 
 if [ ! -z "${SOLEDAD_PERF_REMOTE}" ]; then
-  git -C /var/local/soledad-perf remote add test ${SOLEDAD_PERF_REMOTE}
-  git -C /var/local/soledad-perf fetch test
+  git -C /var/local/soledad-perf remote set-url origin ${SOLEDAD_PERF_REMOTE}
+  git -C /var/local/soledad-perf fetch origin
 fi
 
 if [ ! -z "${SOLEDAD_PERF_BRANCH}" ]; then
@@ -105,11 +105,11 @@ if [ ${elapsed} -ge ${TIMEOUT} ]; then
   exit 1
 fi
 
-sleep 2
-
 #-----------------------------------------------------------------------------
 # create docs and run test
 #-----------------------------------------------------------------------------
+
+#set -e
 
 # create documents in client
 make trigger-create-docs
