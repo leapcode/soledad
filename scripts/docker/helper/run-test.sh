@@ -14,13 +14,18 @@
 # seconds to wait before giving up waiting from server
 TIMEOUT=20
 
-# get a test
+# parse command
 if [ ${#} -ne 1 ]; then
-  "Usage: ${0} [perf|connect]"
+  echo "Usage: ${0} perf|connect"
   exit 1
 fi
 
 test=${1}
+
+if [ "${1}" != "perf" -a "${1}" != "perf" ]; then
+  echo "Usage: ${0} perf|connect"
+  exit 1
+fi
 
 # make sure the image is up to date
 make image
@@ -33,11 +38,9 @@ scriptpath=$(dirname "${script}")
 tempfile=`mktemp -u`
 make run-server CONTAINER_ID_FILE=${tempfile}
 
-# get server container info
+# wait for server until timeout
 container_id=`cat ${tempfile}`
 server_ip=`${scriptpath}/get-container-ip.sh ${container_id}`
-
-# wait for server until timeout
 start=`date +%s`
 elapsed=0
 
@@ -63,10 +66,6 @@ fi
 
 set -e
 
-# run the client
-if [ "${test}" = "connect" ]; then
-  make run-client-test CONTAINER_ID_FILE=${tempfile}
-elif [ "${test}" = "perf" ]; then
-  make run-perf-test CONTAINER_ID_FILE=${tempfile}
-  make cp-perf-result CONTAINER_ID_FILE=${tempfile}
-fi
+# run the test
+make run-${test}-test CONTAINER_ID_FILE=${tempfile}
+rm -r ${tempfile}
