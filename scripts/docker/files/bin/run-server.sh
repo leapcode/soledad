@@ -18,7 +18,7 @@
 # This script is meant to be copied to the docker container and run upon
 # container start.
 
-CMD="/usr/local/soledad/test-env.py"
+CMD="/usr/local/soledad/setup-test-env.py"
 
 #---------------------------------------------------------------------------
 # eventually checkout a specific branch from a specific remote
@@ -79,6 +79,11 @@ fi
 #---------------------------------------------------------------------------
 # actually run the server
 #---------------------------------------------------------------------------
+
+if [ "${1}" = "--drop-to-shell" ]; then
+  /bin/bash
+  exit 0
+fi
 
 echo "Starting soledad server..."
 ${CMD} soledad-server start --no-daemonize

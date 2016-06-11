@@ -10,7 +10,7 @@
 # Example usage:
 #
 #   make run-server CONTAINER_ID_FILE=/tmp/container-id.txt
-#   make run-client-test CONTAINER_ID_FILE=/tmp/container-id.txt
+#   make run-client-perf CONTAINER_ID_FILE=/tmp/container-id.txt
 
 #####################################################################
 # Some configurations you might override when calling this makefile #
@@ -50,9 +50,9 @@ run-server:
 	  --cidfile=$(CONTAINER_ID_FILE) \
 	  --detach \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/start-server.sh
+	  /usr/local/soledad/run-server.sh # --drop-to-shell
 
-run-client-test:
+run-client-bootstrap:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
 	  echo "Error: you have to pass a value to CONTAINER_ID_FILE."; \
 	  exit 2; \
@@ -65,28 +65,28 @@ run-client-test:
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
 	  --env="SOLEDAD_SERVER_URL=http://$${server_ip}:2424" \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/start-client-test.sh
+	  /usr/local/soledad/run-client-bootstrap.sh
 
 #################################################
 # Run all trial tests inside a docker container #
 #################################################
 
-run-trial-test:
+run-trial:
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/start-trial-test.sh
+	  /usr/local/soledad/run-trial.sh
 
 ############################################
 # Performance tests and graphic generation #
 ############################################
 
-run-perf:
+run-perf-test:
 	helper/run-test.sh perf
 
-run-perf-test:
+run-client-perf:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
 	  echo "Error: you have to pass a value to CONTAINER_ID_FILE."; \
 	  exit 2; \
@@ -105,7 +105,7 @@ run-perf-test:
 	  --env="SOLEDAD_STATS=1" \
 	  --env="SOLEDAD_SERVER_URL=http://$${server_ip}:2424" \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/run-perf-test.sh
+	  /usr/local/soledad/run-client-perf.sh # --drop-to-shell
 
 cp-perf-result:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \

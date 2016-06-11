@@ -23,7 +23,7 @@
 # This script is meant to be copied to the docker container and run upon
 # container start.
 
-CMD="/usr/local/soledad/test-env.py"
+CMD="/usr/local/soledad/setup-test-env.py"
 REPO="/var/local/soledad"
 TIMEOUT=20
 
@@ -74,6 +74,11 @@ auth_token = an-auth-token
 stats_file = ./out/stats.json
 EOF
 
+if [ "${1}" = "--drop-to-shell" ]; then
+  /bin/bash
+  exit 0
+fi
+
 #-----------------------------------------------------------------------------
 # start the local server and wait for it to come up
 #-----------------------------------------------------------------------------
@@ -109,7 +114,7 @@ fi
 # create docs and run test
 #-----------------------------------------------------------------------------
 
-#set -e
+set -e
 
 # create documents in client
 make trigger-create-docs
@@ -121,4 +126,3 @@ sleep 5  # wait a bit for some data points
 # run a sync and generate a graph
 make trigger-sync
 make trigger-stop
-make graph-image

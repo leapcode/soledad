@@ -16,14 +16,14 @@ TIMEOUT=20
 
 # parse command
 if [ ${#} -ne 1 ]; then
-  echo "Usage: ${0} perf|connect"
+  echo "Usage: ${0} perf|bootstrap"
   exit 1
 fi
 
 test=${1}
 
-if [ "${1}" != "perf" -a "${1}" != "perf" ]; then
-  echo "Usage: ${0} perf|connect"
+if [ "${test}" != "perf" -a "${test}" != "bootstrap" ]; then
+  echo "Usage: ${0} perf|bootstrap"
   exit 1
 fi
 
@@ -67,5 +67,5 @@ fi
 set -e
 
 # run the test
-make run-${test}-test CONTAINER_ID_FILE=${tempfile}
+make run-client-${test} CONTAINER_ID_FILE=${tempfile}
 rm -r ${tempfile}
