@@ -104,6 +104,7 @@ run-client-perf:
 	  --env="SOLEDAD_PRELOAD_SIZE=$(SOLEDAD_PRELOAD_SIZE)" \
 	  --env="SOLEDAD_STATS=1" \
 	  --env="SOLEDAD_SERVER_URL=http://$${server_ip}:2424" \
+	  --env="SOLEDAD_LOG=1" \
 	  $(IMAGE_NAME) \
 	  /usr/local/soledad/run-client-perf.sh # --drop-to-shell
 
