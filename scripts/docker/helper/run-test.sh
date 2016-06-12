@@ -15,16 +15,20 @@
 TIMEOUT=20
 
 # parse command
-if [ ${#} -ne 1 ]; then
+if [ ${#} -lt 1 -o ${#} -gt 2 ]; then
   echo "Usage: ${0} perf|bootstrap"
   exit 1
 fi
 
 test=${1}
-
 if [ "${test}" != "perf" -a "${test}" != "bootstrap" ]; then
   echo "Usage: ${0} perf|bootstrap"
   exit 1
+fi
+
+branch=""
+if [ ${#} -eq 2 ]; then
+  branch="SOLEDAD_BRANCH=${2}"
 fi
 
 # make sure the image is up to date
@@ -36,7 +40,7 @@ scriptpath=$(dirname "${script}")
 
 # run the server
 tempfile=`mktemp -u`
-make run-server CONTAINER_ID_FILE=${tempfile}
+make run-server CONTAINER_ID_FILE=${tempfile} ${branch}
 
 # wait for server until timeout
 container_id=`cat ${tempfile}`
@@ -67,5 +71,5 @@ fi
 set -e
 
 # run the test
-make run-client-${test} CONTAINER_ID_FILE=${tempfile}
+make run-client-${test} CONTAINER_ID_FILE=${tempfile} ${branch}
 rm -r ${tempfile}
