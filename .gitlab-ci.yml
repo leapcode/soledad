@@ -1,3 +1,5 @@
-run_tests:
+image: leap/soledad:1.0
+
+test:
   script:
-    - /home/gitlab-runner/soledad/scripts/gitlab/run_tests.sh
+  - /usr/local/soledad/run-trial-from-gitlab-ci.sh
