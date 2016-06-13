@@ -43,6 +43,7 @@ run-server:
 	fi
 	docker run \
 	  --memory="$(MEMORY)" \
+	  --cpuset-cpus=0 \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
 	  --env="SOLEDAD_PRELOAD_NUM=$(SOLEDAD_PRELOAD_NUM)" \
@@ -95,6 +96,7 @@ run-client-perf:
 	server_ip=`./helper/get-container-ip.sh $${container_id}`; \
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
+	  --cpuset-cpus=1 \
 	  --cidfile=$(CONTAINER_ID_FILE)-perf \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
