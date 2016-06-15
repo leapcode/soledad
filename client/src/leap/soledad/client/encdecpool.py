@@ -178,9 +178,11 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         secret = self._crypto.secret
         args = doc.doc_id, doc.rev, docstr, key, secret
         # encrypt asynchronously
+        # TODO use dedicated threadpool / move to ampoule
         d = threads.deferToThread(
             encrypt_doc_task, *args)
         d.addCallback(self._encrypt_doc_cb)
+        return d
 
     def _encrypt_doc_cb(self, result):
         """
@@ -429,9 +431,12 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         secret = self._crypto.secret
         args = doc_id, doc_rev, content, gen, trans_id, key, secret, idx
         # decrypt asynchronously
-        doc = decrypt_doc_task(*args)
+        # TODO use dedicated threadpool / move to ampoule
+        d = threads.deferToThread(
+            decrypt_doc_task, *args)
         # callback will insert it for later processing
-        return self._decrypt_doc_cb(doc)
+        d.addCallback(self._decrypt_doc_cb)
+        return d
 
     def insert_received_doc(
             self, doc_id, doc_rev, content, gen, trans_id, idx):
