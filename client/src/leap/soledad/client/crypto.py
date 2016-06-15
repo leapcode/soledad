@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 MAC_KEY_LENGTH = 64
 
+crypto_backend = MultiBackend([OpenSSLBackend()])
+
 
 def encrypt_sym(data, key):
     """
@@ -59,8 +61,7 @@ def encrypt_sym(data, key):
         (len(key) * 8))
 
     iv = os.urandom(16)
-    backend = MultiBackend([OpenSSLBackend()])
-    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=crypto_backend)
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(data) + encryptor.finalize()
 
@@ -87,9 +88,8 @@ def decrypt_sym(data, key, iv):
     soledad_assert(
         len(key) == 32,  # 32 x 8 = 256 bits.
         'Wrong key size: %s (must be 256 bits long).' % len(key))
-    backend = MultiBackend([OpenSSLBackend()])
     iv = binascii.a2b_base64(iv)
-    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=crypto_backend)
     decryptor = cipher.decryptor()
     return decryptor.update(data) + decryptor.finalize()
 
