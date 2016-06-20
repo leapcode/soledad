@@ -204,7 +204,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         :rtype: twisted.internet.defer.Deferred
         """
         meth = "u1db_%s" % meth
-        semaphore = DeferredSemaphore(SQLCIPHER_MAX_RETRIES )
+        semaphore = DeferredSemaphore(SQLCIPHER_MAX_RETRIES)
 
         def _run_interaction():
             return self.runInteraction(
