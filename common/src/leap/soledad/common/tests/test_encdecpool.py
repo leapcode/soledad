@@ -133,7 +133,7 @@ class TestSyncDecrypterPool(BaseSoledadTest):
         self.assertFalse(self._pool.running)
         self.assertTrue(self._pool.deferred.called)
 
-    def test_sync_id_column_is_created_if_non_existing_in_docs_received_table(self):
+    def test_sync_id_col_is_created_if_non_existing_in_docs_recvd_table(self):
         """
         Test that docs_received table is migrated, and has the sync_id column
         """
@@ -145,7 +145,8 @@ class TestSyncDecrypterPool(BaseSoledadTest):
         pool.stop()
 
         def assert_trial_to_create_sync_id_column(_):
-            mock_run_query.assert_called_once_with("ALTER TABLE docs_received ADD COLUMN sync_id")
+            mock_run_query.assert_called_once_with(
+                "ALTER TABLE docs_received ADD COLUMN sync_id")
 
         d.addCallback(assert_trial_to_create_sync_id_column)
         return d

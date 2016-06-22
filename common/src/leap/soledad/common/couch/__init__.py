@@ -341,7 +341,8 @@ class CouchDatabase(object):
         # This will not be needed when/if we switch from python-couchdb to
         # paisley.
         time.strptime('Mar 8 1917', '%b %d %Y')
-        get_one = functools.partial(self.get_doc, check_for_conflicts=check_for_conflicts)
+        get_one = functools.partial(
+            self.get_doc, check_for_conflicts=check_for_conflicts)
         docs = [THREAD_POOL.apply_async(get_one, [doc_id])
                 for doc_id in doc_ids]
         for doc in docs:
