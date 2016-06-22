@@ -378,7 +378,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
                  has finished.
         :rtype: twisted.internet.defer.Deferred
         """
-        ensure_sync_id_column = "ALTER TABLE %s ADD COLUMN sync_id" % self.TABLE_NAME
+        ensure_sync_id_column = ("ALTER TABLE %s ADD COLUMN sync_id" %
+                                 self.TABLE_NAME)
         d = self._runQuery(ensure_sync_id_column)
 
         def empty_received_docs(_):

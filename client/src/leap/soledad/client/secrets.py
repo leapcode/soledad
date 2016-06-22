@@ -441,7 +441,8 @@ class SoledadSecrets(object):
             if secret_id not in self._secrets:
                 try:
                     self._secrets[secret_id] = \
-                        self._decrypt_storage_secret_version_1(encrypted_secret)
+                        self._decrypt_storage_secret_version_1(
+                            encrypted_secret)
                     secret_count += 1
                 except SecretsException as e:
                     logger.error("Failed to decrypt storage secret: %s"

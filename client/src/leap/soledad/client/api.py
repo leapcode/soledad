@@ -311,7 +311,8 @@ class Soledad(object):
         sync_exchange_phase = 0
         if getattr(self._dbsyncer, 'syncer', None):
             if getattr(self._dbsyncer.syncer, 'sync_exchange_phase', None):
-                sync_exchange_phase = self._dbsyncer.syncer.sync_exchange_phase[0]
+                _p = self._dbsyncer.syncer.sync_exchange_phase[0]
+                sync_exchange_phase = _p
         return sync_phase, sync_exchange_phase
 
     #
