@@ -594,7 +594,7 @@ class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
-        self._factory = u1db.Document
+        self._factory = l2db.Document
 
 
 class SoledadSQLCipherWrapper(SQLCipherDatabase):

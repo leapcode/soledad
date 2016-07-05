@@ -31,7 +31,8 @@ from couchdb.http import PreconditionFailed
 from couchdb.http import ResourceConflict
 from couchdb.http import ResourceNotFound
 from hashlib import sha512
-from u1db.errors import DatabaseDoesNotExist
+
+from leap.soledad.common.l2db.errors import DatabaseDoesNotExist
 
 
 #
@@ -65,15 +66,15 @@ def pidfile_is_running(pidfile):
         return False
 
 
-def status_from_pidfile(args, default_basedir):
+def status_from_pidfile(args, default_basedir, name):
     basedir = _get_basedir(args, default_basedir)
     pidfile = os.path.join(basedir, args.pidfile)
     try:
         pid = get_pid(pidfile)
         psutil.Process(pid)
-        print "[+] running - pid: %d" % pid
+        print "[+] %s is running with pid %d" % (name, pid)
     except (IOError, psutil.NoSuchProcess):
-        print "[-] stopped"
+        print "[-] %s stopped" % name
 
 
 def kill_all_executables(args):
@@ -163,7 +164,7 @@ def couch_server_start(args):
         except:
             time.sleep(0.1)
 
-    print '[+] running - pid: %d' % pid
+    print '[+] couch is running with pid: %d' % pid
 
 
 def couch_server_stop(args):
@@ -177,11 +178,11 @@ def couch_server_stop(args):
         args.executable,
         '-p %s' % pidfile,  # set the background PID FILE
         '-k'])  # kill the background process, will respawn if needed
-    print '[-] stopped - pid: %d ' % pid
+    print '[-] stopped couch server with pid %d ' % pid
 
 
 def couch_status_from_pidfile(args):
-    status_from_pidfile(args, COUCH_BASEDIR)
+    status_from_pidfile(args, COUCH_BASEDIR, 'couch')
 
 
 #
@@ -264,7 +265,7 @@ def soledad_server_start(args):
     call([args.executable] + params)
 
     pid = get_pid(pidfile)
-    print '[+] running - pid: %d' % pid
+    print '[+] soledad-server is running with pid %d' % pid
 
 
 def soledad_server_stop(args):
@@ -279,7 +280,7 @@ def soledad_server_stop(args):
 
 
 def soledad_server_status_from_pidfile(args):
-    status_from_pidfile(args, SOLEDAD_SERVER_BASEDIR)
+    status_from_pidfile(args, SOLEDAD_SERVER_BASEDIR, 'soledad-server')
 
 
 # couch helpers

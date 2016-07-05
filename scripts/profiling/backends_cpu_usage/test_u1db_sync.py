@@ -1,18 +1,16 @@
 #!/usr/bin/python
 
 
-import u1db
 import tempfile
 import logging
 import shutil
 import os
-import argparse
 import time
 import binascii
-import random
 
-
+from leap.soledad.common import l2db
 from leap.soledad.client.sqlcipher import open as sqlcipher_open
+
 from log_cpu_usage import LogCpuUsage
 from u1dblite import open as u1dblite_open
 from u1dbcipher import open as u1dbcipher_open
@@ -24,10 +22,10 @@ BIGGEST_DOC_SIZE = 100 * 1024  # 100 KB
 
 
 def get_data(size):
-    return binascii.hexlify(os.urandom(size/2))
+    return binascii.hexlify(os.urandom(size / 2))
 
 
-def run_test(testname, open_fun, tempdir, docs,  *args):
+def run_test(testname, open_fun, tempdir, docs, *args):
     logger.info('Starting test \"%s\".' % testname)
 
     # instantiate dbs
@@ -36,8 +34,7 @@ def run_test(testname, open_fun, tempdir, docs,  *args):
 
     # get sync target and synchsonizer
     target = db2.get_sync_target()
-    synchronizer = u1db.sync.Synchronizer(db1, target)
-
+    synchronizer = l2db.sync.Synchronizer(db1, target)
 
     # generate lots of small documents
     logger.info('Creating %d documents in source db...' % DOCS_TO_SYNC)
@@ -80,30 +77,28 @@ def run_test(testname, open_fun, tempdir, docs,  *args):
 
 
 if __name__ == '__main__':
-    
+
     # configure logger
     logger = logging.getLogger(__name__)
     LOG_FORMAT = '%(asctime)s %(message)s'
     logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
-
     # get a temporary dir
     tempdir = tempfile.mkdtemp()
     logger.info('Using temporary directory %s' % tempdir)
-
 
     # create a lot of documents with random sizes
     docs = []
     for i in xrange(DOCS_TO_SYNC):
         docs.append({
             'index': i,
-            #'data': get_data(
+            # 'data': get_data(
             #    random.randrange(
             #        SMALLEST_DOC_SIZE, BIGGEST_DOC_SIZE))
         })
 
     # run tests
-    run_test('sqlite', u1db.open, tempdir, docs, True)
+    run_test('sqlite', l2db.open, tempdir, docs, True)
     run_test('sqlcipher', sqlcipher_open, tempdir, docs, '123456', True)
     run_test('u1dblite', u1dblite_open, tempdir, docs)
     run_test('u1dbcipher', u1dbcipher_open, tempdir, docs, '123456', True)
