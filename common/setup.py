@@ -284,11 +284,9 @@ setup(
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src', exclude=['*.tests', '*.tests.*']),
     package_dir={'': 'src'},
+    package_data={'': ["*.sql"]},
     test_suite='leap.soledad.common.tests',
     install_requires=requirements,
     tests_require=utils.parse_requirements(
         reqfiles=['pkg/requirements-testing.pip']),
-    extras_require={
-        'couchdb': ['couchdb'],
-    },
 )
