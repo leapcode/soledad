@@ -4,7 +4,7 @@
 # Use at your own risk.
 # See $usage for help
 
-insecure_packages="dirspec"
+insecure_packages=""
 leap_wheelhouse=https://lizard.leap.se/wheels
 
 show_help() {
