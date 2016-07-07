@@ -1,5 +1,4 @@
 # Copyright 2011-2012 Canonical Ltd.
-# Copyright 2016 LEAP Encryption Access Project
 #
 # This file is part of u1db.
 #
@@ -18,7 +17,6 @@
 """Base class to make requests to a remote HTTP server."""
 
 import httplib
-from oauth import oauth
 try:
     import simplejson as json
 except ImportError:
@@ -33,9 +31,7 @@ from time import sleep
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.remote import http_errors
 
-from leap.soledad.common.l2db.remote.ssl_match_hostname import (  # noqa
-    CertificateError,
-    match_hostname)
+from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
 
 # Ubuntu/debian
 # XXX other...
@@ -68,7 +64,7 @@ class _VerifiedHTTPSConnection(httplib.HTTPSConnection):
             cert_opts = {
                 'cert_reqs': ssl.CERT_REQUIRED,
                 'ca_certs': CA_CERTS
-                }
+            }
         else:
             # XXX no cert verification implemented elsewhere for now
             cert_opts = {}
@@ -82,13 +78,6 @@ class _VerifiedHTTPSConnection(httplib.HTTPSConnection):
 
 class HTTPClientBase(object):
     """Base class to make requests to a remote HTTP server."""
-
-    # by default use HMAC-SHA1 OAuth signature method to not disclose
-    # tokens
-    # NB: given that the content bodies are not covered by the
-    # signatures though, to achieve security (against man-in-the-middle
-    # attacks for example) one would need HTTPS
-    oauth_signature_method = oauth.OAuthSignatureMethod_HMAC_SHA1()
 
     # Will use these delays to retry on 503 befor finally giving up. The final
     # 0 is there to not wait after the final try fails.
@@ -107,12 +96,6 @@ class HTTPClientBase(object):
             except AttributeError:
                 raise errors.UnknownAuthMethod(auth_meth)
             set_creds(**credentials)
-
-    def set_oauth_credentials(self, consumer_key, consumer_secret,
-                              token_key, token_secret):
-        self._creds = {'oauth': (
-            oauth.OAuthConsumer(consumer_key, consumer_secret),
-            oauth.OAuthToken(token_key, token_secret))}
 
     def _ensure_connection(self):
         if self._conn is not None:
@@ -149,7 +132,6 @@ class HTTPClientBase(object):
             except ValueError:
                 pass
             else:
-                print "ERROR--->", respdic
                 self._error(respdic)
         # special case
         if resp.status == 503:
@@ -157,25 +139,10 @@ class HTTPClientBase(object):
         raise errors.HTTPError(resp.status, body, headers)
 
     def _sign_request(self, method, url_query, params):
-        if 'oauth' in self._creds:
-            consumer, token = self._creds['oauth']
-            full_url = "%s://%s%s" % (self._url.scheme, self._url.netloc,
-                                      url_query)
-            oauth_req = oauth.OAuthRequest.from_consumer_and_token(
-                consumer, token,
-                http_method=method,
-                parameters=params,
-                http_url=full_url
-                )
-            oauth_req.sign_request(
-                self.oauth_signature_method, consumer, token)
-            # Authorization: OAuth ...
-            return oauth_req.to_header().items()
-        else:
-            return []
+        raise NotImplementedError
 
     def _request(self, method, url_parts, params=None, body=None,
-                                                       content_type=None):
+                 content_type=None):
         self._ensure_connection()
         unquoted_url = url_query = self._url.path
         if url_parts:
@@ -209,7 +176,7 @@ class HTTPClientBase(object):
         raise e
 
     def _request_json(self, method, url_parts, params=None, body=None,
-                                                            content_type=None):
+                      content_type=None):
         res, headers = self._request(method, url_parts, params, body,
                                      content_type)
         return json.loads(res), headers
