@@ -58,6 +58,7 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common import l2db
 from leap.soledad.common.l2db import errors as u1db_errors
 from leap.soledad.common.l2db.backends import sqlite_backend
+from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
@@ -442,21 +443,18 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # format is the following:
         #
         #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
-
         self._syncers = {}
-
-        # Storage for the documents received during a sync
+        # storage for the documents received during a sync
         self.received_docs = []
 
         self.running = False
+        self.shutdownID = None
+        self._db_handle = None
 
+        # initialize the main db before scheduling a start
+        self._initialize_main_db()
         self._reactor = reactor
         self._reactor.callWhenRunning(self._start)
-
-        self._db_handle = None
-        self._initialize_main_db()
-
-        self.shutdownID = None
 
         if DO_STATS:
             self.sync_phase = None
@@ -472,11 +470,14 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             self.running = True
 
     def _initialize_main_db(self):
-        self._db_handle = initialize_sqlcipher_db(
-            self._opts, check_same_thread=False)
-        self._real_replica_uid = None
-        self._ensure_schema()
-        self.set_document_factory(soledad_doc_factory)
+        try:
+            self._db_handle = initialize_sqlcipher_db(
+                self._opts, check_same_thread=False)
+            self._real_replica_uid = None
+            self._ensure_schema()
+            self.set_document_factory(soledad_doc_factory)
+        except sqlcipher_dbapi2.DatabaseError as e:
+            raise DatabaseAccessError(str(e))
 
     @defer.inlineCallbacks
     def sync(self, url, creds=None, defer_decryption=True):

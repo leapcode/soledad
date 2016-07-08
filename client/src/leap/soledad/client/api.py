@@ -51,6 +51,7 @@ from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common.l2db.remote import http_client
 from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
+from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
@@ -213,10 +214,22 @@ class Soledad(object):
         self._init_secrets()
 
         self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
-        self._init_u1db_sqlcipher_backend()
 
-        if syncable:
-            self._init_u1db_syncer()
+        try:
+            # initialize database access, trap any problems so we can shutdown
+            # smoothly.
+            self._init_u1db_sqlcipher_backend()
+            if syncable:
+                self._init_u1db_syncer()
+        except DatabaseAccessError:
+            # oops! something went wrong with backend initialization. We
+            # have to close any thread-related stuff we have already opened
+            # here, otherwise there might be zombie threads that may clog the
+            # reactor.
+            self._sync_db.close()
+            if hasattr(self, '_dbpool'):
+                self._dbpool.close()
+            raise
 
     #
     # initialization/destruction methods

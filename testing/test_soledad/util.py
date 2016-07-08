@@ -313,7 +313,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                 self.tempdir, prefix, secrets_path),
             local_db_path=os.path.join(
                 self.tempdir, prefix, local_db_path),
-            server_url=server_url,  # Soledad will fail if not given an url.
+            server_url=server_url,  # Soledad will fail if not given an url
             cert_file=cert_file,
             defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),

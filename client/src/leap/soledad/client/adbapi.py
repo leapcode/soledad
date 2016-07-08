@@ -29,8 +29,7 @@ from twisted.enterprise import adbapi
 from twisted.internet.defer import DeferredSemaphore
 from twisted.python import log
 from zope.proxy import ProxyBase, setProxiedObject
-from pysqlcipher.dbapi2 import OperationalError
-from pysqlcipher.dbapi2 import DatabaseError
+from pysqlcipher import dbapi2
 
 from leap.soledad.common.errors import DatabaseAccessError
 
@@ -105,8 +104,10 @@ class U1DBConnection(adbapi.Connection):
         self._sync_enc_pool = sync_enc_pool
         try:
             adbapi.Connection.__init__(self, pool)
-        except DatabaseError:
-            raise DatabaseAccessError('Could not open sqlcipher database')
+        except dbapi2.DatabaseError as e:
+            raise DatabaseAccessError(
+                'Error initializing connection to sqlcipher database: %s'
+                % str(e))
 
     def reconnect(self):
         """
@@ -174,8 +175,9 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         self._sync_enc_pool = kwargs.pop("sync_enc_pool")
         try:
             adbapi.ConnectionPool.__init__(self, *args, **kwargs)
-        except DatabaseError:
-            raise DatabaseAccessError('Could not open sqlcipher database')
+        except dbapi2.DatabaseError as e:
+            raise DatabaseAccessError(
+                'Error initializing u1db connection pool: %s' % str(e))
 
         # all u1db connections, hashed by thread-id
         self._u1dbconnections = {}
@@ -183,10 +185,15 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         # The replica uid, primed by the connections on init.
         self.replica_uid = ProxyBase(None)
 
-        conn = self.connectionFactory(
-            self, self._sync_enc_pool, init_u1db=True)
-        replica_uid = conn._u1db._real_replica_uid
-        setProxiedObject(self.replica_uid, replica_uid)
+        try:
+            conn = self.connectionFactory(
+                self, self._sync_enc_pool, init_u1db=True)
+            replica_uid = conn._u1db._real_replica_uid
+            setProxiedObject(self.replica_uid, replica_uid)
+        except DatabaseAccessError as e:
+            self.threadpool.stop()
+            raise DatabaseAccessError(
+                "Error initializing connection factory: %s" % str(e))
 
     def runU1DBQuery(self, meth, *args, **kw):
         """
@@ -211,7 +218,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
                 self._runU1DBQuery, meth, *args, **kw)
 
         def _errback(failure):
-            failure.trap(OperationalError)
+            failure.trap(dbapi2.OperationalError)
             if failure.getErrorMessage() == "database is locked":
                 should_retry = semaphore.acquire()
                 if should_retry:
