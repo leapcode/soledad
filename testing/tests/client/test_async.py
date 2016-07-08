@@ -32,6 +32,14 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
 
     NUM_DOCS = 5000
 
+    def setUp(self):
+        BaseSoledadTest.setUp(self)
+        self._dbpool = self._get_dbpool()
+
+    def tearDown(self):
+        self._dbpool.close()
+        BaseSoledadTest.tearDown(self)
+
     def _get_dbpool(self):
         tmpdb = os.path.join(self.tempdir, "test.soledad")
         opts = SQLCipherOptions(tmpdb, "secret", create=True)
@@ -72,10 +80,8 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
         adbapi.SQLCIPHER_CONNECTION_TIMEOUT = 1
         adbapi.SQLCIPHER_MAX_RETRIES = 1
 
-        dbpool = self._get_dbpool()
-
         def _create_doc(doc):
-            return dbpool.runU1DBQuery("create_doc", doc)
+            return self._dbpool.runU1DBQuery("create_doc", doc)
 
         def _insert_docs():
             deferreds = []
@@ -95,7 +101,7 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
             raise Exception
 
         d = _insert_docs()
-        d.addCallback(lambda _: dbpool.runU1DBQuery("get_all_docs"))
+        d.addCallback(lambda _: self._dbpool.runU1DBQuery("get_all_docs"))
         d.addErrback(_errback)
         return d
 
@@ -115,10 +121,8 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
         above will fail and we should remove this comment from here.
         """
 
-        dbpool = self._get_dbpool()
-
         def _create_doc(doc):
-            return dbpool.runU1DBQuery("create_doc", doc)
+            return self._dbpool.runU1DBQuery("create_doc", doc)
 
         def _insert_docs():
             deferreds = []
@@ -137,6 +141,6 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
             raise Exception
 
         d = _insert_docs()
-        d.addCallback(lambda _: dbpool.runU1DBQuery("get_all_docs"))
+        d.addCallback(lambda _: self._dbpool.runU1DBQuery("get_all_docs"))
         d.addCallback(_count_docs)
         return d
