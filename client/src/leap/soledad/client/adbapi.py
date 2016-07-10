@@ -78,9 +78,11 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher",
     if openfun is None and driver == "pysqlcipher":
         openfun = partial(set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
-        "%s.dbapi2" % driver, opts=opts, sync_enc_pool=sync_enc_pool,
-        database=opts.path, check_same_thread=False, cp_openfun=openfun,
-        timeout=SQLCIPHER_CONNECTION_TIMEOUT)
+        opts, sync_enc_pool,
+        # the following params are relayed "as is" to twisted's
+        # ConnectionPool.
+        "%s.dbapi2" % driver, opts.path, timeout=SQLCIPHER_CONNECTION_TIMEOUT,
+        check_same_thread=False, cp_openfun=openfun)
 
 
 class U1DBConnection(adbapi.Connection):
@@ -166,13 +168,12 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
     connectionFactory = U1DBConnection
     transactionFactory = U1DBTransaction
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, opts, sync_enc_pool, *args, **kwargs):
         """
         Initialize the connection pool.
         """
-        # extract soledad-specific objects from keyword arguments
-        self.opts = kwargs.pop("opts")
-        self._sync_enc_pool = kwargs.pop("sync_enc_pool")
+        self.opts = opts
+        self._sync_enc_pool = sync_enc_pool
         try:
             adbapi.ConnectionPool.__init__(self, *args, **kwargs)
         except dbapi2.DatabaseError as e:
@@ -220,6 +221,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         def _errback(failure):
             failure.trap(dbapi2.OperationalError)
             if failure.getErrorMessage() == "database is locked":
+                logger.warning("Database operation timed out.")
                 should_retry = semaphore.acquire()
                 if should_retry:
                     logger.warning(
