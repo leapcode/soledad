@@ -12,6 +12,8 @@ MANIFEST
 *.log
 *.*~
 *.csv
+.cache
+.tox
 .eggs
 _trial_temp
 .DS_Store
