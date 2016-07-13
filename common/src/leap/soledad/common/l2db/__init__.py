@@ -464,8 +464,8 @@ class DocumentBase(object):
         """
         # Since this is just for testing, we don't worry about comparing
         # against things that aren't a Document.
-        return ((self.doc_id, self.rev, self.get_json())
-            < (other.doc_id, other.rev, other.get_json()))
+        return ((self.doc_id, self.rev, self.get_json()) <
+                (other.doc_id, other.rev, other.get_json()))
 
     def get_json(self):
         """Get the json serialization of this document."""

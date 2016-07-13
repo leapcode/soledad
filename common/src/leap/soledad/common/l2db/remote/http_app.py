@@ -18,7 +18,6 @@
 """
 HTTP Application exposing U1DB.
 """
-
 # TODO -- deprecate, use twisted/txaio.
 
 import functools
@@ -340,18 +339,18 @@ class DocResource(object):
                 headers={
                     'x-u1db-rev': '',
                     'x-u1db-has-conflicts': 'false'
-                    })
+                })
             return
         headers = {
             'x-u1db-rev': doc.rev,
             'x-u1db-has-conflicts': json.dumps(doc.has_conflicts)
-            }
+        }
         if doc.is_tombstone():
             self.responder.send_response_json(
-               http_errors.wire_description_to_status[
-                   errors.DOCUMENT_DELETED],
-               error=errors.DOCUMENT_DELETED,
-               headers=headers)
+                http_errors.wire_description_to_status[
+                    errors.DOCUMENT_DELETED],
+                error=errors.DOCUMENT_DELETED,
+                headers=headers)
         else:
             self.responder.send_response_content(
                 doc.get_json(), headers=headers)
@@ -431,7 +430,7 @@ class SyncResource(object):
         self.responder.start_response(200)
         self.responder.start_stream(),
         header = {"new_generation": new_gen,
-                     "new_transaction_id": self.sync_exch.new_trans_id}
+                  "new_transaction_id": self.sync_exch.new_trans_id}
         if self.replica_uid is not None:
             header['replica_uid'] = self.replica_uid
         self.responder.stream_entry(header)
@@ -462,10 +461,11 @@ class HTTPResponder(object):
             return
         self._started = True
         status_text = httplib.responses[status]
-        self._write = self._start_response('%d %s' % (status, status_text),
-                                         [('content-type', self.content_type),
-                                          ('cache-control', 'no-cache')] +
-                                             headers.items())
+        self._write = self._start_response(
+            '%d %s' % (status, status_text),
+            [('content-type', self.content_type),
+             ('cache-control', 'no-cache')] +
+            headers.items())
         # xxx version in headers
         if obj_dic is not None:
             self._no_initial_obj = False

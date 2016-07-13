@@ -358,8 +358,8 @@ class Parser(object):
     @classmethod
     def register_transormation(cls, transform):
         assert transform.name not in cls._transformations, (
-                "Transform %s already registered for %s"
-                % (transform.name, cls._transformations[transform.name]))
+            "Transform %s already registered for %s"
+            % (transform.name, cls._transformations[transform.name]))
         cls._transformations[transform.name] = transform
 
 

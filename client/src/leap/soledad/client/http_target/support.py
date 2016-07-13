@@ -31,6 +31,7 @@ from leap.soledad.common.l2db.remote import http_errors
 # twisted. Because of that, we redefine the http body reader used by the HTTP
 # client below.
 
+
 class ReadBodyProtocol(_ReadBodyProtocol):
     """
     From original Twisted implementation, focused on adding our error

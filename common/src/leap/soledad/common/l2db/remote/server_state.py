@@ -18,6 +18,7 @@
 import os
 import errno
 
+
 class ServerState(object):
     """Passed to a Request when it is instantiated.
 

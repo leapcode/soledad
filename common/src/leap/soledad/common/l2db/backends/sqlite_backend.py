@@ -156,7 +156,7 @@ class SQLiteDatabase(CommonBackend):
 
     def _initialize(self, c):
         """Create the schema in the database."""
-        #read the script with sql commands
+        # read the script with sql commands
         # TODO: Change how we set up the dependency. Most likely use something
         #   like lp:dirspec to grab the file from a common resource
         #   directory. Doesn't specifically need to be handled until we get
@@ -172,7 +172,7 @@ class SQLiteDatabase(CommonBackend):
             if not line:
                 continue
             c.execute(line)
-        #add extra fields
+        # add extra fields
         self._extra_schema_init(c)
         # A unique identifier should be set for this replica. Implementations
         # don't have to strictly use uuid here, but we do want the uid to be
@@ -509,7 +509,8 @@ class SQLiteDatabase(CommonBackend):
     def _put_doc_if_newer(self, doc, save_conflict, replica_uid=None,
                           replica_gen=None, replica_trans_id=None):
         with self._db_handle:
-            return super(SQLiteDatabase, self)._put_doc_if_newer(doc,
+            return super(SQLiteDatabase, self)._put_doc_if_newer(
+                doc,
                 save_conflict=save_conflict,
                 replica_uid=replica_uid, replica_gen=replica_gen,
                 replica_trans_id=replica_trans_id)
@@ -620,14 +621,14 @@ class SQLiteDatabase(CommonBackend):
         novalue_where = ["d.doc_id = d%d.doc_id"
                          " AND d%d.field_name = ?"
                          % (i, i) for i in range(len(definition))]
-        wildcard_where = [novalue_where[i]
-                          + (" AND d%d.value NOT NULL" % (i,))
+        wildcard_where = [novalue_where[i] +
+                          (" AND d%d.value NOT NULL" % (i,))
                           for i in range(len(definition))]
-        exact_where = [novalue_where[i]
-                       + (" AND d%d.value = ?" % (i,))
+        exact_where = [novalue_where[i] +
+                       (" AND d%d.value = ?" % (i,))
                        for i in range(len(definition))]
-        like_where = [novalue_where[i]
-                      + (" AND d%d.value GLOB ?" % (i,))
+        like_where = [novalue_where[i] +
+                      (" AND d%d.value GLOB ?" % (i,))
                       for i in range(len(definition))]
         is_wildcard = False
         # Merge the lists together, so that:
@@ -672,7 +673,8 @@ class SQLiteDatabase(CommonBackend):
         try:
             c.execute(statement, tuple(args))
         except dbapi2.OperationalError, e:
-            raise dbapi2.OperationalError(str(e) +
+            raise dbapi2.OperationalError(
+                str(e) +
                 '\nstatement: %s\nargs: %s\n' % (statement, args))
         res = c.fetchall()
         results = []
@@ -771,7 +773,8 @@ class SQLiteDatabase(CommonBackend):
         try:
             c.execute(statement, tuple(args))
         except dbapi2.OperationalError, e:
-            raise dbapi2.OperationalError(str(e) +
+            raise dbapi2.OperationalError(
+                str(e) +
                 '\nstatement: %s\nargs: %s\n' % (statement, args))
         res = c.fetchall()
         results = []
@@ -800,7 +803,8 @@ class SQLiteDatabase(CommonBackend):
         try:
             c.execute(statement, tuple(definition))
         except dbapi2.OperationalError, e:
-            raise dbapi2.OperationalError(str(e) +
+            raise dbapi2.OperationalError(
+                str(e) +
                 '\nstatement: %s\nargs: %s\n' % (statement, tuple(definition)))
         return c.fetchall()
 

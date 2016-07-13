@@ -185,8 +185,7 @@ class UnknownAuthMethod(U1DBError):
 # mapping wire (transimission) descriptions/tags for errors to the exceptions
 wire_description_to_exc = dict(
     (x.wire_description, x) for x in globals().values()
-            if getattr(x, 'wire_description', None) not in (None, "error")
-)
+    if getattr(x, 'wire_description', None) not in (None, "error"))
 wire_description_to_exc["error"] = U1DBError
 
 

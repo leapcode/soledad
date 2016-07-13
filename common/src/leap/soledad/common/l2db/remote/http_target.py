@@ -47,7 +47,7 @@ class HTTPSyncTarget(http_client.HTTPClientBase, SyncTarget):
         if self._trace_hook:  # for tests
             self._trace_hook('record_sync_info')
         self._request_json('PUT', ['sync-from', source_replica_uid], {},
-                              {'generation': source_replica_generation,
+                           {'generation': source_replica_generation,
                                'transaction_id': source_transaction_id})
 
     def _parse_sync_stream(self, data, return_doc_cb, ensure_callback=None):

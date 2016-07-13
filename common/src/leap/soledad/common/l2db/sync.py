@@ -53,7 +53,8 @@ class Synchronizer(object):
         """
         # Increases self.num_inserted depending whether the document
         # was effectively inserted.
-        state, _ = self.source._put_doc_if_newer(doc, save_conflict=True,
+        state, _ = self.source._put_doc_if_newer(
+            doc, save_conflict=True,
             replica_uid=self.target_replica_uid, replica_gen=replica_gen,
             replica_trans_id=trans_id)
         if state == 'inserted':
@@ -85,10 +86,10 @@ class Synchronizer(object):
         new generation.
         """
         cur_gen, trans_id = self.source._get_generation_info()
-        if (cur_gen == start_generation + self.num_inserted
-                and self.num_inserted > 0):
-            self.sync_target.record_sync_info(
-                self.source._replica_uid, cur_gen, trans_id)
+        last_gen = start_generation + self.num_inserted
+        if (cur_gen == last_gen and self.num_inserted > 0):
+                self.sync_target.record_sync_info(
+                    self.source._replica_uid, cur_gen, trans_id)
 
     def sync(self, callback=None, autocreate=False):
         """Synchronize documents between source and target."""
@@ -124,15 +125,17 @@ class Synchronizer(object):
         if self.target_replica_uid is None:
             target_last_known_gen, target_last_known_trans_id = 0, ''
         else:
-            target_last_known_gen, target_last_known_trans_id = \
-            self.source._get_replica_gen_and_trans_id(self.target_replica_uid)
+            target_last_known_gen, target_last_known_trans_id = (
+            self.source._get_replica_gen_and_trans_id(  # nopep8
+                self.target_replica_uid))
         if not changes and target_last_known_gen == target_gen:
             if target_trans_id != target_last_known_trans_id:
                 raise errors.InvalidTransactionId
             return my_gen
         changed_doc_ids = [doc_id for doc_id, _, _ in changes]
         # prepare to send all the changed docs
-        docs_to_send = self.source.get_docs(changed_doc_ids,
+        docs_to_send = self.source.get_docs(
+            changed_doc_ids,
             check_for_conflicts=False, include_deleted=True)
         # TODO: there must be a way to not iterate twice
         docs_by_generation = zip(
@@ -172,7 +175,7 @@ class SyncExchange(object):
         self._db._last_exchange_log = {
             'receive': {'docs': self._incoming_trace},
             'return': None
-            }
+        }
 
     def _set_trace_hook(self, cb):
         self._trace_hook = cb
@@ -198,7 +201,8 @@ class SyncExchange(object):
         :param source_gen: The source generation of doc.
         :return: None
         """
-        state, at_gen = self._db._put_doc_if_newer(doc, save_conflict=False,
+        state, at_gen = self._db._put_doc_if_newer(
+            doc, save_conflict=False,
             replica_uid=self.source_replica_uid, replica_gen=source_gen,
             replica_trans_id=trans_id)
         if state == 'inserted':
@@ -217,7 +221,7 @@ class SyncExchange(object):
         self._db._last_exchange_log['receive'].update({
             'source_uid': self.source_replica_uid,
             'source_gen': source_gen
-            })
+        })
 
     def find_changes_to_return(self):
         """Find changes to return.
@@ -232,7 +236,7 @@ class SyncExchange(object):
         """
         self._db._last_exchange_log['receive'].update({  # for tests
             'last_known_gen': self.source_last_known_generation
-            })
+        })
         self._trace('before whats_changed')
         gen, trans_id, changes = self._db.whats_changed(
             self.source_last_known_generation)
@@ -242,9 +246,9 @@ class SyncExchange(object):
         seen_ids = self.seen_ids
         # changed docs that weren't superseded by or converged with
         self.changes_to_return = [
-            (doc_id, gen, trans_id) for (doc_id, gen, trans_id) in changes
+            (doc_id, gen, trans_id) for (doc_id, gen, trans_id) in changes if
             # there was a subsequent update
-            if doc_id not in seen_ids or seen_ids.get(doc_id) < gen]
+            doc_id not in seen_ids or seen_ids.get(doc_id) < gen]
         return self.new_gen
 
     def return_docs(self, return_doc_cb):
