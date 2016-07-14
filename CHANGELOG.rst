@@ -1,3 +1,40 @@
+0.8.1 - 14 July, 2016
++++++++++++++++++++++
+
+Client
+======
+
+Features
+~~~~~~~~
+- Add recovery document format version for future migrations.
+- Use DeferredLock instead of its locking cousin.
+- Use DeferredSemaphore instead of its locking cousin.
+
+Bugfixes
+~~~~~~~~
+- `#8180 <https://leap.se/code/issues/8180>`_: Initialize OpenSSL context just once.
+- Remove document content conversion to unicode. Users of API are responsible
+  for only passing valid JSON to Soledad for storage.
+
+Misc
+~~~~
+- Add ability to get information about sync phases for profiling purposes.
+- Add script for setting up develop environment.
+- Refactor bootstrap to remove shared db lock.
+- Removed multiprocessing from encdecpool with some extra refactoring.
+- Remove user_id argument from Soledad init.
+
+Common
+======
+
+Features
+~~~~~~~~
+- Embed l2db, forking u1db.
+
+Misc
+~~~~
+- Toxify tests.
+
 0.8.0 - 18 Apr, 2016
 ++++++++++++++++++++
 
