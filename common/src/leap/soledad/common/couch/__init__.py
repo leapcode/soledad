@@ -110,6 +110,9 @@ class CouchDatabase(object):
     CouchDB details from backend code.
     """
 
+    CONFIG_DOC_ID = '_local/config'
+    SYNC_DOC_ID_PREFIX = '_local/sync_'
+
     @classmethod
     def open_database(cls, url, create, ensure_ddocs=False, replica_uid=None,
                       database_security=None):
@@ -261,12 +264,12 @@ class CouchDatabase(object):
         """
         try:
             # set on existent config document
-            doc = self._database['u1db_config']
+            doc = self._database[self.CONFIG_DOC_ID]
             doc['replica_uid'] = replica_uid
         except ResourceNotFound:
             # or create the config document
             doc = {
-                '_id': 'u1db_config',
+                '_id': self.CONFIG_DOC_ID,
                 'replica_uid': replica_uid,
             }
         self._database.save(doc)
@@ -280,7 +283,7 @@ class CouchDatabase(object):
         """
         try:
             # grab replica_uid from server
-            doc = self._database['u1db_config']
+            doc = self._database[self.CONFIG_DOC_ID]
             replica_uid = doc['replica_uid']
             return replica_uid
         except ResourceNotFound:
@@ -499,7 +502,7 @@ class CouchDatabase(object):
                  synchronized with the replica, this is (0, '').
         :rtype: (int, str)
         """
-        doc_id = 'u1db_sync_%s' % other_replica_uid
+        doc_id = '%s%s' % (self.SYNC_DOC_ID_PREFIX, other_replica_uid)
         try:
             doc = self._database[doc_id]
         except ResourceNotFound:
@@ -562,7 +565,7 @@ class CouchDatabase(object):
                                      generation.
         :type other_transaction_id: str
         """
-        doc_id = 'u1db_sync_%s' % other_replica_uid
+        doc_id = '%s%s' % (self.SYNC_DOC_ID_PREFIX, other_replica_uid)
         try:
             doc = self._database[doc_id]
         except ResourceNotFound:
