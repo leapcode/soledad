@@ -37,7 +37,6 @@ from couchdb.client import Server, Database
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
-    ServerError,
     Session,
     urljoin as couch_urljoin,
     Resource,
@@ -50,9 +49,6 @@ from leap.soledad.common.l2db.errors import (
 from leap.soledad.common.l2db.remote import http_app
 
 
-from leap.soledad.common import ddocs
-from .errors import raise_server_error
-from .errors import raise_missing_design_doc_error
 from .support import MultipartWriter
 from leap.soledad.common.errors import InvalidURLError
 from leap.soledad.common.document import ServerDocument
@@ -177,7 +173,6 @@ class CouchDatabase(object):
         self.batch_generation = None
         self.batch_docs = {}
         if ensure_ddocs:
-            self.ensure_ddocs_on_db()
             self.ensure_security_ddoc(database_security)
 
     def batch_start(self):
@@ -211,22 +206,6 @@ class CouchDatabase(object):
                 self._session)
         except ResourceNotFound:
             raise DatabaseDoesNotExist()
-
-    def ensure_ddocs_on_db(self):
-        """
-        Ensure that the design documents used by the backend exist on the
-        couch database.
-        """
-        for ddoc_name in ['docs', 'syncs']:
-            try:
-                self.json_from_resource(['_design'] +
-                                        ddoc_name.split('/') + ['_info'],
-                                        check_missing_ddoc=False)
-            except ResourceNotFound:
-                ddoc = json.loads(
-                    binascii.a2b_base64(
-                        getattr(ddocs, ddoc_name)))
-                self._database.save(ddoc)
 
     def ensure_security_ddoc(self, security_config=None):
         """
@@ -539,7 +518,6 @@ class CouchDatabase(object):
 
         try:
             response = self.json_from_resource([doc_id, 'u1db_conflicts'],
-                                               check_missing_ddoc=False,
                                                **params)
             return conflicts + self._build_conflicts(
                 doc_id, json.loads(response.read()))
@@ -652,48 +630,23 @@ class CouchDatabase(object):
         gen_doc = rows.pop()['doc']
         return gen_doc['gen'], gen_doc['trans_id']
 
-    def json_from_resource(self, ddoc_path, check_missing_ddoc=True,
-                           **kwargs):
+    def json_from_resource(self, doc_path, **kwargs):
         """
         Get a resource from it's path and gets a doc's JSON using provided
-        parameters, also checking for missing design docs by default.
+        parameters.
 
-        :param ddoc_path: The path to resource.
-        :type ddoc_path: [str]
-        :param check_missing_ddoc: Raises info on what design doc is missing.
-        :type check_missin_ddoc: bool
+        :param doc_path: The path to resource.
+        :type doc_path: [str]
 
         :return: The request's data parsed from JSON to a dict.
         :rtype: dict
-
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
         """
-        if ddoc_path is not None:
-            resource = self._database.resource(*ddoc_path)
+        if doc_path is not None:
+            resource = self._database.resource(*doc_path)
         else:
             resource = self._database.resource()
-        try:
-            _, _, data = resource.get_json(**kwargs)
-            return data
-        except ResourceNotFound as e:
-            if check_missing_ddoc:
-                raise_missing_design_doc_error(e, ddoc_path)
-            else:
-                raise e
-        except ServerError as e:
-            raise_server_error(e, ddoc_path)
+        _, _, data = resource.get_json(**kwargs)
+        return data
 
     def save_document(self, old_doc, doc, transaction_id):
         """
@@ -710,19 +663,6 @@ class CouchDatabase(object):
 
         :raise RevisionConflict: Raised when trying to update a document but
                                  couch revisions mismatch.
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
         """
         attachments = {}  # we save content and conflicts as attachments
         parts = []  # and we put it using couch's multipart PUT

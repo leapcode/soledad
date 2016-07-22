@@ -41,10 +41,6 @@ def copy_couch_database_for_test(test, db):
         # bypass u1db_config document
         if doc_id == 'u1db_config':
             pass
-        # copy design docs
-        elif doc_id.startswith('_design'):
-            del doc['_rev']
-            new_couch_db.save(doc)
         # copy u1db docs
         elif 'u1db_rev' in doc:
             new_doc = {

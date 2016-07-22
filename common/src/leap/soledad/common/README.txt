@@ -60,15 +60,6 @@ implemented in a way that all changes will be pushed with just one operation.
     * delete_index
     * create_index
 
-Couch views and update functions are used in order to achieve atomicity on the
-Couch backend. Transactions are stored in the `u1db_transactions` field of the
-couch document. Document's content and conflicted versions are stored as couch
-document attachments with names, respectivelly, `u1db_content` and
-`u1db_conflicts`.
-
-A map of methods and couch query URI can be found on the `./ddocs/README.txt`
-document.
-
 Notes:
 
   * Currently, the couch backend does not implement indexing, so what is
