@@ -14,6 +14,15 @@ Check the `Makefile` for the rules for running containers.
 Check the `helper/` directory for scripts that help running tests.
 
 
+Installation
+------------
+
+0. update and install 
+1. Install docker for your system: https://docs.docker.com/
+2. Build the image by running `make`
+3. Use one of the scripts in the `helper/` directory
+
+
 Environment variables for docker containers
 -------------------------------------------
 
