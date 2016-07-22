@@ -389,8 +389,11 @@ def cert_create(args):
 def cert_delete(args):
     private_key = os.path.join(args.basedir, args.private_key)
     cert_key = os.path.join(args.basedir, args.cert_key)
-    os.unlink(private_key)
-    os.unlink(cert_key)
+    try:
+        os.unlink(private_key)
+        os.unlink(cert_key)
+    except OSError:
+        pass
 
 
 #
