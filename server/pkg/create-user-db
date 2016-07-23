@@ -80,7 +80,7 @@ def ensure_database(dbname):
     url = url_for_db(dbname)
     db_security = CONF['database-security']
     db = CouchDatabase.open_database(url=url, create=True,
-                                     replica_uid=None, ensure_ddocs=True,
+                                     replica_uid=None,
                                      database_security=db_security)
     print ('success! Ensured that database %s exists, with replica_uid: %s' %
            (db._dbname, db.replica_uid))

@@ -391,8 +391,7 @@ class CouchServerStateForTests(CouchServerState):
         db = CouchDatabase.open_database(
             urljoin(self.couch_url, dbname),
             True,
-            replica_uid=replica_uid or 'test',
-            ensure_ddocs=True)
+            replica_uid=replica_uid or 'test')
         self.dbs.append(db)
         return db
 

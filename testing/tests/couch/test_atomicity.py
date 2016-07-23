@@ -90,8 +90,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         self.db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + self.user),
             create=True,
-            replica_uid='replica',
-            ensure_ddocs=True)
+            replica_uid='replica')
         self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self.startTwistedServer()
 

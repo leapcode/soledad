@@ -105,8 +105,7 @@ class TestSyncMutex(
         # ensure remote db exists before syncing
         db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + self.user),
-            create=True,
-            ensure_ddocs=True)
+            create=True)
 
         sol = self._soledad_instance(
             user=self.user, server_url=self.getURL())

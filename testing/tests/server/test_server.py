@@ -391,8 +391,7 @@ class EncryptedSyncTestCase(
         # ensure remote db exists before syncing
         db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + user),
-            create=True,
-            ensure_ddocs=True)
+            create=True)
 
         def _db1AssertEmptyDocList(results):
             _, doclist = results

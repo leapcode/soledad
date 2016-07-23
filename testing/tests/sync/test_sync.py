@@ -101,8 +101,7 @@ class InterruptableSyncTestCase(
         # ensure remote db exists before syncing
         db = couch.CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-user-uuid'),
-            create=True,
-            ensure_ddocs=True)
+            create=True)
 
         # create interruptor thread
         t = _SyncInterruptor(sol, db)

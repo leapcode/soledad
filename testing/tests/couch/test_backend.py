@@ -43,8 +43,7 @@ class TestCouchBackendImpl(CouchDBTestCase):
                 'http://localhost:' + str(self.couch_port),
                 ('test-%s' % uuid4().hex)
             ),
-            create=True,
-            ensure_ddocs=True)
+            create=True)
         doc_id1 = db._allocate_doc_id()
         self.assertTrue(doc_id1.startswith('D-'))
         self.assertEqual(34, len(doc_id1))
