@@ -714,7 +714,18 @@ class CouchDatabase(object):
         if not self.batching:
             buf = StringIO()
             envelope = MultipartWriter(buf)
-            envelope.add('application/json', json.dumps(couch_doc))
+            # the order in which attachments are described inside the
+            # serialization of the couch document must match the order in which
+            # they are actually written in the multipart structure. Because of
+            # that, we use `sorted_keys=True` in the json serialization (so
+            # "u1db_conflicts" comes before "u1db_content" on the couch
+            # document attachments description), and also reverse the order of
+            # the parts before writing them, so the "conflict" part is written
+            # before the "content" part.
+            envelope.add(
+                'application/json',
+                json.dumps(couch_doc, sort_keys=True))
+            parts.reverse()
             for part in parts:
                 envelope.add('application/octet-stream', part)
             envelope.close()
