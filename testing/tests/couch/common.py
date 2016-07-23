@@ -49,7 +49,6 @@ def copy_couch_database_for_test(test, db):
         elif 'u1db_rev' in doc:
             new_doc = {
                 '_id': doc['_id'],
-                'u1db_transactions': doc['u1db_transactions'],
                 'u1db_rev': doc['u1db_rev']
             }
             attachments = []
@@ -65,6 +64,8 @@ def copy_couch_database_for_test(test, db):
                 if (att is not None):
                     new_couch_db.put_attachment(new_doc, att,
                                                 filename=att_name)
+        elif doc_id.startswith('gen-'):
+            new_couch_db.save(doc)
     # cleanup connections to prevent file descriptor leaking
     return new_db
 
