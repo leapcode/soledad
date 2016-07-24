@@ -27,10 +27,12 @@ import time
 import functools
 
 
+from collections import defaultdict
 from StringIO import StringIO
 from urlparse import urljoin
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
+from threading import Lock
 
 
 from couchdb.client import Server, Database
@@ -112,6 +114,8 @@ class CouchDatabase(object):
 
     CONFIG_DOC_ID = '_local/config'
     SYNC_DOC_ID_PREFIX = '_local/sync_'
+
+    _put_doc_lock = defaultdict(Lock)
 
     @classmethod
     def open_database(cls, url, create, ensure_ddocs=False, replica_uid=None,
@@ -675,6 +679,7 @@ class CouchDatabase(object):
                 'length': len(content),
             }
             parts.append(content)
+
         # save conflicts as attachment
         if doc.has_conflicts is True:
             conflicts = json.dumps(
@@ -686,21 +691,26 @@ class CouchDatabase(object):
                 'length': len(conflicts),
             }
             parts.append(conflicts)
+
         # add the gen document
-        while True:  # TODO: add a lock, remove this while
-            try:
-                gen, _ = self.get_generation_info()
-                new_gen = gen + 1
-                gen_doc = {
-                    '_id': _get_gen_doc_id(new_gen),
-                    'gen': new_gen,
-                    'doc_id': doc.doc_id,
-                    'trans_id': transaction_id,
-                }
-                self._database.save(gen_doc)
-                break
-            except ResourceConflict:
-                pass
+
+        # TODO: in u1db protocol, the increment of database generation should
+        # be made in the same atomic transaction as the actual document save,
+        # otherwise the same document might be concurrently updated by
+        # concurrent syncs from other replicas. A simple lock based on the uuid
+        # and doc_id would be enough to prevent that, if all entry points to
+        # database update are made through the soledad api.
+        with self._put_doc_lock[self._database.name]:
+            gen, _ = self.get_generation_info()
+            new_gen = gen + 1
+            gen_doc = {
+                '_id': _get_gen_doc_id(new_gen),
+                'gen': new_gen,
+                'doc_id': doc.doc_id,
+                'trans_id': transaction_id,
+            }
+            self._database.save(gen_doc)
+
         # build the couch document
         couch_doc = {
             '_id': doc.doc_id,
