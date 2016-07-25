@@ -1,3 +1,6 @@
-trial:
+tests:
+  image: leap/soledad:1.0
+  services:
+  - couchdb
   script:
-  - cd testing; tox
+  - cd testing; tox -- --couch-url http://couchdb:5984
