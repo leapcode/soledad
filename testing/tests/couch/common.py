@@ -13,10 +13,9 @@ nested_doc = tests.nested_doc
 
 
 def make_couch_database_for_test(test, replica_uid):
-    port = str(test.couch_port)
     dbname = ('test-%s' % uuid4().hex)
     db = couch.CouchDatabase.open_database(
-        urljoin('http://localhost:' + port, dbname),
+        urljoin(test.couch_url, dbname),
         create=True,
         replica_uid=replica_uid or 'test',
         ensure_ddocs=True)
@@ -25,8 +24,7 @@ def make_couch_database_for_test(test, replica_uid):
 
 
 def copy_couch_database_for_test(test, db):
-    port = str(test.couch_port)
-    couch_url = 'http://localhost:' + port
+    couch_url = test.couch_url
     new_dbname = db._dbname + '_copy'
     new_db = couch.CouchDatabase.open_database(
         urljoin(couch_url, new_dbname),

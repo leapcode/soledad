@@ -27,6 +27,7 @@ import shutil
 import random
 import string
 import couchdb
+import pytest
 
 from uuid import uuid4
 from mock import Mock
@@ -344,6 +345,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self.assertEqual(exp_doc.content, doc.content)
 
 
+@pytest.mark.usefixtures("couch_url")
 class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
 
     """
@@ -354,8 +356,6 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
         """
         Make sure we have a CouchDB instance for a test.
         """
-        self.couch_port = 5984
-        self.couch_url = 'http://localhost:%d' % self.couch_port
         self.couch_server = couchdb.Server(self.couch_url)
 
     def delete_db(self, name):
