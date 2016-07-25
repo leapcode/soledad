@@ -10,7 +10,7 @@ content = ' ' * 10000
 
 
 @pytest.inlineCallbacks
-def test_upload(soledad_client):
+def test_upload(soledad_client, request):
     # create a bunch of local documents
     uploads = 100
     deferreds = []
@@ -23,16 +23,18 @@ def test_upload(soledad_client):
     yield soledad_client.sync()
 
     # check that documents reached the remote database
-    remote = CouchDatabase('http://127.0.0.1:5984', 'user-0')
+    url = request.config.getoption('--couch-url')
+    remote = CouchDatabase(url, 'user-0')
     remote_count, _ = remote.get_all_docs()
     assert remote_count == uploads
 
 
 @pytest.inlineCallbacks
-def test_download(soledad_client):
+def test_download(soledad_client, request):
     # create a bunch of remote documents
     downloads = 100
-    remote = CouchDatabase('http://127.0.0.1:5984', 'user-0')
+    url = request.config.getoption('--couch-url')
+    remote = CouchDatabase(url, 'user-0')
     for i in xrange(downloads):
         doc = ServerDocument('doc-%d' % i, 'replica:1')
         doc.content = {'download': True, 'content': content}

@@ -7,9 +7,11 @@ import time
 
 from hashlib import sha512
 from subprocess import call
+from urlparse import urljoin
 
 from leap.soledad.client import Soledad
 from leap.soledad.common.couch import CouchDatabase
+
 
 # we have to manually setup the events server in order to be able to signal
 # events. This is usually done by the enclosing application using soledad
@@ -17,6 +19,16 @@ from leap.soledad.common.couch import CouchDatabase
 from leap.common.events import server
 server.ensure_server()
 
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--couch-url", type="string", default="http://127.0.0.1:5984",
+        help="the url for the couch server to be used during tests")
+
+
+#
+# default options for all tests
+#
 
 DEFAULT_UUID = '0'
 DEFAULT_PASSPHRASE = '123'
@@ -40,10 +52,9 @@ def _token_dbname():
 
 class SoledadDatabases(object):
 
-    def __init__(self):
-        url = 'http://127.0.0.1:5984/'
-        self._token_db_url = url + _token_dbname()
-        self._shared_db_url = url + 'shared'
+    def __init__(self, url):
+        self._token_db_url = urljoin(url, _token_dbname())
+        self._shared_db_url = urljoin(url, 'shared')
 
     def setup(self):
         self._create_dbs()
@@ -66,7 +77,8 @@ class SoledadDatabases(object):
 
 @pytest.fixture(scope='module')
 def soledad_dbs(request):
-    db = SoledadDatabases()
+    couch_url = request.config.option.couch_url
+    db = SoledadDatabases(couch_url)
     db.setup()
     request.addfinalizer(db.teardown)
     return db
@@ -79,9 +91,8 @@ def soledad_dbs(request):
 
 class UserDatabase(object):
 
-    def __init__(self):
-        url = 'http://127.0.0.1:5984/'
-        self._user_db_url = url + 'user-%s' % DEFAULT_UUID
+    def __init__(self, url):
+        self._user_db_url = urljoin(url, 'user-%s' % DEFAULT_UUID)
 
     def setup(self):
         CouchDatabase.open_database(
@@ -93,7 +104,8 @@ class UserDatabase(object):
 
 @pytest.fixture(scope='function')
 def user_db(request):
-    db = UserDatabase()
+    couch_url = request.config.option.couch_url
+    db = UserDatabase(couch_url)
     db.setup()
     request.addfinalizer(db.teardown)
     return db
@@ -116,12 +128,15 @@ def get_pid(pidfile):
 
 class SoledadServer(object):
 
-    def __init__(self, tmpdir_factory):
+    def __init__(self, tmpdir_factory, couch_url):
         tmpdir = tmpdir_factory.mktemp('soledad-server')
         self._pidfile = os.path.join(tmpdir.strpath, 'soledad-server.pid')
         self._logfile = os.path.join(tmpdir.strpath, 'soledad-server.log')
+        self._couch_url = couch_url
 
     def start(self):
+        self._create_conf_file()
+        # start the server
         call([
             'twistd',
             '--logfile=%s' % self._logfile,
@@ -131,6 +146,15 @@ class SoledadServer(object):
             '--port=2424'
         ])
 
+    def _create_conf_file(self):
+        if not os.access('/etc', os.W_OK):
+            return
+        if not os.path.isdir('/etc/soledad'):
+            os.mkdir('/etc/soledad')
+        with open('/etc/soledad/soledad-server.conf', 'w') as f:
+            content = '[soledad-server]\ncouch_url = %s' % self._couch_url
+            f.write(content)
+
     def stop(self):
         pid = get_pid(self._pidfile)
         os.kill(pid, signal.SIGKILL)
@@ -138,7 +162,8 @@ class SoledadServer(object):
 
 @pytest.fixture(scope='module')
 def soledad_server(tmpdir_factory, request):
-    server = SoledadServer(tmpdir_factory)
+    couch_url = request.config.option.couch_url
+    server = SoledadServer(tmpdir_factory, couch_url)
     server.start()
     request.addfinalizer(server.stop)
     return server
