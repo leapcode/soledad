@@ -6,13 +6,16 @@ from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.document import ServerDocument
 
 
+content = ' ' * 10000
+
+
 @pytest.inlineCallbacks
 def test_upload(soledad_client):
     # create a bunch of local documents
     uploads = 100
     deferreds = []
     for i in xrange(uploads):
-        d = soledad_client.create_doc({'upload': True})
+        d = soledad_client.create_doc({'upload': True, 'content': content})
         deferreds.append(d)
     yield gatherResults(deferreds)
 
@@ -32,7 +35,7 @@ def test_download(soledad_client):
     remote = CouchDatabase('http://127.0.0.1:5984', 'user-0')
     for i in xrange(downloads):
         doc = ServerDocument('doc-%d' % i, 'replica:1')
-        doc.content = {'download': True}
+        doc.content = {'download': True, 'content': content}
         remote.save_document(None, doc, i)
 
     # synchronize
