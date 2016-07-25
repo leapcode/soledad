@@ -27,10 +27,13 @@ MEMORY               ?= 512m
 # Docker image generation (main make target) #
 ##############################################
 
-all: image
+all: soledad-image couchdb-image
 
-image:
+soledad-image:
 	docker build -t $(IMAGE_NAME) .
+
+couchdb-image:
+	docker pull couchdb
 
 ##################################################
 # Run a Soledad Server inside a docker container #
@@ -69,16 +72,18 @@ run-client-bootstrap:
 	  /usr/local/soledad/run-client-bootstrap.sh
 
 #################################################
-# Run all trial tests inside a docker container #
+# Run all tests inside a docker container       #
 #################################################
 
-run-trial:
+run-tox:
+	docker run -d --name couchdb couchdb
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  --link couchdb \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/run-trial.sh
+	  /usr/local/soledad/run-tox.sh
 
 ############################################
 # Performance tests and graphic generation #
@@ -123,7 +128,7 @@ cp-perf-result:
 # Other helper targets #
 ########################
 
-run-shell: image
+run-shell: soledad-image
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  $(IMAGE_NAME) \
