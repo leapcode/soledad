@@ -13,7 +13,6 @@ RUN apt-get -y install libffi-dev
 
 # install pip and tox
 RUN apt-get -y install python-pip
-
 RUN pip install -U pip
 RUN pip install tox
 
