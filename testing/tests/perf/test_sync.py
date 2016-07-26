@@ -12,7 +12,7 @@ content = ' ' * 10000
 @pytest.inlineCallbacks
 def test_upload(soledad_client, request):
     # create a bunch of local documents
-    uploads = 100
+    uploads = request.config.option.num_docs
     deferreds = []
     for i in xrange(uploads):
         d = soledad_client.create_doc({'upload': True, 'content': content})
@@ -32,7 +32,7 @@ def test_upload(soledad_client, request):
 @pytest.inlineCallbacks
 def test_download(soledad_client, request):
     # create a bunch of remote documents
-    downloads = 100
+    downloads = request.config.option.num_docs
     url = request.config.getoption('--couch-url')
     remote = CouchDatabase(url, 'user-0')
     for i in xrange(downloads):

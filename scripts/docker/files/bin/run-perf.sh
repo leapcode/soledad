@@ -2,6 +2,7 @@
 
 REPO=/builds/leap/soledad/testing
 COUCH_URL="${COUCH_URL:-http://127.0.0.1:5984}"
+SOLEDAD_PRELOAD_NUM="${SOLEDAD_PRELOAD_NUM:-100}"
 
 if [ ! -z "${SOLEDAD_REMOTE}" ]; then
   git -C ${REPO} remote set-url origin ${SOLEDAD_REMOTE}
@@ -17,4 +18,5 @@ cd ${REPO}
 tox perf -- \
 	--durations 0 \
 	--couch-url ${COUCH_URL} \
-	--twisted
+	--twisted \
+	--num-docs ${SOLEDAD_PRELOAD_NUM}
