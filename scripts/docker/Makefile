@@ -33,7 +33,7 @@ soledad-image:
 	docker build -t $(IMAGE_NAME) .
 
 couchdb-image:
-	docker pull couchdb
+	(cd couchdb/ && make)
 
 ##################################################
 # Run a Soledad Server inside a docker container #
@@ -77,7 +77,7 @@ run-client-bootstrap:
 
 run-tox:
 	name=$$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1); \
-	docker run -d --name $${name} couchdb; \
+	docker run -d --name $${name} leap/couchdb; \
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
@@ -93,7 +93,7 @@ run-tox:
 
 run-perf:
 	name=$$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1); \
-	docker run -d --name $${name} couchdb; \
+	docker run -d --name $${name} leap/couchdb; \
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
