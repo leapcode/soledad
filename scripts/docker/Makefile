@@ -76,12 +76,14 @@ run-client-bootstrap:
 #################################################
 
 run-tox:
-	docker run -d --name couchdb couchdb
+	name=$$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1); \
+	docker run -d --name $${name} couchdb; \
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
-	  --link couchdb \
+	  --env="COUCH_URL=http://$${name}:5984" \
+	  --link $${name} \
 	  $(IMAGE_NAME) \
 	  /usr/local/soledad/run-tox.sh
 
@@ -90,14 +92,17 @@ run-tox:
 ############################################
 
 run-perf:
-	docker run -d --name couchdb couchdb
+	name=$$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1); \
+	docker run -d --name $${name} couchdb; \
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
-	  --link couchdb \
+	  --env="SOLEDAD_PRELOAD_NUM=$(SOLEDAD_PRELOAD_NUM)" \
+	  --env="COUCH_URL=http://$${name}:5984" \
+	  --link $${name} \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/run-tox-perf.sh
+	  /usr/local/soledad/run-perf.sh
 
 run-client-perf:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \

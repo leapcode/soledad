@@ -14,4 +14,7 @@ fi
 
 cd ${REPO}
 
-tox -- --couch-url ${COUCH_URL}
+tox perf -- \
+	--durations 0 \
+	--couch-url ${COUCH_URL} \
+	--twisted
