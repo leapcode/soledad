@@ -89,8 +89,15 @@ run-tox:
 # Performance tests and graphic generation #
 ############################################
 
-run-perf-test:
-	helper/run-test.sh perf
+run-perf:
+	docker run -d --name couchdb couchdb
+	docker run -t -i \
+	  --memory="$(MEMORY)" \
+	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
+	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  --link couchdb \
+	  $(IMAGE_NAME) \
+	  /usr/local/soledad/run-tox-perf.sh
 
 run-client-perf:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
