@@ -105,15 +105,23 @@ def _get_gen_doc_id(gen):
     return 'gen-%s' % str(gen).zfill(10)
 
 
+GENERATION_KEY = 'gen'
+TRANSACTION_ID_KEY = 'trans_id'
+REPLICA_UID_KEY = 'replica_uid'
+DOC_ID_KEY = 'doc_id'
+SCHEMA_VERSION_KEY = 'schema_version'
+
+CONFIG_DOC_ID = '_local/config'
+SYNC_DOC_ID_PREFIX = '_local/sync_'
+SCHEMA_VERSION = 1
+
+
 class CouchDatabase(object):
     """
     Holds CouchDB related code.
     This class gives methods to encapsulate database operations and hide
     CouchDB details from backend code.
     """
-
-    CONFIG_DOC_ID = '_local/config'
-    SYNC_DOC_ID_PREFIX = '_local/sync_'
 
     _put_doc_lock = defaultdict(Lock)
 
@@ -251,13 +259,14 @@ class CouchDatabase(object):
         """
         try:
             # set on existent config document
-            doc = self._database[self.CONFIG_DOC_ID]
-            doc['replica_uid'] = replica_uid
+            doc = self._database[CONFIG_DOC_ID]
+            doc[REPLICA_UID_KEY] = replica_uid
         except ResourceNotFound:
             # or create the config document
             doc = {
-                '_id': self.CONFIG_DOC_ID,
-                'replica_uid': replica_uid,
+                '_id': CONFIG_DOC_ID,
+                REPLICA_UID_KEY: replica_uid,
+                SCHEMA_VERSION_KEY: SCHEMA_VERSION,
             }
         self._database.save(doc)
 
@@ -270,8 +279,8 @@ class CouchDatabase(object):
         """
         try:
             # grab replica_uid from server
-            doc = self._database[self.CONFIG_DOC_ID]
-            replica_uid = doc['replica_uid']
+            doc = self._database[CONFIG_DOC_ID]
+            replica_uid = doc[REPLICA_UID_KEY]
             return replica_uid
         except ResourceNotFound:
             # create a unique replica_uid
@@ -484,17 +493,18 @@ class CouchDatabase(object):
                  synchronized with the replica, this is (0, '').
         :rtype: (int, str)
         """
-        doc_id = '%s%s' % (self.SYNC_DOC_ID_PREFIX, other_replica_uid)
+        doc_id = '%s%s' % (SYNC_DOC_ID_PREFIX, other_replica_uid)
         try:
             doc = self._database[doc_id]
         except ResourceNotFound:
             doc = {
                 '_id': doc_id,
-                'generation': 0,
-                'transaction_id': '',
+                GENERATION_KEY: 0,
+                REPLICA_UID_KEY: str(other_replica_uid),
+                TRANSACTION_ID_KEY: '',
             }
             self._database.save(doc)
-        gen, trans_id = doc['generation'], doc['transaction_id']
+        gen, trans_id = doc[GENERATION_KEY], doc[TRANSACTION_ID_KEY]
         return gen, trans_id
 
     def get_doc_conflicts(self, doc_id, couch_rev=None):
@@ -546,13 +556,13 @@ class CouchDatabase(object):
                                      generation.
         :type other_transaction_id: str
         """
-        doc_id = '%s%s' % (self.SYNC_DOC_ID_PREFIX, other_replica_uid)
+        doc_id = '%s%s' % (SYNC_DOC_ID_PREFIX, other_replica_uid)
         try:
             doc = self._database[doc_id]
         except ResourceNotFound:
             doc = {'_id': doc_id}
-        doc['generation'] = other_generation
-        doc['transaction_id'] = other_transaction_id
+        doc[GENERATION_KEY] = other_generation
+        doc[TRANSACTION_ID_KEY] = other_transaction_id
         self._database.save(doc)
 
     def get_transaction_log(self):
@@ -586,7 +596,10 @@ class CouchDatabase(object):
         log = []
         for row in rows:
             doc = row['doc']
-            log.append((doc['gen'], doc['doc_id'], doc['trans_id']))
+            log.append((
+                doc[GENERATION_KEY],
+                doc[DOC_ID_KEY],
+                doc[TRANSACTION_ID_KEY]))
         return log
 
     def whats_changed(self, old_generation=0):
@@ -632,7 +645,7 @@ class CouchDatabase(object):
         if not rows:
             return 0, ''
         gen_doc = rows.pop()['doc']
-        return gen_doc['gen'], gen_doc['trans_id']
+        return gen_doc[GENERATION_KEY], gen_doc[TRANSACTION_ID_KEY]
 
     def json_from_resource(self, doc_path, **kwargs):
         """
@@ -705,9 +718,9 @@ class CouchDatabase(object):
             new_gen = gen + 1
             gen_doc = {
                 '_id': _get_gen_doc_id(new_gen),
-                'gen': new_gen,
-                'doc_id': doc.doc_id,
-                'trans_id': transaction_id,
+                GENERATION_KEY: new_gen,
+                DOC_ID_KEY: doc.doc_id,
+                TRANSACTION_ID_KEY: transaction_id,
             }
             self._database.save(gen_doc)
 
