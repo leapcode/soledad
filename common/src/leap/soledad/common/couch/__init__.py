@@ -623,12 +623,10 @@ class CouchDatabase(object):
         cur_generation, last_trans_id = self.get_generation_info()
         relevant_tail = self._get_transaction_log(start=old_generation + 1)
         seen = set()
-        generation = cur_generation
-        for _, doc_id, trans_id in reversed(relevant_tail):
+        for generation, doc_id, trans_id in reversed(relevant_tail):
             if doc_id not in seen:
                 changes.append((doc_id, generation, trans_id))
                 seen.add(doc_id)
-            generation -= 1
         changes.reverse()
         return (cur_generation, last_trans_id, changes)
 
