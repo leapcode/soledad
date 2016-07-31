@@ -23,15 +23,12 @@ import json
 import re
 import uuid
 import binascii
-import time
-import functools
 
 
 from collections import defaultdict
 from StringIO import StringIO
 from urlparse import urljoin
 from contextlib import contextmanager
-from multiprocessing.pool import ThreadPool
 from threading import Lock
 
 
@@ -96,9 +93,6 @@ def couch_server(url):
     session = Session(timeout=COUCH_TIMEOUT)
     server = Server(url=url, full_commit=False, session=session)
     yield server
-
-
-THREAD_POOL = ThreadPool(20)
 
 
 def _get_gen_doc_id(gen):
@@ -307,8 +301,8 @@ class CouchDatabase(object):
         """
 
         generation, _ = self.get_generation_info()
-        results = list(self.get_docs(self._database,
-                                     include_deleted=include_deleted))
+        results = list(
+            self._get_docs(None, True, include_deleted))
         return (generation, results)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
@@ -329,24 +323,37 @@ class CouchDatabase(object):
                  in matching doc_ids order.
         :rtype: iterable
         """
-        # Workaround for:
-        #
-        #   http://bugs.python.org/issue7980
-        #   https://leap.se/code/issues/5449
-        #
-        # python-couchdb uses time.strptime, which is not thread safe. In
-        # order to avoid the problem described on the issues above, we preload
-        # strptime here by evaluating the conversion of an arbitrary date.
-        # This will not be needed when/if we switch from python-couchdb to
-        # paisley.
-        time.strptime('Mar 8 1917', '%b %d %Y')
-        get_one = functools.partial(
-            self.get_doc, check_for_conflicts=check_for_conflicts)
-        docs = [THREAD_POOL.apply_async(get_one, [doc_id])
-                for doc_id in doc_ids]
-        for doc in docs:
-            doc = doc.get()
-            if not doc or not include_deleted and doc.is_tombstone():
+        return self._get_docs(doc_ids, check_for_conflicts, include_deleted)
+
+    def _get_docs(self, doc_ids, check_for_conflicts, include_deleted):
+        """
+        Use couch's `_all_docs` view to get the documents indicated in
+        `doc_ids`,
+
+        :param doc_ids: A list of document identifiers or None for all.
+        :type doc_ids: list
+        :param check_for_conflicts: If set to False, then the conflict check
+                                    will be skipped, and 'None' will be
+                                    returned instead of True/False.
+        :type check_for_conflicts: bool
+        :param include_deleted: If set to True, deleted documents will be
+                                returned with empty content. Otherwise deleted
+                                documents will not be included in the results.
+
+        :return: iterable giving the Document object for each document id
+                 in matching doc_ids order.
+        :rtype: iterable
+        """
+        params = {'include_docs': 'true', 'attachments': 'true'}
+        if doc_ids is not None:
+            params['keys'] = doc_ids
+        view = self._database.view("_all_docs", **params)
+        for row in view.rows:
+            result = row['doc']
+            doc = self.__parse_doc_from_couch(
+                result, result['_id'], check_for_conflicts=check_for_conflicts)
+            # filter out non-u1db or deleted documents
+            if not doc or (not include_deleted and doc.is_tombstone()):
                 continue
             yield doc
 
