@@ -29,7 +29,6 @@ from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.common.document import SoledadDocument
 from test_soledad.util import BaseSoledadTest
 from twisted.internet import defer
-from twisted.test.proto_helpers import MemoryReactorClock
 
 DOC_ID = "mydoc"
 DOC_REV = "rev"
@@ -219,9 +218,6 @@ class TestSyncDecrypterPool(BaseSoledadTest):
         This test ensures that processing of documents only occur if there is
         a sequence in place.
         """
-        reactor_clock = MemoryReactorClock()
-        self._pool._loop.clock = reactor_clock
-
         crypto = self._soledad._crypto
 
         docs = []
@@ -234,18 +230,19 @@ class TestSyncDecrypterPool(BaseSoledadTest):
             docs.append((doc, encrypted_content))
 
         # insert the encrypted document in the pool
-        self._pool.start(10)  # pool is expecting to process 10 docs
+        yield self._pool.start(10)  # pool is expecting to process 10 docs
+        self._pool._loop.stop()  # we are processing manually
         # first three arrives, forming a sequence
         for i, (doc, encrypted_content) in enumerate(docs[:3]):
             gen = idx = i + 1
             yield self._pool.insert_encrypted_received_doc(
                 doc.doc_id, doc.rev, encrypted_content, gen, "trans_id", idx)
+
         # last one arrives alone, so it can't be processed
         doc, encrypted_content = docs[-1]
         yield self._pool.insert_encrypted_received_doc(
             doc.doc_id, doc.rev, encrypted_content, 10, "trans_id", 10)
 
-        reactor_clock.advance(self._pool.DECRYPT_LOOP_PERIOD)
         yield self._pool._decrypt_and_recurse()
 
         self.assertEqual(3, self._pool._processed_docs)

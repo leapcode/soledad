@@ -344,6 +344,9 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
         self._loop = LoopingCall(self._decrypt_and_recurse)
 
+    def _start_pool(self, period):
+        self._loop.start(period)
+
     def start(self, docs_to_process):
         """
         Set the number of documents we expect to process.
@@ -360,7 +363,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         self._docs_to_process = docs_to_process
         self._deferred = defer.Deferred()
         d = self._init_db()
-        d.addCallback(lambda _: self._loop.start(self.DECRYPT_LOOP_PERIOD))
+        d.addCallback(lambda _: self._start_pool(self.DECRYPT_LOOP_PERIOD))
         return d
 
     def stop(self):
