@@ -22,15 +22,20 @@ See the README.md file for more information.
 
 import datetime
 import logging
+import netrc
 import os
 
 from argparse import ArgumentParser
+
+from leap.soledad.server import load_configuration
 
 from migrate_couch_schema import migrate
 
 
 TARGET_VERSION = '0.8.2'
 DEFAULT_COUCH_URL = 'http://127.0.0.1:5984'
+CONF = load_configuration('/etc/soledad/soledad-server.conf')
+NETRC_PATH = CONF['soledad-server']['admin_netrc']
 
 
 #
@@ -54,12 +59,24 @@ def _configure_logger(log_file):
         level=logging.DEBUG)
 
 
+def _default_couch_url():
+    if not os.path.exists(NETRC_PATH):
+        return DEFAULT_COUCH_URL
+    parsed_netrc = netrc.netrc(NETRC_PATH)
+    host, (login, _, password) = parsed_netrc.hosts.items()[0]
+    url = ('http://%(login)s:%(password)s@%(host)s:5984' % {
+           'login': login,
+           'password': password,
+           'host': host})
+    return url
+
+
 def _parse_args():
     parser = ArgumentParser()
     parser.add_argument(
         '--couch_url',
         help='the url for the couch database',
-        default=DEFAULT_COUCH_URL)
+        default=_default_couch_url())
     parser.add_argument(
         '--do-migrate',
         help='actually perform the migration (otherwise '
