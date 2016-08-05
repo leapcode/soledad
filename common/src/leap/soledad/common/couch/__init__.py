@@ -751,8 +751,6 @@ class CouchDatabase(object):
             }
             parts.append(conflicts)
 
-        self._allocate_new_generation(doc.doc_id, transaction_id)
-
         # build the couch document
         couch_doc = {
             '_id': doc.doc_id,
@@ -801,6 +799,8 @@ class CouchDatabase(object):
             self.batch_docs[doc.doc_id] = couch_doc
             last_gen, last_trans_id = self.batch_generation
             self.batch_generation = (last_gen + 1, transaction_id)
+
+        self._allocate_new_generation(doc.doc_id, transaction_id)
 
     def _new_resource(self, *path):
         """
