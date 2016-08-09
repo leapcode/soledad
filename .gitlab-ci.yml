@@ -1,5 +1,5 @@
 tests:
-  image: leap/soledad:1.0
+  image: leapcode/soledad:1.0
   services:
   - couchdb
   script:
