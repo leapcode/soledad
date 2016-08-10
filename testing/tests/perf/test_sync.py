@@ -15,87 +15,45 @@ def load_up(client, amount, size):
     return d
 
 
-@pytest.inlineCallbacks
-@pytest.mark.benchmark(group="test_upload")
-def test_upload_20_500k(soledad_client, txbenchmark_with_setup):
-    uploads, size, client = 20, 500*1000, soledad_client()
+def create_upload(uploads, size):
+    @pytest.inlineCallbacks
+    @pytest.mark.benchmark(group="test_upload")
+    def test(soledad_client, txbenchmark_with_setup):
+        client = soledad_client()
 
-    def setup():
-        return load_up(client, uploads, size)
+        def setup():
+            return load_up(client, uploads, size)
 
-    yield txbenchmark_with_setup(setup, client.sync)
-
-
-@pytest.inlineCallbacks
-@pytest.mark.benchmark(group="test_upload")
-def test_upload_100_100k(soledad_client, txbenchmark_with_setup):
-    uploads, size, client = 100, 100*1000, soledad_client()
-
-    def setup():
-        return load_up(client, uploads, size)
-
-    yield txbenchmark_with_setup(setup, client.sync)
+        yield txbenchmark_with_setup(setup, client.sync)
+    return test
 
 
-@pytest.inlineCallbacks
-@pytest.mark.benchmark(group="test_upload")
-def test_upload_1000_10k(soledad_client, txbenchmark_with_setup):
-    uploads, size, client = 1000, 10*1000, soledad_client()
-
-    def setup():
-        return load_up(client, uploads, size)
-
-    yield txbenchmark_with_setup(setup, client.sync)
+test_upload_20_500k = create_upload(20, 500*1000)
+test_upload_100_100k = create_upload(100, 100*1000)
+test_upload_1000_10k = create_upload(1000, 10*1000)
 
 
-@pytest.inlineCallbacks
-@pytest.mark.benchmark(group="test_download")
-def test_download_20_500k(soledad_client, txbenchmark_with_setup):
-    downloads, size, client = 20, 500*1000, soledad_client()
+def create_download(downloads, size):
+    @pytest.inlineCallbacks
+    @pytest.mark.benchmark(group="test_download")
+    def test(soledad_client, txbenchmark_with_setup):
+        client = soledad_client()
 
-    yield load_up(client, downloads, size)
-    yield client.sync()
+        yield load_up(client, downloads, size)
+        yield client.sync()
+        # We could create them directly on couch, but sending them
+        # ensures we are dealing with properly encrypted docs
 
-    def setup():
-        clean_client = soledad_client()
-        return (clean_client,), {}
+        def setup():
+            clean_client = soledad_client()
+            return (clean_client,), {}
 
-    def sync(clean_client):
-        return clean_client.sync()
-    yield txbenchmark_with_setup(setup, sync)
-
-
-@pytest.inlineCallbacks
-@pytest.mark.benchmark(group="test_download")
-def test_download_100_100k(soledad_client, txbenchmark_with_setup):
-    downloads, size, client = 100, 100*1000, soledad_client()
-
-    yield load_up(client, downloads, size)
-    yield client.sync()
-    # We could create them directly on remote db, but sending them
-    # ensures we are dealing with properly encrypted docs
-
-    def setup():
-        clean_client = soledad_client()
-        return (clean_client,), {}
-
-    def sync(clean_client):
-        return clean_client.sync()
-    yield txbenchmark_with_setup(setup, sync)
+        def sync(clean_client):
+            return clean_client.sync()
+        yield txbenchmark_with_setup(setup, sync)
+    return test
 
 
-@pytest.inlineCallbacks
-@pytest.mark.benchmark(group="test_download")
-def test_download_1000_10k(soledad_client, txbenchmark_with_setup):
-    downloads, size, client = 1000, 10*1000, soledad_client()
-
-    yield load_up(client, downloads, size)
-    yield client.sync()
-
-    def setup():
-        clean_client = soledad_client()
-        return (clean_client,), {}
-
-    def sync(clean_client):
-        return clean_client.sync()
-    yield txbenchmark_with_setup(setup, sync)
+test_download_20_500k = create_download(20, 500*1000)
+test_download_100_100k = create_download(100, 100*1000)
+test_download_1000_10k = create_download(1000, 10*1000)

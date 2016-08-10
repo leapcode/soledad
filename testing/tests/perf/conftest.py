@@ -208,7 +208,7 @@ def txbenchmark_with_setup(benchmark):
 #
 
 @pytest.fixture()
-def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs):
+def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
     passphrase = DEFAULT_PASSPHRASE
     server_url = DEFAULT_URL
     token = DEFAULT_TOKEN
@@ -220,7 +220,7 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs):
         local_db_path = os.path.join(tmpdir.strpath, '%s.db' % uuid4().hex)
         remote_db(uuid)
         soledad_dbs(uuid)
-        return Soledad(
+        soledad_client = Soledad(
             uuid,
             unicode(passphrase),
             secrets_path=secrets_path,
@@ -229,4 +229,6 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs):
             cert_file=None,
             auth_token=token,
             defer_encryption=True)
+        request.addfinalizer(soledad_client.close)
+        return soledad_client
     return create
