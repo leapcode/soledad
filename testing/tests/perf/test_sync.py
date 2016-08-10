@@ -2,47 +2,100 @@ import pytest
 
 from twisted.internet.defer import gatherResults
 
-from leap.soledad.common.couch import CouchDatabase
-from leap.soledad.common.document import ServerDocument
 
-
-content = ' ' * 10000
-
-
-@pytest.inlineCallbacks
-def test_upload(soledad_client, request):
-    # create a bunch of local documents
-    uploads = request.config.option.num_docs
+def load_up(client, amount, size):
+    content = 'x'*size
     deferreds = []
-    for i in xrange(uploads):
-        d = soledad_client.create_doc({'upload': True, 'content': content})
+    # create a bunch of local documents
+    for i in xrange(amount):
+        d = client.create_doc({'content': content})
         deferreds.append(d)
-    yield gatherResults(deferreds)
-
-    # synchronize
-    yield soledad_client.sync()
-
-    # check that documents reached the remote database
-    url = request.config.getoption('--couch-url')
-    remote = CouchDatabase(url, 'user-0')
-    remote_count, _ = remote.get_all_docs()
-    assert remote_count == uploads
+    d = gatherResults(deferreds)
+    d.addCallback(lambda _: None)
+    return d
 
 
 @pytest.inlineCallbacks
-def test_download(soledad_client, request):
-    # create a bunch of remote documents
-    downloads = request.config.option.num_docs
-    url = request.config.getoption('--couch-url')
-    remote = CouchDatabase(url, 'user-0')
-    for i in xrange(downloads):
-        doc = ServerDocument('doc-%d' % i, 'replica:1')
-        doc.content = {'download': True, 'content': content}
-        remote.save_document(None, doc, i)
+@pytest.mark.benchmark(group="test_upload")
+def test_upload_20_500k(soledad_client, txbenchmark_with_setup):
+    uploads, size, client = 20, 500*1000, soledad_client()
 
-    # synchronize
-    yield soledad_client.sync()
+    def setup():
+        return load_up(client, uploads, size)
 
-    # check that documents reached the local database
-    local_count, docs = yield soledad_client.get_all_docs()
-    assert local_count == downloads
+    yield txbenchmark_with_setup(setup, client.sync)
+
+
+@pytest.inlineCallbacks
+@pytest.mark.benchmark(group="test_upload")
+def test_upload_100_100k(soledad_client, txbenchmark_with_setup):
+    uploads, size, client = 100, 100*1000, soledad_client()
+
+    def setup():
+        return load_up(client, uploads, size)
+
+    yield txbenchmark_with_setup(setup, client.sync)
+
+
+@pytest.inlineCallbacks
+@pytest.mark.benchmark(group="test_upload")
+def test_upload_1000_10k(soledad_client, txbenchmark_with_setup):
+    uploads, size, client = 1000, 10*1000, soledad_client()
+
+    def setup():
+        return load_up(client, uploads, size)
+
+    yield txbenchmark_with_setup(setup, client.sync)
+
+
+@pytest.inlineCallbacks
+@pytest.mark.benchmark(group="test_download")
+def test_download_20_500k(soledad_client, txbenchmark_with_setup):
+    downloads, size, client = 20, 500*1000, soledad_client()
+
+    yield load_up(client, downloads, size)
+    yield client.sync()
+
+    def setup():
+        clean_client = soledad_client()
+        return (clean_client,), {}
+
+    def sync(clean_client):
+        return clean_client.sync()
+    yield txbenchmark_with_setup(setup, sync)
+
+
+@pytest.inlineCallbacks
+@pytest.mark.benchmark(group="test_download")
+def test_download_100_100k(soledad_client, txbenchmark_with_setup):
+    downloads, size, client = 100, 100*1000, soledad_client()
+
+    yield load_up(client, downloads, size)
+    yield client.sync()
+    # We could create them directly on remote db, but sending them
+    # ensures we are dealing with properly encrypted docs
+
+    def setup():
+        clean_client = soledad_client()
+        return (clean_client,), {}
+
+    def sync(clean_client):
+        return clean_client.sync()
+    yield txbenchmark_with_setup(setup, sync)
+
+
+@pytest.inlineCallbacks
+@pytest.mark.benchmark(group="test_download")
+def test_download_1000_10k(soledad_client, txbenchmark_with_setup):
+    downloads, size, client = 1000, 10*1000, soledad_client()
+
+    yield load_up(client, downloads, size)
+    yield client.sync()
+
+    def setup():
+        clean_client = soledad_client()
+        return (clean_client,), {}
+
+    def sync(clean_client):
+        return clean_client.sync()
+    yield txbenchmark_with_setup(setup, sync)

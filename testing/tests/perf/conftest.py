@@ -6,8 +6,10 @@ import signal
 import time
 
 from hashlib import sha512
+from uuid import uuid4
 from subprocess import call
 from urlparse import urljoin
+from twisted.internet import threads, reactor
 
 from leap.soledad.client import Soledad
 from leap.soledad.common.couch import CouchDatabase
@@ -59,17 +61,17 @@ class SoledadDatabases(object):
         self._token_db_url = urljoin(url, _token_dbname())
         self._shared_db_url = urljoin(url, 'shared')
 
-    def setup(self):
+    def setup(self, uuid):
         self._create_dbs()
-        self._add_token()
+        self._add_token(uuid)
 
     def _create_dbs(self):
         requests.put(self._token_db_url)
         requests.put(self._shared_db_url)
 
-    def _add_token(self):
+    def _add_token(self, uuid):
         token = sha512(DEFAULT_TOKEN).hexdigest()
-        content = {'type': 'Token', 'user_id': DEFAULT_UUID}
+        content = {'type': 'Token', 'user_id': uuid}
         requests.put(
             self._token_db_url + '/' + token, data=json.dumps(content))
 
@@ -81,37 +83,41 @@ class SoledadDatabases(object):
 @pytest.fixture(scope='module')
 def soledad_dbs(request):
     couch_url = request.config.option.couch_url
-    db = SoledadDatabases(couch_url)
-    db.setup()
-    request.addfinalizer(db.teardown)
-    return db
+
+    def create(uuid=DEFAULT_UUID):
+        db = SoledadDatabases(couch_url)
+        request.addfinalizer(db.teardown)
+        return db.setup(uuid)
+    return create
 
 
 #
-# user_db fixture: provides an empty database for a given user in a per
+# remote_db fixture: provides an empty database for a given user in a per
 # function scope.
 #
 
 class UserDatabase(object):
 
-    def __init__(self, url):
-        self._user_db_url = urljoin(url, 'user-%s' % DEFAULT_UUID)
+    def __init__(self, url, uuid):
+        self._remote_db_url = urljoin(url, 'user-%s' % uuid)
 
     def setup(self):
-        CouchDatabase.open_database(
-            url=self._user_db_url, create=True, replica_uid=None)
+        return CouchDatabase.open_database(
+            url=self._remote_db_url, create=True, replica_uid=None)
 
     def teardown(self):
-        requests.delete(self._user_db_url)
+        requests.delete(self._remote_db_url)
 
 
 @pytest.fixture(scope='function')
-def user_db(request):
+def remote_db(request):
     couch_url = request.config.option.couch_url
-    db = UserDatabase(couch_url)
-    db.setup()
-    request.addfinalizer(db.teardown)
-    return db
+
+    def create(uuid=DEFAULT_UUID):
+        db = UserDatabase(couch_url, uuid)
+        request.addfinalizer(db.teardown)
+        return db.setup()
+    return create
 
 
 def get_pid(pidfile):
@@ -172,26 +178,55 @@ def soledad_server(tmpdir_factory, request):
     return server
 
 
+@pytest.fixture(scope='function')
+def txbenchmark(benchmark):
+    def blockOnThread(*args, **kwargs):
+        return threads.deferToThread(
+                benchmark, threads.blockingCallFromThread,
+                reactor, *args, **kwargs)
+    return blockOnThread
+
+
+@pytest.fixture(scope='function')
+def txbenchmark_with_setup(benchmark):
+    def blockOnThreadWithSetup(setup, f):
+        def blocking_runner(*args, **kwargs):
+            return threads.blockingCallFromThread(reactor, f, *args, **kwargs)
+
+        def blocking_setup():
+            return threads.blockingCallFromThread(reactor, setup)
+
+        def bench():
+            return benchmark.pedantic(blocking_runner, setup=blocking_setup,
+                                      rounds=4, warmup_rounds=1)
+        return threads.deferToThread(bench)
+    return blockOnThreadWithSetup
+
+
 #
 # soledad_client fixture: provides a clean soledad client for a test function.
 #
 
 @pytest.fixture()
-def soledad_client(tmpdir, soledad_server, user_db, soledad_dbs):
-    uuid = DEFAULT_UUID
+def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs):
     passphrase = DEFAULT_PASSPHRASE
-    secrets_path = os.path.join(tmpdir.strpath, '%s.secret' % uuid)
-    local_db_path = os.path.join(tmpdir.strpath, '%s.db' % uuid)
     server_url = DEFAULT_URL
     token = DEFAULT_TOKEN
 
     # get a soledad instance
-    return Soledad(
-        uuid,
-        unicode(passphrase),
-        secrets_path=secrets_path,
-        local_db_path=local_db_path,
-        server_url=server_url,
-        cert_file=None,
-        auth_token=token,
-        defer_encryption=True)
+    def create(new=False):
+        uuid = uuid4().hex if new else DEFAULT_UUID
+        secrets_path = os.path.join(tmpdir.strpath, '%s.secret' % uuid4().hex)
+        local_db_path = os.path.join(tmpdir.strpath, '%s.db' % uuid4().hex)
+        remote_db(uuid)
+        soledad_dbs(uuid)
+        return Soledad(
+            uuid,
+            unicode(passphrase),
+            secrets_path=secrets_path,
+            local_db_path=local_db_path,
+            server_url=server_url,
+            cert_file=None,
+            auth_token=token,
+            defer_encryption=True)
+    return create
