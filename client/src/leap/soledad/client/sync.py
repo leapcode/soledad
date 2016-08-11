@@ -176,6 +176,7 @@ class SoledadSynchronizer(Synchronizer):
             defer_decryption=defer_decryption)
         logger.debug("target gen after sync: %d" % new_gen)
         logger.debug("target trans_id after sync: %s" % new_trans_id)
+        self.source.commit() # sync worked, commit
         info = {
             "target_replica_uid": self.target_replica_uid,
             "new_gen": new_gen,
