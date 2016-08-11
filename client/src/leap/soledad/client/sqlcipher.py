@@ -458,6 +458,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         if DO_STATS:
             self.sync_phase = None
 
+    def commit(self):
+        self._db_handle.commit()
+
     @property
     def _replica_uid(self):
         return str(self.__replica_uid)
