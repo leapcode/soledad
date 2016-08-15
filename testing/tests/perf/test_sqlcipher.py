@@ -6,27 +6,40 @@ import pytest
 from twisted.internet.defer import gatherResults
 
 
-def load_up(client, amount, size):
+def load_up(client, amount, size, defer=True):
     content = 'x'*size
     deferreds = []
     # create a bunch of local documents
     for i in xrange(amount):
         d = client.create_doc({'content': content})
         deferreds.append(d)
-    d = gatherResults(deferreds)
-    d.addCallback(lambda _: None)
-    return d
+    if defer:
+        d = gatherResults(deferreds)
+        d.addCallback(lambda _: None)
+        return d
 
 
-def build_test_sqlcipher_create(amount, size):
+def build_test_sqlcipher_async_create(amount, size):
     @pytest.inlineCallbacks
-    @pytest.mark.benchmark(group="test_sqlcipher_create")
+    @pytest.mark.benchmark(group="test_sqlcipher_async_create")
     def test(soledad_client, txbenchmark):
         client = soledad_client()
         yield txbenchmark(load_up, client, amount, size)
     return test
 
 
+def build_test_sqlcipher_create(amount, size):
+    @pytest.mark.benchmark(group="test_sqlcipher_create")
+    def test(soledad_client, benchmark):
+        client = soledad_client()._dbsyncer
+        benchmark(load_up, client, amount, size, defer=False)
+    return test
+
+
+test_async_create_20_500k = build_test_sqlcipher_async_create(20, 500*1000)
+test_async_create_100_100k = build_test_sqlcipher_async_create(100, 100*1000)
+test_async_create_1000_10k = build_test_sqlcipher_async_create(1000, 10*1000)
+# synchronous
 test_create_20_500k = build_test_sqlcipher_create(20, 500*1000)
 test_create_100_100k = build_test_sqlcipher_create(100, 100*1000)
 test_create_1000_10k = build_test_sqlcipher_create(1000, 10*1000)
