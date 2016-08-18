@@ -116,7 +116,7 @@ class CouchDatabase(object):
     """
 
     @classmethod
-    def open_database(cls, url, create, ensure_ddocs=False, replica_uid=None,
+    def open_database(cls, url, create, replica_uid=None,
                       database_security=None):
         """
         Open a U1DB database using CouchDB as backend.
@@ -127,8 +127,6 @@ class CouchDatabase(object):
         :type create: bool
         :param replica_uid: an optional unique replica identifier
         :type replica_uid: str
-        :param ensure_ddocs: Ensure that the design docs exist on server.
-        :type ensure_ddocs: bool
         :param database_security: security rules as CouchDB security doc
         :type database_security: dict
 
@@ -149,21 +147,20 @@ class CouchDatabase(object):
                     server.create(dbname)
                 else:
                     raise DatabaseDoesNotExist()
-        db = cls(url,
-                 dbname, ensure_ddocs=ensure_ddocs,
+        db = cls(url, dbname, ensure_security=create,
                  database_security=database_security)
         return SoledadBackend(
             db, replica_uid=replica_uid)
 
-    def __init__(self, url, dbname, ensure_ddocs=True,
+    def __init__(self, url, dbname, ensure_security=False,
                  database_security=None):
         """
         :param url: Couch server URL with necessary credentials
         :type url: string
         :param dbname: Couch database name
         :type dbname: string
-        :param ensure_ddocs: Ensure that the design docs exist on server.
-        :type ensure_ddocs: bool
+        :param ensure_security: will PUT a _security ddoc if set
+        :type ensure_security: bool
         :param database_security: security rules as CouchDB security doc
         :type database_security: dict
         """
@@ -174,7 +171,7 @@ class CouchDatabase(object):
         self.batching = False
         self.batch_generation = None
         self.batch_docs = {}
-        if ensure_ddocs:
+        if ensure_security:
             self.ensure_security_ddoc(database_security)
 
     def batch_start(self):

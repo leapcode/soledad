@@ -80,7 +80,7 @@ class CouchServerState(ServerState):
         :rtype: SoledadBackend
         """
         url = urljoin(self.couch_url, dbname)
-        db = CouchDatabase.open_database(url, create=False, ensure_ddocs=False)
+        db = CouchDatabase.open_database(url, create=False)
         return db
 
     def ensure_database(self, dbname):
