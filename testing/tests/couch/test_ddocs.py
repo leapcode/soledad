@@ -9,16 +9,16 @@ class CouchDesignDocsTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
+        self.create_db()
 
-    def create_db(self, ensure=True, dbname=None):
+    def create_db(self, dbname=None):
         if not dbname:
             dbname = ('test-%s' % uuid4().hex)
         if dbname not in self.couch_server:
             self.couch_server.create(dbname)
         self.db = couch.CouchDatabase(
             (self.couch_url),
-            dbname,
-            ensure_ddocs=ensure)
+            dbname)
 
     def tearDown(self):
         self.db.delete_database()
@@ -30,7 +30,6 @@ class CouchDesignDocsTests(CouchDBTestCase):
         Ensure_security creates a _security ddoc to ensure that only soledad
         will have the lowest privileged access to an user db.
         """
-        self.create_db(ensure=False)
         self.assertFalse(self.db._database.resource.get_json('_security')[2])
         self.db.ensure_security_ddoc()
         security_ddoc = self.db._database.resource.get_json('_security')[2]
@@ -43,7 +42,6 @@ class CouchDesignDocsTests(CouchDBTestCase):
         """
         Given a configuration, follow it to create the security document
         """
-        self.create_db(ensure=False)
         configuration = {'members': ['user1', 'user2'],
                          'members_roles': ['role1', 'role2'],
                          'admins': ['admin'],

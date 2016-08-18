@@ -17,8 +17,7 @@ def make_couch_database_for_test(test, replica_uid):
     db = couch.CouchDatabase.open_database(
         urljoin(test.couch_url, dbname),
         create=True,
-        replica_uid=replica_uid or 'test',
-        ensure_ddocs=True)
+        replica_uid=replica_uid or 'test')
     test.addCleanup(test.delete_db, dbname)
     return db
 
