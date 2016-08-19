@@ -85,10 +85,22 @@ def _parse_args():
     parser.add_argument(
         '--log-file',
         help='the log file to use')
+    parser.add_argument(
+        '--pdb', action='store_true',
+        help='escape to pdb shell in case of exception')
     return parser.parse_args()
+
+
+def _enable_pdb():
+    import sys
+    from IPython.core import ultratb
+    sys.excepthook = ultratb.FormattedTB(
+        mode='Verbose', color_scheme='Linux', call_pdb=1)
 
 
 if __name__ == '__main__':
     args = _parse_args()
+    if args.pdb:
+        _enable_pdb()
     _configure_logger(args.log_file)
     migrate(args, TARGET_VERSION)
