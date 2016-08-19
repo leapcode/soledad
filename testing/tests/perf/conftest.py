@@ -35,7 +35,6 @@ def pytest_addoption(parser):
 # default options for all tests
 #
 
-DEFAULT_UUID = '0'
 DEFAULT_PASSPHRASE = '123'
 
 DEFAULT_URL = 'http://127.0.0.1:2424'
@@ -84,7 +83,7 @@ class SoledadDatabases(object):
 def soledad_dbs(request):
     couch_url = request.config.option.couch_url
 
-    def create(uuid=DEFAULT_UUID):
+    def create(uuid):
         db = SoledadDatabases(couch_url)
         request.addfinalizer(db.teardown)
         return db.setup(uuid)
@@ -113,7 +112,7 @@ class UserDatabase(object):
 def remote_db(request):
     couch_url = request.config.option.couch_url
 
-    def create(uuid=DEFAULT_UUID):
+    def create(uuid):
         db = UserDatabase(couch_url, uuid)
         request.addfinalizer(db.teardown)
         return db.setup()
@@ -212,14 +211,20 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
     passphrase = DEFAULT_PASSPHRASE
     server_url = DEFAULT_URL
     token = DEFAULT_TOKEN
+    default_uuid = uuid4().hex
+    remote_db(default_uuid)
+    soledad_dbs(default_uuid)
 
     # get a soledad instance
     def create(new=False):
-        uuid = uuid4().hex if new else DEFAULT_UUID
         secrets_path = os.path.join(tmpdir.strpath, '%s.secret' % uuid4().hex)
         local_db_path = os.path.join(tmpdir.strpath, '%s.db' % uuid4().hex)
-        remote_db(uuid)
-        soledad_dbs(uuid)
+        if new:
+            uuid = uuid4().hex
+            remote_db(uuid)
+            soledad_dbs(uuid)
+        else:
+            uuid = default_uuid
         soledad_client = Soledad(
             uuid,
             unicode(passphrase),
