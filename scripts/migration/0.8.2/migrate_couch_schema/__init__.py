@@ -77,8 +77,12 @@ def migrate(args, target_version):
             logger.warning("skipping not migrateable user db: %s" % dbname)
             continue
         logger.info("starting migration of user db: %s" % dbname)
-        _migrate_user_db(db, args.do_migrate)
-        logger.info("finished migration of user db: %s" % dbname)
+        try:
+            _migrate_user_db(db, args.do_migrate)
+            logger.info("finished migration of user db: %s" % dbname)
+        except:
+            logger.exception('Error migrating user db: %s' % dbname)
+            logger.error('Continuing with next database.')
     logger.info('finished couch schema migration to %s' % target_version)
 
 
