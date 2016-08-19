@@ -7,6 +7,7 @@ import logging
 
 from couchdb import Server
 from couchdb import ResourceNotFound
+from couchdb import ResourceConflict
 
 from leap.soledad.common.couch import GENERATION_KEY
 from leap.soledad.common.couch import TRANSACTION_ID_KEY
@@ -100,7 +101,15 @@ def _migrate_transaction_log(db, do_migrate):
         }
         logger.info('creating gen doc: %s' % (gen_doc_id))
         if do_migrate:
-            db.save(doc)
+            try:
+                db.save(doc)
+            except ResourceConflict:
+                # this gen document already exists. if documents are the same,
+                # continue with migration.
+                existing_doc = db.get(gen_doc_id)
+                for key in [GENERATION_KEY, DOC_ID_KEY, TRANSACTION_ID_KEY]:
+                    if existing_doc[key] != doc[key]:
+                        raise
 
 
 def _migrate_config_doc(db, do_migrate):
