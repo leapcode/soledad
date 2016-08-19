@@ -73,7 +73,7 @@ def migrate(args, target_version):
     for dbname in user_dbs:
         db = server[dbname]
         if not _is_migrateable(db):
-            logger.warning("skipping user db: %s" % dbname)
+            logger.warning("skipping not migrateable user db: %s" % dbname)
             continue
         logger.info("starting migration of user db: %s" % dbname)
         _migrate_user_db(db, args.do_migrate)
