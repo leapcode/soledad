@@ -6,6 +6,7 @@ Support functions for migration script.
 import logging
 
 from couchdb import Server
+from couchdb import ResourceNotFound
 
 from leap.soledad.common.couch import GENERATION_KEY
 from leap.soledad.common.couch import TRANSACTION_ID_KEY
@@ -38,7 +39,13 @@ def _is_migrateable(db):
 def _get_transaction_log(db):
     ddoc_path = ['_design', 'transactions', '_view', 'log']
     resource = db.resource(*ddoc_path)
-    _, _, data = resource.get_json()
+    try:
+        _, _, data = resource.get_json()
+    except ResourceNotFound:
+        logger.warning(
+            'Missing transactions design document, '
+            'can\'t get transaction log.')
+        return []
     rows = data['rows']
     transaction_log = []
     gen = 1
@@ -152,6 +159,9 @@ def _delete_design_docs(db, do_migrate):
     for ddoc in ['docs', 'syncs', 'transactions']:
         doc_id = '_design/%s' % ddoc
         doc = db.get(doc_id)
-        logger.info("deleting design doc: %s" % doc_id)
-        if do_migrate:
-            db.delete(doc)
+        if doc:
+            logger.info("deleting design doc: %s" % doc_id)
+            if do_migrate:
+                db.delete(doc)
+        else:
+            logger.warning("design doc not found: %s" % doc_id)
