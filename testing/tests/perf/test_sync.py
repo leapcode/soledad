@@ -57,3 +57,15 @@ def create_download(downloads, size):
 test_download_20_500k = create_download(20, 500*1000)
 test_download_100_100k = create_download(100, 100*1000)
 test_download_1000_10k = create_download(1000, 10*1000)
+
+
+@pytest.inlineCallbacks
+@pytest.mark.benchmark(group="test_nothing_to_sync")
+def test_nothing_to_sync(soledad_client, txbenchmark_with_setup):
+    def setup():
+        clean_client = soledad_client()
+        return (clean_client,), {}
+
+    def sync(clean_client):
+        return clean_client.sync()
+    yield txbenchmark_with_setup(setup, sync)
