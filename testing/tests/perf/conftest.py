@@ -80,7 +80,7 @@ class SoledadDatabases(object):
         requests.delete(self._shared_db_url)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture()
 def soledad_dbs(request):
     couch_url = request.config.option.couch_url
 
@@ -109,7 +109,7 @@ class UserDatabase(object):
         requests.delete(self._remote_db_url)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture()
 def remote_db(request):
     couch_url = request.config.option.couch_url
 
@@ -178,7 +178,7 @@ def soledad_server(tmpdir_factory, request):
     return server
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture()
 def txbenchmark(benchmark):
     def blockOnThread(*args, **kwargs):
         return threads.deferToThread(
@@ -187,7 +187,7 @@ def txbenchmark(benchmark):
     return blockOnThread
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture()
 def txbenchmark_with_setup(benchmark):
     def blockOnThreadWithSetup(setup, f):
         def blocking_runner(*args, **kwargs):
