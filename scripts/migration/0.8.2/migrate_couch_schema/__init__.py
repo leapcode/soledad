@@ -76,9 +76,9 @@ def migrate(args, target_version):
 
 def _migrate_user_db(db, do_migrate):
     _migrate_transaction_log(db, do_migrate)
-    _migrate_config_doc(db, do_migrate)
     _migrate_sync_docs(db, do_migrate)
     _delete_design_docs(db, do_migrate)
+    _migrate_config_doc(db, do_migrate)
 
 
 def _migrate_transaction_log(db, do_migrate):
