@@ -103,4 +103,9 @@ if __name__ == '__main__':
     if args.pdb:
         _enable_pdb()
     _configure_logger(args.log_file)
-    migrate(args, TARGET_VERSION)
+    logger = logging.getLogger(__name__)
+    try:
+        migrate(args, TARGET_VERSION)
+    except:
+        logger.exception('Fatal error on migrate script!')
+        raise
