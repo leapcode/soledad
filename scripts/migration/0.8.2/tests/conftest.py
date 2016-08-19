@@ -31,7 +31,11 @@ initial_docs = [
     {'_id': 'doc2', 'u1db_transactions': [(2, 'trans-2'), (4, 'trans-4')]},
     {'_id': '_design/docs'},
     {'_id': '_design/syncs'},
-    {'_id': '_design/transactions', 'views': {'log': {'map': transaction_map}}}
+    {'_id': '_design/transactions',
+     'views': {'log': {'map': transaction_map}}},
+    # the following should be removed if found in the dbs
+    {'_id': 'u1db_sync_log'},
+    {'_id': 'u1db_sync_state'},
 ]
 
 

@@ -119,6 +119,21 @@ def _migrate_sync_docs(db, do_migrate):
     for row in view.rows:
         old_doc = row['doc']
         old_id = old_doc['_id']
+
+        # older schemas used different documents with ids starting with
+        # "u1db_sync" to store sync-related data:
+        #
+        #   - u1db_sync_log: was used to store the whole sync log.
+        #   - u1db_sync_state: was used to store the sync state.
+        #
+        # if any of these documents exist in the current db, they are leftover
+        # from previous migrations, and should just be removed.
+        if old_id in ['u1db_sync_log', 'u1db_sync_state']:
+            logger.info('removing leftover "u1db_sync_log" document...')
+            if do_migrate:
+                db.delete(old_doc)
+            continue
+
         replica_uid = old_id.replace('u1db_sync_', '')
         new_id = "%s%s" % (SYNC_DOC_ID_PREFIX, replica_uid)
         new_doc = {
