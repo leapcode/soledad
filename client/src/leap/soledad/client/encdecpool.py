@@ -556,6 +556,8 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         while next_index in self._decrypted_docs_indexes:
             sequence.append(str(next_index))
             next_index += 1
+            if len(sequence) > 900:
+                break  # SQLITE_LIMIT_VARIABLE_NUMBER
         # Then fetch all the ones ready for insertion.
         if sequence:
             insertable_docs = yield self._get_docs(encrypted=False,
