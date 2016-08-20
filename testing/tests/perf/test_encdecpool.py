@@ -35,10 +35,10 @@ def create_encrypt(amount, size):
         yield txbenchmark_with_setup(setup, put_and_wait)
     return test
 
-test_encrypt_1000_10k = create_encrypt(1000, 10*1000)
-# test_encrypt_1000_500k = create_encrypt(1000, 500*1000)
-# test_encrypt_1000_1M = create_encrypt(1000, 1000*1000)
-# test_encrypt_1000_10M = create_encrypt(1000, 10*1000*1000)
+test_encdecpool_encrypt_1000_10k = create_encrypt(1000, 10*1000)
+# test_encdecpool_encrypt_1000_500k = create_encrypt(1000, 500*1000)
+# test_encdecpool_encrypt_1000_1M = create_encrypt(1000, 1000*1000)
+# test_encdecpool_encrypt_1000_10M = create_encrypt(1000, 10*1000*1000)
 
 
 def create_decrypt(amount, size):
@@ -76,9 +76,9 @@ def create_decrypt(amount, size):
         yield txbenchmark_with_setup(setup, put_and_wait)
     return test
 
-test_decrypt_1000_10k = create_decrypt(1000, 10*1000)
-test_decrypt_1000_100k = create_decrypt(1000, 10*1000)
+test_encdecpool_decrypt_1000_10k = create_decrypt(1000, 10*1000)
+test_encdecpool_decrypt_1000_100k = create_decrypt(1000, 10*1000)
 # memory issues ahead
-# test_decrypt_1000_500k = create_decrypt(1000, 500*1000)
-# test_decrypt_1000_1M = create_decrypt(1000, 1000*1000)
-# test_decrypt_1000_10M = create_decrypt(1000, 10*1000*1000)
+# test_encdecpool_decrypt_1000_500k = create_decrypt(1000, 500*1000)
+# test_encdecpool_decrypt_1000_1M = create_decrypt(1000, 1000*1000)
+# test_encdecpool_decrypt_1000_10M = create_decrypt(1000, 10*1000*1000)
