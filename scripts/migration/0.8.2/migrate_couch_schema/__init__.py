@@ -44,8 +44,8 @@ def _get_transaction_log(db):
         _, _, data = resource.get_json()
     except ResourceNotFound:
         logger.warning(
-            'Missing transactions design document, '
-            'can\'t get transaction log.')
+            '[%s] missing transactions design document, '
+            'can\'t get transaction log.' % db.name)
         return []
     rows = data['rows']
     transaction_log = []
@@ -67,22 +67,22 @@ def _get_user_dbs(server):
 
 def migrate(args, target_version):
     server = _get_couch_server(args.couch_url)
-    logger.info('starting couch schema migration to %s...' % target_version)
+    logger.info('starting couch schema migration to %s' % target_version)
     if not args.do_migrate:
         logger.warning('dry-run: no changes will be made to databases')
     user_dbs = _get_user_dbs(server)
     for dbname in user_dbs:
         db = server[dbname]
         if not _is_migrateable(db):
-            logger.warning("skipping not migrateable user db: %s" % dbname)
+            logger.warning("[%s] skipping not migrateable user db" % dbname)
             continue
-        logger.info("starting migration of user db: %s" % dbname)
+        logger.info("[%s] starting migration of user db" % dbname)
         try:
             _migrate_user_db(db, args.do_migrate)
-            logger.info("finished migration of user db: %s" % dbname)
+            logger.info("[%s] finished migration of user db" % dbname)
         except:
-            logger.exception('Error migrating user db: %s' % dbname)
-            logger.error('Continuing with next database.')
+            logger.exception('[%s] error migrating user db' % dbname)
+            logger.error('continuing with next database.')
     logger.info('finished couch schema migration to %s' % target_version)
 
 
@@ -103,7 +103,7 @@ def _migrate_transaction_log(db, do_migrate):
             DOC_ID_KEY: doc_id,
             TRANSACTION_ID_KEY: trans_id,
         }
-        logger.info('creating gen doc: %s' % (gen_doc_id))
+        logger.debug('[%s] creating gen doc: %s' % (db.name, gen_doc_id))
         if do_migrate:
             try:
                 db.save(doc)
@@ -123,14 +123,15 @@ def _migrate_config_doc(db, do_migrate):
         REPLICA_UID_KEY: old_doc[REPLICA_UID_KEY],
         SCHEMA_VERSION_KEY: SCHEMA_VERSION,
     }
-    logger.info("moving config doc: %s -> %s"
-                % (old_doc['_id'], new_doc['_id']))
+    logger.info("[%s] moving config doc: %s -> %s"
+                % (db.name, old_doc['_id'], new_doc['_id']))
     if do_migrate:
         db.save(new_doc)
         db.delete(old_doc)
 
 
 def _migrate_sync_docs(db, do_migrate):
+    logger.info('[%s] moving sync docs' % db.name)
     view = db.view(
         '_all_docs',
         startkey='u1db_sync',
@@ -149,7 +150,8 @@ def _migrate_sync_docs(db, do_migrate):
         # if any of these documents exist in the current db, they are leftover
         # from previous migrations, and should just be removed.
         if old_id in ['u1db_sync_log', 'u1db_sync_state']:
-            logger.info('removing leftover "u1db_sync_log" document...')
+            logger.info('[%s] removing leftover document: %s'
+                        % (db.name, old_id))
             if do_migrate:
                 db.delete(old_doc)
             continue
@@ -162,7 +164,8 @@ def _migrate_sync_docs(db, do_migrate):
             TRANSACTION_ID_KEY: old_doc['transaction_id'],
             REPLICA_UID_KEY: replica_uid,
         }
-        logger.info("moving sync doc: %s -> %s" % (old_id, new_id))
+        logger.debug("[%s] moving sync doc: %s -> %s"
+                     % (db.name, old_id, new_id))
         if do_migrate:
             db.save(new_doc)
             db.delete(old_doc)
@@ -173,8 +176,8 @@ def _delete_design_docs(db, do_migrate):
         doc_id = '_design/%s' % ddoc
         doc = db.get(doc_id)
         if doc:
-            logger.info("deleting design doc: %s" % doc_id)
+            logger.info("[%s] deleting design doc: %s" % (db.name, doc_id))
             if do_migrate:
                 db.delete(doc)
         else:
-            logger.warning("design doc not found: %s" % doc_id)
+            logger.warning("[%s] design doc not found: %s" % (db.name, doc_id))

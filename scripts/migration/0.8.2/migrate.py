@@ -42,7 +42,7 @@ NETRC_PATH = CONF['soledad-server']['admin_netrc']
 # command line args and execution
 #
 
-def _configure_logger(log_file):
+def _configure_logger(log_file, level=logging.INFO):
     if not log_file:
         fname, _ = os.path.basename(__file__).split('.')
         timestr = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -56,7 +56,7 @@ def _configure_logger(log_file):
         filemode='a',
         format='%(asctime)s,%(msecs)d %(levelname)s %(message)s',
         datefmt='%H:%M:%S',
-        level=logging.DEBUG)
+        level=level)
 
 
 def _default_couch_url():
@@ -88,6 +88,10 @@ def _parse_args():
     parser.add_argument(
         '--pdb', action='store_true',
         help='escape to pdb shell in case of exception')
+    parser.add_argument(
+        '--verbose', action='store_true',
+        help='output detailed information about the migration '
+             '(i.e. include debug messages)')
     return parser.parse_args()
 
 
@@ -102,7 +106,9 @@ if __name__ == '__main__':
     args = _parse_args()
     if args.pdb:
         _enable_pdb()
-    _configure_logger(args.log_file)
+    _configure_logger(
+        args.log_file,
+        level=logging.DEBUG if args.verbose else logging.INFO)
     logger = logging.getLogger(__name__)
     try:
         migrate(args, TARGET_VERSION)
