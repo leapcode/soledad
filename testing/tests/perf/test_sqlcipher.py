@@ -8,15 +8,9 @@ from twisted.internet.defer import gatherResults
 
 def load_up(client, amount, size, defer=True):
     content = 'x'*size
-    deferreds = []
-    # create a bunch of local documents
-    for i in xrange(amount):
-        d = client.create_doc({'content': content})
-        deferreds.append(d)
+    results = [client.create_doc({'content': content}) for _ in xrange(amount)]
     if defer:
-        d = gatherResults(deferreds)
-        d.addCallback(lambda _: None)
-        return d
+        return gatherResults(results)
 
 
 def build_test_sqlcipher_async_create(amount, size):
