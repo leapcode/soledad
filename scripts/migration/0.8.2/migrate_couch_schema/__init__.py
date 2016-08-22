@@ -32,9 +32,7 @@ def _get_couch_server(couch_url):
 
 def _is_migrateable(db):
     config_doc = db.get('u1db_config')
-    if config_doc is None:
-        return False
-    return True
+    return bool(config_doc)
 
 
 def _get_transaction_log(db):
@@ -126,6 +124,8 @@ def _migrate_config_doc(db, do_migrate):
     logger.info("[%s] moving config doc: %s -> %s"
                 % (db.name, old_doc['_id'], new_doc['_id']))
     if do_migrate:
+        # the config doc must not exist, otherwise we would have skipped this
+        # database.
         db.save(new_doc)
         db.delete(old_doc)
 
@@ -167,7 +167,16 @@ def _migrate_sync_docs(db, do_migrate):
         logger.debug("[%s] moving sync doc: %s -> %s"
                      % (db.name, old_id, new_id))
         if do_migrate:
-            db.save(new_doc)
+            try:
+                db.save(new_doc)
+            except ResourceConflict:
+                # this sync document already exists. if documents are the same,
+                # continue with migration.
+                existing_doc = db.get(new_id)
+                for key in [GENERATION_KEY, TRANSACTION_ID_KEY,
+                            REPLICA_UID_KEY]:
+                    if existing_doc[key] != new_doc[key]:
+                        raise
             db.delete(old_doc)
 
 

@@ -33,6 +33,10 @@ initial_docs = [
     {'_id': '_design/syncs'},
     {'_id': '_design/transactions',
      'views': {'log': {'map': transaction_map}}},
+    # add some data from previous interrupted migration
+    {'_id': '_local/sync_A', 'gen': 0, 'trans_id': '', 'replica_uid': 'A'},
+    {'_id': 'gen-0000000002',
+     'gen': 2, 'trans_id': 'trans-2', 'doc_id': 'doc2'},
     # the following should be removed if found in the dbs
     {'_id': 'u1db_sync_log'},
     {'_id': 'u1db_sync_state'},
