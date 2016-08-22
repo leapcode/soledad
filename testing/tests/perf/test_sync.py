@@ -45,8 +45,7 @@ def create_download(downloads, size):
         # ensures we are dealing with properly encrypted docs
 
         def setup():
-            clean_client = soledad_client()
-            return (clean_client,), {}
+            return soledad_client()
 
         def sync(clean_client):
             return clean_client.sync()
@@ -63,8 +62,7 @@ test_download_1000_10k = create_download(1000, 10*1000)
 @pytest.mark.benchmark(group="test_nothing_to_sync")
 def test_nothing_to_sync(soledad_client, txbenchmark_with_setup):
     def setup():
-        clean_client = soledad_client()
-        return (clean_client,), {}
+        return soledad_client()
 
     def sync(clean_client):
         return clean_client.sync()

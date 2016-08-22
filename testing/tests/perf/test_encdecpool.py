@@ -18,7 +18,7 @@ def create_encrypt(amount, size):
             pool = SyncEncrypterPool(client._crypto, client._sync_db)
             pool.start()
             request.addfinalizer(pool.stop)
-            return (pool,), {}
+            return pool
 
         @pytest.inlineCallbacks
         def put_and_wait(pool):
@@ -63,7 +63,7 @@ def create_decrypt(amount, size):
                     json=json.dumps(DOC_CONTENT))
                 encrypted_content = json.loads(crypto.encrypt_doc(doc))
                 docs.append((doc.doc_id, encrypted_content))
-            return (pool, docs), {}
+            return pool, docs
 
         def put_and_wait(pool, docs):
             deferreds = []  # fires on completion

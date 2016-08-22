@@ -193,7 +193,11 @@ def txbenchmark_with_setup(benchmark):
             return threads.blockingCallFromThread(reactor, f, *args, **kwargs)
 
         def blocking_setup():
-            return threads.blockingCallFromThread(reactor, setup)
+            args = threads.blockingCallFromThread(reactor, setup)
+            try:
+                return tuple(arg for arg in args), {}
+            except TypeError:
+                    return ((args,), {}) if args else None
 
         def bench():
             return benchmark.pedantic(blocking_runner, setup=blocking_setup,
