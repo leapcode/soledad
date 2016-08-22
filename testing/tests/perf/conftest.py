@@ -220,17 +220,11 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
     soledad_dbs(default_uuid)
 
     # get a soledad instance
-    def create(new=False):
+    def create():
         secrets_path = os.path.join(tmpdir.strpath, '%s.secret' % uuid4().hex)
         local_db_path = os.path.join(tmpdir.strpath, '%s.db' % uuid4().hex)
-        if new:
-            uuid = uuid4().hex
-            remote_db(uuid)
-            soledad_dbs(uuid)
-        else:
-            uuid = default_uuid
         soledad_client = Soledad(
-            uuid,
+            default_uuid,
             unicode(passphrase),
             secrets_path=secrets_path,
             local_db_path=local_db_path,
