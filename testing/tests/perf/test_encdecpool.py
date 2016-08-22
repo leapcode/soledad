@@ -18,19 +18,16 @@ def create_encrypt(amount, size):
             pool = SyncEncrypterPool(client._crypto, client._sync_db)
             pool.start()
             request.addfinalizer(pool.stop)
-            return pool
+            docs = [
+                SoledadDocument(doc_id=uuid4().hex, rev='rev',
+                                json=json.dumps(DOC_CONTENT))
+                for _ in xrange(amount)
+            ]
+            return pool, docs
 
         @pytest.inlineCallbacks
-        def put_and_wait(pool):
-            doc_ids = []
-            deferreds = []
-            for _ in xrange(amount):
-                doc = SoledadDocument(
-                    doc_id=uuid4().hex, rev='rev',
-                    json=json.dumps(DOC_CONTENT))
-                deferreds.append(pool.encrypt_doc(doc))
-                doc_ids.append(doc.doc_id)
-            yield gatherResults(deferreds)
+        def put_and_wait(pool, docs):
+            yield gatherResults([pool.encrypt_doc(doc) for doc in docs])
 
         yield txbenchmark_with_setup(setup, put_and_wait)
     return test
