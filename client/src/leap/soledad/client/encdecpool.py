@@ -557,7 +557,11 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
             sequence.append(str(next_index))
             next_index += 1
             if len(sequence) > 900:
-                break  # SQLITE_LIMIT_VARIABLE_NUMBER
+                # 999 is the default value of SQLITE_MAX_VARIABLE_NUMBER
+                # if we try to query more, SQLite will refuse
+                # we need to find a way to improve this
+                # being researched in #7669
+                break
         # Then fetch all the ones ready for insertion.
         if sequence:
             insertable_docs = yield self._get_docs(encrypted=False,
