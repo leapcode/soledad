@@ -5,6 +5,7 @@ from twisted.internet.defer import gatherResults
 from leap.soledad.client.encdecpool import SyncEncrypterPool
 from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.common.document import SoledadDocument
+# FIXME: test load is low due issue #7370, higher values will get out of memory
 
 
 def create_encrypt(amount, size):
