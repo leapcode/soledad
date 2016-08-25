@@ -64,17 +64,11 @@ class TestSyncEncrypterPool(BaseSoledadTest):
         """
         doc = SoledadDocument(
             doc_id=DOC_ID, rev=DOC_REV, json=json.dumps(DOC_CONTENT))
-        self._pool.encrypt_doc(doc)
 
-        # exhaustivelly attempt to get the encrypted document
-        encrypted = None
-        attempts = 0
-        while encrypted is None and attempts < 10:
-            encrypted = yield self._pool.get_encrypted_doc(DOC_ID, DOC_REV)
-            attempts += 1
+        yield self._pool.encrypt_doc(doc)
+        encrypted = yield self._pool.get_encrypted_doc(DOC_ID, DOC_REV)
 
         self.assertIsNotNone(encrypted)
-        self.assertTrue(attempts < 10)
 
 
 class TestSyncDecrypterPool(BaseSoledadTest):
