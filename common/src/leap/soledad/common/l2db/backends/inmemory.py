@@ -16,10 +16,7 @@
 
 """The in-memory Database class for U1DB."""
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from leap.soledad.common.l2db import (
     Document, errors,

@@ -16,10 +16,7 @@
 
 """HTTPDatabase to access a remote db over the HTTP API."""
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 import uuid
 
 from leap.soledad.common.l2db import (

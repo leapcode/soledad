@@ -17,10 +17,7 @@
 """Base class to make requests to a remote HTTP server."""
 
 import httplib
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 import socket
 import ssl
 import sys

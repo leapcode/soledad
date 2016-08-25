@@ -15,10 +15,8 @@
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 """U1DB Basic Auth authorisation WSGI middleware."""
 import httplib
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
+
 from wsgiref.util import shift_path_info
 
 

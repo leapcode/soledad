@@ -23,10 +23,7 @@ HTTP Application exposing U1DB.
 import functools
 import httplib
 import inspect
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 import sys
 import urlparse
 
