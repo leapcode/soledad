@@ -164,6 +164,4 @@ setup(
     package_data={'': ["*.sql"]},
     test_suite='leap.soledad.common.tests',
     install_requires=requirements,
-    tests_require=utils.parse_requirements(
-        reqfiles=['pkg/requirements-testing.pip']),
 )
