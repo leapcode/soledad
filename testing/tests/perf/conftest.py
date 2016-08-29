@@ -2,6 +2,8 @@ import json
 import os
 import pytest
 import requests
+import random
+import base64
 import signal
 import time
 
@@ -41,6 +43,16 @@ DEFAULT_URL = 'http://127.0.0.1:2424'
 DEFAULT_PRIVKEY = 'soledad_privkey.pem'
 DEFAULT_CERTKEY = 'soledad_certkey.pem'
 DEFAULT_TOKEN = 'an-auth-token'
+
+
+@pytest.fixture()
+def payload():
+    def generate(size):
+        random.seed(1337)  # same seed to avoid different bench results
+        payload_bytes = bytearray(random.getrandbits(8) for _ in xrange(size))
+        # encode as base64 to avoid ascii encode/decode errors
+        return base64.b64encode(payload_bytes)[:size]  # remove b64 overhead
+    return generate
 
 
 #

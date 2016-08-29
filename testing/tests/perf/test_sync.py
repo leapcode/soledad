@@ -3,12 +3,11 @@ import pytest
 from twisted.internet.defer import gatherResults
 
 
-def load_up(client, amount, size):
-    content = 'x'*size
+def load_up(client, amount, payload):
     deferreds = []
     # create a bunch of local documents
     for i in xrange(amount):
-        d = client.create_doc({'content': content})
+        d = client.create_doc({'content': payload})
         deferreds.append(d)
     d = gatherResults(deferreds)
     d.addCallback(lambda _: None)
@@ -18,11 +17,11 @@ def load_up(client, amount, size):
 def create_upload(uploads, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_upload")
-    def test(soledad_client, txbenchmark_with_setup):
+    def test(soledad_client, txbenchmark_with_setup, payload):
         client = soledad_client()
 
         def setup():
-            return load_up(client, uploads, size)
+            return load_up(client, uploads, payload(size))
 
         yield txbenchmark_with_setup(setup, client.sync)
     return test
@@ -36,10 +35,10 @@ test_upload_1000_10k = create_upload(1000, 10*1000)
 def create_download(downloads, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_download")
-    def test(soledad_client, txbenchmark_with_setup):
+    def test(soledad_client, txbenchmark_with_setup, payload):
         client = soledad_client()
 
-        yield load_up(client, downloads, size)
+        yield load_up(client, downloads, payload(size))
         yield client.sync()
         # We could create them directly on couch, but sending them
         # ensures we are dealing with properly encrypted docs

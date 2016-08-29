@@ -6,9 +6,8 @@ import pytest
 from twisted.internet.defer import gatherResults
 
 
-def load_up(client, amount, size, defer=True):
-    content = 'x'*size
-    results = [client.create_doc({'content': content}) for _ in xrange(amount)]
+def load_up(client, amount, payload, defer=True):
+    results = [client.create_doc({'content': payload}) for _ in xrange(amount)]
     if defer:
         return gatherResults(results)
 
@@ -16,17 +15,17 @@ def load_up(client, amount, size, defer=True):
 def build_test_sqlcipher_async_create(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_sqlcipher_async_create")
-    def test(soledad_client, txbenchmark):
+    def test(soledad_client, txbenchmark, payload):
         client = soledad_client()
-        yield txbenchmark(load_up, client, amount, size)
+        yield txbenchmark(load_up, client, amount, payload(size))
     return test
 
 
 def build_test_sqlcipher_create(amount, size):
     @pytest.mark.benchmark(group="test_sqlcipher_create")
-    def test(soledad_client, benchmark):
+    def test(soledad_client, benchmark, payload):
         client = soledad_client()._dbsyncer
-        benchmark(load_up, client, amount, size, defer=False)
+        benchmark(load_up, client, amount, payload(size), defer=False)
     return test
 
 

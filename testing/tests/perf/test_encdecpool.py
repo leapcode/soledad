@@ -11,8 +11,8 @@ from leap.soledad.common.document import SoledadDocument
 def create_encrypt(amount, size):
     @pytest.mark.benchmark(group="test_pool_encrypt")
     @pytest.inlineCallbacks
-    def test(soledad_client, txbenchmark_with_setup, request):
-        DOC_CONTENT = {'payload': 'x'*size}
+    def test(soledad_client, txbenchmark_with_setup, request, payload):
+        DOC_CONTENT = {'payload': payload(size)}
 
         def setup():
             client = soledad_client()
@@ -41,8 +41,8 @@ test_encdecpool_encrypt_100_500k = create_encrypt(100, 500*1000)
 def create_decrypt(amount, size):
     @pytest.mark.benchmark(group="test_pool_decrypt")
     @pytest.inlineCallbacks
-    def test(soledad_client, txbenchmark_with_setup, request):
-        DOC_CONTENT = {'payload': 'x'*size}
+    def test(soledad_client, txbenchmark_with_setup, request, payload):
+        DOC_CONTENT = {'payload': payload(size)}
         client = soledad_client()
 
         def setup():

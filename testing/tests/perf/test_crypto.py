@@ -8,10 +8,10 @@ from leap.soledad.client.crypto import decrypt_sym
 
 def create_doc_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_encrypt_doc")
-    def test_doc_encryption(soledad_client, benchmark):
+    def test_doc_encryption(soledad_client, benchmark, payload):
         crypto = soledad_client()._crypto
 
-        DOC_CONTENT = {'payload': 'x'*size}
+        DOC_CONTENT = {'payload': payload(size)}
         doc = SoledadDocument(
             doc_id=uuid4().hex, rev='rev',
             json=json.dumps(DOC_CONTENT))
@@ -22,10 +22,10 @@ def create_doc_encryption(size):
 
 def create_doc_decryption(size):
     @pytest.mark.benchmark(group="test_crypto_decrypt_doc")
-    def test_doc_decryption(soledad_client, benchmark):
+    def test_doc_decryption(soledad_client, benchmark, payload):
         crypto = soledad_client()._crypto
 
-        DOC_CONTENT = {'payload': 'x'*size}
+        DOC_CONTENT = {'payload': payload(size)}
         doc = SoledadDocument(
             doc_id=uuid4().hex, rev='rev',
             json=json.dumps(DOC_CONTENT))
@@ -49,21 +49,21 @@ test_decrypt_doc_1M = create_doc_decryption(1000*1000)
 test_decrypt_doc_10M = create_doc_decryption(10*1000*1000)
 test_decrypt_doc_50M = create_doc_decryption(50*1000*1000)
 
-KEY = 'x'*32
-
 
 def create_raw_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_encrypt")
-    def test_raw_encrypt(benchmark):
-        benchmark(encrypt_sym, 'x'*size, KEY)
+    def test_raw_encrypt(benchmark, payload):
+        key = payload(32)
+        benchmark(encrypt_sym, payload(size), key)
     return test_raw_encrypt
 
 
 def create_raw_decryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_decrypt")
-    def test_raw_decrypt(benchmark):
-        iv, ciphertext = encrypt_sym('x'*size, KEY)
-        benchmark(decrypt_sym, ciphertext, KEY, iv)
+    def test_raw_decrypt(benchmark, payload):
+        key = payload(32)
+        iv, ciphertext = encrypt_sym(payload(size), key)
+        benchmark(decrypt_sym, ciphertext, key, iv)
     return test_raw_decrypt
 
 
