@@ -736,6 +736,8 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
+        if not self._dbsyncer:
+            return
         d = self._dbsyncer.sync(
             sync_url,
             creds=self._creds,
