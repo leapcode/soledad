@@ -3,4 +3,4 @@ tests:
   services:
   - couchdb
   script:
-  - cd testing; tox -- --couch-url http://couchdb:5984
+  - cd testing; tox -- --couch-url http://couchdb:5984 && tox -e pep8
