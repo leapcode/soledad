@@ -127,13 +127,13 @@ requirements = utils.parse_requirements()
 
 if utils.is_develop_mode():
     print
-    print ("[WARNING] Skipping leap-specific dependencies "
-           "because development mode is detected.")
-    print ("[WARNING] You can install "
-           "the latest published versions with "
-           "'pip install -r pkg/requirements-leap.pip'")
-    print ("[WARNING] Or you can instead do 'python setup.py develop' "
-           "from the parent folder of each one of them.")
+    print("[WARNING] Skipping leap-specific dependencies "
+          "because development mode is detected.")
+    print("[WARNING] You can install "
+          "the latest published versions with "
+          "'pip install -r pkg/requirements-leap.pip'")
+    print("[WARNING] Or you can instead do 'python setup.py develop' "
+          "from the parent folder of each one of them.")
     print
 else:
     requirements += utils.parse_requirements(
