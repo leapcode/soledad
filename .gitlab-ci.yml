@@ -1,6 +1,31 @@
+stages:
+  - syntax
+  - tests
+  - benchmark
+
+syntax:
+  stage: syntax
+  script:
+    - cd testing
+    - tox -e pep8
+
 tests:
+  stage: tests
   image: leapcode/soledad:1.0
   services:
-  - couchdb
+    - couchdb
   script:
-  - cd testing; tox -- --couch-url http://couchdb:5984 && tox -e pep8
+    - cd testing
+    - tox -- --couch-url http://couchdb:5984
+
+benchmark:
+  stage: benchmark
+  image: leapcode/soledad:1.0
+  services:
+    - couchdb
+  script:
+    - cd testing
+    - tox -e perf -- --couch-url http://couchdb:5984
+  tags:
+    - docker
+    - benchmark
