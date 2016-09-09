@@ -1,0 +1,8 @@
+files
+*.postinst.debhelper
+*.prerm.debhelper
+*.postrm.debhelper
+*.substvars
+soledad-client/
+soledad-common/
+soledad-server/

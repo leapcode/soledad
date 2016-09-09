@@ -1,0 +1,2 @@
+server/pkg/create-user-db usr/bin/
+debian/soledad-sudoers etc/sudoers.d/
