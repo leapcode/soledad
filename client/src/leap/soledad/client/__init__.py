@@ -21,6 +21,7 @@ from leap.soledad.client.api import Soledad
 from leap.soledad.common import soledad_assert
 
 from ._version import get_versions
+
 __version__ = get_versions()['version']
 del get_versions
 

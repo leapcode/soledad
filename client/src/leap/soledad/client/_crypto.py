@@ -1,14 +1,37 @@
+# -*- coding: utf-8 -*-
+# _crypto.py
+# Copyright (C) 2016 LEAP Encryption Access Project
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+"""
+Cryptographic operations for the soledad client
+"""
+
 import binascii
+import base64
 import hashlib
 import hmac
 import os
 
 from cStringIO import StringIO
 
-from twisted.persisted import dirdbm
 from twisted.internet import defer
 from twisted.internet import interfaces
 from twisted.internet import reactor
+from twisted.logger import Logger
+from twisted.persisted import dirdbm
 from twisted.web import client
 from twisted.web.client import FileBodyProducer
 
@@ -23,9 +46,15 @@ from leap.common.config import get_path_prefix
 from leap.soledad.client.secrets import SoledadSecrets
 
 
+log = Logger()
+
 MAC_KEY_LENGTH = 64
 
 crypto_backend = MultiBackend([OpenSSLBackend()])
+
+
+class EncryptionError(Exception):
+    pass
 
 
 class AESWriter(object):
@@ -35,6 +64,10 @@ class AESWriter(object):
     def __init__(self, key, fd, iv=None):
         if iv is None:
             iv = os.urandom(16)
+        if len(key) != 32:
+            raise EncryptionError('key is not 256 bits')
+        if len(iv) != 16:
+            raise EncryptionError('iv is not 128 bits')
 
         cipher = _get_aes_ctr_cipher(key, iv)
         self.encryptor = cipher.encryptor()
@@ -51,7 +84,6 @@ class AESWriter(object):
     def end(self):
         if not self.done:
             self.encryptor.finalize()
-            self.fd.seek(0)
             self.deferred.callback(self.fd)
         self.done = True
 
@@ -91,18 +123,12 @@ class EncryptAndHMAC(object):
         
 
 
-class NewDocCryptoStreamer(object):
+class DocEncrypter(object):
 
     staging_path = os.path.join(get_path_prefix(), 'leap', 'soledad', 'staging')
-    staged_template = """
-     {"_enc_scheme": "symkey",
-      "_enc_method": "aes-256-ctr",
-      "_mac_method": "hmac",
-      "_mac_hash": "sha256",
-      "_encoding": "ENCODING",
-      "_enc_json": "ENC",
-      "_enc_iv": "IV",
-      "_mac": "MAC"}"""
+    staged_template = """{"_enc_scheme": "symkey", "_enc_method":
+        "aes-256-ctr", "_mac_method": "hmac", "_mac_hash": "sha256",
+        "_encoding": "ENCODING", "_enc_json": "CIPHERTEXT", "_enc_iv": "IV", "_mac": "MAC"}"""
 
 
     def __init__(self, content_fd, doc_id, rev, secret=None):
@@ -140,14 +166,12 @@ class NewDocCryptoStreamer(object):
         self.hmac_consumer.end()
         return defer.succeed('ok')
 
-    def persist_encrypted_doc(self, ignored, encoding='hex'):
-        # TODO to avoid blocking on io, this can use a
-        # version of dbm that chunks the writes to the 
-        # disk fd by using the same FileBodyProducer strategy
-        # that we're using here, long live to the Cooperator.
-        # this will benefit 
+    # TODO make this pluggable:
+    # pass another class (CryptoSerializer) to which we pass
+    # the doc info, the encrypted_fd and the mac_digest
 
-        # TODO -- transition to hex: needs migration FIXME
+    def persist_encrypted_doc(self, ignored, encoding='hex'):
+        # TODO -- transition to b64: needs migration FIXME
         if encoding == 'b64':
             encode = binascii.b2a_base64
         elif encoding == 'hex':
@@ -155,14 +179,25 @@ class NewDocCryptoStreamer(object):
         else:
             raise RuntimeError('Unknown encoding: %s' % encoding)
 
+        # TODO to avoid blocking on io, this can use a
+        # version of dbm that chunks the writes to the 
+        # disk fd by using the same FileBodyProducer strategy
+        # that we're using here, long live to the Cooperator.
+
+
         db = dirdbm.DirDBM(self.staging_path)
         key = '{doc_id}@{rev}'.format(
             doc_id=self.doc_id, rev=self.rev)
+        ciphertext = encode(self._encrypted_fd.getvalue())
         value = self.staged_template.replace(
             'ENCODING', encoding).replace(
-            'ENC', encode(self._encrypted_fd.read())).replace(
-            'IV', binascii.b2a_base64(self.iv)).replace(
-            'MAC', encode(self.hmac_consumer.digest))
+            'CIPHERTEXT', ciphertext).replace(
+            'IV', encode(self.iv)).replace(
+            'MAC', encode(self.hmac_consumer.digest)).replace(
+            '\n', '')
+        self._encrypted_fd.seek(0)
+
+        log.debug('persisting %s' % key)
         db[key] = value
 
         self._content_fd.close()
@@ -174,12 +209,12 @@ class NewDocCryptoStreamer(object):
         self.hmac_consumer.write(pre)
 
     def _post_hmac(self):
-        # FIXME -- original impl passed b64 encoded iv
         post = '{enc_scheme}{enc_method}{enc_iv}'.format(
             enc_scheme='symkey',
             enc_method='aes-256-ctr',
-            enc_iv=binascii.b2a_base64(self.iv))
+            enc_iv=binascii.b2a_hex(self.iv))
         self.hmac_consumer.write(post)
+
 
 
 def _hmac_sha256(key, data):

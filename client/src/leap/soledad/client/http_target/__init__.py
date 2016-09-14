@@ -54,7 +54,7 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
     written to the main database.
     """
     def __init__(self, url, source_replica_uid, creds, crypto, cert_file,
-                 sync_db=None, sync_enc_pool=None):
+                 sync_db=None):
         """
         Initialize the sync target.
 
@@ -78,10 +78,6 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
                         instead of retreiving it from the dedicated
                         database.
         :type sync_db: Sqlite handler
-        :param sync_enc_pool: The encryption pool to use to defer encryption.
-                              If None is passed the encryption will not be
-                              deferred.
-        :type sync_enc_pool: leap.soledad.client.encdecpool.SyncEncrypterPool
         """
         if url.endswith("/"):
             url = url[:-1]
@@ -92,7 +88,6 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self.set_creds(creds)
         self._crypto = crypto
         self._sync_db = sync_db
-        self._sync_enc_pool = sync_enc_pool
         self._insert_doc_cb = None
         # asynchronous encryption/decryption attributes
         self._decryption_callback = None

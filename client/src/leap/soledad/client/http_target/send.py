@@ -15,10 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
+import os
 
 from twisted.internet import defer
+from twisted.persisted import dirdbm
 
 from leap.soledad.common.log import getLogger
+from leap.common.config import get_path_prefix
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.http_target.support import RequestBody
@@ -38,6 +41,8 @@ class HTTPDocSender(object):
     # The uuid of the local replica.
     # Any class inheriting from this one should provide a meaningful attribute
     # if the sync status event is meant to be used somewhere else.
+
+    staging_path = os.path.join(get_path_prefix(), 'leap', 'soledad', 'staging')
 
     uuid = 'undefined'
     userid = 'undefined'
