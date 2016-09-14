@@ -146,7 +146,20 @@ class HTTPDocFetcher(object):
         # make sure we have replica_uid from fresh new dbs
         if self._ensure_callback and 'replica_uid' in metadata:
             self._ensure_callback(metadata['replica_uid'])
-        return number_of_changes, new_generation, new_transaction_id
+        # parse incoming document info
+        entries = []
+        for index in xrange(1, len(data[1:]), 2):
+            try:
+                line, comma = utils.check_and_strip_comma(data[index])
+                content, _ = utils.check_and_strip_comma(data[index + 1])
+                entry = json.loads(line)
+                entries.append((entry['id'], entry['rev'], content,
+                                entry['gen'], entry['trans_id']))
+            except (IndexError, KeyError):
+                raise errors.BrokenSyncStream
+        return new_generation, new_transaction_id, number_of_changes, \
+            entries
+
 
 
 def _emit_receive_status(user_data, received_docs, total):

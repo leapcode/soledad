@@ -42,8 +42,6 @@ class SyncTargetAPI(SyncTarget):
 
     @defer.inlineCallbacks
     def close(self):
-        if self._sync_enc_pool:
-            self._sync_enc_pool.stop()
         yield self._http.close()
 
     @property
@@ -67,10 +65,6 @@ class SyncTargetAPI(SyncTarget):
     @property
     def _base_header(self):
         return self._auth_header.copy() if self._auth_header else {}
-
-    @property
-    def _defer_encryption(self):
-        return self._sync_enc_pool is not None
 
     def _http_request(self, url, method='GET', body=None, headers=None,
                       content_type=None, body_reader=readBody,

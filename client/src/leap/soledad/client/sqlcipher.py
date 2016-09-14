@@ -266,26 +266,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
-    #
-    # Document operations
-    #
-
-    def put_doc(self, doc):
-        """
-        Overwrite the put_doc method, to enqueue the modified document for
-        encryption before sync.
-
-        :param doc: The document to be put.
-        :type doc: u1db.Document
-
-        :return: The new document revision.
-        :rtype: str
-        """
-        doc_rev = sqlite_backend.SQLitePartialExpandDatabase.put_doc(self, doc)
-        if self.defer_encryption:
-            # TODO move to api?
-            self._sync_enc_pool.encrypt_doc(doc)
-        return doc_rev
 
     #
     # SQLCipher API methods
@@ -426,14 +406,13 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     ENCRYPT_LOOP_PERIOD = 1
 
     def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
-                 defer_encryption=False, sync_db=None, sync_enc_pool=None):
+                 sync_db=None):
 
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto
         self.__replica_uid = replica_uid
         self._cert_file = cert_file
-        self._sync_enc_pool = sync_enc_pool
 
         self._sync_db = sync_db
 
@@ -538,8 +517,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                     creds=creds,
                     crypto=self._crypto,
                     cert_file=self._cert_file,
-                    sync_db=self._sync_db,
-                    sync_enc_pool=self._sync_enc_pool))
+                    sync_db=self._sync_db))
             self._syncers[url] = (h, syncer)
         # in order to reuse the same synchronizer multiple times we have to
         # reset its state (i.e. the number of documents received from target
@@ -597,14 +575,12 @@ class SoledadSQLCipherWrapper(SQLCipherDatabase):
     It can be used from adbapi to initialize a soledad database after
     getting a regular connection to a sqlcipher database.
     """
-    def __init__(self, conn, opts, sync_enc_pool):
+    def __init__(self, conn, opts):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
         self.set_document_factory(soledad_doc_factory)
         self._prime_replica_uid()
-        self.defer_encryption = opts.defer_encryption
-        self._sync_enc_pool = sync_enc_pool
 
 
 def _assert_db_is_encrypted(opts):

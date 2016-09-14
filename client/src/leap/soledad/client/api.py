@@ -61,6 +61,7 @@ from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client import sqlcipher
 from leap.soledad.client import encdecpool
+from leap.soledad.client._crypto import DocEncrypter
 
 logger = getLogger(__name__)
 
@@ -190,7 +191,6 @@ class Soledad(object):
         self._server_url = server_url
         self._defer_encryption = defer_encryption
         self._secrets_path = None
-        self._sync_enc_pool = None
         self._dbsyncer = None
 
         self.shared_db = shared_db
@@ -299,12 +299,7 @@ class Soledad(object):
         )
         self._sqlcipher_opts = opts
 
-        # the sync_db is used both for deferred encryption, so
-        # we want to initialize it anyway to allow for all combinations of
-        # deferred encryption configurations.
-        self._initialize_sync_db(opts)
-        self._dbpool = adbapi.getConnectionPool(
-            opts, sync_enc_pool=self._sync_enc_pool)
+        self._dbpool = adbapi.getConnectionPool(opts)
 
     def _init_u1db_syncer(self):
         """
@@ -314,9 +309,7 @@ class Soledad(object):
         self._dbsyncer = sqlcipher.SQLCipherU1DBSync(
             self._sqlcipher_opts, self._crypto, replica_uid,
             SOLEDAD_CERT,
-            defer_encryption=self._defer_encryption,
-            sync_db=self._sync_db,
-            sync_enc_pool=self._sync_enc_pool)
+            sync_db=self._sync_db)
 
     def sync_stats(self):
         sync_phase = 0
@@ -345,8 +338,6 @@ class Soledad(object):
         if self._sync_db:
             self._sync_db.close()
         self._sync_db = None
-        if self._defer_encryption:
-            self._sync_enc_pool.stop()
 
     #
     # ILocalStorage
@@ -362,6 +353,19 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         return self._dbpool.runU1DBQuery(meth, *args, **kw)
+
+    def stream_encryption(self, result, doc):
+        contentfd = StringIO()
+        contentfd.write(doc.get_json())
+        contentfd.seek(0)
+
+        sikret = self._secrets.remote_storage_secret
+        crypter = DocEncrypter(
+            contentfd, doc.doc_id, doc.rev, secret=sikret)
+        d = crypter.encrypt_stream()
+        d.addCallback(lambda _: result)
+        return d
+
 
     def put_doc(self, doc):
         """
@@ -385,7 +389,9 @@ class Soledad(object):
             also be updated.
         :rtype: twisted.internet.defer.Deferred
         """
-        return self._defer("put_doc", doc)
+        d = self._defer("put_doc", doc)
+        d.addCallback(self.stream_encryption, doc)
+        return d
 
     def delete_doc(self, doc):
         """
@@ -479,7 +485,9 @@ class Soledad(object):
         # create_doc (and probably to put_doc too). There are cases (mail
         # payloads for example) in which we already have the encoding in the
         # headers, so we don't need to guess it.
-        return self._defer("create_doc", content, doc_id=doc_id)
+        d = self._defer("create_doc", content, doc_id=doc_id)
+        d.addCallback(lambda doc: self.stream_encryption('', doc))
+        return d
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -846,11 +854,6 @@ class Soledad(object):
             opts, path=sync_db_path, create=True)
         self._sync_db = sqlcipher.getConnectionPool(
             sync_opts, extra_queries=self._sync_db_extra_init)
-        if self._defer_encryption:
-            # initialize syncing queue encryption pool
-            self._sync_enc_pool = encdecpool.SyncEncrypterPool(
-                self._crypto, self._sync_db)
-            self._sync_enc_pool.start()
 
     @property
     def _sync_db_extra_init(self):
@@ -860,11 +863,6 @@ class Soledad(object):
 
         :rtype: tuple of strings
         """
-        maybe_create = "CREATE TABLE IF NOT EXISTS %s (%s)"
-        encr = encdecpool.SyncEncrypterPool
-        sql_encr_table_query = (maybe_create % (
-            encr.TABLE_NAME, encr.FIELD_NAMES))
-        return (sql_encr_table_query,)
 
     #
     # ISecretsStorage
