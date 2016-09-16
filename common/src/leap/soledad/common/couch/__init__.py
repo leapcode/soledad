@@ -20,6 +20,7 @@
 
 
 import json
+import copy
 import re
 import uuid
 import binascii
@@ -337,14 +338,22 @@ class CouchDatabase(object):
                  in matching doc_ids order.
         :rtype: iterable
         """
-        params = {'include_docs': 'true', 'attachments': 'true'}
+        params = {'include_docs': 'true', 'attachments': 'false'}
         if doc_ids is not None:
             params['keys'] = doc_ids
         view = self._database.view("_all_docs", **params)
         for row in view.rows:
-            result = row['doc']
+            result = copy.deepcopy(row['doc'])
+            attachment_file_names = result['_attachments'].keys()
+            result['_attachments'] = {}
+            for file_name in attachment_file_names:
+                result['_attachments'][file_name] = {
+                    'data': json.load(
+                        self._database.get_attachment(result, file_name))
+                }
             doc = self.__parse_doc_from_couch(
-                result, result['_id'], check_for_conflicts=check_for_conflicts)
+                result, result['_id'],
+                check_for_conflicts=check_for_conflicts, decode=False)
             # filter out non-u1db or deleted documents
             if not doc or (not include_deleted and doc.is_tombstone()):
                 continue
@@ -408,7 +417,7 @@ class CouchDatabase(object):
         self.batch_docs.clear()
         return rev
 
-    def __parse_doc_from_couch(self, result, doc_id,
+    def __parse_doc_from_couch(self, result, doc_id, decode=True,
                                check_for_conflicts=False):
         # restrict to u1db documents
         if 'u1db_rev' not in result:
@@ -418,19 +427,22 @@ class CouchDatabase(object):
         if '_attachments' not in result \
                 or 'u1db_content' not in result['_attachments']:
             doc.make_tombstone()
-        else:
+        elif decode:
             doc.content = json.loads(
                 binascii.a2b_base64(
                     result['_attachments']['u1db_content']['data']))
+        else:
+            doc.content = result['_attachments']['u1db_content']['data']
         # determine if there are conflicts
         if check_for_conflicts \
                 and '_attachments' in result \
                 and 'u1db_conflicts' in result['_attachments']:
-            doc.set_conflicts(
-                self._build_conflicts(
-                    doc.doc_id,
-                    json.loads(binascii.a2b_base64(
-                        result['_attachments']['u1db_conflicts']['data']))))
+            if decode:
+                conflicts = json.loads(binascii.a2b_base64(
+                    result['_attachments']['u1db_conflicts']['data']))
+            else:
+                conflicts = result['_attachments']['u1db_conflicts']['data']
+            doc.set_conflicts(self._build_conflicts(doc.doc_id, conflicts))
         # store couch revision
         doc.couch_rev = result['_rev']
         return doc
