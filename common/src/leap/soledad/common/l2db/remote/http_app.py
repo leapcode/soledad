@@ -501,7 +501,9 @@ class HTTPResponder(object):
             self._write('\r\n')
         else:
             self._write(',\r\n')
-        self._write(json.dumps(entry))
+        if type(entry) == dict:
+            entry = json.dumps(entry)
+        self._write(entry)
 
     def end_stream(self):
         "end stream (array)."

@@ -348,8 +348,7 @@ class CouchDatabase(object):
             result['_attachments'] = {}
             for file_name in attachment_file_names:
                 result['_attachments'][file_name] = {
-                    'data': json.load(
-                        self._database.get_attachment(result, file_name))
+                    'data': self._database.get_attachment(result, file_name)
                 }
             doc = self.__parse_doc_from_couch(
                 result, result['_id'],
@@ -432,7 +431,7 @@ class CouchDatabase(object):
                 binascii.a2b_base64(
                     result['_attachments']['u1db_content']['data']))
         else:
-            doc.content = result['_attachments']['u1db_content']['data']
+            doc._json = result['_attachments']['u1db_content']['data']
         # determine if there are conflicts
         if check_for_conflicts \
                 and '_attachments' in result \
