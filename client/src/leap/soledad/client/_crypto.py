@@ -24,8 +24,13 @@ import base64
 import hashlib
 import hmac
 import os
+import struct
+import time
 
+from io import BytesIO
 from cStringIO import StringIO
+
+import six
 
 from twisted.internet import defer
 from twisted.internet import interfaces
@@ -35,6 +40,9 @@ from twisted.persisted import dirdbm
 from twisted.web import client
 from twisted.web.client import FileBodyProducer
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.hmac import HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends.multibackend import MultiBackend
 from cryptography.hazmat.backends.openssl.backend \
@@ -53,63 +61,223 @@ MAC_KEY_LENGTH = 64
 crypto_backend = MultiBackend([OpenSSLBackend()])
 
 
-class EncryptionError(Exception):
+class ENC_SCHEME:
+    symkey = 1
+
+
+class ENC_METHOD:
+    aes_256_ctr = 1
+
+
+class EncryptionDecryptionError(Exception):
     pass
 
 
-class AESWriter(object):
+class InvalidBlob(Exception):
+    pass
+
+
+
+class BlobEncryptor(object):
+
+    """
+    Encrypts a payload associated with a given Document.
+    """
+
+    def __init__(self, doc_info, content_fd, result=None, secret=None, iv=None):
+
+        if iv is None:
+            iv = os.urandom(16)
+        else:
+            log.warn('Using a fixed IV. Use only for testing!')
+        self.iv = iv
+        if not secret:
+            raise EncryptionDecryptionError('no secret given')
+
+        self.doc_id = doc_info.doc_id
+        self.rev = doc_info.rev
+
+        self._producer = FileBodyProducer(content_fd, readSize=2**8)
+
+        self._preamble = BytesIO()
+        if result is None:
+            result = BytesIO()
+        self.result = result
+
+        sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
+        mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
+
+        self._aes_fd = BytesIO()
+        self._aes = AESEncryptor(sym_key, self.iv, self._aes_fd)
+        self._hmac = HMACWriter(mac_key)
+        self._write_preamble()
+
+        self._crypter = VerifiedEncrypter(self._aes, self._hmac)
+
+    def encrypt(self):
+        d = self._producer.startProducing(self._crypter)
+        d.addCallback(self._end_crypto_stream)
+        return d
+
+    def _write_preamble(self):
+
+        def write(data):
+            self._preamble.write(data)
+            self._hmac.write(data)
+        
+        current_time = int(time.time())
+
+        write(b'\x80')
+        write(struct.pack(
+            'Qbb', 
+            current_time,
+            ENC_SCHEME.symkey,
+            ENC_METHOD.aes_256_ctr))
+        write(self.iv)
+        write(self.doc_id)
+        write(self.rev)
+
+    def _end_crypto_stream(self, ignored):
+        self._aes.end()
+        self._hmac.end()
+
+        preamble = self._preamble.getvalue()
+        encrypted = self._aes_fd.getvalue()
+        hmac = self._hmac.result.getvalue()
+
+        self.result.write(
+            base64.urlsafe_b64encode(preamble + encrypted + hmac))
+        self._preamble.close()
+        self._aes_fd.close()
+        self._hmac.result.close()
+        self.result.seek(0)
+        return defer.succeed('ok')
+
+
+class BlobDecryptor(object):
+    """
+    Decrypts an encrypted blob associated with a given Document.
+
+    Will raise an exception if the blob doesn't have the expected structure, or
+    if the HMAC doesn't verify.
+    """
+
+    def __init__(self, doc_info, ciphertext_fd, result=None,
+                 secret=None):
+        self.doc_id = doc_info.doc_id
+        self.rev = doc_info.rev
+
+        self.ciphertext = ciphertext_fd
+
+        self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
+        self.mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
+
+        if result is None:
+            result = BytesIO()
+        self.result = result
+
+    def decrypt(self):
+
+        try:
+            data = base64.urlsafe_b64decode(self.ciphertext.getvalue())
+        except (TypeError, binascii.Error):
+            raise InvalidBlob
+        self.ciphertext.close()
+
+        current_time = int(time.time())
+        if not data or six.indexbytes(data, 0) != 0x80:
+            raise InvalidBlob
+        try:
+            ts, sch, meth = struct.unpack("Qbb", data[1:11])
+        except struct.error:
+            raise InvalidBlob
+
+        # TODO check timestamp
+        if sch != ENC_SCHEME.symkey:
+            raise InvalidBlob('invalid scheme')
+        # TODO should adapt the assymetric-gpg too, rigth?
+        if meth != ENC_METHOD.aes_256_ctr:
+            raise InvalidBlob('invalid encryption scheme')
+
+        iv = data[11:27]
+        docidlen = len(self.doc_id)
+        ciph_idx = 26 + docidlen
+        doc_id = data[26:ciph_idx]
+        revlen = len(self.rev)
+        rev_idx = ciph_idx + 1 + revlen
+        rev = data[ciph_idx + 1:rev_idx]
+
+        if rev != self.rev:
+            raise InvalidBlob('invalid revision')
+
+        ciphertext = data[rev_idx:-64]
+        hmac = data[-64:]
+
+        h = HMAC(self.mac_key, hashes.SHA512(), backend=crypto_backend)
+        h.update(data[:-64])
+        try:
+            h.verify(hmac)
+        except InvalidSignature:
+            raise InvalidBlob('HMAC could not be verifed')
+
+        decryptor = _get_aes_ctr_cipher(self.sym_key, iv).decryptor()
+
+        # TODO pass chunks, streaming, instead
+        # Use AESDecryptor below
+        self.result.write(decryptor.update(ciphertext))
+        self.result.write(decryptor.finalize())
+        return self.result
+
+
+class AESEncryptor(object):
 
     implements(interfaces.IConsumer)
 
-    def __init__(self, key, fd, iv=None):
-        if iv is None:
-            iv = os.urandom(16)
+    def __init__(self, key, iv, fd=None):
         if len(key) != 32:
-            raise EncryptionError('key is not 256 bits')
+            raise EncryptionDecryptionError('key is not 256 bits')
         if len(iv) != 16:
-            raise EncryptionError('iv is not 128 bits')
+            raise EncryptionDecryptionError('iv is not 128 bits')
 
         cipher = _get_aes_ctr_cipher(key, iv)
         self.encryptor = cipher.encryptor()
-
+        
+        if fd is None:
+            fd = BytesIO()
         self.fd = fd
+
         self.done = False
-        self.deferred = defer.Deferred()
 
     def write(self, data):
         encrypted = self.encryptor.update(data)
+        encode = binascii.b2a_hex
         self.fd.write(encrypted)
         return encrypted
 
     def end(self):
         if not self.done:
-            self.encryptor.finalize()
-            self.deferred.callback(self.fd)
+            final = self.encryptor.finalize()
         self.done = True
 
 
 class HMACWriter(object):
 
     implements(interfaces.IConsumer)
+    hashtype = 'sha512'
 
     def __init__(self, key):
-        self.done = False
-        self.deferred = defer.Deferred()
-
-        self.digest = ''
-        self._hmac = hmac.new(key, '', hashlib.sha256)
+        self._hmac = hmac.new(key, '', getattr(hashlib, self.hashtype))
+        self.result = BytesIO('')
 
     def write(self, data):
         self._hmac.update(data)
 
     def end(self):
-        if not self.done:
-            self.digest = self._hmac.digest()
-            self.deferred.callback(self.digest)
-        self.done = True
+        self.result.write(self._hmac.digest())
 
 
-class EncryptAndHMAC(object):
+
+class VerifiedEncrypter(object):
 
     implements(interfaces.IConsumer)
 
@@ -122,99 +290,39 @@ class EncryptAndHMAC(object):
         self.hmac.write(enc_chunk)
         
 
+class AESDecryptor(object):
 
-class DocEncrypter(object):
+    implements(interfaces.IConsumer)
 
-    staging_path = os.path.join(get_path_prefix(), 'leap', 'soledad', 'staging')
-    staged_template = """{"_enc_scheme": "symkey", "_enc_method":
-        "aes-256-ctr", "_mac_method": "hmac", "_mac_hash": "sha256",
-        "_encoding": "ENCODING", "_enc_json": "CIPHERTEXT", "_enc_iv": "IV", "_mac": "MAC"}"""
+    def __init__(self, key, iv, fd):
+        if iv is None:
+            iv = os.urandom(16)
+        if len(key) != 32:
+            raise EncryptionhDecryptionError('key is not 256 bits')
+        if len(iv) != 16:
+            raise EncryptionDecryptionError('iv is not 128 bits')
 
+        cipher = _get_aes_ctr_cipher(key, iv)
+        self.decryptor = cipher.decryptor()
 
-    def __init__(self, content_fd, doc_id, rev, secret=None):
-        self._content_fd  = content_fd
-        self._contentFileProducer = FileBodyProducer(
-            content_fd, readSize=2**8)
-        self.doc_id = doc_id
-        self.rev = rev
-        self._encrypted_fd = StringIO()
-
-        self.iv = os.urandom(16)
-
-        sym_key = _get_sym_key_for_doc(doc_id, secret)
-        mac_key = _get_mac_key_for_doc(doc_id, secret)
-
-        crypter = AESWriter(sym_key, self._encrypted_fd, self.iv)
-        hmac = HMACWriter(mac_key)
-
-        self.crypter_consumer = crypter
-        self.hmac_consumer = hmac
-
-        self._prime_hmac()
-        self.encrypt_and_mac_consumer = EncryptAndHMAC(crypter, hmac)
-
-    def encrypt_stream(self):
-        d = self._contentFileProducer.startProducing(
-            self.encrypt_and_mac_consumer)
-        d.addCallback(self.end_crypto_stream)
-        d.addCallback(self.persist_encrypted_doc)
-        return d
-
-    def end_crypto_stream(self, ignored):
-        self.crypter_consumer.end()
-        self._post_hmac()
-        self.hmac_consumer.end()
-        return defer.succeed('ok')
-
-    # TODO make this pluggable:
-    # pass another class (CryptoSerializer) to which we pass
-    # the doc info, the encrypted_fd and the mac_digest
-
-    def persist_encrypted_doc(self, ignored, encoding='hex'):
-        # TODO -- transition to b64: needs migration FIXME
-        if encoding == 'b64':
-            encode = binascii.b2a_base64
-        elif encoding == 'hex':
-            encode = binascii.b2a_hex
-        else:
-            raise RuntimeError('Unknown encoding: %s' % encoding)
-
-        # TODO to avoid blocking on io, this can use a
-        # version of dbm that chunks the writes to the 
-        # disk fd by using the same FileBodyProducer strategy
-        # that we're using here, long live to the Cooperator.
+        self.fd = fd
+        self.done = False
+        self.deferred = defer.Deferred()
 
 
-        db = dirdbm.DirDBM(self.staging_path)
-        key = '{doc_id}@{rev}'.format(
-            doc_id=self.doc_id, rev=self.rev)
-        ciphertext = encode(self._encrypted_fd.getvalue())
-        value = self.staged_template.replace(
-            'ENCODING', encoding).replace(
-            'CIPHERTEXT', ciphertext).replace(
-            'IV', encode(self.iv)).replace(
-            'MAC', encode(self.hmac_consumer.digest)).replace(
-            '\n', '')
-        self._encrypted_fd.seek(0)
+    def write(self, data):
+        decrypted = self.decryptor.update(data)
+        self.fd.write(decrypted)
+        return decrypted
 
-        log.debug('persisting %s' % key)
-        db[key] = value
+    def end(self):
+        if not self.done:
+            self.decryptor.finalize()
+            self.deferred.callback(self.fd)
+        self.done = True
 
-        self._content_fd.close()
-        self._encrypted_fd.close()
 
-    def _prime_hmac(self):
-        pre = '{doc_id}{rev}'.format(
-            doc_id=self.doc_id, rev=self.rev)
-        self.hmac_consumer.write(pre)
-
-    def _post_hmac(self):
-        post = '{enc_scheme}{enc_method}{enc_iv}'.format(
-            enc_scheme='symkey',
-            enc_method='aes-256-ctr',
-            enc_iv=binascii.b2a_hex(self.iv))
-        self.hmac_consumer.write(post)
-
+# utils
 
 
 def _hmac_sha256(key, data):
