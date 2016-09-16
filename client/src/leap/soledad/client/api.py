@@ -61,7 +61,7 @@ from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client import sqlcipher
 from leap.soledad.client import encdecpool
-from leap.soledad.client._crypto import DocEncrypter
+#from leap.soledad.client._crypto import DocEncrypter
 
 logger = getLogger(__name__)
 
@@ -360,8 +360,10 @@ class Soledad(object):
         contentfd.seek(0)
 
         sikret = self._secrets.remote_storage_secret
-        crypter = DocEncrypter(
-            contentfd, doc.doc_id, doc.rev, secret=sikret)
+
+        # TODO use BlobEncrypter
+        #crypter = DocEncrypter(
+            #contentfd, doc.doc_id, doc.rev, secret=sikret)
         d = crypter.encrypt_stream()
         d.addCallback(lambda _: result)
         return d
