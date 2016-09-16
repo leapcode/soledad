@@ -200,11 +200,12 @@ class HTTPDocFetcher(object):
             self._ensure_callback(metadata['replica_uid'])
         # parse incoming document info
         entries = []
-        for data in data[1:]:
+        for index in xrange(1, len(data[1:]), 2):
             try:
-                line, comma = utils.check_and_strip_comma(data)
+                line, comma = utils.check_and_strip_comma(data[index])
+                content, _ = utils.check_and_strip_comma(data[index + 1])
                 entry = json.loads(line)
-                entries.append((entry['id'], entry['rev'], entry['content'],
+                entries.append((entry['id'], entry['rev'], content,
                                 entry['gen'], entry['trans_id']))
             except (IndexError, KeyError):
                 raise errors.BrokenSyncStream
