@@ -23,7 +23,8 @@ def create_upload(uploads, size):
         def setup():
             return load_up(client, uploads, payload(size))
 
-        yield txbenchmark_with_setup(setup, client.sync)
+        yield txbenchmark_with_setup(setup, client.sync,
+                                     defer_decryption=False)
     return test
 
 
