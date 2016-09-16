@@ -248,9 +248,10 @@ class SyncResource(http_app.SyncResource):
         """
 
         def send_doc(doc, gen, trans_id):
-            entry = dict(id=doc.doc_id, rev=doc.rev, content=doc.get_json(),
+            entry = dict(id=doc.doc_id, rev=doc.rev,
                          gen=gen, trans_id=trans_id)
             self.responder.stream_entry(entry)
+            self.responder.stream_entry(doc.get_json().read())
 
         new_gen, number_of_changes = \
             self.sync_exch.find_changes_to_return(received)
