@@ -205,7 +205,7 @@ class HTTPDocFetcher(object):
                 line, comma = utils.check_and_strip_comma(data[index])
                 content, _ = utils.check_and_strip_comma(data[index + 1])
                 entry = json.loads(line)
-                entries.append((entry['id'], entry['rev'], content,
+                entries.append((entry['id'], entry['rev'], content or None,
                                 entry['gen'], entry['trans_id']))
             except (IndexError, KeyError):
                 raise errors.BrokenSyncStream
