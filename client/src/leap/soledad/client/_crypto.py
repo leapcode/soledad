@@ -77,6 +77,31 @@ class InvalidBlob(Exception):
     pass
 
 
+docinfo = namedtuple('docinfo', 'doc_id rev')
+
+
+class SoledadCrypto(object):
+
+    def __init__(self, secret):
+        self.secret = secret
+
+    def encrypt_doc(self, doc):
+        content = BytesIO()
+        content.write(str(doc.get_json()))
+        info = docinfo(doc.doc_id, doc.rev)
+        del doc
+        encryptor = BlobEncryptor(info, content, secret=self.secret)
+        return encryptor.encrypt()
+
+    def decrypt_doc(self, doc):
+        info = docinfo(doc.doc_id, doc.rev)
+        ciphertext = BytesIO()
+        ciphertext.write(doc.get_json())
+        ciphertext.seek(0)
+        del doc
+        decryptor = BlobDecryptor(info, ciphertext, secret=self.secret)
+        return decryptor.decrypt()
+
 
 class BlobEncryptor(object):
 
@@ -134,8 +159,8 @@ class BlobEncryptor(object):
             ENC_SCHEME.symkey,
             ENC_METHOD.aes_256_ctr))
         write(self.iv)
-        write(self.doc_id)
-        write(self.rev)
+        write(str(self.doc_id))
+        write(str(self.rev))
 
     def _end_crypto_stream(self, ignored):
         self._aes.end()
@@ -177,7 +202,6 @@ class BlobDecryptor(object):
         self.result = result
 
     def decrypt(self):
-
         try:
             data = base64.urlsafe_b64decode(self.ciphertext.getvalue())
         except (TypeError, binascii.Error):
@@ -341,3 +365,9 @@ def _get_sym_key_for_doc(doc_id, secret):
 
 def _get_aes_ctr_cipher(key, iv):
     return Cipher(algorithms.AES(key), modes.CTR(iv), backend=crypto_backend)
+
+
+def is_symmetrically_encrypted(payload):
+    header = base64.urlsafe_b64decode(enc[:15] + '===')
+    ts, sch, meth = struct.unpack('Qbb', header[1:11])
+    return sch == ENC_SCHEME.symkey

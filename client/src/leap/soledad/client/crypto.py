@@ -130,77 +130,6 @@ def doc_mac_key(doc_id, secret):
         hashlib.sha256).digest()
 
 
-class SoledadCrypto(object):
-    """
-    General cryptographic functionality encapsulated in a
-    object that can be passed along.
-    """
-    def __init__(self, secret):
-        """
-        Initialize the crypto object.
-
-        :param secret: The Soledad remote storage secret.
-        :type secret: str
-        """
-        self._secret = secret
-
-    def doc_mac_key(self, doc_id):
-        return doc_mac_key(doc_id, self._secret)
-
-    def doc_passphrase(self, doc_id):
-        """
-        Generate a passphrase for symmetric encryption of document's contents.
-
-        The password is derived using HMAC having sha256 as underlying hash
-        function. The key used for HMAC are the first
-        C{soledad.REMOTE_STORAGE_SECRET_LENGTH} bytes of Soledad's storage
-        secret stripped from the first MAC_KEY_LENGTH characters. The HMAC
-        message is C{doc_id}.
-
-        :param doc_id: The id of the document that will be encrypted using
-            this passphrase.
-        :type doc_id: str
-
-        :return: The passphrase.
-        :rtype: str
-        """
-        soledad_assert(self._secret is not None)
-        return hmac.new(
-            self._secret[MAC_KEY_LENGTH:],
-            doc_id,
-            hashlib.sha256).digest()
-
-    #def encrypt_doc(self, doc):
-        #"""
-        #Wrapper around encrypt_docstr that accepts the document as argument.
-#
-        #:param doc: the document.
-        #:type doc: SoledadDocument
-        #"""
-        #key = self.doc_passphrase(doc.doc_id)
-#
-        #return encrypt_docstr(
-            #doc.get_json(), doc.doc_id, doc.rev, key, self._secret)
-
-    def decrypt_doc(self, doc):
-        """
-        Wrapper around decrypt_doc_dict that accepts the document as argument.
-
-        :param doc: the document.
-        :type doc: SoledadDocument
-
-        :return: json string with the decrypted document
-        :rtype: str
-        """
-        key = self.doc_passphrase(doc.doc_id)
-        return decrypt_doc_dict(
-            doc.content, doc.doc_id, doc.rev, key, self._secret)
-
-    @property
-    def secret(self):
-        return self._secret
-
-
 #
 # Crypto utilities for a SoledadDocument.
 #
@@ -455,6 +384,7 @@ def decrypt_doc_dict(doc_dict, doc_id, doc_rev, key, secret):
     return decr
 
 
+# TODO deprecate
 def is_symmetrically_encrypted(doc):
     """
     Return True if the document was symmetrically encrypted.

@@ -18,9 +18,9 @@ from twisted.internet import defer
 
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
-from leap.soledad.client.crypto import is_symmetrically_encrypted
 from leap.soledad.client.http_target.support import RequestBody
 from leap.soledad.common.log import getLogger
+from leap.soledad.client._crypto import is_symmetrically_encrypted
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.l2db import errors
 
@@ -49,6 +49,8 @@ class HTTPDocFetcher(object):
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
                       ensure_callback, sync_id):
+
+        print 'receiving.....', sync_id
 
         new_generation = last_known_generation
         new_transaction_id = last_known_trans_id
@@ -90,6 +92,7 @@ class HTTPDocFetcher(object):
             content_type='application/x-soledad-sync-get',
             body_reader=body_reader)
 
+    @defer.inlineCallbacks
     def _doc_parser(self, doc_info, content):
         """
         Insert a received document into the local replica.
@@ -102,13 +105,19 @@ class HTTPDocFetcher(object):
         :type total: int
         """
         # decrypt incoming document and insert into local database
-        # ---------------------------------------------------------
-        # symmetric decryption of document's contents
-        # ---------------------------------------------------------
         # If arriving content was symmetrically encrypted, we decrypt
+
         doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
-        if is_symmetrically_encrypted(doc):
-            doc.set_json(self._crypto.decrypt_doc(doc))
+
+        print "GOT.....", doc
+
+        payload = doc['raw']
+        if is_symmetrically_encrypted(payload):
+            print "SHOULD DECRYPT!!!!", content
+            decrypted = yield self._crypto.decrypt_doc(doc)
+            doc.set_json(decrypted)
+
+        # TODO insert blobs here on the blob backend
         self._insert_doc_cb(doc, doc_info['gen'], doc_info['trans_id'])
         self._received_docs += 1
         user_data = {'uuid': self.uuid, 'userid': self.userid}
@@ -125,17 +134,6 @@ class HTTPDocFetcher(object):
                  content, gen, trans_id)
         :rtype: tuple
         """
-        # decode incoming stream
-        # parts = response.splitlines()
-        # if not parts or parts[0] != '[' or parts[-1] != ']':
-        #    raise errors.BrokenSyncStream
-        # data = parts[1:-1]
-        # decode metadata
-        # try:
-        #    line, comma = utils.check_and_strip_comma(data[0])
-        #    metadata = None
-        # except (IndexError):
-        #    raise errors.BrokenSyncStream
         try:
             # metadata = json.loads(line)
             new_generation = metadata['new_generation']
@@ -146,20 +144,7 @@ class HTTPDocFetcher(object):
         # make sure we have replica_uid from fresh new dbs
         if self._ensure_callback and 'replica_uid' in metadata:
             self._ensure_callback(metadata['replica_uid'])
-        # parse incoming document info
-        entries = []
-        for index in xrange(1, len(data[1:]), 2):
-            try:
-                line, comma = utils.check_and_strip_comma(data[index])
-                content, _ = utils.check_and_strip_comma(data[index + 1])
-                entry = json.loads(line)
-                entries.append((entry['id'], entry['rev'], content,
-                                entry['gen'], entry['trans_id']))
-            except (IndexError, KeyError):
-                raise errors.BrokenSyncStream
-        return new_generation, new_transaction_id, number_of_changes, \
-            entries
-
+        return number_of_changes, new_generation, new_transaction_id
 
 
 def _emit_receive_status(user_data, received_docs, total):

@@ -56,12 +56,11 @@ from leap.soledad.common.errors import DatabaseAccessError
 from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
 from leap.soledad.client import interfaces as soledad_interfaces
-from leap.soledad.client.crypto import SoledadCrypto
+from leap.soledad.client import sqlcipher
 from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client import sqlcipher
-from leap.soledad.client import encdecpool
-#from leap.soledad.client._crypto import DocEncrypter
+from leap.soledad.client._crypto import SoledadCrypto
+from leap.soledad.client._crypto import BlobEncryptor
 
 logger = getLogger(__name__)
 
@@ -308,8 +307,7 @@ class Soledad(object):
         replica_uid = self._dbpool.replica_uid
         self._dbsyncer = sqlcipher.SQLCipherU1DBSync(
             self._sqlcipher_opts, self._crypto, replica_uid,
-            SOLEDAD_CERT,
-            sync_db=self._sync_db)
+            SOLEDAD_CERT)
 
     def sync_stats(self):
         sync_phase = 0
@@ -354,19 +352,38 @@ class Soledad(object):
         """
         return self._dbpool.runU1DBQuery(meth, *args, **kw)
 
-    def stream_encryption(self, result, doc):
-        contentfd = StringIO()
-        contentfd.write(doc.get_json())
-        contentfd.seek(0)
-
-        sikret = self._secrets.remote_storage_secret
-
-        # TODO use BlobEncrypter
-        #crypter = DocEncrypter(
-            #contentfd, doc.doc_id, doc.rev, secret=sikret)
-        d = crypter.encrypt_stream()
-        d.addCallback(lambda _: result)
-        return d
+    #def stream_encryption(self, result, doc):
+        #print 'streaming encryption'
+        #contentfd = StringIO()
+        #contentfd.write(str(doc.get_json()))
+        #contentfd.seek(0)
+#
+        #sikret = self._secrets.remote_storage_secret
+        #docinfo = DocInfo(doc.doc_id, doc.rev)
+#
+        # -------------------------------------------------------
+        # TODO need to pass a fd to stage this!!!
+        # in the long run, we could connect this to the uploader
+        # but in the meantime, I thikn it's easy if we just
+        # serialize this to disk.
+        # 
+        # To do this:
+        # 1. open a file, with a known name:
+        #     soledad/staging/docid@rev.bin
+        # 2. pass that fd to BlobEncrypter as result (it's a fd)
+        # 3. On the upload part of the sync, just open again a read-only fd 
+        #    to this staging path and read it.
+        #    that's the encrypted blob, ready to upload!
+        # -------------------------------------------------------
+#
+        #crypter = BlobEncryptor(
+            #docinfo, contentfd, secret=sikret)
+        #del doc
+#
+#
+        #d = crypter.encrypt()
+        #d.addCallback(lambda _: result)
+        #return d
 
 
     def put_doc(self, doc):
@@ -392,7 +409,6 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         d = self._defer("put_doc", doc)
-        d.addCallback(self.stream_encryption, doc)
         return d
 
     def delete_doc(self, doc):
@@ -488,7 +504,6 @@ class Soledad(object):
         # payloads for example) in which we already have the encoding in the
         # headers, so we don't need to guess it.
         d = self._defer("create_doc", content, doc_id=doc_id)
-        d.addCallback(lambda doc: self.stream_encryption('', doc))
         return d
 
     def create_doc_from_json(self, json, doc_id=None):
@@ -857,14 +872,6 @@ class Soledad(object):
         self._sync_db = sqlcipher.getConnectionPool(
             sync_opts, extra_queries=self._sync_db_extra_init)
 
-    @property
-    def _sync_db_extra_init(self):
-        """
-        Queries for creating tables for the local sync documents db if needed.
-        They are passed as extra initialization to initialize_sqlciphjer_db
-
-        :rtype: tuple of strings
-        """
 
     #
     # ISecretsStorage
@@ -1032,6 +1039,14 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
                                     ca_certs=SOLEDAD_CERT,
                                     cert_reqs=ssl.CERT_REQUIRED)
         match_hostname(self.sock.getpeercert(), self.host)
+
+
+# TODO move this to a common module
+
+class DocInfo:
+    def __init__(self, doc_id, rev):
+        self.doc_id = doc_id
+        self.rev = rev
 
 
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
