@@ -102,10 +102,12 @@ class SyncExchange(sync.SyncExchange):
         :return: None
         """
         changes_to_return = self.changes_to_return
-        # return docs, including conflicts
+        # return docs, including conflicts.
+        # content as a file-object (will be read when writing)
         changed_doc_ids = [doc_id for doc_id, _, _ in changes_to_return]
         docs = self._db.get_docs(
-            changed_doc_ids, check_for_conflicts=False, include_deleted=True)
+            changed_doc_ids, check_for_conflicts=False,
+            include_deleted=True, read_content=False)
 
         docs_by_gen = izip(
             docs, (gen for _, gen, _ in changes_to_return),

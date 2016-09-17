@@ -296,31 +296,14 @@ class CouchDatabase(object):
 
         generation, _ = self.get_generation_info()
         results = list(
-            self._get_docs(None, True, include_deleted))
+            self.get_docs(None, True, include_deleted))
         return (generation, results)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
-                 include_deleted=False):
+                 include_deleted=False, read_content=True):
         """
         Get the JSON content for many documents.
 
-        :param doc_ids: A list of document identifiers or None for all.
-        :type doc_ids: list
-        :param check_for_conflicts: If set to False, then the conflict check
-                                    will be skipped, and 'None' will be
-                                    returned instead of True/False.
-        :type check_for_conflicts: bool
-        :param include_deleted: If set to True, deleted documents will be
-                                returned with empty content. Otherwise deleted
-                                documents will not be included in the results.
-        :return: iterable giving the Document object for each document id
-                 in matching doc_ids order.
-        :rtype: iterable
-        """
-        return self._get_docs(doc_ids, check_for_conflicts, include_deleted)
-
-    def _get_docs(self, doc_ids, check_for_conflicts, include_deleted):
-        """
         Use couch's `_all_docs` view to get the documents indicated in
         `doc_ids`,
 
@@ -344,12 +327,12 @@ class CouchDatabase(object):
         view = self._database.view("_all_docs", **params)
         for row in view.rows:
             result = copy.deepcopy(row['doc'])
-            attachment_file_names = result['_attachments'].keys()
-            result['_attachments'] = {}
-            for file_name in attachment_file_names:
-                result['_attachments'][file_name] = {
-                    'data': self._database.get_attachment(result, file_name)
-                }
+            for file_name in result.get('_attachments', {}).keys():
+                data = self._database.get_attachment(result, file_name)
+                if data:
+                    if read_content:
+                        data = data.read()
+                    result['_attachments'][file_name] = {'data': data}
             doc = self.__parse_doc_from_couch(
                 result, result['_id'],
                 check_for_conflicts=check_for_conflicts, decode=False)
@@ -416,8 +399,8 @@ class CouchDatabase(object):
         self.batch_docs.clear()
         return rev
 
-    def __parse_doc_from_couch(self, result, doc_id, decode=True,
-                               check_for_conflicts=False):
+    def __parse_doc_from_couch(self, result, doc_id,
+                               check_for_conflicts=False, decode=True):
         # restrict to u1db documents
         if 'u1db_rev' not in result:
             return None
@@ -437,10 +420,11 @@ class CouchDatabase(object):
                 and '_attachments' in result \
                 and 'u1db_conflicts' in result['_attachments']:
             if decode:
-                conflicts = json.loads(binascii.a2b_base64(
-                    result['_attachments']['u1db_conflicts']['data']))
+                conflicts = binascii.a2b_base64(
+                    result['_attachments']['u1db_conflicts']['data'])
             else:
                 conflicts = result['_attachments']['u1db_conflicts']['data']
+            conflicts = json.loads(conflicts)
             doc.set_conflicts(self._build_conflicts(doc.doc_id, conflicts))
         # store couch revision
         doc.couch_rev = result['_rev']
