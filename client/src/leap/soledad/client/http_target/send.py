@@ -109,7 +109,10 @@ class HTTPDocSender(object):
         if doc.is_tombstone():
             defer.returnValue((doc, None))
         else:
-            defer.returnValue((doc, self._crypto.encrypt_doc(doc)))
+            # TODO -- for blobs, should stream the doc raw content
+            # TODO -- get rid of this json encoding
+            content = yield self._crypto.encrypt_doc(doc)
+            defer.returnValue((doc, content.getvalue()))
 
 
 def _emit_send_status(user_data, idx, total):
