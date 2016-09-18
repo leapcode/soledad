@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Test Leap backend bits: sync with deferred encryption/decryption.
+Test Leap backend bits: sync with deferred encryption.
 """
 import time
 import os
@@ -22,11 +22,7 @@ import random
 import string
 import shutil
 
-from urlparse import urljoin
-
 from twisted.internet import defer
-
-from leap.soledad.common import couch
 
 from leap.soledad.client import sync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
@@ -41,9 +37,6 @@ from test_soledad.util import make_soledad_app
 from test_soledad.util import soledad_sync_target
 
 
-# Just to make clear how this test is different... :)
-DEFER_DECRYPTION = True
-
 WAIT_STEP = 1
 MAX_WAIT = 10
 DBPASS = "pass"
@@ -52,7 +45,7 @@ DBPASS = "pass"
 class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
 
     """
-    Another base class for testing the deferred encryption/decryption during
+    Another base class for testing the deferred encryption during
     the syncs, using the intermediate database.
     """
     defer_sync_encryption = True
@@ -109,7 +102,7 @@ class TestSoledadDbSyncDeferredEncDecr(
 
     """
     Test db.sync remote sync shortcut.
-    Case with deferred encryption and decryption: using the intermediate
+    Case with deferred encryption: using the intermediate
     syncdb.
     """
 
@@ -158,7 +151,7 @@ class TestSoledadDbSyncDeferredEncDecr(
         self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
             dbsyncer,
-            target).sync(defer_decryption=True)
+            target).sync()
 
     def wait_for_sync(self):
         """

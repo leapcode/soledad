@@ -43,8 +43,6 @@ class SyncTargetAPI(SyncTarget):
     def close(self):
         if self._sync_enc_pool:
             self._sync_enc_pool.stop()
-        if self._sync_decr_pool:
-            self._sync_decr_pool.stop()
         yield self._http.close()
 
     @property
@@ -153,7 +151,7 @@ class SyncTargetAPI(SyncTarget):
     def sync_exchange(self, docs_by_generation, source_replica_uid,
                       last_known_generation, last_known_trans_id,
                       insert_doc_cb, ensure_callback=None,
-                      defer_decryption=True, sync_id=None):
+                      sync_id=None):
         """
         Find out which documents the remote database does not know about,
         encrypt and send them. After that, receive documents from the remote
@@ -184,11 +182,6 @@ class SyncTargetAPI(SyncTarget):
                                 replica uid if the target replica was just
                                 created.
         :type ensure_callback: function
-
-        :param defer_decryption: Whether to defer the decryption process using
-                                 the intermediate database. If False,
-                                 decryption will be done inline.
-        :type defer_decryption: bool
 
         :return: A deferred which fires with the new generation and
                  transaction id of the target replica.
@@ -221,8 +214,7 @@ class SyncTargetAPI(SyncTarget):
 
         cur_target_gen, cur_target_trans_id = yield self._receive_docs(
             last_known_generation, last_known_trans_id,
-            ensure_callback, sync_id,
-            defer_decryption=defer_decryption)
+            ensure_callback, sync_id)
 
         # update gen and trans id info in case we just sent and did not
         # receive docs.

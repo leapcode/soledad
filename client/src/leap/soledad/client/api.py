@@ -169,7 +169,7 @@ class Soledad(object):
         :type auth_token: str
 
         :param defer_encryption:
-            Whether to defer encryption/decryption of documents, or do it
+            Whether to defer encryption of documents, or do it
             inline while syncing.
         :type defer_encryption: bool
 
@@ -299,9 +299,9 @@ class Soledad(object):
         )
         self._sqlcipher_opts = opts
 
-        # the sync_db is used both for deferred encryption and decryption, so
+        # the sync_db is used both for deferred encryption, so
         # we want to initialize it anyway to allow for all combinations of
-        # deferred encryption and decryption configurations.
+        # deferred encryption configurations.
         self._initialize_sync_db(opts)
         self._dbpool = adbapi.getConnectionPool(
             opts, sync_enc_pool=self._sync_enc_pool)
@@ -700,17 +700,12 @@ class Soledad(object):
         if syncable and not self._dbsyncer:
             self._init_u1db_syncer()
 
-    def sync(self, defer_decryption=True):
+    def sync(self):
         """
         Synchronize documents with the server replica.
 
         This method uses a lock to prevent multiple concurrent sync processes
         over the same local db file.
-
-        :param defer_decryption:
-            Whether to defer decryption of documents, or do it inline while
-            syncing.
-        :type defer_decryption: bool
 
         :return: A deferred lock that will run the actual sync process when
                  the lock is acquired, and which will fire with with the local
@@ -718,18 +713,12 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         d = self.sync_lock.run(
-            self._sync,
-            defer_decryption)
+            self._sync)
         return d
 
-    def _sync(self, defer_decryption):
+    def _sync(self):
         """
         Synchronize documents with the server replica.
-
-        :param defer_decryption:
-            Whether to defer decryption of documents, or do it inline while
-            syncing.
-        :type defer_decryption: bool
 
         :return: A deferred whose callback will be invoked with the local
             generation before the synchronization was performed.
@@ -740,8 +729,7 @@ class Soledad(object):
             return
         d = self._dbsyncer.sync(
             sync_url,
-            creds=self._creds,
-            defer_decryption=defer_decryption)
+            creds=self._creds)
 
         def _sync_callback(local_gen):
             self._last_received_docs = docs = self._dbsyncer.received_docs
@@ -874,12 +862,9 @@ class Soledad(object):
         """
         maybe_create = "CREATE TABLE IF NOT EXISTS %s (%s)"
         encr = encdecpool.SyncEncrypterPool
-        decr = encdecpool.SyncDecrypterPool
         sql_encr_table_query = (maybe_create % (
             encr.TABLE_NAME, encr.FIELD_NAMES))
-        sql_decr_table_query = (maybe_create % (
-            decr.TABLE_NAME, decr.FIELD_NAMES))
-        return (sql_encr_table_query, sql_decr_table_query)
+        return (sql_encr_table_query,)
 
     #
     # ISecretsStorage

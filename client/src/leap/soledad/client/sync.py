@@ -56,22 +56,9 @@ class SoledadSynchronizer(Synchronizer):
             self.sync_exchange_phase = None
 
     @defer.inlineCallbacks
-    def sync(self, defer_decryption=True):
+    def sync(self):
         """
         Synchronize documents between source and target.
-
-        Differently from u1db `Synchronizer.sync` method, this one allows to
-        pass a `defer_decryption` flag that will postpone the last
-        step in the synchronization dance, namely, the setting of the last
-        known generation and transaction id for a given remote replica.
-
-        This is done to allow the ongoing parallel decryption of the incoming
-        docs to proceed without `InvalidGeneration` conflicts.
-
-        :param defer_decryption: Whether to defer the decryption process using
-                                 the intermediate database. If False,
-                                 decryption will be done inline.
-        :type defer_decryption: bool
 
         :return: A deferred which will fire after the sync has finished with
                  the local generation before the synchronization was performed.
@@ -172,8 +159,7 @@ class SoledadSynchronizer(Synchronizer):
         new_gen, new_trans_id = yield sync_target.sync_exchange(
             docs_by_generation, self.source._replica_uid,
             target_last_known_gen, target_last_known_trans_id,
-            self._insert_doc_from_target, ensure_callback=ensure_callback,
-            defer_decryption=defer_decryption)
+            self._insert_doc_from_target, ensure_callback=ensure_callback)
         logger.debug("target gen after sync: %d" % new_gen)
         logger.debug("target trans_id after sync: %s" % new_trans_id)
         if hasattr(self.source, 'commit'):
