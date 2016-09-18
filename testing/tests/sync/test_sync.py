@@ -187,7 +187,7 @@ class TestSoledadDbSync(
         self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
             self.db,
-            target).sync(defer_decryption=False)
+            target).sync()
 
     @defer.inlineCallbacks
     def test_db_sync(self):

@@ -231,8 +231,7 @@ class TestSoledadSyncTarget(
         doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
         new_gen, trans_id = yield remote_target.sync_exchange(
             [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=receive_doc)
         self.assertEqual(1, new_gen)
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
@@ -285,8 +284,7 @@ class TestSoledadSyncTarget(
                 'replica',
                 last_known_generation=0,
                 last_known_trans_id=None,
-                insert_doc_cb=receive_doc,
-                defer_decryption=False)
+                insert_doc_cb=receive_doc)
 
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}',
@@ -298,8 +296,7 @@ class TestSoledadSyncTarget(
         trigger_ids = []
         new_gen, trans_id = yield remote_target.sync_exchange(
             [(doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=receive_doc)
         self.assertGetEncryptedDoc(
             db, 'doc-here2', 'replica:1', '{"value": "here2"}',
             False)
@@ -331,7 +328,7 @@ class TestSoledadSyncTarget(
         new_gen, trans_id = yield remote_target.sync_exchange(
             [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=receive_doc,
-            ensure_callback=ensure_cb, defer_decryption=False)
+            ensure_callback=ensure_cb)
         self.assertEqual(1, new_gen)
         db = self.db2
         self.assertEqual(1, len(replica_uid_box))
@@ -446,8 +443,7 @@ class SoledadDatabaseSyncTargetTests(
              'T-sid')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertGetEncryptedDoc(
             self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertTransactionLog(['doc-id'], self.db)
@@ -471,8 +467,7 @@ class SoledadDatabaseSyncTargetTests(
                 'doc-id2', 'replica:1', tests.nested_doc), 11, 'T-2')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertGetEncryptedDoc(
             self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertGetEncryptedDoc(
@@ -498,8 +493,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
         new_gen, _ = yield self.st.sync_exchange(
             [], 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
         self.assertEqual(2, new_gen)
         self.assertEqual(
@@ -779,10 +773,6 @@ class SoledadDatabaseSyncTargetTests(
         yield self.st.record_sync_info('replica', 0, 'T-sid')
         self.assertEqual(expected, called)
 
-
-# Just to make clear how this test is different... :)
-DEFER_DECRYPTION = False
-
 WAIT_STEP = 1
 MAX_WAIT = 10
 DBPASS = "pass"
@@ -890,8 +880,7 @@ class TestSoledadDbSync(
                 defer_encryption=True)
             self.dbsyncer = dbsyncer
             return dbsyncer.sync(target_url,
-                                 creds=creds,
-                                 defer_decryption=DEFER_DECRYPTION)
+                                 creds=creds)
         else:
             return self._do_sync(self, target_name)
 

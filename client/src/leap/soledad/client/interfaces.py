@@ -321,7 +321,7 @@ class ISyncableStorage(Interface):
         "Property, True if the syncer is syncing.")
     token = Attribute("The authentication Token.")
 
-    def sync(self, defer_decryption=True):
+    def sync(self):
         """
         Synchronize the local encrypted replica with a remote replica.
 
@@ -330,11 +330,6 @@ class ISyncableStorage(Interface):
 
         :param url: the url of the target replica to sync with
         :type url: str
-
-        :param defer_decryption:
-            Whether to defer the decryption process using the intermediate
-            database. If False, decryption will be done inline.
-        :type defer_decryption: bool
 
         :return:
             A deferred that will fire with the local generation before the

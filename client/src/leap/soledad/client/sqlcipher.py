@@ -164,7 +164,7 @@ class SQLCipherOptions(object):
         :param cipher_page_size: The page size.
         :type cipher_page_size: int
         :param defer_encryption:
-            Whether to defer encryption/decryption of documents, or do it
+            Whether to defer encryption of documents, or do it
             inline while syncing.
         :type defer_encryption: bool
         """
@@ -480,7 +480,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             raise DatabaseAccessError(str(e))
 
     @defer.inlineCallbacks
-    def sync(self, url, creds=None, defer_decryption=True):
+    def sync(self, url, creds=None):
         """
         Synchronize documents with remote replica exposed at url.
 
@@ -495,10 +495,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :param creds: optional dictionary giving credentials to authorize the
                       operation with the server.
         :type creds: dict
-        :param defer_decryption:
-            Whether to defer the decryption process using the intermediate
-            database. If False, decryption will be done inline.
-        :type defer_decryption: bool
 
         :return:
             A Deferred, that will fire with the local generation (type `int`)
@@ -510,8 +506,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             self.sync_phase = syncer.sync_phase
             self.syncer = syncer
             self.sync_exchange_phase = syncer.sync_exchange_phase
-        local_gen_before_sync = yield syncer.sync(
-            defer_decryption=defer_decryption)
+        local_gen_before_sync = yield syncer.sync()
         self.received_docs = syncer.received_docs
         defer.returnValue(local_gen_before_sync)
 

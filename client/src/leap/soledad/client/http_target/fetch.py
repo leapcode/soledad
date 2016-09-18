@@ -21,7 +21,6 @@ from twisted.internet import defer
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.crypto import is_symmetrically_encrypted
-from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.client.http_target.support import RequestBody
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.document import SoledadDocument
@@ -50,25 +49,10 @@ class HTTPDocFetcher(object):
 
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
-                      ensure_callback, sync_id, defer_decryption):
-        defer_decryption = False
-
-        self._queue_for_decrypt = defer_decryption \
-            and self._sync_db is not None
+                      ensure_callback, sync_id):
 
         new_generation = last_known_generation
         new_transaction_id = last_known_trans_id
-
-        if self._queue_for_decrypt:
-            logger.debug(
-                "Soledad sync: will queue received docs for decrypting.")
-
-        if defer_decryption:
-            self._setup_sync_decr_pool()
-
-        # ---------------------------------------------------------------------
-        # maybe receive the first document
-        # ---------------------------------------------------------------------
 
         # we fetch the first document before fetching the rest because we need
         # to know the total number of documents to be received, and this
@@ -84,14 +68,6 @@ class HTTPDocFetcher(object):
         if ngen:
             new_generation = ngen
             new_transaction_id = ntrans
-
-        # ---------------------------------------------------------------------
-        # wait for async decryption to finish
-        # ---------------------------------------------------------------------
-
-        if defer_decryption:
-            yield self._sync_decr_pool.deferred
-            self._sync_decr_pool.stop()
 
         defer.returnValue([new_generation, new_transaction_id])
 
@@ -126,9 +102,6 @@ class HTTPDocFetcher(object):
         new_generation, new_transaction_id, number_of_changes, entries =\
             self._parse_received_doc_response(response)
 
-        if self._sync_decr_pool and not self._sync_decr_pool.running:
-            self._sync_decr_pool.start(number_of_changes)
-
         for doc_id, rev, content, gen, trans_id in entries:
             if doc_id is not None:
                 # decrypt incoming document and insert into local database
@@ -136,31 +109,10 @@ class HTTPDocFetcher(object):
                 # symmetric decryption of document's contents
                 # ---------------------------------------------------------
                 # If arriving content was symmetrically encrypted, we decrypt
-                # it.  We do it inline if defer_decryption flag is False or no
-                # sync_db was defined, otherwise we defer it writing it to the
-                # received docs table.
                 doc = SoledadDocument(doc_id, rev, content)
                 if is_symmetrically_encrypted(doc):
-                    if self._queue_for_decrypt:
-                        self._sync_decr_pool.insert_encrypted_received_doc(
-                            doc.doc_id, doc.rev, doc.content, gen, trans_id,
-                            idx)
-                    else:
-                        # defer_decryption is False or no-sync-db fallback
-                        doc.set_json(self._crypto.decrypt_doc(doc))
-                        self._insert_doc_cb(doc, gen, trans_id)
-                else:
-                    # not symmetrically encrypted doc, insert it directly
-                    # or save it in the decrypted stage.
-                    if self._queue_for_decrypt:
-                        self._sync_decr_pool.insert_received_doc(
-                            doc.doc_id, doc.rev, doc.content, gen, trans_id,
-                            idx)
-                    else:
-                        self._insert_doc_cb(doc, gen, trans_id)
-                # -------------------------------------------------------------
-                # end of symmetric decryption
-                # -------------------------------------------------------------
+                    doc.set_json(self._crypto.decrypt_doc(doc))
+                self._insert_doc_cb(doc, gen, trans_id)
             self._received_docs += 1
             user_data = {'uuid': self.uuid, 'userid': self.userid}
             _emit_receive_status(user_data, self._received_docs, total)
@@ -211,18 +163,6 @@ class HTTPDocFetcher(object):
                 raise errors.BrokenSyncStream
         return new_generation, new_transaction_id, number_of_changes, \
             entries
-
-    def _setup_sync_decr_pool(self):
-        """
-        Set up the SyncDecrypterPool for deferred decryption.
-        """
-        if self._sync_decr_pool is None and self._sync_db is not None:
-            # initialize syncing queue decryption pool
-            self._sync_decr_pool = SyncDecrypterPool(
-                self._crypto,
-                self._sync_db,
-                insert_doc_cb=self._insert_doc_cb,
-                source_replica_uid=self.source_replica_uid)
 
 
 def _emit_receive_status(user_data, received_docs, total):
