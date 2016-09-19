@@ -30,6 +30,7 @@ from testscenarios import TestWithScenarios
 from twisted.internet import defer
 
 from leap.soledad.client import http_target as target
+from leap.soledad.client.http_target.fetch_protocol import DocStreamReceiver
 from leap.soledad.client import crypto
 from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
@@ -44,6 +45,7 @@ from test_soledad.util import make_soledad_app
 from test_soledad.util import make_token_soledad_app
 from test_soledad.util import make_soledad_document_for_test
 from test_soledad.util import soledad_sync_target
+from twisted.trial import unittest
 from test_soledad.util import SoledadWithCouchServerMixin
 from test_soledad.util import ADDRESS
 from test_soledad.util import SQLCIPHER_SCENARIOS
@@ -53,92 +55,69 @@ from test_soledad.util import SQLCIPHER_SCENARIOS
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 # -----------------------------------------------------------------------------
 
-class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
+class TestSoledadParseReceivedDocResponse(unittest.TestCase):
 
     """
     Some tests had to be copied to this class so we can instantiate our own
     target.
     """
 
-    def setUp(self):
-        SoledadWithCouchServerMixin.setUp(self)
-        creds = {'token': {
-            'uuid': 'user-uuid',
-            'token': 'auth-token',
-        }}
-        self.target = target.SoledadHTTPSyncTarget(
-            self.couch_url,
-            uuid4().hex,
-            creds,
-            self._soledad._crypto,
-            None)
-
-    def tearDown(self):
-        self.target.close()
-        SoledadWithCouchServerMixin.tearDown(self)
+    def parse(self, stream):
+        parser = DocStreamReceiver(None, None, lambda x, y: 42)
+        parser.dataReceived(stream)
+        parser.finish()
 
     def test_extra_comma(self):
-        """
-        Test adapted to use encrypted content.
-        """
         doc = SoledadDocument('i', rev='r')
-        doc.content = {}
-        _crypto = self._soledad._crypto
-        key = _crypto.doc_passphrase(doc.doc_id)
-        secret = _crypto.secret
+        doc.content = {'a': 'b'}
 
-        enc_json = crypto.encrypt_docstr(
-            doc.get_json(), doc.doc_id, doc.rev,
-            key, secret)
+        encrypted_docstr = crypto.SoledadCrypto('').encrypt_doc(doc)
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n{},\r\n]")
+            self.parse("[\r\n{},\r\n]")
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 ('[\r\n{},\r\n{"id": "i", "rev": "r", ' +
-                 '"content": %s, "gen": 3, "trans_id": "T-sid"}' +
-                 ',\r\n]') % json.dumps(enc_json))
+                 '"gen": 3, "trans_id": "T-sid"},\r\n' +
+                 '%s,\r\n]') % encrypted_docstr)
 
     def test_wrong_start(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("{}\r\n]")
+            self.parse("{}\r\n]")
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("\r\n{}\r\n]")
-
-        with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("")
+            self.parse("\r\n{}\r\n]")
 
     def test_wrong_end(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n{}")
+            self.parse("[\r\n{}")
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n")
+            self.parse("[\r\n")
 
     def test_missing_comma(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 '[\r\n{}\r\n{"id": "i", "rev": "r", '
                 '"content": "c", "gen": 3}\r\n]')
 
     def test_no_entries(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n]")
+            self.parse("[\r\n]")
 
     def test_error_in_stream(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 '[\r\n{"new_generation": 0},'
                 '\r\n{"error": "unavailable"}\r\n')
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 '[\r\n{"error": "unavailable"}\r\n')
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response('[\r\n{"error": "?"}\r\n')
+            self.parse('[\r\n{"error": "?"}\r\n')
 
 #
 # functions for TestRemoteSyncTargets

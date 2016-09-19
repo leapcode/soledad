@@ -72,11 +72,11 @@ class SyncTargetAPI(SyncTarget):
         return self._sync_enc_pool is not None
 
     def _http_request(self, url, method='GET', body=None, headers=None,
-                      content_type=None):
+                      content_type=None, body_reader=readBody):
         headers = headers or self._base_header
         if content_type:
             headers.update({'content-type': [content_type]})
-        d = self._http.request(url, method, body, headers, readBody)
+        d = self._http.request(url, method, body, headers, body_reader)
         d.addErrback(_unauth_to_invalid_token_error)
         return d
 
