@@ -254,7 +254,11 @@ class SyncResource(http_app.SyncResource):
                          gen=gen, trans_id=trans_id)
             self.responder.stream_entry(entry)
             content = doc.get_json()
-            self.responder.stream_entry(content.read() if content else '')
+            if content:
+                self.responder.stream_entry(content.read())
+                content.close()
+            else:
+                self.responder.stream_entry('')
 
         new_gen, number_of_changes = \
             self.sync_exch.find_changes_to_return(received)
