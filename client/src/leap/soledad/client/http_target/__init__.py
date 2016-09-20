@@ -26,6 +26,8 @@ import os
 
 from leap.soledad.common.log import getLogger
 from leap.common.http import HTTPClient
+from twisted.web.client import HTTPConnectionPool
+from twisted.internet import reactor
 from leap.soledad.client.http_target.send import HTTPDocSender
 from leap.soledad.client.http_target.api import SyncTargetAPI
 from leap.soledad.client.http_target.fetch import HTTPDocFetcher
@@ -99,7 +101,8 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         # XXX Increasing timeout of simple requests to avoid chances of hitting
         # the duplicated syncing bug. This could be reduced to the 30s default
         # after implementing Cancellable Sync. See #7382
-        self._http = HTTPClient(cert_file, timeout=90)
+        self._http = HTTPClient(cert_file, timeout=90,
+                                pool=HTTPConnectionPool(reactor))
 
         if DO_STATS:
             self.sync_exchange_phase = [0]

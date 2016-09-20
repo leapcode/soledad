@@ -142,17 +142,21 @@ class SoledadSynchronizer(Synchronizer):
         # --------------------------------------------------------------------
 
         # prepare to send all the changed docs
-        changed_doc_ids = [doc_id for doc_id, _, _ in changes]
-        docs_to_send = self.source.get_docs(
-            changed_doc_ids, check_for_conflicts=False, include_deleted=True)
-        ids_sent = []
+        # changed_doc_ids = [doc_id for doc_id, _, _ in changes]
+        # docs_to_send = self.source.get_docs(
+        #     changed_doc_ids, check_for_conflicts=False, include_deleted=True)
+        ids_sent = [doc_id for doc_id, _, _ in changes]
+        # docs_by_generation = []
+        # idx = 0
+        # for doc in docs_to_send:
+        #     _, gen, trans = changes[idx]
+        #     docs_by_generation.append((doc, gen, trans))
+        #     idx += 1
+        #     ids_sent.append(doc.doc_id)
         docs_by_generation = []
-        idx = 0
-        for doc in docs_to_send:
-            _, gen, trans = changes[idx]
-            docs_by_generation.append((doc, gen, trans))
-            idx += 1
-            ids_sent.append(doc.doc_id)
+        for doc_id, gen, trans in changes:
+            get_doc = (self.source.get_doc, doc_id)
+            docs_by_generation.append((get_doc, gen, trans))
 
         # exchange documents and try to insert the returned ones with
         # the target, return target synced-up-to gen.

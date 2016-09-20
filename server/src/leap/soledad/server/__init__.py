@@ -198,7 +198,8 @@ class HTTPInvocationByMethodWithBody(
             try:
                 content_length = int(self.environ['CONTENT_LENGTH'])
             except (ValueError, KeyError):
-                raise http_app.BadRequest
+                # raise http_app.BadRequest
+                content_length = self.max_request_size
             if content_length <= 0:
                 raise http_app.BadRequest
             if content_length > self.max_request_size:
@@ -224,7 +225,6 @@ class HTTPInvocationByMethodWithBody(
                 if content_type == 'application/x-soledad-sync-put':
                     meth_put = self._lookup('%s_put' % method)
                     meth_end = self._lookup('%s_end' % method)
-                    entries = []
                     while True:
                         line = body_getline()
                         entry = line.strip()
@@ -233,11 +233,9 @@ class HTTPInvocationByMethodWithBody(
                         if not entry or not comma:  # empty or no prec comma
                             raise http_app.BadRequest
                         entry, comma = utils.check_and_strip_comma(entry)
-                        entries.append(entry)
+                        meth_put({}, entry)
                     if comma or body_getline():  # extra comma or data
                         raise http_app.BadRequest
-                    for entry in entries:
-                        meth_put({}, entry)
                     return meth_end()
                 # handle outgoing documents
                 elif content_type == 'application/x-soledad-sync-get':

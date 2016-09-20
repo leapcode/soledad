@@ -22,6 +22,7 @@ from uuid import uuid4
 
 from twisted.web.error import Error
 from twisted.internet import defer
+from twisted.web.http_headers import Headers
 
 from leap.soledad.client.http_target.support import readBody
 from leap.soledad.common.errors import InvalidAuthTokenError
@@ -72,11 +73,18 @@ class SyncTargetAPI(SyncTarget):
         return self._sync_enc_pool is not None
 
     def _http_request(self, url, method='GET', body=None, headers=None,
-                      content_type=None, body_reader=readBody):
+                      content_type=None, body_reader=readBody,
+                      body_producer=None):
         headers = headers or self._base_header
         if content_type:
             headers.update({'content-type': [content_type]})
-        d = self._http.request(url, method, body, headers, body_reader)
+        if not body_producer:
+            d = self._http.request(url, method, body, headers, body_reader)
+        else:
+            d = self._http._agent.request(
+                method, url, headers=Headers(headers),
+                bodyProducer=body_producer(body))
+            d.addCallback(body_reader)
         d.addErrback(_unauth_to_invalid_token_error)
         return d
 
