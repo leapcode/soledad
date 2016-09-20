@@ -237,7 +237,9 @@ class SyncResource(http_app.SyncResource):
         :type doc_idx: int
         """
         doc = Document(id, rev, content)
-        self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
+        self.sync_exch.insert_doc_from_source(
+            doc, gen, trans_id, number_of_docs=None,
+            doc_idx=None, sync_id=None)
 
     @http_app.http_method(received=int, content_as_args=True)
     def post_get(self, received):
@@ -282,7 +284,6 @@ class SyncResource(http_app.SyncResource):
         Return the current generation and transaction_id after inserting one
         incoming document.
         """
-        self.sync_exch.batched_insert_from_source(self._staging, self._sync_id)
         self.responder.content_type = 'application/x-soledad-sync-response'
         self.responder.start_response(200)
         self.responder.start_stream(),

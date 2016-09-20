@@ -23,7 +23,6 @@ from leap.soledad.client.http_target.support import RequestBody
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.l2db import errors
-from datetime import datetime
 
 from . import fetch_protocol
 

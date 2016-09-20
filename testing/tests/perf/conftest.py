@@ -243,7 +243,7 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
             server_url=server_url,
             cert_file=None,
             auth_token=token,
-            defer_encryption=True)
+            defer_encryption=False)
         request.addfinalizer(soledad_client.close)
         return soledad_client
     return create
