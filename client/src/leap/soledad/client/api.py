@@ -225,7 +225,6 @@ class Soledad(object):
             # have to close any thread-related stuff we have already opened
             # here, otherwise there might be zombie threads that may clog the
             # reactor.
-            self._sync_db.close()
             if hasattr(self, '_dbpool'):
                 self._dbpool.close()
             raise
@@ -288,16 +287,12 @@ class Soledad(object):
         tohex = binascii.b2a_hex
         # sqlcipher only accepts the hex version
         key = tohex(self._secrets.get_local_storage_key())
-        sync_db_key = tohex(self._secrets.get_sync_db_key())
 
         opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,
             is_raw_key=True, create=True,
-            defer_encryption=self._defer_encryption,
-            sync_db_key=sync_db_key,
-        )
+            defer_encryption=self._defer_encryption)
         self._sqlcipher_opts = opts
-
         self._dbpool = adbapi.getConnectionPool(opts)
 
     def _init_u1db_syncer(self):
@@ -332,10 +327,6 @@ class Soledad(object):
         self._dbpool.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
-        # close the sync database
-        if self._sync_db:
-            self._sync_db.close()
-        self._sync_db = None
 
     #
     # ILocalStorage
@@ -849,28 +840,6 @@ class Soledad(object):
         return self._creds['token']['token']
 
     token = property(_get_token, _set_token, doc='The authentication Token.')
-
-    def _initialize_sync_db(self, opts):
-        """
-        Initialize the Symmetrically-Encrypted document to be synced database,
-        and the queue to communicate with subprocess workers.
-
-        :param opts:
-        :type opts: SQLCipherOptions
-        """
-        soledad_assert(opts.sync_db_key is not None)
-        sync_db_path = None
-        if opts.path != ":memory:":
-            sync_db_path = "%s-sync" % opts.path
-        else:
-            sync_db_path = ":memory:"
-
-        # we copy incoming options because the opts object might be used
-        # somewhere else
-        sync_opts = sqlcipher.SQLCipherOptions.copy(
-            opts, path=sync_db_path, create=True)
-        self._sync_db = sqlcipher.getConnectionPool(
-            sync_opts, extra_queries=self._sync_db_extra_init)
 
 
     #

@@ -1,9 +1,21 @@
+"""
+Benchmarks for crypto operations.
+If you don't want to stress your local machine too much, you can pass the
+SIZE_LIMT environment variable.
+
+For instance, to keep the maximum payload at 1MB:
+
+SIZE_LIMIT=1E6 py.test -s tests/perf/test_crypto.py 
+"""
 import pytest
+import os
 import json
 from uuid import uuid4
+
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.client.crypto import encrypt_sym
-from leap.soledad.client.crypto import decrypt_sym
+from leap.soledad.client import _crypto
+
+LIMIT = int(float(os.environ.get('SIZE_LIMIT', 50 * 1000 * 1000)))
 
 
 def create_doc_encryption(size):
@@ -20,7 +32,11 @@ def create_doc_encryption(size):
     return test_doc_encryption
 
 
+# TODO this test is really bullshit, because it's still including
+# the json serialization.
+
 def create_doc_decryption(size):
+    @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_crypto_decrypt_doc")
     def test_doc_decryption(soledad_client, benchmark, payload):
         crypto = soledad_client()._crypto
@@ -29,32 +45,19 @@ def create_doc_decryption(size):
         doc = SoledadDocument(
             doc_id=uuid4().hex, rev='rev',
             json=json.dumps(DOC_CONTENT))
-        encrypted_doc = crypto.encrypt_doc(doc)
+        
+        encrypted_doc = yield crypto.encrypt_doc(doc)
         doc.set_json(encrypted_doc)
 
         benchmark(crypto.decrypt_doc, doc)
     return test_doc_decryption
 
 
-test_encrypt_doc_10k = create_doc_encryption(10*1000)
-test_encrypt_doc_100k = create_doc_encryption(100*1000)
-test_encrypt_doc_500k = create_doc_encryption(500*1000)
-test_encrypt_doc_1M = create_doc_encryption(1000*1000)
-test_encrypt_doc_10M = create_doc_encryption(10*1000*1000)
-test_encrypt_doc_50M = create_doc_encryption(50*1000*1000)
-test_decrypt_doc_10k = create_doc_decryption(10*1000)
-test_decrypt_doc_100k = create_doc_decryption(100*1000)
-test_decrypt_doc_500k = create_doc_decryption(500*1000)
-test_decrypt_doc_1M = create_doc_decryption(1000*1000)
-test_decrypt_doc_10M = create_doc_decryption(10*1000*1000)
-test_decrypt_doc_50M = create_doc_decryption(50*1000*1000)
-
-
 def create_raw_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_encrypt")
     def test_raw_encrypt(benchmark, payload):
         key = payload(32)
-        benchmark(encrypt_sym, payload(size), key)
+        benchmark(_crypto.encrypt_sym, payload(size), key)
     return test_raw_encrypt
 
 
@@ -62,20 +65,32 @@ def create_raw_decryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_decrypt")
     def test_raw_decrypt(benchmark, payload):
         key = payload(32)
-        iv, ciphertext = encrypt_sym(payload(size), key)
-        benchmark(decrypt_sym, ciphertext, key, iv)
+        iv, ciphertext = _crypto.encrypt_sym(payload(size), key)
+        benchmark(_crypto.decrypt_sym, ciphertext, key, iv)
     return test_raw_decrypt
 
 
-test_encrypt_raw_10k = create_raw_encryption(10*1000)
-test_encrypt_raw_100k = create_raw_encryption(100*1000)
-test_encrypt_raw_500k = create_raw_encryption(500*1000)
-test_encrypt_raw_1M = create_raw_encryption(1000*1000)
-test_encrypt_raw_10M = create_raw_encryption(10*1000*1000)
-test_encrypt_raw_50M = create_raw_encryption(50*1000*1000)
-test_decrypt_raw_10k = create_raw_decryption(10*1000)
-test_decrypt_raw_100k = create_raw_decryption(100*1000)
-test_decrypt_raw_500k = create_raw_decryption(500*1000)
-test_decrypt_raw_1M = create_raw_decryption(1000*1000)
-test_decrypt_raw_10M = create_raw_decryption(10*1000*1000)
-test_decrypt_raw_50M = create_raw_decryption(50*1000*1000)
+# Create the TESTS in the global namespace, they'll be picked by the benchmark
+# plugin.
+
+encryption_tests = [
+    ('10k',  1E4),
+    ('100k', 1E5),
+    ('500k', 5E5),
+    ('1M',   1E6),
+    ('10M',  1E7), 
+    ('50M',  5E7), 
+]
+
+for name, size in encryption_tests:
+    if size <  LIMIT:
+        sz = int(size)
+        globals()['test_encrypt_doc_' + name] = create_doc_encryption(sz)
+        globals()['test_decrypt_doc_' + name] = create_doc_decryption(sz)
+
+
+for name, size in encryption_tests:
+    if size < LIMIT:
+        sz = int(size)
+        globals()['test_encrypt_raw_' + name] = create_raw_encryption(sz)
+        globals()['test_decrypt_raw_' + name] = create_raw_decryption(sz)
