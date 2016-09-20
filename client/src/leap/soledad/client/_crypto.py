@@ -29,6 +29,7 @@ import time
 
 from io import BytesIO
 from cStringIO import StringIO
+from collections import namedtuple
 
 import six
 
@@ -51,7 +52,6 @@ from cryptography.hazmat.backends.openssl.backend \
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
-from leap.soledad.client.secrets import SoledadSecrets
 
 
 log = Logger()
@@ -86,21 +86,47 @@ class SoledadCrypto(object):
         self.secret = secret
 
     def encrypt_doc(self, doc):
+
+        def put_raw(blob):
+            return '{"raw": "' + blob.getvalue() + '"}'
+
         content = BytesIO()
         content.write(str(doc.get_json()))
         info = docinfo(doc.doc_id, doc.rev)
         del doc
         encryptor = BlobEncryptor(info, content, secret=self.secret)
-        return encryptor.encrypt()
+        d = encryptor.encrypt()
+        d.addCallback(put_raw)
+        return d
 
     def decrypt_doc(self, doc):
         info = docinfo(doc.doc_id, doc.rev)
         ciphertext = BytesIO()
-        ciphertext.write(doc.get_json())
-        ciphertext.seek(0)
+        payload = doc.content['raw']
         del doc
+        ciphertext.write(str(payload))
+        ciphertext.seek(0)
         decryptor = BlobDecryptor(info, ciphertext, secret=self.secret)
         return decryptor.decrypt()
+
+
+def encrypt_sym(data, key):
+    iv = os.urandom(16)
+    encryptor = AESEncryptor(key, iv)
+    encryptor.write(data)
+    encryptor.end()
+    ciphertext = encryptor.fd.getvalue()
+    return base64.urlsafe_b64encode(iv), ciphertext
+
+
+def decrypt_sym(data, key, iv):
+    _iv = base64.urlsafe_b64decode(iv)
+    decryptor = AESDecryptor(key, _iv)
+    decryptor.write(data)
+    decryptor.end()
+    plaintext = decryptor.fd.getvalue()
+    return plaintext
+
 
 
 class BlobEncryptor(object):
@@ -122,7 +148,7 @@ class BlobEncryptor(object):
         self.doc_id = doc_info.doc_id
         self.rev = doc_info.rev
 
-        self._producer = FileBodyProducer(content_fd, readSize=2**8)
+        self._producer = FileBodyProducer(content_fd, readSize=2**16)
 
         self._preamble = BytesIO()
         if result is None:
@@ -176,7 +202,7 @@ class BlobEncryptor(object):
         self._aes_fd.close()
         self._hmac.result.close()
         self.result.seek(0)
-        return defer.succeed('ok')
+        return defer.succeed(self.result)
 
 
 class BlobDecryptor(object):
@@ -274,7 +300,6 @@ class AESEncryptor(object):
 
     def write(self, data):
         encrypted = self.encryptor.update(data)
-        encode = binascii.b2a_hex
         self.fd.write(encrypted)
         return encrypted
 
@@ -318,7 +343,7 @@ class AESDecryptor(object):
 
     implements(interfaces.IConsumer)
 
-    def __init__(self, key, iv, fd):
+    def __init__(self, key, iv, fd=None):
         if iv is None:
             iv = os.urandom(16)
         if len(key) != 32:
@@ -329,6 +354,8 @@ class AESDecryptor(object):
         cipher = _get_aes_ctr_cipher(key, iv)
         self.decryptor = cipher.decryptor()
 
+        if fd is None:
+            fd = BytesIO()
         self.fd = fd
         self.done = False
         self.deferred = defer.Deferred()
