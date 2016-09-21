@@ -17,14 +17,16 @@
 """
 Server side synchronization infrastructure.
 """
-from leap.soledad.common.l2db import sync, Document
+import time
+from leap.soledad.common.l2db import sync
 from leap.soledad.common.l2db.remote import http_app
 from leap.soledad.server.caching import get_cache_for
 from leap.soledad.server.state import ServerSyncState
+from leap.soledad.common.document import ServerDocument
 from itertools import izip
 
 
-MAX_REQUEST_SIZE = 200  # in Mb
+MAX_REQUEST_SIZE = 6000  # in Mb
 MAX_ENTRY_SIZE = 200  # in Mb
 
 
@@ -236,7 +238,8 @@ class SyncResource(http_app.SyncResource):
         :param doc_idx: The index of the current document.
         :type doc_idx: int
         """
-        doc = Document(id, rev, content)
+        doc = ServerDocument(id, rev)
+        doc._json = content
         self.sync_exch.insert_doc_from_source(
             doc, gen, trans_id, number_of_docs=None,
             doc_idx=None, sync_id=None)
@@ -255,10 +258,15 @@ class SyncResource(http_app.SyncResource):
             entry = dict(id=doc.doc_id, rev=doc.rev,
                          gen=gen, trans_id=trans_id)
             self.responder.stream_entry(entry)
-            content = doc.get_json()
-            if content:
-                self.responder.stream_entry(content.read())
-                content.close()
+            content_reader = doc.get_json()
+            if content_reader:
+                content = content_reader.read()
+                self.responder.stream_entry(content)
+                content_reader.close()
+                # throttle at 5mb/s
+                # FIXME: twistd cant control througput
+                # we need to either use gunicorn or go async
+                time.sleep(len(content) / (5.0 * 1024 * 1024))
             else:
                 self.responder.stream_entry('')
 
