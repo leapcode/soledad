@@ -49,9 +49,6 @@ class HTTPDocFetcher(object):
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
                       ensure_callback, sync_id):
-
-        print 'receiving.....', sync_id
-
         new_generation = last_known_generation
         new_transaction_id = last_known_trans_id
 
@@ -104,16 +101,13 @@ class HTTPDocFetcher(object):
         :param total: The total number of operations.
         :type total: int
         """
-        # decrypt incoming document and insert into local database
         # If arriving content was symmetrically encrypted, we decrypt
+        # decrypt incoming document and insert into local database
 
         doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
 
-        print "GOT.....", doc
-
-        payload = doc['raw']
+        payload = doc.content['raw']
         if is_symmetrically_encrypted(payload):
-            print "SHOULD DECRYPT!!!!", content
             decrypted = yield self._crypto.decrypt_doc(doc)
             doc.set_json(decrypted)
 
