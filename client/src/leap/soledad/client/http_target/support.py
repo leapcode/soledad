@@ -53,6 +53,9 @@ class ReadBodyProtocol(_ReadBodyProtocol):
         if exc_cls is not None:
             message = respdic.get("message")
             self.deferred.errback(exc_cls(message))
+        else:
+            self.deferred.errback(
+                errors.HTTPError(self.status, respdic, self.headers))
     # ---8<--- end of snippet from u1db.remote.http_client
 
     def connectionLost(self, reason):
