@@ -41,7 +41,7 @@ from test_soledad.util import (
     BaseSoledadTest,
 )
 
-from leap.soledad.common import crypto
+from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
 from leap.soledad.server.config import load_configuration
 from leap.soledad.server.config import CONFIG_DEFAULTS
@@ -412,13 +412,8 @@ class EncryptedSyncTestCase(
                 self.assertEqual(soldoc.doc_id, couchdoc.doc_id)
                 self.assertEqual(soldoc.rev, couchdoc.rev)
                 couch_content = couchdoc.content.keys()
-                self.assertEqual(6, len(couch_content))
-                self.assertTrue(crypto.ENC_JSON_KEY in couch_content)
-                self.assertTrue(crypto.ENC_SCHEME_KEY in couch_content)
-                self.assertTrue(crypto.ENC_METHOD_KEY in couch_content)
-                self.assertTrue(crypto.ENC_IV_KEY in couch_content)
-                self.assertTrue(crypto.MAC_KEY in couch_content)
-                self.assertTrue(crypto.MAC_METHOD_KEY in couch_content)
+                self.assertEqual(['raw'], couch_content)
+                self.assertTrue(_crypto.is_symmetrically_encrypted(couchdoc.get_json()))
 
         d = sol1.get_all_docs()
         d.addCallback(_db1AssertEmptyDocList)

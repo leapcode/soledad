@@ -216,7 +216,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
     """
     Instantiates Soledad for usage in tests.
     """
-    defer_sync_encryption = False
 
     @pytest.mark.usefixtures("method_tmpdir")
     def setUp(self):
@@ -300,7 +299,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                 self.tempdir, prefix, local_db_path),
             server_url=server_url,  # Soledad will fail if not given an url
             cert_file=cert_file,
-            defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),
             auth_token=auth_token)
         self.addCleanup(soledad.close)

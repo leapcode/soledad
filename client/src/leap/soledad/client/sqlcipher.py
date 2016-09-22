@@ -117,7 +117,7 @@ class SQLCipherOptions(object):
     @classmethod
     def copy(cls, source, path=None, key=None, create=None,
              is_raw_key=None, cipher=None, kdf_iter=None,
-             cipher_page_size=None, defer_encryption=None, sync_db_key=None):
+             cipher_page_size=None, sync_db_key=None):
         """
         Return a copy of C{source} with parameters different than None
         replaced by new values.
@@ -134,7 +134,7 @@ class SQLCipherOptions(object):
                 args.append(getattr(source, name))
 
         for name in ["create", "is_raw_key", "cipher", "kdf_iter",
-                     "cipher_page_size", "defer_encryption", "sync_db_key"]:
+                     "cipher_page_size", "sync_db_key"]:
             val = local_vars[name]
             if val is not None:
                 kwargs[name] = val
@@ -145,7 +145,7 @@ class SQLCipherOptions(object):
 
     def __init__(self, path, key, create=True, is_raw_key=False,
                  cipher='aes-256-cbc', kdf_iter=4000, cipher_page_size=1024,
-                 defer_encryption=False, sync_db_key=None):
+                 sync_db_key=None):
         """
         :param path: The filesystem path for the database to open.
         :type path: str
@@ -163,10 +163,6 @@ class SQLCipherOptions(object):
         :type kdf_iter: int
         :param cipher_page_size: The page size.
         :type cipher_page_size: int
-        :param defer_encryption:
-            Whether to defer encryption of documents, or do it
-            inline while syncing.
-        :type defer_encryption: bool
         """
         self.path = path
         self.key = key
@@ -175,7 +171,6 @@ class SQLCipherOptions(object):
         self.cipher = cipher
         self.kdf_iter = kdf_iter
         self.cipher_page_size = cipher_page_size
-        self.defer_encryption = defer_encryption
         self.sync_db_key = sync_db_key
 
     def __str__(self):
@@ -201,7 +196,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     """
     A U1DB implementation that uses SQLCipher as its persistence layer.
     """
-    defer_encryption = False
 
     # The attribute _index_storage_value will be used as the lookup key for the
     # implementation of the SQLCipher storage backend.
