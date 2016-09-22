@@ -17,23 +17,14 @@
 """
 Server side synchronization infrastructure.
 """
-<<<<<<< a64e0fad3a8b1a07887c567d99fd32e3dcf54b23
 import time
+from itertools import izip
+
 from leap.soledad.common.l2db import sync
 from leap.soledad.common.l2db.remote import http_app
 from leap.soledad.server.caching import get_cache_for
 from leap.soledad.server.state import ServerSyncState
 from leap.soledad.common.document import ServerDocument
-from itertools import izip
-=======
-from itertools import izip
-import cjson
-
-from leap.soledad.common.l2db import sync, Document
-from leap.soledad.common.l2db.remote import http_app
-from leap.soledad.server.caching import get_cache_for
-from leap.soledad.server.state import ServerSyncState
->>>>>>> wip: adapt crypto to streaming flow
 
 
 MAX_REQUEST_SIZE = 6000  # in Mb
