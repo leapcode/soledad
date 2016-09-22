@@ -71,12 +71,10 @@ class BaseSoledadDeferredEncTest(SoledadWithCouchServerMixin):
         import binascii
         tohex = binascii.b2a_hex
         key = tohex(self._soledad.secrets.get_local_storage_key())
-        sync_db_key = tohex(self._soledad.secrets.get_sync_db_key())
         dbpath = self._soledad._local_db_path
 
         self.opts = SQLCipherOptions(
-            dbpath, key, is_raw_key=True, create=False,
-            defer_encryption=True, sync_db_key=sync_db_key)
+            dbpath, key, is_raw_key=True, create=False)
         self.db1 = SQLCipherDatabase(self.opts)
 
         self.db2 = self.request_state._create_database('test')
@@ -139,15 +137,11 @@ class TestSoledadDbSyncDeferredEncDecr(
         and Token auth.
         """
         replica_uid = self._soledad._dbpool.replica_uid
-        sync_db = self._soledad._sync_db
-        sync_enc_pool = self._soledad._sync_enc_pool
         dbsyncer = self._soledad._dbsyncer  # Soledad.sync uses the dbsyncer
 
         target = soledad_sync_target(
             self, self.db2._dbname,
-            source_replica_uid=replica_uid,
-            sync_db=sync_db,
-            sync_enc_pool=sync_enc_pool)
+            source_replica_uid=replica_uid)
         self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
             dbsyncer,

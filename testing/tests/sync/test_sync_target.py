@@ -130,13 +130,9 @@ def make_local_db_and_soledad_target(
     test.startTwistedServer()
     replica_uid = os.path.basename(path)
     db = test.request_state._create_database(replica_uid)
-    sync_db = test._soledad._sync_db
-    sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
         test, db._dbname,
-        source_replica_uid=source_replica_uid,
-        sync_db=sync_db,
-        sync_enc_pool=sync_enc_pool)
+        source_replica_uid=source_replica_uid)
     return db, st
 
 
@@ -167,15 +163,11 @@ class TestSoledadSyncTarget(
     def getSyncTarget(self, path=None, source_replica_uid=uuid4().hex):
         if self.port is None:
             self.startTwistedServer()
-        sync_db = self._soledad._sync_db
-        sync_enc_pool = self._soledad._sync_enc_pool
         if path is None:
             path = self.db2._dbname
         target = self.sync_target(
             self, path,
-            source_replica_uid=source_replica_uid,
-            sync_db=sync_db,
-            sync_enc_pool=sync_enc_pool)
+            source_replica_uid=source_replica_uid)
         self.addCleanup(target.close)
         return target
 
@@ -811,12 +803,10 @@ class TestSoledadDbSync(
         import binascii
         tohex = binascii.b2a_hex
         key = tohex(self._soledad.secrets.get_local_storage_key())
-        sync_db_key = tohex(self._soledad.secrets.get_sync_db_key())
         dbpath = self._soledad._local_db_path
 
         self.opts = SQLCipherOptions(
-            dbpath, key, is_raw_key=True, create=False,
-            defer_encryption=True, sync_db_key=sync_db_key)
+            dbpath, key, is_raw_key=True, create=False)
         self.db1 = SQLCipherDatabase(self.opts)
 
         self.db2 = self.request_state._create_database(replica_uid='test')
@@ -855,8 +845,7 @@ class TestSoledadDbSync(
                 self.opts,
                 crypto,
                 replica_uid,
-                None,
-                defer_encryption=True)
+                None)
             self.dbsyncer = dbsyncer
             return dbsyncer.sync(target_url,
                                  creds=creds)
