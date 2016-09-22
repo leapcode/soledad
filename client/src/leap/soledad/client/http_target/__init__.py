@@ -23,15 +23,15 @@ after receiving.
 
 
 import os
-import logging
 
+from leap.soledad.common.log import getLogger
 from leap.common.http import HTTPClient
 from leap.soledad.client.http_target.send import HTTPDocSender
 from leap.soledad.client.http_target.api import SyncTargetAPI
 from leap.soledad.client.http_target.fetch import HTTPDocFetcher
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # we may want to collect statistics from the sync process

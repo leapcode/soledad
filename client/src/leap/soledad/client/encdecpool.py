@@ -23,22 +23,21 @@ during synchronization.
 
 
 import json
-import logging
 from uuid import uuid4
 
 from twisted.internet.task import LoopingCall
 from twisted.internet import threads
 from twisted.internet import defer
-from twisted.python import log
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common import soledad_assert
+from leap.soledad.common.log import getLogger
 
 from leap.soledad.client.crypto import encrypt_docstr
 from leap.soledad.client.crypto import decrypt_doc_dict
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 #
@@ -393,7 +392,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         return d
 
     def _errback(self, failure):
-        log.err(failure)
+        logger.error(failure)
         self._deferred.errback(failure)
         self._processed_docs = 0
         self._last_inserted_idx = 0

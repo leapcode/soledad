@@ -22,7 +22,6 @@ import binascii
 import hmac
 import hashlib
 import json
-import logging
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends.multibackend import MultiBackend
@@ -32,9 +31,10 @@ from cryptography.hazmat.backends.openssl.backend \
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import crypto
+from leap.soledad.common.log import getLogger
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 MAC_KEY_LENGTH = 64
@@ -356,7 +356,7 @@ def _verify_doc_mac(doc_id, doc_rev, ciphertext, enc_scheme, enc_method,
     calculated_mac_hash = hashlib.sha256(calculated_mac).digest()
 
     if doc_mac_hash != calculated_mac_hash:
-        logger.warning("Wrong MAC while decrypting doc...")
+        logger.warn("Wrong MAC while decrypting doc...")
         raise crypto.WrongMacError("Could not authenticate document's "
                                    "contents.")
 

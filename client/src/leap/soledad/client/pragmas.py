@@ -17,15 +17,15 @@
 """
 Different pragmas used in the initialization of the SQLCipher database.
 """
-import logging
 import string
 import threading
 import os
 
 from leap.soledad.common import soledad_assert
+from leap.soledad.common.log import getLogger
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 _db_init_lock = threading.Lock()

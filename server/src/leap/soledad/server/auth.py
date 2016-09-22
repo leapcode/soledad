@@ -22,11 +22,14 @@ import json
 
 from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
-from twisted.python import log
 
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import USER_DB_PREFIX
+
+
+logger = getLogger(__name__)
 
 
 class URLToAuthorization(object):
@@ -378,7 +381,7 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         try:
             return self._state.verify_token(uuid, token)
         except Exception as e:
-            log.err(e)
+            logger.error(e)
             return False
 
     def _get_auth_error_string(self):

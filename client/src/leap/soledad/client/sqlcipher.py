@@ -41,7 +41,6 @@ So, as the statements above were introduced for backwards compatibility with
 SQLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
-import logging
 import os
 import json
 
@@ -55,8 +54,9 @@ from twisted.internet import defer
 from twisted.enterprise import adbapi
 
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common import l2db
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import errors as u1db_errors
+from leap.soledad.common.l2db import Document
 from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.errors import DatabaseAccessError
 
@@ -65,7 +65,7 @@ from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client import pragmas
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
@@ -595,7 +595,7 @@ class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
-        self._factory = l2db.Document
+        self._factory = Document
 
 
 class SoledadSQLCipherWrapper(SQLCipherDatabase):

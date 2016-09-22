@@ -17,12 +17,12 @@
 """
 Server state using CouchDatabase as backend.
 """
-import logging
 import re
 import time
 from urlparse import urljoin
 from hashlib import sha512
 
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch import couch_server
 from leap.soledad.common.command import exec_validated_cmd
@@ -30,7 +30,7 @@ from leap.soledad.common.l2db.remote.server_state import ServerState
 from leap.soledad.common.l2db.errors import Unauthorized
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 def is_db_name_valid(name):

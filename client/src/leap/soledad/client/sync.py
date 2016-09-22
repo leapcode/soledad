@@ -18,17 +18,16 @@
 Soledad synchronization utilities.
 """
 import os
-import time
-import logging
 
 from twisted.internet import defer
 
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.sync import Synchronizer
 from leap.soledad.common.errors import BackendNotReadyError
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # we may want to collect statistics from the sync process

@@ -28,7 +28,6 @@ remote storage in the server side.
 import binascii
 import errno
 import httplib
-import logging
 import os
 import socket
 import ssl
@@ -49,6 +48,7 @@ from leap.common.plugins import collect_plugins
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db.remote import http_client
 from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
 from leap.soledad.common.errors import DatabaseAccessError
@@ -62,7 +62,7 @@ from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client import sqlcipher
 from leap.soledad.client import encdecpool
 
-logger = logging.getLogger(name=__name__)
+logger = getLogger(__name__)
 
 
 # we may want to collect statistics from the sync process

@@ -23,7 +23,6 @@ Soledad secrets handling.
 
 import os
 import scrypt
-import logging
 import binascii
 import errno
 import json
@@ -33,11 +32,12 @@ from hashlib import sha256
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
+from leap.soledad.common.log import getLogger
 from leap.soledad.client import events
 from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
 
 
-logger = logging.getLogger(name=__name__)
+logger = getLogger(__name__)
 
 
 #
@@ -461,7 +461,7 @@ class SoledadSecrets(object):
         events.emit_async(events.SOLEDAD_DOWNLOADING_KEYS, user_data)
         db = self._shared_db
         if not db:
-            logger.warning('No shared db found')
+            logger.warn('no shared db found')
             return
         doc = db.get_doc(self._shared_db_doc_id())
         user_data = {'userid': self._userid, 'uuid': self._uuid}
@@ -492,7 +492,7 @@ class SoledadSecrets(object):
         events.emit_async(events.SOLEDAD_UPLOADING_KEYS, user_data)
         db = self._shared_db
         if not db:
-            logger.warning('No shared db found')
+            logger.warn('no shared db found')
             return
         db.put_doc(doc)
         events.emit_async(events.SOLEDAD_DONE_UPLOADING_KEYS, user_data)
