@@ -128,14 +128,14 @@ def decrypt_sym(data, key, iv):
     return plaintext
 
 
-
 class BlobEncryptor(object):
 
     """
     Encrypts a payload associated with a given Document.
     """
 
-    def __init__(self, doc_info, content_fd, result=None, secret=None, iv=None):
+    def __init__(self, doc_info, content_fd, result=None, secret=None,
+                 iv=None):
         if iv is None:
             iv = os.urandom(16)
         else:
@@ -181,12 +181,12 @@ class BlobEncryptor(object):
         def write(data):
             self._preamble.write(data)
             self._hmac.write(data)
-        
+
         current_time = int(time.time())
 
         write(b'\x80')
         write(struct.pack(
-            'Qbb', 
+            'Qbb',
             current_time,
             ENC_SCHEME.symkey,
             ENC_METHOD.aes_256_ctr))
@@ -299,11 +299,10 @@ class AESEncryptor(object):
 
         cipher = _get_aes_ctr_cipher(key, iv)
         self.encryptor = cipher.encryptor()
-        
+
         if fd is None:
             fd = BytesIO()
         self.fd = fd
-
 
         self.done = False
 
@@ -334,7 +333,6 @@ class HMACWriter(object):
         self.result.write(self._hmac.digest())
 
 
-
 class VerifiedEncrypter(object):
 
     implements(interfaces.IConsumer)
@@ -346,7 +344,7 @@ class VerifiedEncrypter(object):
     def write(self, data):
         enc_chunk = self.crypter.write(data)
         self.hmac.write(enc_chunk)
-        
+
 
 class AESDecryptor(object):
 
@@ -368,7 +366,6 @@ class AESDecryptor(object):
         self.fd = fd
         self.done = False
         self.deferred = defer.Deferred()
-
 
     def write(self, data):
         decrypted = self.decryptor.update(data)

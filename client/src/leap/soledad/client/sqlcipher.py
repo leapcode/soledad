@@ -266,7 +266,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
 
-
     #
     # SQLCipher API methods
     #

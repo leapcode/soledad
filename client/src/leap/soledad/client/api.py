@@ -131,7 +131,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, defer_encryption=False, syncable=True):
+                 auth_token=None, syncable=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -167,11 +167,6 @@ class Soledad(object):
         :param auth_token:
             Authorization token for accessing remote databases.
         :type auth_token: str
-
-        :param defer_encryption:
-            Whether to defer encryption of documents, or do it
-            inline while syncing.
-        :type defer_encryption: bool
 
         :param syncable:
             If set to ``False``, this database will not attempt to synchronize
@@ -342,40 +337,6 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         return self._dbpool.runU1DBQuery(meth, *args, **kw)
-
-    #def stream_encryption(self, result, doc):
-        #print 'streaming encryption'
-        #contentfd = StringIO()
-        #contentfd.write(str(doc.get_json()))
-        #contentfd.seek(0)
-#
-        #sikret = self._secrets.remote_storage_secret
-        #docinfo = DocInfo(doc.doc_id, doc.rev)
-#
-        # -------------------------------------------------------
-        # TODO need to pass a fd to stage this!!!
-        # in the long run, we could connect this to the uploader
-        # but in the meantime, I thikn it's easy if we just
-        # serialize this to disk.
-        # 
-        # To do this:
-        # 1. open a file, with a known name:
-        #     soledad/staging/docid@rev.bin
-        # 2. pass that fd to BlobEncrypter as result (it's a fd)
-        # 3. On the upload part of the sync, just open again a read-only fd 
-        #    to this staging path and read it.
-        #    that's the encrypted blob, ready to upload!
-        # -------------------------------------------------------
-#
-        #crypter = BlobEncryptor(
-            #docinfo, contentfd, secret=sikret)
-        #del doc
-#
-#
-        #d = crypter.encrypt()
-        #d.addCallback(lambda _: result)
-        #return d
-
 
     def put_doc(self, doc):
         """
@@ -840,7 +801,6 @@ class Soledad(object):
         return self._creds['token']['token']
 
     token = property(_get_token, _set_token, doc='The authentication Token.')
-
 
     #
     # ISecretsStorage
