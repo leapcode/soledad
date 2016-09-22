@@ -35,7 +35,6 @@ import six
 
 from twisted.internet import defer
 from twisted.internet import interfaces
-from twisted.internet import reactor
 from twisted.logger import Logger
 from twisted.persisted import dirdbm
 from twisted.web import client
@@ -88,7 +87,8 @@ class SoledadCrypto(object):
     def encrypt_doc(self, doc):
 
         def put_raw(blob):
-            return '{"raw": "' + blob.getvalue() + '"}'
+            raw = blob.getvalue()
+            return '{"raw": "' + raw + '"}'
 
         content = BytesIO()
         content.write(str(doc.get_json()))
@@ -105,9 +105,9 @@ class SoledadCrypto(object):
         payload = doc.content['raw']
         del doc
         ciphertext.write(str(payload))
-        ciphertext.seek(0)
         decryptor = BlobDecryptor(info, ciphertext, secret=self.secret)
-        return decryptor.decrypt()
+        buf = decryptor.decrypt()
+        return buf.getvalue()
 
 
 def encrypt_sym(data, key):
@@ -116,11 +116,11 @@ def encrypt_sym(data, key):
     encryptor.write(data)
     encryptor.end()
     ciphertext = encryptor.fd.getvalue()
-    return base64.urlsafe_b64encode(iv), ciphertext
+    return base64.b64encode(iv), ciphertext
 
 
 def decrypt_sym(data, key, iv):
-    _iv = base64.urlsafe_b64decode(iv)
+    _iv = base64.b64decode(str(iv))
     decryptor = AESDecryptor(key, _iv)
     decryptor.write(data)
     decryptor.end()
@@ -136,7 +136,6 @@ class BlobEncryptor(object):
     """
 
     def __init__(self, doc_info, content_fd, result=None, secret=None, iv=None):
-
         if iv is None:
             iv = os.urandom(16)
         else:
@@ -148,7 +147,9 @@ class BlobEncryptor(object):
         self.doc_id = doc_info.doc_id
         self.rev = doc_info.rev
 
+        content_fd.seek(0)
         self._producer = FileBodyProducer(content_fd, readSize=2**16)
+        self._content_fd = content_fd
 
         self._preamble = BytesIO()
         if result is None:
@@ -169,6 +170,11 @@ class BlobEncryptor(object):
         d = self._producer.startProducing(self._crypter)
         d.addCallback(self._end_crypto_stream)
         return d
+
+    def encrypt_whole(self):
+        self._crypter.write(self._content_fd.getvalue())
+        self._end_crypto_stream(None)
+        return '{"raw":"' + self.result.getvalue() + '"}'
 
     def _write_preamble(self):
 
@@ -191,6 +197,7 @@ class BlobEncryptor(object):
     def _end_crypto_stream(self, ignored):
         self._aes.end()
         self._hmac.end()
+        self._content_fd.close()
 
         preamble = self._preamble.getvalue()
         encrypted = self._aes_fd.getvalue()
@@ -274,6 +281,7 @@ class BlobDecryptor(object):
 
         # TODO pass chunks, streaming, instead
         # Use AESDecryptor below
+
         self.result.write(decryptor.update(ciphertext))
         self.result.write(decryptor.finalize())
         return self.result
@@ -295,6 +303,7 @@ class AESEncryptor(object):
         if fd is None:
             fd = BytesIO()
         self.fd = fd
+
 
         self.done = False
 
@@ -373,6 +382,12 @@ class AESDecryptor(object):
         self.done = True
 
 
+def is_symmetrically_encrypted(payload):
+    header = base64.urlsafe_b64decode(enc[:15] + '===')
+    ts, sch, meth = struct.unpack('Qbb', header[1:11])
+    return sch == ENC_SCHEME.symkey
+
+
 # utils
 
 
@@ -392,9 +407,3 @@ def _get_sym_key_for_doc(doc_id, secret):
 
 def _get_aes_ctr_cipher(key, iv):
     return Cipher(algorithms.AES(key), modes.CTR(iv), backend=crypto_backend)
-
-
-def is_symmetrically_encrypted(payload):
-    header = base64.urlsafe_b64decode(enc[:15] + '===')
-    ts, sch, meth = struct.unpack('Qbb', header[1:11])
-    return sch == ENC_SCHEME.symkey
