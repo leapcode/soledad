@@ -791,7 +791,8 @@ class CouchDatabase(object):
                 attachment['data'] = binascii.b2a_base64(
                     parts[index]).strip()
             couch_doc['_attachments'] = attachments
-            gen_doc = self._allocate_new_generation(doc.doc_id, transaction_id, save=False)
+            gen_doc = self._allocate_new_generation(
+                doc.doc_id, transaction_id, save=False)
             self.batch_docs[doc.doc_id] = couch_doc
             self.batch_docs[gen_doc['_id']] = gen_doc
             last_gen, last_trans_id = self.batch_generation
