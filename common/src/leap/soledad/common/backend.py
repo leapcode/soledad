@@ -73,8 +73,8 @@ class SoledadBackend(CommonBackend):
     def batch_end(self):
         if not self.BATCH_SUPPORT:
             return
-        self.batching = False
         self._database.batch_end()
+        self.batching = False
         for name in self.after_batch_callbacks:
             self.after_batch_callbacks[name]()
         self.after_batch_callbacks = None

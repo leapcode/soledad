@@ -658,7 +658,7 @@ class CouchDatabase(object):
         _, _, data = resource.get_json(**kwargs)
         return data
 
-    def _allocate_new_generation(self, doc_id, transaction_id):
+    def _allocate_new_generation(self, doc_id, transaction_id, save=True):
         """
         Allocate a new generation number for a document modification.
 
@@ -698,10 +698,12 @@ class CouchDatabase(object):
                     DOC_ID_KEY: doc_id,
                     TRANSACTION_ID_KEY: transaction_id,
                 }
-                self._database.save(gen_doc)
+                if save:
+                    self._database.save(gen_doc)
                 break  # succeeded allocating a new generation, proceed
             except ResourceConflict:
                 pass  # try again!
+        return gen_doc
 
     def save_document(self, old_doc, doc, transaction_id):
         """
@@ -780,6 +782,7 @@ class CouchDatabase(object):
                     headers=envelope.headers)
             except ResourceConflict:
                 raise RevisionConflict()
+            self._allocate_new_generation(doc.doc_id, transaction_id)
         else:
             for name, attachment in attachments.items():
                 del attachment['follows']
@@ -788,11 +791,11 @@ class CouchDatabase(object):
                 attachment['data'] = binascii.b2a_base64(
                     parts[index]).strip()
             couch_doc['_attachments'] = attachments
+            gen_doc = self._allocate_new_generation(doc.doc_id, transaction_id, save=False)
             self.batch_docs[doc.doc_id] = couch_doc
+            self.batch_docs[gen_doc['_id']] = gen_doc
             last_gen, last_trans_id = self.batch_generation
             self.batch_generation = (last_gen + 1, transaction_id)
-
-        self._allocate_new_generation(doc.doc_id, transaction_id)
 
     def _new_resource(self, *path):
         """
