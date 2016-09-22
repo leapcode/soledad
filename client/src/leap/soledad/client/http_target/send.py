@@ -112,7 +112,7 @@ class HTTPDocSender(object):
             # TODO -- for blobs, should stream the doc raw content
             # TODO -- get rid of this json encoding
             content = yield self._crypto.encrypt_doc(doc)
-            defer.returnValue((doc, content.getvalue()))
+            defer.returnValue((doc, content))
 
 
 def _emit_send_status(user_data, idx, total):

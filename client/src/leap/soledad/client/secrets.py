@@ -266,11 +266,7 @@ class SoledadSecrets(object):
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
-            raw = f.read()
-            raw = raw.replace('\n', '')
-            content = json.loads(raw)
-
-        print "LOADING", content
+            content = json.loads(f.read())
         _, active_secret, version = self._import_recovery_document(content)
 
         self._maybe_set_active_secret(active_secret)

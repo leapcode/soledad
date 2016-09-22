@@ -15,11 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
 """
 Utilities used by multiple test suites.
 """
-
 
 import os
 import random
@@ -45,14 +43,13 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import CouchServerState
 
-from leap.soledad.common.crypto import ENC_SCHEME_KEY
 
 from leap.soledad.client import Soledad
 from leap.soledad.client import http_target
 from leap.soledad.client import auth
-from leap.soledad.client.crypto import decrypt_doc_dict
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
 from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client._crypto import is_symmetrically_encrypted
 
 from leap.soledad.server import SoledadApp
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
@@ -212,6 +209,7 @@ def soledad_sync_target(
 # redefine the base leap test class so it inherits from twisted trial's
 # TestCase. This is needed so trial knows that it has to manage a reactor and
 # wait for deferreds returned by tests to be fired.
+
 BaseLeapTest = type(
     'BaseLeapTest', (unittest.TestCase,), dict(BaseLeapTest.__dict__))
 
@@ -311,6 +309,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self.addCleanup(soledad.close)
         return soledad
 
+    @pytest.inlineCallbacks
     def assertGetEncryptedDoc(
             self, db, doc_id, doc_rev, content, has_conflicts):
         """
@@ -320,13 +319,9 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                                      has_conflicts=has_conflicts)
         doc = db.get_doc(doc_id)
 
-        if ENC_SCHEME_KEY in doc.content:
-            # XXX check for SYM_KEY too
-            key = self._soledad._crypto.doc_passphrase(doc.doc_id)
-            secret = self._soledad._crypto.secret
-            decrypted = decrypt_doc_dict(
-                doc.content, doc.doc_id, doc.rev,
-                key, secret)
+        if is_symmetrically_encrypted(doc.content['raw']):
+            crypt = self._soledad._crypto
+            decrypted = yield crypt.decrypt_doc(doc)
             doc.set_json(decrypted)
         self.assertEqual(exp_doc.doc_id, doc.doc_id)
         self.assertEqual(exp_doc.rev, doc.rev)

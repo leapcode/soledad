@@ -17,47 +17,184 @@
 """
 Tests for cryptographic related stuff.
 """
-import os
-import hashlib
 import binascii
+import base64
+import hashlib
+import json
+import os
+import struct
 
-from leap.soledad.client import crypto
+from io import BytesIO
+
+import pytest
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+
 from leap.soledad.common.document import SoledadDocument
 from test_soledad.util import BaseSoledadTest
-from leap.soledad.common.crypto import WrongMacError
-from leap.soledad.common.crypto import UnknownMacMethodError
-from leap.soledad.common.crypto import ENC_JSON_KEY
-from leap.soledad.common.crypto import ENC_SCHEME_KEY
-from leap.soledad.common.crypto import MAC_KEY
-from leap.soledad.common.crypto import MAC_METHOD_KEY
+from leap.soledad.client import _crypto
+
+from twisted.trial import unittest
+from twisted.internet import defer
 
 
-class EncryptedSyncTestCase(BaseSoledadTest):
+snowden1 = (
+    "You can't come up against "
+    "the world's most powerful intelligence "
+    "agencies and not accept the risk. "
+    "If they want to get you, over time "
+    "they will.")
 
-    """
-    Tests that guarantee that data will always be encrypted when syncing.
-    """
 
-    def test_encrypt_decrypt_json(self):
+class AESTest(unittest.TestCase):
+
+    def test_chunked_encryption(self):
+        key = 'A' * 32
+        iv = 'A' * 16
+
+        fd = BytesIO()
+        aes = _crypto.AESEncryptor(key, iv, fd)
+
+        data = snowden1
+        block = 16
+
+        for i in range(len(data)/block):
+            chunk = data[i * block:(i+1)*block]
+            aes.write(chunk)
+        aes.end()
+
+        ciphertext_chunked = fd.getvalue()
+        ciphertext = _aes_encrypt(key, iv, data)
+
+        assert ciphertext_chunked == ciphertext
+
+
+    def test_decrypt(self):
+        key = 'A' * 32
+        iv = 'A' * 16
+
+        data = snowden1
+        block = 16
+
+        ciphertext = _aes_encrypt(key, iv, data)
+
+        fd = BytesIO()
+        aes = _crypto.AESDecryptor(key, iv, fd)
+
+        for i in range(len(ciphertext)/block):
+            chunk = ciphertext[i * block:(i+1)*block]
+            aes.write(chunk)
+        aes.end()
+
+        cleartext_chunked = fd.getvalue()
+        assert cleartext_chunked == data
+
+
+
+class BlobTestCase(unittest.TestCase):
+
+    class doc_info:
+        doc_id = 'D-deadbeef'
+        rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
+
+    @defer.inlineCallbacks
+    def test_blob_encryptor(self):
+
+        inf = BytesIO()
+        inf.write(snowden1)
+        inf.seek(0)
+        outf = BytesIO()
+
+        blob = _crypto.BlobEncryptor(
+            self.doc_info, inf, result=outf,
+            secret='A' * 96, iv='B'*16)
+
+        encrypted = yield blob.encrypt()
+        data = base64.urlsafe_b64decode(encrypted.getvalue())
+
+        assert data[0] == '\x80'
+        ts, sch, meth  = struct.unpack(
+            'Qbb', data[1:11])
+        assert sch == 1
+        assert meth == 1
+        iv = data[11:27]
+        assert iv == 'B' * 16
+        doc_id = data[27:37]
+        assert doc_id == 'D-deadbeef'
+
+        rev = data[37:71]
+        assert rev == self.doc_info.rev
+
+        ciphertext = data[71:-64]
+        aes_key = _crypto._get_sym_key_for_doc(
+            self.doc_info.doc_id, 'A'*96)
+        assert ciphertext == _aes_encrypt(aes_key, 'B'*16, snowden1)
+
+        decrypted = _aes_decrypt(aes_key, 'B'*16, ciphertext)
+        assert str(decrypted) == snowden1
+
+
+    @defer.inlineCallbacks
+    def test_blob_decryptor(self):
+
+        inf = BytesIO()
+        inf.write(snowden1)
+        inf.seek(0)
+        outf = BytesIO()
+
+        blob = _crypto.BlobEncryptor(
+            self.doc_info, inf, result=outf,
+            secret='A' * 96, iv='B' * 16)
+        yield blob.encrypt()
+
+        decryptor = _crypto.BlobDecryptor(
+            self.doc_info, outf,
+            secret='A' * 96)
+        decrypted = yield decryptor.decrypt()
+        assert decrypted.getvalue() == snowden1
+
+
+    @defer.inlineCallbacks
+    def test_encrypt_and_decrypt(self):
         """
-        Test encrypting and decrypting documents.
+        Check that encrypting and decrypting gives same doc.
         """
-        simpledoc = {'key': 'val'}
-        doc1 = SoledadDocument(doc_id='id')
-        doc1.content = simpledoc
+        crypto = _crypto.SoledadCrypto('A' * 96)
+        payload = {'key': 'someval'}
+        doc1 = SoledadDocument('id1', '1', json.dumps(payload))
 
-        # encrypt doc
-        doc1.set_json(self._soledad._crypto.encrypt_doc(doc1))
-        # assert content is different and includes keys
-        self.assertNotEqual(
-            simpledoc, doc1.content,
-            'incorrect document encryption')
-        self.assertTrue(ENC_JSON_KEY in doc1.content)
-        self.assertTrue(ENC_SCHEME_KEY in doc1.content)
-        # decrypt doc
-        doc1.set_json(self._soledad._crypto.decrypt_doc(doc1))
-        self.assertEqual(
-            simpledoc, doc1.content, 'incorrect document encryption')
+        encrypted = yield crypto.encrypt_doc(doc1)
+        assert encrypted != payload
+        assert 'raw' in encrypted
+        doc2 = SoledadDocument('id1', '1')
+        doc2.set_json(encrypted)
+        decrypted = yield crypto.decrypt_doc(doc2)
+        assert len(decrypted) != 0
+        assert json.loads(decrypted) == payload
+
+
+    @defer.inlineCallbacks
+    def test_decrypt_with_wrong_mac_raises(self):
+        """
+        Trying to decrypt a document with wrong MAC should raise.
+        """
+        crypto = _crypto.SoledadCrypto('A' * 96)
+        payload = {'key': 'someval'}
+        doc1 = SoledadDocument('id1', '1', json.dumps(payload))
+
+        encrypted = yield crypto.encrypt_doc(doc1)
+        encdict = json.loads(encrypted)
+        raw = base64.urlsafe_b64decode(str(encdict['raw']))
+        # mess with MAC
+        messed = raw[:-64] + '0' * 64
+        newraw = base64.urlsafe_b64encode(str(messed))
+        doc2 = SoledadDocument('id1', '1')
+        doc2.set_json(json.dumps({"raw": str(newraw)}))
+
+        with pytest.raises(_crypto.InvalidBlob):
+            decrypted = yield crypto.decrypt_doc(doc2)
+
 
 
 class RecoveryDocumentTestCase(BaseSoledadTest):
@@ -146,60 +283,22 @@ class SoledadSecretsTestCase(BaseSoledadTest):
             "Should have a secret at this point")
 
 
-class MacAuthTestCase(BaseSoledadTest):
-
-    def test_decrypt_with_wrong_mac_raises(self):
-        """
-        Trying to decrypt a document with wrong MAC should raise.
-        """
-        simpledoc = {'key': 'val'}
-        doc = SoledadDocument(doc_id='id')
-        doc.content = simpledoc
-        # encrypt doc
-        doc.set_json(self._soledad._crypto.encrypt_doc(doc))
-        self.assertTrue(MAC_KEY in doc.content)
-        self.assertTrue(MAC_METHOD_KEY in doc.content)
-        # mess with MAC
-        doc.content[MAC_KEY] = '1234567890ABCDEF'
-        # try to decrypt doc
-        self.assertRaises(
-            WrongMacError,
-            self._soledad._crypto.decrypt_doc, doc)
-
-    def test_decrypt_with_unknown_mac_method_raises(self):
-        """
-        Trying to decrypt a document with unknown MAC method should raise.
-        """
-        simpledoc = {'key': 'val'}
-        doc = SoledadDocument(doc_id='id')
-        doc.content = simpledoc
-        # encrypt doc
-        doc.set_json(self._soledad._crypto.encrypt_doc(doc))
-        self.assertTrue(MAC_KEY in doc.content)
-        self.assertTrue(MAC_METHOD_KEY in doc.content)
-        # mess with MAC method
-        doc.content[MAC_METHOD_KEY] = 'mymac'
-        # try to decrypt doc
-        self.assertRaises(
-            UnknownMacMethodError,
-            self._soledad._crypto.decrypt_doc, doc)
-
 
 class SoledadCryptoAESTestCase(BaseSoledadTest):
 
     def test_encrypt_decrypt_sym(self):
         # generate 256-bit key
         key = os.urandom(32)
-        iv, cyphertext = crypto.encrypt_sym('data', key)
+        iv, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
-        plaintext = crypto.decrypt_sym(cyphertext, key, iv)
+        plaintext = _crypto.decrypt_sym(cyphertext, key, iv)
         self.assertEqual('data', plaintext)
 
     def test_decrypt_with_wrong_iv_fails(self):
         key = os.urandom(32)
-        iv, cyphertext = crypto.encrypt_sym('data', key)
+        iv, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -208,13 +307,13 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         wrongiv = rawiv
         while wrongiv == rawiv:
             wrongiv = os.urandom(1) + rawiv[1:]
-        plaintext = crypto.decrypt_sym(
+        plaintext = _crypto.decrypt_sym(
             cyphertext, key, iv=binascii.b2a_base64(wrongiv))
         self.assertNotEqual('data', plaintext)
 
     def test_decrypt_with_wrong_key_fails(self):
         key = os.urandom(32)
-        iv, cyphertext = crypto.encrypt_sym('data', key)
+        iv, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -222,5 +321,19 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         # ensure keys are different in case we are extremely lucky
         while wrongkey == key:
             wrongkey = os.urandom(32)
-        plaintext = crypto.decrypt_sym(cyphertext, wrongkey, iv)
+        plaintext = _crypto.decrypt_sym(cyphertext, wrongkey, iv)
         self.assertNotEqual('data', plaintext)
+
+
+def _aes_encrypt(key, iv, data):
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    encryptor = cipher.encryptor()
+    return encryptor.update(data) + encryptor.finalize()
+
+
+def _aes_decrypt(key, iv, data):
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    decryptor = cipher.decryptor()
+    return decryptor.update(data) + decryptor.finalize()

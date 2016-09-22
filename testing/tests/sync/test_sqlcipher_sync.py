@@ -27,8 +27,6 @@ from leap.soledad.common.l2db import sync
 from leap.soledad.common.l2db import vectorclock
 from leap.soledad.common.l2db import errors
 
-from leap.soledad.common.crypto import ENC_SCHEME_KEY
-from leap.soledad.client.crypto import decrypt_doc_dict
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 
 from test_soledad import u1db_tests as tests
@@ -545,13 +543,11 @@ class SQLCipherDatabaseSyncTests(
         self.assertFalse(doc2.has_conflicts)
         self.sync(self.db2, db3)
         doc3 = db3.get_doc('the-doc')
-        if ENC_SCHEME_KEY in doc3.content:
-            _crypto = self._soledad._crypto
-            key = _crypto.doc_passphrase(doc3.doc_id)
-            secret = _crypto.secret
-            doc3.set_json(decrypt_doc_dict(
-                doc3.content,
-                doc3.doc_id, doc3.rev, key, secret))
+
+        _crypto = self._soledad._crypto
+        decrypted = _crypto.decrypt_doc(doc3)
+        doc3.set_json(decrypted)
+
         self.assertEqual(doc4.get_json(), doc3.get_json())
         self.assertFalse(doc3.has_conflicts)
         self.db1.close()
