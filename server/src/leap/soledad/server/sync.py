@@ -212,6 +212,7 @@ class SyncResource(http_app.SyncResource):
             db, self.source_replica_uid, last_known_generation, sync_id)
         self._sync_id = sync_id
         self._staging = []
+        self._staging_size = 0
 
     @http_app.http_method(content_as_args=True)
     def post_put(
@@ -240,9 +241,13 @@ class SyncResource(http_app.SyncResource):
         """
         doc = ServerDocument(id, rev)
         doc._json = content
-        self.sync_exch.insert_doc_from_source(
-            doc, gen, trans_id, number_of_docs=None,
-            doc_idx=None, sync_id=None)
+        self._staging_size += len(content or '')
+        self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
+        if self._staging_size > 8192 * 1024 or doc_idx == number_of_docs:
+            self.sync_exch.batched_insert_from_source(self._staging,
+                                                      self._sync_id)
+            self._staging = []
+            self._staging_size = 0
 
     @http_app.http_method(received=int, content_as_args=True)
     def post_get(self, received):

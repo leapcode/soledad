@@ -39,7 +39,7 @@ class DocStreamProducer(object):
         yield call[0](*call[1:])
         while self.producer and not self.stop:
             if self.pause:
-                yield self.sleep(0.01)
+                yield self.sleep(0.001)
                 continue
             call = self.producer.pop(0)
             yield call[0](*call[1:])

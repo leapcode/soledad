@@ -221,14 +221,15 @@ class HTTPInvocationByMethodWithBody(
                     meth_put = self._lookup('%s_put' % method)
                     meth_end = self._lookup('%s_end' % method)
                     while True:
-                        line = body_getline()
-                        entry = line.strip()
+                        entry = body_getline().strip()
                         if entry == ']':  # end of incoming document stream
                             break
                         if not entry or not comma:  # empty or no prec comma
                             raise http_app.BadRequest
                         entry, comma = utils.check_and_strip_comma(entry)
-                        meth_put({}, entry)
+                        content = body_getline().strip()
+                        content, comma = utils.check_and_strip_comma(content)
+                        meth_put({'content': content or None}, entry)
                     if comma or body_getline():  # extra comma or data
                         raise http_app.BadRequest
                     return meth_end()
