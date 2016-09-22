@@ -118,6 +118,8 @@ class SyncExchange(sync.SyncExchange):
             return_doc_cb(doc, gen, trans_id)
 
     def batched_insert_from_source(self, entries, sync_id):
+        if not entries:
+            return
         self._db.batch_start()
         for entry in entries:
             doc, gen, trans_id, number_of_docs, doc_idx = entry
@@ -241,8 +243,19 @@ class SyncResource(http_app.SyncResource):
         """
         doc = ServerDocument(id, rev)
         doc._json = content
-        self._staging_size += len(content or '')
-        self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
+        if (len(content or '') > (8192 * 1024) / 4) or number_of_docs < 4:
+            self.sync_exch.batched_insert_from_source(self._staging,
+                                                      self._sync_id)
+            self._staging = []
+            self._staging_size = 0
+            self.sync_exch.insert_doc_from_source(
+                doc, gen, trans_id,
+                number_of_docs=number_of_docs,
+                doc_idx=doc_idx,
+                sync_id=self._sync_id)
+        else:
+            self._staging_size += len(content or '')
+            self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
         if self._staging_size > 8192 * 1024 or doc_idx == number_of_docs:
             self.sync_exch.batched_insert_from_source(self._staging,
                                                       self._sync_id)
