@@ -42,8 +42,6 @@ class HTTPDocSender(object):
     # Any class inheriting from this one should provide a meaningful attribute
     # if the sync status event is meant to be used somewhere else.
 
-    staging_path = os.path.join(get_path_prefix(), 'leap', 'soledad', 'staging')
-
     uuid = 'undefined'
     userid = 'undefined'
 
