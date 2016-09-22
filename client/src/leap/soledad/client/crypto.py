@@ -300,7 +300,7 @@ def encrypt_docstr(docstr, doc_id, doc_rev, key, secret):
     # convert binary data to hexadecimal representation so the JSON
     # serialization does not complain about what it tries to serialize.
     hex_ciphertext = binascii.b2a_hex(ciphertext)
-    logger.debug("Encrypting doc: %s" % doc_id)
+    logger.debug("encrypting doc: %s" % doc_id)
     return json.dumps({
         crypto.ENC_JSON_KEY: hex_ciphertext,
         crypto.ENC_SCHEME_KEY: enc_scheme,
@@ -356,7 +356,7 @@ def _verify_doc_mac(doc_id, doc_rev, ciphertext, enc_scheme, enc_method,
     calculated_mac_hash = hashlib.sha256(calculated_mac).digest()
 
     if doc_mac_hash != calculated_mac_hash:
-        logger.warn("Wrong MAC while decrypting doc...")
+        logger.warn("wrong MAC while decrypting doc...")
         raise crypto.WrongMacError("Could not authenticate document's "
                                    "contents.")
 

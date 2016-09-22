@@ -337,7 +337,7 @@ class Soledad(object):
         """
         Close underlying U1DB database.
         """
-        logger.debug("Closing soledad")
+        logger.debug("closing soledad")
         self._dbpool.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
@@ -763,7 +763,7 @@ class Soledad(object):
         def _sync_errback(failure):
             s = StringIO()
             failure.printDetailedTraceback(file=s)
-            msg = "Soledad exception when syncing!\n" + s.getvalue()
+            msg = "got exception when syncing!\n" + s.getvalue()
             logger.error(msg)
             return failure
 
@@ -1005,7 +1005,7 @@ class Soledad(object):
 def create_path_if_not_exists(path):
     try:
         if not os.path.isdir(path):
-            logger.info('Creating directory: %s.' % path)
+            logger.info('creating directory: %s.' % path)
         os.makedirs(path)
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(path):

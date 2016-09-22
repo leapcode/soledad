@@ -154,7 +154,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         Start the encrypter pool.
         """
         SyncEncryptDecryptPool.start(self)
-        logger.debug("Starting the encryption loop...")
+        logger.debug("starting the encryption loop...")
 
     def stop(self):
         """
@@ -229,10 +229,10 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
                 % self.TABLE_NAME
         result = yield self._runQuery(query, (doc_id, doc_rev))
         if result:
-            logger.debug("Found doc on sync db: %s" % doc_id)
+            logger.debug("found doc on sync db: %s" % doc_id)
             val = result.pop()
             defer.returnValue(val[0])
-        logger.debug("Did not find doc on sync db: %s" % doc_id)
+        logger.debug("did not find doc on sync db: %s" % doc_id)
         defer.returnValue(None)
 
     def delete_encrypted_doc(self, doc_id, doc_rev):
@@ -505,7 +505,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :rtype: twisted.internet.defer.Deferred
         """
         doc_id, rev, content, gen, trans_id, idx = result
-        logger.debug("Sync decrypter pool: decrypted doc %s: %s %s %s"
+        logger.debug("sync decrypter pool: decrypted doc %s: %s %s %s"
                      % (doc_id, rev, gen, trans_id))
         return self.insert_received_doc(
             doc_id, rev, content, gen, trans_id, idx)
@@ -610,7 +610,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :type trans_id: str
         """
         # could pass source_replica in params for callback chain
-        logger.debug("Sync decrypter pool: inserting doc in local db: "
+        logger.debug("sync decrypter pool: inserting doc in local db: "
                      "%s:%s %s" % (doc_id, doc_rev, gen))
 
         # convert deleted documents to avoid error on document creation
