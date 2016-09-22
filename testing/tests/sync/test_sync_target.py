@@ -31,10 +31,10 @@ from twisted.internet import defer
 
 from leap.soledad.client import http_target as target
 from leap.soledad.client.http_target.fetch_protocol import DocStreamReceiver
-from leap.soledad.client import crypto
 from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
+from leap.soledad.client import _crypto
 
 from leap.soledad.common import l2db
 
@@ -71,7 +71,7 @@ class TestSoledadParseReceivedDocResponse(unittest.TestCase):
         doc = SoledadDocument('i', rev='r')
         doc.content = {'a': 'b'}
 
-        encrypted_docstr = crypto.SoledadCrypto('').encrypt_doc(doc)
+        encrypted_docstr = _crypto.SoledadCrypto('').encrypt_doc(doc)
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.parse("[\r\n{},\r\n]")
