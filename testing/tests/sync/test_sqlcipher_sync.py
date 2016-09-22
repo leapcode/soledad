@@ -709,13 +709,9 @@ def make_local_db_and_soledad_target(
     test.startTwistedServer()
     replica_uid = os.path.basename(path)
     db = test.request_state._create_database(replica_uid)
-    sync_db = test._soledad._sync_db
-    sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
         test, db._dbname,
-        source_replica_uid=source_replica_uid,
-        sync_db=sync_db,
-        sync_enc_pool=sync_enc_pool)
+        source_replica_uid=source_replica_uid)
     return db, st
 
 target_scenarios = [
