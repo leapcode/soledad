@@ -200,7 +200,6 @@ class SyncResource(http_app.SyncResource):
                        not already exist.
         :type ensure: bool
         """
-        print "POST ARGS"
         # create or open the database
         cache = get_cache_for('db-' + sync_id + self.dbname, expire=120)
         if ensure:
@@ -273,8 +272,6 @@ class SyncResource(http_app.SyncResource):
                          client on the current sync session.
         :type received: int
         """
-        print 'IN POST GET'
-
         def send_doc(doc, gen, trans_id):
             entry = dict(id=doc.doc_id, rev=doc.rev,
                          gen=gen, trans_id=trans_id)
