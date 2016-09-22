@@ -169,7 +169,13 @@ class RequestBody(object):
         :return: length of the entry after JSON dumps
         :rtype: int
         """
-        entry = json.dumps(entry_dict)
+        if 'content' in entry_dict:
+            content = entry_dict['content'] or ''
+            del entry_dict['content']
+            entry = json.dumps(entry_dict)
+            entry = entry + ',\r\n' + content
+        else:
+            entry = json.dumps(entry_dict)
         self.entries.append(entry)
 
     def pop(self, amount=10):
