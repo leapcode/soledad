@@ -133,8 +133,7 @@ def _get_soledad_instance(uuid, passphrase, basedir, server_url, cert_file,
         local_db_path=local_db_path,
         server_url=server_url,
         cert_file=cert_file,
-        auth_token=token,
-        defer_encryption=True)
+        auth_token=token)
 
 
 def _get_keymanager_instance(username, provider, soledad, token,

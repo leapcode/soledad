@@ -40,7 +40,7 @@ def init_soledad(_):
     global soledad
     soledad = Soledad(uuid, _pass, secrets_path, local_db_path,
                       server_url, cert_file,
-                      auth_token=token, defer_encryption=False)
+                      auth_token=token)
 
     def getall(_):
         d = soledad.get_all_docs()

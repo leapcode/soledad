@@ -106,10 +106,10 @@ class HTTPDocFetcher(object):
 
         doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
 
-        payload = doc.content['raw']
-        if is_symmetrically_encrypted(payload):
-            decrypted = yield self._crypto.decrypt_doc(doc)
-            doc.set_json(decrypted)
+        if is_symmetrically_encrypted(content):
+            content = yield self._crypto.decrypt_doc(doc)
+
+        doc.set_json(content)
 
         # TODO insert blobs here on the blob backend
         self._insert_doc_cb(doc, doc_info['gen'], doc_info['trans_id'])

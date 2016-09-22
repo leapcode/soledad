@@ -60,7 +60,6 @@ from leap.soledad.client import sqlcipher
 from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client._crypto import SoledadCrypto
-from leap.soledad.client._crypto import BlobEncryptor
 
 logger = getLogger(__name__)
 
@@ -183,7 +182,6 @@ class Soledad(object):
         self._passphrase = passphrase
         self._local_db_path = local_db_path
         self._server_url = server_url
-        self._defer_encryption = defer_encryption
         self._secrets_path = None
         self._dbsyncer = None
 
@@ -285,8 +283,7 @@ class Soledad(object):
 
         opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,
-            is_raw_key=True, create=True,
-            defer_encryption=self._defer_encryption)
+            is_raw_key=True, create=True)
         self._sqlcipher_opts = opts
         self._dbpool = adbapi.getConnectionPool(opts)
 

@@ -71,7 +71,7 @@ class TestSoledadParseReceivedDocResponse(unittest.TestCase):
         doc = SoledadDocument('i', rev='r')
         doc.content = {'a': 'b'}
 
-        encrypted_docstr = _crypto.SoledadCrypto('').encrypt_doc(doc)
+        encrypted_docstr = _crypto.SoledadCrypto('safe').encrypt_doc(doc)
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
             self.parse("[\r\n{},\r\n]")
@@ -589,9 +589,9 @@ class SoledadDatabaseSyncTargetTests(
             [], 'other-replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id, doc.doc_id], self.db)
+        self.assertEqual(2, new_gen)
         self.assertEqual(
             (doc.doc_id, doc.rev, None, 2), self.other_changes[0][:-1])
-        self.assertEqual(2, new_gen)
         if self.whitebox:
             self.assertEqual(self.db._last_exchange_log['return'],
                              {'last_gen': 2, 'docs': [(doc.doc_id, doc.rev)]})

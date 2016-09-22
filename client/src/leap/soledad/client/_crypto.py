@@ -28,7 +28,6 @@ import struct
 import time
 
 from io import BytesIO
-from cStringIO import StringIO
 from collections import namedtuple
 
 import six
@@ -36,8 +35,6 @@ import six
 from twisted.internet import defer
 from twisted.internet import interfaces
 from twisted.logger import Logger
-from twisted.persisted import dirdbm
-from twisted.web import client
 from twisted.web.client import FileBodyProducer
 
 from cryptography.exceptions import InvalidSignature
@@ -49,8 +46,6 @@ from cryptography.hazmat.backends.openssl.backend \
     import Backend as OpenSSLBackend
 
 from zope.interface import implements
-
-from leap.common.config import get_path_prefix
 
 
 log = Logger()
@@ -241,7 +236,6 @@ class BlobDecryptor(object):
             raise InvalidBlob
         self.ciphertext.close()
 
-        current_time = int(time.time())
         if not data or six.indexbytes(data, 0) != 0x80:
             raise InvalidBlob
         try:
@@ -259,7 +253,6 @@ class BlobDecryptor(object):
         iv = data[11:27]
         docidlen = len(self.doc_id)
         ciph_idx = 26 + docidlen
-        doc_id = data[26:ciph_idx]
         revlen = len(self.rev)
         rev_idx = ciph_idx + 1 + revlen
         rev = data[ciph_idx + 1:rev_idx]
@@ -313,7 +306,7 @@ class AESEncryptor(object):
 
     def end(self):
         if not self.done:
-            final = self.encryptor.finalize()
+            self.fd.write(self.encryptor.finalize())
         self.done = True
 
 
@@ -354,7 +347,7 @@ class AESDecryptor(object):
         if iv is None:
             iv = os.urandom(16)
         if len(key) != 32:
-            raise EncryptionhDecryptionError('key is not 256 bits')
+            raise EncryptionDecryptionError('key is not 256 bits')
         if len(iv) != 16:
             raise EncryptionDecryptionError('iv is not 128 bits')
 
@@ -380,9 +373,12 @@ class AESDecryptor(object):
 
 
 def is_symmetrically_encrypted(payload):
-    header = base64.urlsafe_b64decode(enc[:15] + '===')
+    if not payload or len(payload) < 24 \
+            or not payload.startswith('{"raw": "'):
+        return False
+    header = base64.urlsafe_b64decode(payload[9:24] + '==')
     ts, sch, meth = struct.unpack('Qbb', header[1:11])
-    return sch == ENC_SCHEME.symkey
+    return sch == ENC_SCHEME.symkey and meth == ENC_METHOD.aes_256_ctr
 
 
 # utils

@@ -544,10 +544,6 @@ class SQLCipherDatabaseSyncTests(
         self.sync(self.db2, db3)
         doc3 = db3.get_doc('the-doc')
 
-        _crypto = self._soledad._crypto
-        decrypted = _crypto.decrypt_doc(doc3)
-        doc3.set_json(decrypted)
-
         self.assertEqual(doc4.get_json(), doc3.get_json())
         self.assertFalse(doc3.has_conflicts)
         self.db1.close()
