@@ -18,24 +18,25 @@
 """Test u1db.open"""
 
 import os
+import pytest
+
 from unittest import skip
 
-from leap.soledad.common.l2db import (
-    errors, open as u1db_open,
-)
 from test_soledad import u1db_tests as tests
+from test_soledad.u1db_tests.test_backends import TestAlternativeDocument
+
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db import open as u1db_open
 from leap.soledad.common.l2db.backends import sqlite_backend
-from test_soledad.u1db_tests.test_backends \
-    import TestAlternativeDocument
 
 
 @skip("Skiping tests imported from U1DB.")
+@pytest.mark.usefixtures('method_tmpdir')
 class TestU1DBOpen(tests.TestCase):
 
     def setUp(self):
         super(TestU1DBOpen, self).setUp()
-        tmpdir = self.createTempDir()
-        self.db_path = tmpdir + '/test.db'
+        self.db_path = self.tempdir + '/test.db'
 
     def test_open_no_create(self):
         self.assertRaises(errors.DatabaseDoesNotExist,

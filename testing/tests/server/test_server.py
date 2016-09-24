@@ -20,7 +20,7 @@ Tests for server-related functionality.
 import binascii
 import mock
 import os
-import tempfile
+import pytest
 
 from hashlib import sha512
 from pkg_resources import resource_filename
@@ -287,6 +287,7 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
                 self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
 
 
+@pytest.mark.usefixtures("method_tmpdir")
 class EncryptedSyncTestCase(
         CouchDBTestCase, TestCaseWithServer):
 
@@ -349,11 +350,7 @@ class EncryptedSyncTestCase(
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
-        # the order of the following initializations is crucial because of
-        # dependencies.
-        # XXX explain better
         CouchDBTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
 
     def tearDown(self):

@@ -11,3 +11,8 @@ def pytest_addoption(parser):
 def couch_url(request):
     url = request.config.getoption('--couch-url')
     request.cls.couch_url = url
+
+
+@pytest.fixture
+def method_tmpdir(request, tmpdir):
+    request.instance.tempdir = tmpdir.strpath

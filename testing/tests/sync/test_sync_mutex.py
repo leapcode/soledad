@@ -24,8 +24,6 @@ be two concurrent synchronization processes at the same time.
 
 import time
 import uuid
-import tempfile
-import shutil
 
 from urlparse import urljoin
 
@@ -91,13 +89,11 @@ class TestSyncMutex(
     def setUp(self):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self.user = ('user-%s' % uuid.uuid4().hex)
 
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
         TestCaseWithServer.tearDown(self)
-        shutil.rmtree(self.tempdir)
 
     def test_two_concurrent_syncs_do_not_overlap_no_docs(self):
         self.startServer()

@@ -17,6 +17,8 @@
 """
 Test ObjectStore and Couch backend bits.
 """
+import pytest
+
 from testscenarios import TestWithScenarios
 
 from test_soledad.util import BaseSoledadTest
@@ -31,8 +33,14 @@ from test_soledad.u1db_tests import test_backends
 # The following tests come from `u1db.tests.test_backends`.
 # -----------------------------------------------------------------------------
 
+@pytest.mark.usefixtures('method_tmpdir')
 class SoledadTests(
         TestWithScenarios, test_backends.AllDatabaseTests, BaseSoledadTest):
+
+    def setUp(self):
+        TestWithScenarios.setUp(self)
+        test_backends.AllDatabaseTests.setUp(self)
+        BaseSoledadTest.setUp(self)
 
     scenarios = [
         ('token_http', {

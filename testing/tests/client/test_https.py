@@ -17,7 +17,7 @@
 """
 Test Leap backend bits: https
 """
-from unittest import skip
+import pytest
 
 from testscenarios import TestWithScenarios
 
@@ -62,7 +62,7 @@ def token_leap_https_sync_target(test, host, path, cert_file=None):
     return st
 
 
-@skip("Skiping tests imported from U1DB.")
+@pytest.mark.skip
 class TestSoledadHTTPSyncTargetHttpsSupport(
         TestWithScenarios,
         # test_https.TestHttpSyncTargetHttpsSupport,
