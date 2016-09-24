@@ -1,13 +1,13 @@
 stages:
-  - syntax
+  - code-check
   - tests
   - benchmark
 
-syntax:
-  stage: syntax
+code-check:
+  stage: code-check
   script:
     - cd testing
-    - tox -e pep8
+    - tox -e code-check
 
 tests:
   stage: tests
