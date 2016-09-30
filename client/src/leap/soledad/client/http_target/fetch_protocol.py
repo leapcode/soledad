@@ -107,6 +107,7 @@ class DocStreamReceiver(protocol.Protocol):
             line, _ = utils.check_and_strip_comma(lines.pop(0))
             try:
                 self.lineReceived(line)
+                self._line += 1
             except AssertionError, e:
                 raise errors.BrokenSyncStream(e)
 
@@ -116,17 +117,13 @@ class DocStreamReceiver(protocol.Protocol):
             self._properly_finished = True
         elif self._line == 0:
             assert line == '['
-            self._line += 1
         elif self._line == 1:
-            self._line += 1
             self.metadata = json.loads(line)
             assert 'error' not in self.metadata
         elif (self._line % 2) == 0:
-            self._line += 1
             self.current_doc = json.loads(line)
             assert 'error' not in self.current_doc
         else:
-            self._line += 1
             self._doc_reader(self.current_doc, line.strip() or None)
 
     def finish(self):
