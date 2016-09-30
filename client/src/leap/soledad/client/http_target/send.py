@@ -15,13 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
-import os
 
 from twisted.internet import defer
-from twisted.persisted import dirdbm
 
 from leap.soledad.common.log import getLogger
-from leap.common.config import get_path_prefix
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.http_target.support import RequestBody
