@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from twisted.internet import defer
+from twisted.internet import threads
 
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
@@ -51,6 +52,8 @@ class HTTPDocFetcher(object):
                       ensure_callback, sync_id):
         new_generation = last_known_generation
         new_transaction_id = last_known_trans_id
+        # Acts as a queue, ensuring line order on async processing
+        self.semaphore = defer.DeferredSemaphore(1)
 
         # we fetch the first document before fetching the rest because we need
         # to know the total number of documents to be received, and this
@@ -62,6 +65,7 @@ class HTTPDocFetcher(object):
             sync_id, self._received_docs)
         number_of_changes, ngen, ntrans =\
             self._parse_metadata(metadata)
+        yield self.semaphore.acquire()
 
         if ngen:
             new_generation = ngen
@@ -112,7 +116,12 @@ class HTTPDocFetcher(object):
         doc.set_json(content)
 
         # TODO insert blobs here on the blob backend
-        self._insert_doc_cb(doc, doc_info['gen'], doc_info['trans_id'])
+        # FIXME: This is wrong. Using a SQLite connection from multiple threads
+        # is dangerous. We should bring the dbpool here or find an alternative.
+        # Current fix only helps releasing the reactor for other tasks as this
+        # is an IO intensive call.
+        yield self.semaphore.run(threads.deferToThread, self._insert_doc_cb,
+                                 doc, doc_info['gen'], doc_info['trans_id'])
         self._received_docs += 1
         user_data = {'uuid': self.uuid, 'userid': self.userid}
         _emit_receive_status(user_data, self._received_docs, total=1000000)
