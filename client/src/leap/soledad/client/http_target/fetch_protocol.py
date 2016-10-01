@@ -17,18 +17,15 @@ import warnings
 from cStringIO import StringIO
 from twisted.internet import reactor
 from twisted.internet import defer
-from twisted.internet import protocol
 from twisted.web.client import HTTPConnectionPool
 from twisted.web._newclient import ResponseDone
-from twisted.web._newclient import PotentialDataLoss
-from twisted.web.client import PartialDownloadError
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.remote import utils
-from leap.soledad.common.l2db.remote import http_errors
 from leap.common.http import HTTPClient
+from .support import ReadBodyProtocol
 
 
-class DocStreamReceiver(protocol.Protocol):
+class DocStreamReceiver(ReadBodyProtocol):
 
     def __init__(self, response, deferred, doc_reader):
         self.deferred = deferred
@@ -44,52 +41,19 @@ class DocStreamReceiver(protocol.Protocol):
         self._buffer = StringIO()
         self._properly_finished = False
 
-    # ---8<--- snippet from u1db.remote.http_client, modified to use errbacks
-    def _error(self, respdic):
-        descr = respdic.get("error")
-        exc_cls = errors.wire_description_to_exc.get(descr)
-        if exc_cls is not None:
-            message = respdic.get("message")
-            self.deferred.errback(exc_cls(message))
-    # ---8<--- end of snippet from u1db.remote.http_client
-
     def connectionLost(self, reason):
         """
         Deliver the accumulated response bytes to the waiting L{Deferred}, if
         the response body has been completely received without error.
         """
-        if reason.check(ResponseDone):
-
-            try:
-                body = self.finish()
-            except errors.BrokenSyncStream, e:
-                return self.deferred.errback(e)
-
-            # ---8<--- snippet from u1db.remote.http_client
-            if self.status in (200, 201):
-                self.deferred.callback(self.metadata)
-            elif self.status in http_errors.ERROR_STATUSES:
-                try:
-                    respdic = json.loads(body)
-                except ValueError:
-                    self.deferred.errback(
-                        errors.HTTPError(self.status, body, self.headers))
-                else:
-                    self._error(respdic)
-            # special cases
-            elif self.status == 503:
-                self.deferred.errback(errors.Unavailable(body, self.headers))
+        try:
+            if reason.check(ResponseDone):
+                self.dataBuffer = self.metadata
             else:
-                self.deferred.errback(
-                    errors.HTTPError(self.status, body, self.headers))
-            # ---8<--- end of snippet from u1db.remote.http_client
-
-        elif reason.check(PotentialDataLoss):
-            self.deferred.errback(
-                PartialDownloadError(self.status, self.message,
-                                     b''.join(body)))
-        else:
-            self.deferred.errback(reason)
+                self.dataBuffer = self.finish()
+        except errors.BrokenSyncStream, e:
+            return self.deferred.errback(e)
+        return ReadBodyProtocol.connectionLost(self, reason)
 
     def consumeBufferLines(self):
         content = self._buffer.getvalue()[0:self._buffer.tell()]
@@ -118,7 +82,7 @@ class DocStreamReceiver(protocol.Protocol):
         elif self._line == 0:
             assert line == '['
         elif self._line == 1:
-            self.metadata = json.loads(line)
+            self.metadata = line
             assert 'error' not in self.metadata
         elif (self._line % 2) == 0:
             self.current_doc = json.loads(line)
