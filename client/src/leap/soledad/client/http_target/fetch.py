@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import json
 from twisted.internet import defer
 from twisted.internet import threads
 
@@ -138,7 +139,7 @@ class HTTPDocFetcher(object):
         :rtype: tuple
         """
         try:
-            # metadata = json.loads(line)
+            metadata = json.loads(metadata)
             new_generation = metadata['new_generation']
             new_transaction_id = metadata['new_transaction_id']
             number_of_changes = metadata['number_of_changes']
