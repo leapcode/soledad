@@ -94,7 +94,7 @@ class ReadBodyProtocol(_ReadBodyProtocol):
             self.deferred.errback(reason)
 
 
-def readBody(response):
+def readBody(response, protocolClass=ReadBodyProtocol):
     """
     Get the body of an L{IResponse} and return it as a byte string.
 
@@ -119,7 +119,7 @@ def readBody(response):
             abort()
 
     d = defer.Deferred(cancel)
-    protocol = ReadBodyProtocol(response, d)
+    protocol = protocolClass(response, d)
 
     def getAbort():
         return getattr(protocol.transport, 'abortConnection', None)

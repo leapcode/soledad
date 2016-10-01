@@ -32,7 +32,7 @@ class DocStreamProducer(object):
         :param consumer: Any IConsumer provider.
         :type consumer: twisted.internet.interfaces.IConsumer
 
-        :return: A successful deferred.
+        :return: A Deferred that fires when production ends.
         :rtype: twisted.internet.defer.Deferred
         """
         call = self.producer.pop(0)
