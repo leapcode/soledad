@@ -17,6 +17,7 @@
 """
 Server state using CouchDatabase as backend.
 """
+import couchdb
 import re
 import time
 from urlparse import urljoin
@@ -25,9 +26,14 @@ from hashlib import sha512
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch import couch_server
+from leap.soledad.common.couch import CONFIG_DOC_ID
+from leap.soledad.common.couch import SCHEMA_VERSION
+from leap.soledad.common.couch import SCHEMA_VERSION_KEY
 from leap.soledad.common.command import exec_validated_cmd
 from leap.soledad.common.l2db.remote.server_state import ServerState
 from leap.soledad.common.l2db.errors import Unauthorized
+from leap.soledad.common.errors import WrongCouchSchemaVersionError
+from leap.soledad.common.errors import MissingCouchConfigDocumentError
 
 
 logger = getLogger(__name__)
@@ -59,15 +65,41 @@ class CouchServerState(ServerState):
     TOKENS_TYPE_DEF = "Token"
     TOKENS_USER_ID_KEY = "user_id"
 
-    def __init__(self, couch_url, create_cmd=None):
+    def __init__(self, couch_url, create_cmd=None,
+                 check_schema_versions=True):
         """
         Initialize the couch server state.
 
         :param couch_url: The URL for the couch database.
         :type couch_url: str
+        :param check_schema_versions: Whether to check couch schema version of
+                                      user dbs.
+        :type check_schema_versions: bool
         """
         self.couch_url = couch_url
         self.create_cmd = create_cmd
+        if check_schema_versions:
+            self._check_schema_versions()
+
+    def _check_schema_versions(self):
+        """
+        Check that all user databases use the correct couch schema.
+        """
+        server = couchdb.client.Server(self.couch_url)
+        for dbname in server:
+            if not dbname.startswith('user-'):
+                continue
+            db = server[dbname]
+
+            # if there are documents, ensure that a config doc exists
+            config_doc = db.get(CONFIG_DOC_ID)
+            if config_doc:
+                if config_doc[SCHEMA_VERSION_KEY] != SCHEMA_VERSION:
+                    raise WrongCouchSchemaVersionError(dbname)
+            else:
+                result = db.view('_all_docs', limit=1)
+                if result.total_rows != 0:
+                    raise MissingCouchConfigDocumentError(dbname)
 
     def open_database(self, dbname):
         """

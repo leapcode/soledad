@@ -77,7 +77,6 @@ http_errors.ERROR_STATUSES = set(
 
 
 class InvalidURLError(Exception):
-
     """
     Exception raised when Soledad encounters a malformed URL.
     """
@@ -90,3 +89,15 @@ class BackendNotReadyError(SoledadError):
     """
     wire_description = "backend not ready"
     status = 500
+
+
+class WrongCouchSchemaVersionError(SoledadError):
+    """
+    Raised in case there is a user database with wrong couch schema version.
+    """
+
+
+class MissingCouchConfigDocumentError(SoledadError):
+    """
+    Raised if a database has documents but lacks the couch config document.
+    """

@@ -43,8 +43,8 @@ from test_soledad.util import (
 
 from leap.soledad.common import crypto
 from leap.soledad.client import Soledad
-from leap.soledad.server import load_configuration
-from leap.soledad.server import CONFIG_DEFAULTS
+from leap.soledad.server.config import load_configuration
+from leap.soledad.server.config import CONFIG_DEFAULTS
 from leap.soledad.server.auth import URLToAuthorization
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 

@@ -193,8 +193,8 @@ def soledad_server(tmpdir_factory, request):
 def txbenchmark(benchmark):
     def blockOnThread(*args, **kwargs):
         return threads.deferToThread(
-                benchmark, threads.blockingCallFromThread,
-                reactor, *args, **kwargs)
+            benchmark, threads.blockingCallFromThread,
+            reactor, *args, **kwargs)
     return blockOnThread
 
 

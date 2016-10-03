@@ -90,7 +90,7 @@ from leap.soledad.server.gzip_middleware import GzipMiddleware
 from leap.soledad.server.sync import SyncResource
 from leap.soledad.server.sync import MAX_REQUEST_SIZE
 from leap.soledad.server.sync import MAX_ENTRY_SIZE
-from soledad.server.config import load_configuration
+from leap.soledad.server.config import load_configuration
 
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common.backend import SoledadBackend
