@@ -14,10 +14,12 @@ def test_wrong_couch_version_raises(db):
     db.database.create(
         {'_id': CONFIG_DOC_ID, SCHEMA_VERSION_KEY: wrong_schema_version})
     with pytest.raises(WrongCouchSchemaVersionError):
-        CouchServerState(db.couch_url, create_cmd='/bin/echo')
+        CouchServerState(db.couch_url, create_cmd='/bin/echo',
+                         check_schema_versions=True)
 
 
 def test_missing_config_doc_raises(db):
     db.database.create({})
     with pytest.raises(MissingCouchConfigDocumentError):
-        CouchServerState(db.couch_url, create_cmd='/bin/echo')
+        CouchServerState(db.couch_url, create_cmd='/bin/echo',
+                         check_schema_versions=True)

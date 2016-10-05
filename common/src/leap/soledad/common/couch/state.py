@@ -66,7 +66,7 @@ class CouchServerState(ServerState):
     TOKENS_USER_ID_KEY = "user_id"
 
     def __init__(self, couch_url, create_cmd=None,
-                 check_schema_versions=True):
+                 check_schema_versions=False):
         """
         Initialize the couch server state.
 

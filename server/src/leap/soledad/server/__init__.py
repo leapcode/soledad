@@ -267,7 +267,8 @@ def _load_config():
 
 def _get_couch_state():
     conf = _load_config()
-    state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
+    state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'],
+                             check_schema_versions=True)
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
     return state
 
