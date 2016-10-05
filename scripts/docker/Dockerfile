@@ -1,5 +1,5 @@
 # start with a fresh debian image
-FROM debian
+FROM debian:jessie-backports
 
 RUN apt-get update
 
@@ -10,6 +10,8 @@ RUN apt-get -y install libpython2.7-dev
 # needed to build python cryptography module
 RUN apt-get -y install libssl-dev
 RUN apt-get -y install libffi-dev
+# needed to build pysqlcipher
+RUN apt-get -y install libsqlcipher-dev
 
 # install pip and tox
 RUN apt-get -y install python-pip
