@@ -11,7 +11,7 @@ code-check:
 
 tests:
   stage: tests
-  image: leapcode/soledad:1.0
+  image: leapcode/soledad:latest
   services:
     - couchdb
   script:
@@ -20,7 +20,7 @@ tests:
 
 benchmark:
   stage: benchmark
-  image: leapcode/soledad:1.0
+  image: leapcode/soledad:latest
   services:
     - couchdb
   script:

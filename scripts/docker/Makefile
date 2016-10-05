@@ -16,7 +16,7 @@
 # Some configurations you might override when calling this makefile #
 #####################################################################
 
-IMAGE_NAME           ?= leapcode/soledad:1.0
+IMAGE_NAME           ?= leapcode/soledad:latest
 SOLEDAD_REMOTE       ?= https://0xacab.org/leap/soledad.git
 SOLEDAD_BRANCH       ?= develop
 SOLEDAD_PRELOAD_NUM  ?= 100
