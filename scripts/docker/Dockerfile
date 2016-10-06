@@ -1,4 +1,5 @@
 # start with a fresh debian image
+# we use backports because of libsqlcipher-dev
 FROM debian:jessie-backports
 
 RUN apt-get update
@@ -12,6 +13,8 @@ RUN apt-get -y install libssl-dev
 RUN apt-get -y install libffi-dev
 # needed to build pysqlcipher
 RUN apt-get -y install libsqlcipher-dev
+# needed to support keymanager
+RUN apt-get -y install libsqlite3-dev
 
 # install pip and tox
 RUN apt-get -y install python-pip
