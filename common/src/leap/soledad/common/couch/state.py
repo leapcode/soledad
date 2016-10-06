@@ -72,8 +72,14 @@ class CouchServerState(ServerState):
 
         :param couch_url: The URL for the couch database.
         :type couch_url: str
+        :param create_cmd: Command to be executed for user db creation. It will
+                           receive a properly sanitized parameter with user db
+                           name and should access CouchDB with necessary
+                           privileges, which server lacks for security reasons.
+        :type create_cmd: str
         :param check_schema_versions: Whether to check couch schema version of
-                                      user dbs.
+                                      user dbs. Set to False as this is only
+                                      intended to run once during start-up.
         :type check_schema_versions: bool
         """
         self.couch_url = couch_url
