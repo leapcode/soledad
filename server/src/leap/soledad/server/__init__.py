@@ -272,12 +272,14 @@ def _get_couch_state():
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
     return state
 
+try:
+    _couch_state = _get_couch_state()
+    # a WSGI application that may be used by `twistd -web`
+    application = GzipMiddleware(
+        SoledadTokenAuthMiddleware(SoledadApp(_couch_state)))
+except:
+    pass
 
-_couch_state = _get_couch_state()
-
-# a WSGI application that may be used by `twistd -web`
-application = GzipMiddleware(
-    SoledadTokenAuthMiddleware(SoledadApp(_couch_state)))
 
 # another WSGI application in which we bypass token auth middleware for ease of
 # mind while debugging in your local environment
