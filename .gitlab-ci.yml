@@ -3,6 +3,11 @@ stages:
   - tests
   - benchmark
 
+# Cache tox envs between builds
+cache:
+  paths:
+  - testing/.tox/
+
 code-check:
   stage: code-check
   script:
