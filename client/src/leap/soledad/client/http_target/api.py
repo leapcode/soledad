@@ -40,9 +40,8 @@ class SyncTargetAPI(SyncTarget):
     Declares public methods and implements u1db.SyncTarget.
     """
 
-    @defer.inlineCallbacks
     def close(self):
-        yield self._http.close()
+        return self._http.close()
 
     @property
     def uuid(self):
@@ -75,6 +74,10 @@ class SyncTargetAPI(SyncTarget):
         if not body_producer:
             d = self._http.request(url, method, body, headers, body_reader)
         else:
+            # Upload case, check send.py
+            # Used to lazy produce body from docs with a custom protocol
+            # FIXME: _agent usage to bypass timeout, there is an ongoing
+            # discussion on how to properly do it.
             d = self._http._agent.request(
                 method, url, headers=Headers(headers),
                 bodyProducer=body_producer(body))

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# support.py
+# fetch_protocol.py
 # Copyright (C) 2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
