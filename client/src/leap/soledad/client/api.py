@@ -967,13 +967,5 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         match_hostname(self.sock.getpeercert(), self.host)
 
 
-# TODO move this to a common module
-
-class DocInfo:
-    def __init__(self, doc_id, rev):
-        self.doc_id = doc_id
-        self.rev = rev
-
-
 old__VerifiedHTTPSConnection = http_client._VerifiedHTTPSConnection
 http_client._VerifiedHTTPSConnection = VerifiedHTTPSConnection
