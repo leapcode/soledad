@@ -113,11 +113,13 @@ class DocStreamReceiver(ReadBodyProtocol):
         elif self._line == 1:
             self.metadata = line
             assert 'error' not in self.metadata
+            self.total = json.loads(line).get('number_of_changes', -1)
         elif (self._line % 2) == 0:
             self.current_doc = json.loads(line)
             assert 'error' not in self.current_doc
         else:
-            self._doc_reader(self.current_doc, line.strip() or None)
+            self._doc_reader(
+                self.current_doc, line.strip() or None, self.total)
 
     def finish(self):
         """

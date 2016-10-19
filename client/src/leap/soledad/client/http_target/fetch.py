@@ -97,7 +97,7 @@ class HTTPDocFetcher(object):
             body_reader=body_reader)
 
     @defer.inlineCallbacks
-    def _doc_parser(self, doc_info, content):
+    def _doc_parser(self, doc_info, content, total):
         """
         Insert a received document into the local replica.
 
@@ -127,7 +127,7 @@ class HTTPDocFetcher(object):
                                  doc, doc_info['gen'], doc_info['trans_id'])
         self._received_docs += 1
         user_data = {'uuid': self.uuid, 'userid': self.userid}
-        _emit_receive_status(user_data, self._received_docs, total=1000000)
+        _emit_receive_status(user_data, self._received_docs, total=total)
 
     def _parse_metadata(self, metadata):
         """
