@@ -18,11 +18,13 @@ import os
 import json
 import base64
 
+from StringIO import StringIO
 from uuid import uuid4
 
 from twisted.web.error import Error
 from twisted.internet import defer
 from twisted.web.http_headers import Headers
+from twisted.web.client import FileBodyProducer
 
 from leap.soledad.client.http_target.support import readBody
 from leap.soledad.common.errors import InvalidAuthTokenError
@@ -39,9 +41,6 @@ class SyncTargetAPI(SyncTarget):
     """
     Declares public methods and implements u1db.SyncTarget.
     """
-
-    def close(self):
-        return self._http.close()
 
     @property
     def uuid(self):
@@ -71,17 +70,14 @@ class SyncTargetAPI(SyncTarget):
         headers = headers or self._base_header
         if content_type:
             headers.update({'content-type': [content_type]})
-        if not body_producer:
-            d = self._http.request(url, method, body, headers, body_reader)
-        else:
+        if not body_producer and body:
+            body = FileBodyProducer(StringIO(body))
+        elif body_producer:
             # Upload case, check send.py
-            # Used to lazy produce body from docs with a custom protocol
-            # FIXME: _agent usage to bypass timeout, there is an ongoing
-            # discussion on how to properly do it.
-            d = self._http._agent.request(
-                method, url, headers=Headers(headers),
-                bodyProducer=body_producer(body))
-            d.addCallback(body_reader)
+            body = body_producer(body)
+        d = self._http.request(
+            method, url, headers=Headers(headers), bodyProducer=body)
+        d.addCallback(body_reader)
         d.addErrback(_unauth_to_invalid_token_error)
         return d
 

@@ -168,7 +168,6 @@ class TestSoledadSyncTarget(
         target = self.sync_target(
             self, path,
             source_replica_uid=source_replica_uid)
-        self.addCleanup(target.close)
         return target
 
     def setUp(self):
@@ -389,7 +388,6 @@ class SoledadDatabaseSyncTargetTests(
 
     def tearDown(self):
         self.db.close()
-        self.st.close()
         tests.TestCaseWithServer.tearDown(self)
         SoledadWithCouchServerMixin.tearDown(self)
 

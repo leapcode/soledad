@@ -184,7 +184,6 @@ class TestSoledadDbSync(
         target = soledad_sync_target(
             self, self.db2._dbname,
             source_replica_uid=self._soledad._dbpool.replica_uid)
-        self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
             self.db,
             target).sync()

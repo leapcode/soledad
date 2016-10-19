@@ -533,11 +533,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         """
         super(SQLCipherU1DBSync, self).close()
         # close all open syncers
-        for url in self._syncers.keys():
-            _, syncer = self._syncers[url]
-            syncer.close()
-            del self._syncers[url]
-        self.running = False
+        self._syncers = {}
 
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
