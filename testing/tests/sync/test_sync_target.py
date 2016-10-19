@@ -63,7 +63,7 @@ class TestSoledadParseReceivedDocResponse(unittest.TestCase):
     """
 
     def parse(self, stream):
-        parser = DocStreamReceiver(None, None, lambda x, y: 42)
+        parser = DocStreamReceiver(None, None, lambda *_: 42)
         parser.dataReceived(stream)
         parser.finish()
 
