@@ -42,9 +42,7 @@ SQLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
 import os
-import json
 
-from hashlib import sha256
 from functools import partial
 
 from pysqlcipher import dbapi2 as sqlcipher_dbapi2
@@ -409,13 +407,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         self._sync_db = sync_db
 
-        # we store syncers in a dictionary indexed by the target URL. We also
-        # store a hash of the auth info in case auth info expires and we need
-        # to rebuild the syncer for that target. The final self._syncers
-        # format is the following:
-        #
-        #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
-        self._syncers = {}
         # storage for the documents received during a sync
         self.received_docs = []
 
@@ -495,28 +486,16 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :return: A synchronizer.
         :rtype: Synchronizer
         """
-        # we want to store at most one syncer for each url, so we also store a
-        # hash of the connection credentials and replace the stored syncer for
-        # a certain url if credentials have changed.
-        h = sha256(json.dumps([url, creds])).hexdigest()
-        cur_h, syncer = self._syncers.get(url, (None, None))
-        if syncer is None or h != cur_h:
-            syncer = SoledadSynchronizer(
-                self,
-                SoledadHTTPSyncTarget(
-                    url,
-                    # XXX is the replica_uid ready?
-                    self._replica_uid,
-                    creds=creds,
-                    crypto=self._crypto,
-                    cert_file=self._cert_file,
-                    sync_db=self._sync_db))
-            self._syncers[url] = (h, syncer)
-        # in order to reuse the same synchronizer multiple times we have to
-        # reset its state (i.e. the number of documents received from target
-        # and inserted in the local replica).
-        syncer.num_inserted = 0
-        return syncer
+        return SoledadSynchronizer(
+            self,
+            SoledadHTTPSyncTarget(
+                url,
+                # XXX is the replica_uid ready?
+                self._replica_uid,
+                creds=creds,
+                crypto=self._crypto,
+                cert_file=self._cert_file,
+                sync_db=self._sync_db))
 
     #
     # Symmetric encryption of syncing docs
@@ -526,14 +505,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # FIXME
         # XXX this SHOULD BE a callback
         return self._get_generation()
-
-    def close(self):
-        """
-        Close the syncer and syncdb orderly
-        """
-        super(SQLCipherU1DBSync, self).close()
-        # close all open syncers
-        self._syncers = {}
 
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
