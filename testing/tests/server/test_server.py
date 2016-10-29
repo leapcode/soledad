@@ -468,16 +468,6 @@ class EncryptedSyncTestCase(
         """
         return self._test_encrypted_sym_sync(passphrase=u'ãáàäéàëíìïóòöõúùüñç')
 
-    def test_sync_very_large_files(self):
-        """
-        Test if Soledad can sync very large files.
-        """
-        self.skipTest(
-            "Work in progress. For reference, see: "
-            "https://leap.se/code/issues/7370")
-        length = 100 * (10 ** 6)  # 100 MB
-        return self._test_encrypted_sym_sync(doc_size=length, number_of_docs=1)
-
     def test_sync_many_small_files(self):
         """
         Test if Soledad can sync many smallfiles.
