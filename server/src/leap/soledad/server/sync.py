@@ -29,6 +29,7 @@ from leap.soledad.common.document import ServerDocument
 
 MAX_REQUEST_SIZE = 6000  # in Mb
 MAX_ENTRY_SIZE = 200  # in Mb
+ENTRY_CACHE_SIZE = 8192 * 1024
 
 
 class SyncExchange(sync.SyncExchange):
@@ -242,22 +243,10 @@ class SyncResource(http_app.SyncResource):
         :param doc_idx: The index of the current document.
         :type doc_idx: int
         """
-        doc = ServerDocument(id, rev)
-        doc._json = content
-        if (len(content or '') > (8192 * 1024) / 4) or number_of_docs < 4:
-            self.sync_exch.batched_insert_from_source(self._staging,
-                                                      self._sync_id)
-            self._staging = []
-            self._staging_size = 0
-            self.sync_exch.insert_doc_from_source(
-                doc, gen, trans_id,
-                number_of_docs=number_of_docs,
-                doc_idx=doc_idx,
-                sync_id=self._sync_id)
-        else:
-            self._staging_size += len(content or '')
-            self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
-        if self._staging_size > 8192 * 1024 or doc_idx == number_of_docs:
+        doc = ServerDocument(id, rev, json=content)
+        self._staging_size += len(content or '')
+        self._staging.append((doc, gen, trans_id, number_of_docs, doc_idx))
+        if self._staging_size > ENTRY_CACHE_SIZE or doc_idx == number_of_docs:
             self.sync_exch.batched_insert_from_source(self._staging,
                                                       self._sync_id)
             self._staging = []
