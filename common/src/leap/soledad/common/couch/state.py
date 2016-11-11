@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # state.py
-# Copyright (C) 2015 LEAP
+# Copyright (C) 2015,2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,17 +17,17 @@
 """
 Server state using CouchDatabase as backend.
 """
-import re
 import logging
+import re
 import time
 from urlparse import urljoin
 from hashlib import sha512
 
-from u1db.remote.server_state import ServerState
-from leap.soledad.common.command import exec_validated_cmd
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch import couch_server
-from u1db.errors import Unauthorized
+from leap.soledad.common.command import exec_validated_cmd
+from leap.soledad.common.l2db.remote.server_state import ServerState
+from leap.soledad.common.l2db.errors import Unauthorized
 
 
 logger = logging.getLogger(__name__)

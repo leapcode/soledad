@@ -4,7 +4,7 @@
 # Use at your own risk.
 # See $usage for help
 
-insecure_packages="u1db dirspec"
+insecure_packages=""
 leap_wheelhouse=https://lizard.leap.se/wheels
 
 show_help() {
@@ -80,5 +80,5 @@ insecure_flags=`return_insecure_flags`
 packages=`return_packages`
 
 pip install -U wheel
-pip install $install_options pip
+pip install -U pip
 pip install $install_options $insecure_flags $packages

@@ -55,7 +55,7 @@ def _fail(reason):
 
 def _get_api_info(provider):
     info = requests.get(
-        'https://'+provider+'/provider.json', verify=False).json()
+        'https://' + provider + '/provider.json', verify=False).json()
     return info['api_uri'], info['api_version']
 
 

@@ -16,27 +16,28 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-"""A U1DB generic backend."""
+"""A L2DB generic backend."""
 
+import functools
 
-from u1db import vectorclock
-from u1db.errors import (
+from leap.soledad.common.document import ServerDocument
+from leap.soledad.common.l2db import vectorclock
+from leap.soledad.common.l2db.errors import (
     RevisionConflict,
     InvalidDocId,
     ConflictedDoc,
     DocumentDoesNotExist,
     DocumentAlreadyDeleted,
 )
-from u1db.backends import CommonBackend
-from u1db.backends import CommonSyncTarget
-from leap.soledad.common.document import ServerDocument
+from leap.soledad.common.l2db.backends import CommonBackend
+from leap.soledad.common.l2db.backends import CommonSyncTarget
 
 
 class SoledadBackend(CommonBackend):
     BATCH_SUPPORT = False
 
     """
-    A U1DB backend implementation.
+    A L2DB backend implementation.
     """
 
     def __init__(self, database, replica_uid=None):
@@ -438,9 +439,8 @@ class SoledadBackend(CommonBackend):
                                      generation.
         :type other_transaction_id: str
         """
-        function = self._set_replica_gen_and_trans_id
         args = [other_replica_uid, other_generation, other_transaction_id]
-        callback = lambda: function(*args)
+        callback = functools.partial(self._set_replica_gen_and_trans_id, *args)
         if self.batching:
             self.after_batch_callbacks['set_source_info'] = callback
         else:

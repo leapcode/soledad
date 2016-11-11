@@ -14,17 +14,25 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import os
+import time
 import json
 import base64
 
 from uuid import uuid4
-from u1db import SyncTarget
 
 from twisted.web.error import Error
 from twisted.internet import defer
 
-from leap.soledad.common.errors import InvalidAuthTokenError
 from leap.soledad.client.http_target.support import readBody
+from leap.soledad.common.errors import InvalidAuthTokenError
+from leap.soledad.common.l2db import SyncTarget
+
+
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
 
 
 class SyncTargetAPI(SyncTarget):
@@ -187,6 +195,10 @@ class SyncTargetAPI(SyncTarget):
                  transaction id of the target replica.
         :rtype: twisted.internet.defer.Deferred
         """
+        # ---------- phase 1: send docs to server ----------------------------
+        if DO_STATS:
+            self.sync_exchange_phase[0] += 1
+        # --------------------------------------------------------------------
 
         self._ensure_callback = ensure_callback
 
@@ -203,6 +215,11 @@ class SyncTargetAPI(SyncTarget):
             last_known_trans_id,
             sync_id)
 
+        # ---------- phase 2: receive docs -----------------------------------
+        if DO_STATS:
+            self.sync_exchange_phase[0] += 1
+        # --------------------------------------------------------------------
+
         cur_target_gen, cur_target_trans_id = yield self._receive_docs(
             last_known_generation, last_known_trans_id,
             ensure_callback, sync_id,
@@ -213,6 +230,11 @@ class SyncTargetAPI(SyncTarget):
         if gen_after_send is not None and gen_after_send > cur_target_gen:
             cur_target_gen = gen_after_send
             cur_target_trans_id = trans_id_after_send
+
+        # ---------- phase 3: sync exchange is over --------------------------
+        if DO_STATS:
+            self.sync_exchange_phase[0] += 1
+        # --------------------------------------------------------------------
 
         defer.returnValue([cur_target_gen, cur_target_trans_id])
 

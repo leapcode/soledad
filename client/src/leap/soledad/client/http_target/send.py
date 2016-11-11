@@ -16,10 +16,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
+
 from twisted.internet import defer
+
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.http_target.support import RequestBody
+
 logger = logging.getLogger(__name__)
 
 

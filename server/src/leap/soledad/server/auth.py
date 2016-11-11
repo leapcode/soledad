@@ -14,21 +14,17 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 """
 Authentication facilities for Soledad Server.
 """
-
-
 import httplib
 import json
 
-from u1db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from abc import ABCMeta, abstractmethod
 from routes.mapper import Mapper
 from twisted.python import log
 
+from leap.soledad.common.l2db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import USER_DB_PREFIX
 
@@ -101,7 +97,6 @@ class URLToAuthorization(object):
             /shared-db/docs               | -
             /shared-db/doc/{any_id}       | GET, PUT, DELETE
             /shared-db/sync-from/{source} | -
-            /shared-db/lock/{uuid}        | PUT, DELETE
             /user-db                      | GET, PUT, DELETE
             /user-db/docs                 | -
             /user-db/doc/{id}             | -
@@ -118,10 +113,6 @@ class URLToAuthorization(object):
             '/%s/doc/{id:.*}' % SHARED_DB_NAME,
             [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
              self.HTTP_METHOD_DELETE])
-        # auth info for shared-db lock resource
-        self._register(
-            '/%s/lock/%s' % (SHARED_DB_NAME, self._uuid),
-            [self.HTTP_METHOD_PUT, self.HTTP_METHOD_DELETE])
         # auth info for user-db database resource
         self._register(
             '/%s' % self._user_db_name,

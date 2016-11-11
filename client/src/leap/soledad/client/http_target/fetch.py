@@ -16,15 +16,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import logging
 import json
-from u1db import errors
-from u1db.remote import utils
+
 from twisted.internet import defer
-from leap.soledad.common.document import SoledadDocument
+
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.crypto import is_symmetrically_encrypted
 from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.client.http_target.support import RequestBody
+from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.remote import utils
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +82,6 @@ class HTTPDocFetcher(object):
         if ngen:
             new_generation = ngen
             new_transaction_id = ntrans
-
-        if defer_decryption:
-            self._sync_decr_pool.start(number_of_changes)
 
         # ---------------------------------------------------------------------
         # maybe receive the rest of the documents
@@ -151,6 +150,10 @@ class HTTPDocFetcher(object):
         new_generation, new_transaction_id, number_of_changes, doc_id, \
             rev, content, gen, trans_id = \
             self._parse_received_doc_response(response)
+
+        if self._sync_decr_pool and not self._sync_decr_pool.running:
+            self._sync_decr_pool.start(number_of_changes)
+
         if doc_id is not None:
             # decrypt incoming document and insert into local database
             # -------------------------------------------------------------

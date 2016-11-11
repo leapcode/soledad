@@ -7,7 +7,7 @@ if [ "$WHEELHOUSE" = "" ]; then
 fi
 
 pip wheel --wheel-dir $WHEELHOUSE pip
-pip wheel --wheel-dir $WHEELHOUSE --allow-external u1db --allow-unverified u1db --allow-external dirspec --allow-unverified dirspec -r pkg/requirements.pip
+pip wheel --wheel-dir $WHEELHOUSE -r pkg/requirements.pip
 if [ -f pkg/requirements-testing.pip ]; then
    pip wheel --wheel-dir $WHEELHOUSE -r pkg/requirements-testing.pip
 fi

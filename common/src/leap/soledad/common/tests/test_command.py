@@ -21,10 +21,13 @@ from twisted.trial import unittest
 from leap.soledad.common.command import exec_validated_cmd
 
 
+def validator(arg):
+    return True if arg is 'valid' else False
+
+
 class ExecuteValidatedCommandTest(unittest.TestCase):
 
     def test_argument_validation(self):
-        validator = lambda arg: True if arg is 'valid' else False
         status, out = exec_validated_cmd("command", "invalid arg", validator)
         self.assertEquals(status, 1)
         self.assertEquals(out, "invalid argument")

@@ -47,11 +47,10 @@ Compatibility
 Tests
 -----
 
-Client and server tests are both included in leap.soledad.common. If you want
-to run tests in development mode you must do the following::
+Soledad tests use tox, and they live in the testing folder::
 
-  scripts/develop_mode.sh
-  scripts/run_tests.sh
+  cd testing
+  tox
 
 Note that to run CouchDB tests, be sure you have `CouchDB`_ installed on your
 system.

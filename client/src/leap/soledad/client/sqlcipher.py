@@ -44,10 +44,6 @@ handled by Soledad should be created by SQLCipher >= 2.0.
 import logging
 import os
 import json
-import u1db
-
-from u1db import errors as u1db_errors
-from u1db.backends import sqlite_backend
 
 from hashlib import sha256
 from functools import partial
@@ -58,11 +54,15 @@ from twisted.internet import reactor
 from twisted.internet import defer
 from twisted.enterprise import adbapi
 
+from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common import l2db
+from leap.soledad.common.l2db import errors as u1db_errors
+from leap.soledad.common.l2db.backends import sqlite_backend
+from leap.soledad.common.errors import DatabaseAccessError
+
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
-
 from leap.soledad.client import pragmas
-from leap.soledad.common.document import SoledadDocument
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +70,12 @@ logger = logging.getLogger(__name__)
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
 sqlite_backend.dbapi2 = sqlcipher_dbapi2
+
+
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
 
 
 def initialize_sqlcipher_db(opts, on_init=None, check_same_thread=True):
@@ -278,7 +284,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         doc_rev = sqlite_backend.SQLitePartialExpandDatabase.put_doc(self, doc)
         if self.defer_encryption:
             # TODO move to api?
-            self._sync_enc_pool.enqueue_doc_for_encryption(doc)
+            self._sync_enc_pool.encrypt_doc(doc)
         return doc_rev
 
     #
@@ -437,21 +443,21 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # format is the following:
         #
         #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
-
         self._syncers = {}
-
-        # Storage for the documents received during a sync
+        # storage for the documents received during a sync
         self.received_docs = []
 
         self.running = False
+        self.shutdownID = None
+        self._db_handle = None
 
+        # initialize the main db before scheduling a start
+        self._initialize_main_db()
         self._reactor = reactor
         self._reactor.callWhenRunning(self._start)
 
-        self._db_handle = None
-        self._initialize_main_db()
-
-        self.shutdownID = None
+        if DO_STATS:
+            self.sync_phase = None
 
     @property
     def _replica_uid(self):
@@ -464,11 +470,14 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             self.running = True
 
     def _initialize_main_db(self):
-        self._db_handle = initialize_sqlcipher_db(
-            self._opts, check_same_thread=False)
-        self._real_replica_uid = None
-        self._ensure_schema()
-        self.set_document_factory(soledad_doc_factory)
+        try:
+            self._db_handle = initialize_sqlcipher_db(
+                self._opts, check_same_thread=False)
+            self._real_replica_uid = None
+            self._ensure_schema()
+            self.set_document_factory(soledad_doc_factory)
+        except sqlcipher_dbapi2.DatabaseError as e:
+            raise DatabaseAccessError(str(e))
 
     @defer.inlineCallbacks
     def sync(self, url, creds=None, defer_decryption=True):
@@ -497,6 +506,10 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :rtype: Deferred
         """
         syncer = self._get_syncer(url, creds=creds)
+        if DO_STATS:
+            self.sync_phase = syncer.sync_phase
+            self.syncer = syncer
+            self.sync_exchange_phase = syncer.sync_exchange_phase
         local_gen_before_sync = yield syncer.sync(
             defer_decryption=defer_decryption)
         self.received_docs = syncer.received_docs
@@ -582,7 +595,7 @@ class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
-        self._factory = u1db.Document
+        self._factory = l2db.Document
 
 
 class SoledadSQLCipherWrapper(SQLCipherDatabase):

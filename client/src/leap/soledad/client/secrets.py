@@ -33,7 +33,6 @@ from hashlib import sha256
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
-from leap.soledad.common import errors
 from leap.soledad.client import events
 from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
 
@@ -80,6 +79,7 @@ class BootstrapSequenceError(SecretsException):
 #
 # Secrets handler
 #
+
 
 class SoledadSecrets(object):
 
@@ -143,6 +143,8 @@ class SoledadSecrets(object):
     KDF_LENGTH_KEY = 'kdf_length'
     KDF_SCRYPT = 'scrypt'
     CIPHER_AES256 = 'aes256'
+    RECOVERY_DOC_VERSION_KEY = 'version'
+    RECOVERY_DOC_VERSION = 1
     """
     Keys used to access storage secrets in recovery documents.
     """
@@ -162,17 +164,12 @@ class SoledadSecrets(object):
         :param shared_db: The shared database that stores user secrets.
         :type shared_db: leap.soledad.client.shared_db.SoledadSharedDatabase
         """
-        # XXX removed since not in use
-        # We will pick the first secret available.
-        # param secret_id: The id of the storage secret to be used.
-
         self._uuid = uuid
         self._userid = userid
         self._passphrase = passphrase
         self._secrets_path = secrets_path
         self._shared_db = shared_db
         self._secrets = {}
-
         self._secret_id = None
 
     def bootstrap(self):
@@ -195,49 +192,44 @@ class SoledadSecrets(object):
             storage on server sequence has failed for some reason.
         """
         # STAGE 1 - verify if secrets exist locally
-        if not self._has_secret():  # try to load from local storage.
+        try:
+            logger.info("Trying to load secrets from local storage...")
+            version = self._load_secrets_from_local_file()
+            # eventually migrate local and remote stored documents from old
+            # format version
+            if version < self.RECOVERY_DOC_VERSION:
+                self._store_secrets()
+                self._upload_crypto_secrets()
+            logger.info("Found secrets in local storage.")
+            return
 
-            # STAGE 2 - there are no secrets in local storage, so try to fetch
-            # encrypted secrets from server.
-            logger.info(
-                'Trying to fetch cryptographic secrets from shared recovery '
-                'database...')
+        except NoStorageSecret:
+            logger.info("Could not find secrets in local storage.")
 
-            # --- start of atomic operation in shared db ---
+        # STAGE 2 - there are no secrets in local storage and this is the
+        #           first time we are running soledad with the specified
+        #           secrets_path. Try to fetch encrypted secrets from
+        #           server.
+        try:
+            logger.info('Trying to fetch secrets from remote storage...')
+            version = self._download_crypto_secrets()
+            self._store_secrets()
+            # eventually migrate remote stored document from old format
+            # version
+            if version < self.RECOVERY_DOC_VERSION:
+                self._upload_crypto_secrets()
+            logger.info('Found secrets in remote storage.')
+            return
+        except NoStorageSecret:
+            logger.info("Could not find secrets in remote storage.")
 
-            # obtain lock on shared db
-            token = timeout = None
-            try:
-                token, timeout = self._shared_db.lock()
-            except errors.AlreadyLockedError:
-                raise BootstrapSequenceError('Database is already locked.')
-            except errors.LockTimedOutError:
-                raise BootstrapSequenceError('Lock operation timed out.')
-
-            self._get_or_gen_crypto_secrets()
-
-            # release the lock on shared db
-            try:
-                self._shared_db.unlock(token)
-                self._shared_db.close()
-            except errors.NotLockedError:
-                # for some reason the lock expired. Despite that, secret
-                # loading or generation/storage must have been executed
-                # successfully, so we pass.
-                pass
-            except errors.InvalidTokenError:
-                # here, our lock has not only expired but also some other
-                # client application has obtained a new lock and is currently
-                # doing its thing in the shared database. Using the same
-                # reasoning as above, we assume everything went smooth and
-                # pass.
-                pass
-            except Exception as e:
-                logger.error("Unhandled exception when unlocking shared "
-                             "database.")
-                logger.exception(e)
-
-            # --- end of atomic operation in shared db ---
+        # STAGE 3 - there are no secrets in server also, so we want to
+        #           generate the secrets and store them in the remote
+        #           db.
+        logger.info("Generating secrets...")
+        self._gen_crypto_secrets()
+        logger.info("Uploading secrets...")
+        self._upload_crypto_secrets()
 
     def _has_secret(self):
         """
@@ -246,21 +238,7 @@ class SoledadSecrets(object):
         :return: Whether there's a storage secret for symmetric encryption.
         :rtype: bool
         """
-        logger.info("Checking if there's a secret in local storage...")
-        if (self._secret_id is None or self._secret_id not in self._secrets) \
-                and os.path.isfile(self._secrets_path):
-            try:
-                self._load_secrets()  # try to load from disk
-            except IOError as e:
-                logger.warning(
-                    'IOError while loading secrets from disk: %s' % str(e))
-
-        if self.storage_secret is not None:
-            logger.info("Found a secret in local storage.")
-            return True
-
-        logger.info("Could not find a secret in local storage.")
-        return False
+        return self.storage_secret is not None
 
     def _maybe_set_active_secret(self, active_secret):
         """
@@ -272,73 +250,82 @@ class SoledadSecrets(object):
                 active_secret = self._secrets.items()[0][0]
             self.set_secret_id(active_secret)
 
-    def _load_secrets(self):
+    def _load_secrets_from_local_file(self):
         """
         Load storage secrets from local file.
+
+        :return version: The version of the locally stored recovery document.
+
+        :raise NoStorageSecret: Raised if there are no secrets available in
+                                local storage.
         """
+        # check if secrets file exists and we can read it
+        if not os.path.isfile(self._secrets_path):
+            raise NoStorageSecret
+
         # read storage secrets from file
         content = None
         with open(self._secrets_path, 'r') as f:
             content = json.loads(f.read())
-        _, active_secret = self._import_recovery_document(content)
-        self._maybe_set_active_secret(active_secret)
-        # enlarge secret if needed
-        enlarged = False
-        if len(self._secrets[self._secret_id]) < self.GEN_SECRET_LENGTH:
-            gen_len = self.GEN_SECRET_LENGTH \
-                - len(self._secrets[self._secret_id])
-            new_piece = os.urandom(gen_len)
-            self._secrets[self._secret_id] += new_piece
-            enlarged = True
-        # store and save in shared db if needed
-        if enlarged:
-            self._store_secrets()
-            self._put_secrets_in_shared_db()
+        _, active_secret, version = self._import_recovery_document(content)
 
-    def _get_or_gen_crypto_secrets(self):
+        self._maybe_set_active_secret(active_secret)
+
+        return version
+
+    def _download_crypto_secrets(self):
         """
-        Retrieves or generates the crypto secrets.
+        Download crypto secrets.
+
+        :return version: The version of the remotelly stored recovery document.
+
+        :raise NoStorageSecret: Raised if there are no secrets available in
+                                remote storage.
+        """
+        doc = None
+        if self._shared_db.syncable:
+            doc = self._get_secrets_from_shared_db()
+
+        if doc is None:
+            raise NoStorageSecret
+
+        _, active_secret, version = self._import_recovery_document(doc.content)
+        self._maybe_set_active_secret(active_secret)
+
+        return version
+
+    def _gen_crypto_secrets(self):
+        """
+        Generate the crypto secrets.
+        """
+        logger.info('No cryptographic secrets found, creating new secrets...')
+        secret_id = self._gen_secret()
+        self.set_secret_id(secret_id)
+
+    def _upload_crypto_secrets(self):
+        """
+        Send crypto secrets to shared db.
 
         :raises BootstrapSequenceError: Raised when unable to store secrets in
                                         shared database.
         """
         if self._shared_db.syncable:
-            doc = self._get_secrets_from_shared_db()
-        else:
-            doc = None
-
-        if doc is not None:
-            logger.info(
-                'Found cryptographic secrets in shared recovery '
-                'database.')
-            _, active_secret = self._import_recovery_document(doc.content)
-            self._maybe_set_active_secret(active_secret)
-            self._store_secrets()  # save new secrets in local file
-        else:
-            # STAGE 3 - there are no secrets in server also, so
-            # generate a secret and store it in remote db.
-            logger.info(
-                'No cryptographic secrets found, creating new '
-                ' secrets...')
-            self.set_secret_id(self._gen_secret())
-
-            if self._shared_db.syncable:
+            try:
+                self._put_secrets_in_shared_db()
+            except Exception as ex:
+                # storing generated secret in shared db failed for
+                # some reason, so we erase the generated secret and
+                # raise.
                 try:
-                    self._put_secrets_in_shared_db()
-                except Exception as ex:
-                    # storing generated secret in shared db failed for
-                    # some reason, so we erase the generated secret and
-                    # raise.
-                    try:
-                        os.unlink(self._secrets_path)
-                    except OSError as e:
-                        if e.errno != errno.ENOENT:
-                            # no such file or directory
-                            logger.exception(e)
-                    logger.exception(ex)
-                    raise BootstrapSequenceError(
-                        'Could not store generated secret in the shared '
-                        'database, bailing out...')
+                    os.unlink(self._secrets_path)
+                except OSError as e:
+                    if e.errno != errno.ENOENT:
+                        # no such file or directory
+                        logger.exception(e)
+                logger.exception(ex)
+                raise BootstrapSequenceError(
+                    'Could not store generated secret in the shared '
+                    'database, bailing out...')
 
     #
     # Shared DB related methods
@@ -360,7 +347,7 @@ class SoledadSecrets(object):
         """
         Export the storage secrets.
 
-        A recovery document has the following structure:
+        Current format of recovery document has the following structure:
 
             {
                 'storage_secrets': {
@@ -371,6 +358,7 @@ class SoledadSecrets(object):
                     },
                 },
                 'active_secret': '<secret_id>',
+                'version': '<recovery document format version>',
             }
 
         Note that multiple storage secrets might be stored in one recovery
@@ -388,13 +376,14 @@ class SoledadSecrets(object):
         data = {
             self.STORAGE_SECRETS_KEY: encrypted_secrets,
             self.ACTIVE_SECRET_KEY: self._secret_id,
+            self.RECOVERY_DOC_VERSION_KEY: self.RECOVERY_DOC_VERSION,
         }
         return data
 
     def _import_recovery_document(self, data):
         """
-        Import storage secrets for symmetric encryption and uuid (if present)
-        from a recovery document.
+        Import storage secrets for symmetric encryption from a recovery
+        document.
 
         Note that this method does not store the imported data on disk. For
         that, use C{self._store_secrets()}.
@@ -402,11 +391,44 @@ class SoledadSecrets(object):
         :param data: The recovery document.
         :type data: dict
 
-        :return: A tuple containing the number of imported secrets and the
-                 secret_id of the last active secret.
-        :rtype: (int, str)
+        :return: A tuple containing the number of imported secrets, the
+                 secret_id of the last active secret, and the recovery
+                 document format version.
+        :rtype: (int, str, int)
         """
         soledad_assert(self.STORAGE_SECRETS_KEY in data)
+        version = data.get(self.RECOVERY_DOC_VERSION_KEY, 1)
+        meth = getattr(self, '_import_recovery_document_version_%d' % version)
+        secret_count, active_secret = meth(data)
+        return secret_count, active_secret, version
+
+    def _import_recovery_document_version_1(self, data):
+        """
+        Import storage secrets for symmetric encryption from a recovery
+        document with format version 1.
+
+        Version 1 of recovery document has the following structure:
+
+            {
+                'storage_secrets': {
+                    '<storage_secret id>': {
+                        'cipher': 'aes256',
+                        'length': <secret length>,
+                        'secret': '<encrypted storage_secret>',
+                    },
+                },
+                'active_secret': '<secret_id>',
+                'version': '<recovery document format version>',
+            }
+
+        :param data: The recovery document.
+        :type data: dict
+
+        :return: A tuple containing the number of imported secrets, the
+                 secret_id of the last active secret, and the recovery
+                 document format version.
+        :rtype: (int, str, int)
+        """
         # include secrets in the secret pool.
         secret_count = 0
         secrets = data[self.STORAGE_SECRETS_KEY].items()
@@ -419,7 +441,8 @@ class SoledadSecrets(object):
             if secret_id not in self._secrets:
                 try:
                     self._secrets[secret_id] = \
-                        self._decrypt_storage_secret(encrypted_secret)
+                        self._decrypt_storage_secret_version_1(
+                            encrypted_secret)
                     secret_count += 1
                 except SecretsException as e:
                     logger.error("Failed to decrypt storage secret: %s"
@@ -478,12 +501,20 @@ class SoledadSecrets(object):
     # Management of secret for symmetric encryption.
     #
 
-    def _decrypt_storage_secret(self, encrypted_secret_dict):
+    def _decrypt_storage_secret_version_1(self, encrypted_secret_dict):
         """
         Decrypt the storage secret.
 
         Storage secret is encrypted before being stored. This method decrypts
         and returns the decrypted storage secret.
+
+        Version 1 of storage secret format has the following structure:
+
+            '<storage_secret id>': {
+                'cipher': 'aes256',
+                'length': <secret length>,
+                'secret': '<encrypted storage_secret>',
+            },
 
         :param encrypted_secret_dict: The encrypted storage secret.
         :type encrypted_secret_dict:  dict

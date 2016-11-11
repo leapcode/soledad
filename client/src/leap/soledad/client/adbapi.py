@@ -24,13 +24,12 @@ import sys
 import logging
 
 from functools import partial
-from threading import BoundedSemaphore
 
 from twisted.enterprise import adbapi
+from twisted.internet.defer import DeferredSemaphore
 from twisted.python import log
 from zope.proxy import ProxyBase, setProxiedObject
-from pysqlcipher.dbapi2 import OperationalError
-from pysqlcipher.dbapi2 import DatabaseError
+from pysqlcipher import dbapi2
 
 from leap.soledad.common.errors import DatabaseAccessError
 
@@ -49,7 +48,7 @@ if DEBUG_SQL:
 How long the SQLCipher connection should wait for the lock to go away until
 raising an exception.
 """
-SQLCIPHER_CONNECTION_TIMEOUT = 10
+SQLCIPHER_CONNECTION_TIMEOUT = 5
 
 """
 How many times a SQLCipher query should be retried in case of timeout.
@@ -79,9 +78,11 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher",
     if openfun is None and driver == "pysqlcipher":
         openfun = partial(set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
-        "%s.dbapi2" % driver, opts=opts, sync_enc_pool=sync_enc_pool,
-        database=opts.path, check_same_thread=False, cp_openfun=openfun,
-        timeout=SQLCIPHER_CONNECTION_TIMEOUT)
+        opts, sync_enc_pool,
+        # the following params are relayed "as is" to twisted's
+        # ConnectionPool.
+        "%s.dbapi2" % driver, opts.path, timeout=SQLCIPHER_CONNECTION_TIMEOUT,
+        check_same_thread=False, cp_openfun=openfun)
 
 
 class U1DBConnection(adbapi.Connection):
@@ -105,8 +106,10 @@ class U1DBConnection(adbapi.Connection):
         self._sync_enc_pool = sync_enc_pool
         try:
             adbapi.Connection.__init__(self, pool)
-        except DatabaseError:
-            raise DatabaseAccessError('Could not open sqlcipher database')
+        except dbapi2.DatabaseError as e:
+            raise DatabaseAccessError(
+                'Error initializing connection to sqlcipher database: %s'
+                % str(e))
 
     def reconnect(self):
         """
@@ -165,17 +168,17 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
     connectionFactory = U1DBConnection
     transactionFactory = U1DBTransaction
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, opts, sync_enc_pool, *args, **kwargs):
         """
         Initialize the connection pool.
         """
-        # extract soledad-specific objects from keyword arguments
-        self.opts = kwargs.pop("opts")
-        self._sync_enc_pool = kwargs.pop("sync_enc_pool")
+        self.opts = opts
+        self._sync_enc_pool = sync_enc_pool
         try:
             adbapi.ConnectionPool.__init__(self, *args, **kwargs)
-        except DatabaseError:
-            raise DatabaseAccessError('Could not open sqlcipher database')
+        except dbapi2.DatabaseError as e:
+            raise DatabaseAccessError(
+                'Error initializing u1db connection pool: %s' % str(e))
 
         # all u1db connections, hashed by thread-id
         self._u1dbconnections = {}
@@ -183,10 +186,15 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         # The replica uid, primed by the connections on init.
         self.replica_uid = ProxyBase(None)
 
-        conn = self.connectionFactory(
-            self, self._sync_enc_pool, init_u1db=True)
-        replica_uid = conn._u1db._real_replica_uid
-        setProxiedObject(self.replica_uid, replica_uid)
+        try:
+            conn = self.connectionFactory(
+                self, self._sync_enc_pool, init_u1db=True)
+            replica_uid = conn._u1db._real_replica_uid
+            setProxiedObject(self.replica_uid, replica_uid)
+        except DatabaseAccessError as e:
+            self.threadpool.stop()
+            raise DatabaseAccessError(
+                "Error initializing connection factory: %s" % str(e))
 
     def runU1DBQuery(self, meth, *args, **kw):
         """
@@ -204,16 +212,17 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         :rtype: twisted.internet.defer.Deferred
         """
         meth = "u1db_%s" % meth
-        semaphore = BoundedSemaphore(SQLCIPHER_MAX_RETRIES - 1)
+        semaphore = DeferredSemaphore(SQLCIPHER_MAX_RETRIES)
 
         def _run_interaction():
             return self.runInteraction(
                 self._runU1DBQuery, meth, *args, **kw)
 
         def _errback(failure):
-            failure.trap(OperationalError)
+            failure.trap(dbapi2.OperationalError)
             if failure.getErrorMessage() == "database is locked":
-                should_retry = semaphore.acquire(False)
+                logger.warning("Database operation timed out.")
+                should_retry = semaphore.acquire()
                 if should_retry:
                     logger.warning(
                         "Database operation timed out while waiting for "

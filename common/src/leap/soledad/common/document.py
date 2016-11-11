@@ -17,11 +17,11 @@
 
 
 """
-A Soledad Document is an u1db.Document with lasers.
+A Soledad Document is an l2db.Document with lasers.
 """
 
 
-from u1db import Document
+from .l2db import Document
 
 
 #

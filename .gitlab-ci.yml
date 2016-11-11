@@ -1,0 +1,3 @@
+trial:
+  script:
+  - cd testing; tox

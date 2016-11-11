@@ -24,6 +24,7 @@ import re
 import uuid
 import binascii
 import time
+import functools
 
 
 from StringIO import StringIO
@@ -41,12 +42,12 @@ from couchdb.http import (
     urljoin as couch_urljoin,
     Resource,
 )
-from u1db.errors import (
+from leap.soledad.common.l2db.errors import (
     DatabaseDoesNotExist,
     InvalidGeneration,
     RevisionConflict,
 )
-from u1db.remote import http_app
+from leap.soledad.common.l2db.remote import http_app
 
 
 from leap.soledad.common import ddocs
@@ -340,7 +341,8 @@ class CouchDatabase(object):
         # This will not be needed when/if we switch from python-couchdb to
         # paisley.
         time.strptime('Mar 8 1917', '%b %d %Y')
-        get_one = lambda doc_id: self.get_doc(doc_id, check_for_conflicts)
+        get_one = functools.partial(
+            self.get_doc, check_for_conflicts=check_for_conflicts)
         docs = [THREAD_POOL.apply_async(get_one, [doc_id])
                 for doc_id in doc_ids]
         for doc in docs:

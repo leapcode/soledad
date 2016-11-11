@@ -35,16 +35,11 @@ import ssl
 import uuid
 import urlparse
 
-try:
-    import cchardet as chardet
-except ImportError:
-    import chardet
 from itertools import chain
 
 from StringIO import StringIO
 from collections import defaultdict
-from u1db.remote import http_client
-from u1db.remote.ssl_match_hostname import match_hostname
+
 from twisted.internet.defer import DeferredLock, returnValue, inlineCallbacks
 from zope.interface import implements
 
@@ -54,6 +49,9 @@ from leap.common.plugins import collect_plugins
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
+from leap.soledad.common.l2db.remote import http_client
+from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
+from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
@@ -65,6 +63,13 @@ from leap.soledad.client import sqlcipher
 from leap.soledad.client import encdecpool
 
 logger = logging.getLogger(name=__name__)
+
+
+# we may want to collect statistics from the sync process
+DO_STATS = False
+if os.environ.get('SOLEDAD_STATS'):
+    DO_STATS = True
+
 
 #
 # Constants
@@ -126,8 +131,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, defer_encryption=False, syncable=True,
-                 userid=None):
+                 auth_token=None, defer_encryption=False, syncable=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -181,7 +185,6 @@ class Soledad(object):
         """
         # store config params
         self._uuid = uuid
-        self._userid = userid
         self._passphrase = passphrase
         self._local_db_path = local_db_path
         self._server_url = server_url
@@ -211,10 +214,22 @@ class Soledad(object):
         self._init_secrets()
 
         self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
-        self._init_u1db_sqlcipher_backend()
 
-        if syncable:
-            self._init_u1db_syncer()
+        try:
+            # initialize database access, trap any problems so we can shutdown
+            # smoothly.
+            self._init_u1db_sqlcipher_backend()
+            if syncable:
+                self._init_u1db_syncer()
+        except DatabaseAccessError:
+            # oops! something went wrong with backend initialization. We
+            # have to close any thread-related stuff we have already opened
+            # here, otherwise there might be zombie threads that may clog the
+            # reactor.
+            self._sync_db.close()
+            if hasattr(self, '_dbpool'):
+                self._dbpool.close()
+            raise
 
     #
     # initialization/destruction methods
@@ -255,7 +270,7 @@ class Soledad(object):
         """
         self._secrets = SoledadSecrets(
             self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db, userid=self._userid)
+            self.shared_db, userid=self.userid)
         self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):
@@ -302,6 +317,17 @@ class Soledad(object):
             defer_encryption=self._defer_encryption,
             sync_db=self._sync_db,
             sync_enc_pool=self._sync_enc_pool)
+
+    def sync_stats(self):
+        sync_phase = 0
+        if getattr(self._dbsyncer, 'sync_phase', None):
+            sync_phase = self._dbsyncer.sync_phase[0]
+        sync_exchange_phase = 0
+        if getattr(self._dbsyncer, 'syncer', None):
+            if getattr(self._dbsyncer.syncer, 'sync_exchange_phase', None):
+                _p = self._dbsyncer.syncer.sync_exchange_phase[0]
+                sync_exchange_phase = _p
+        return sync_phase, sync_exchange_phase
 
     #
     # Closing methods
@@ -359,7 +385,6 @@ class Soledad(object):
             also be updated.
         :rtype: twisted.internet.defer.Deferred
         """
-        doc.content = _convert_to_unicode(doc.content)
         return self._defer("put_doc", doc)
 
     def delete_doc(self, doc):
@@ -454,8 +479,7 @@ class Soledad(object):
         # create_doc (and probably to put_doc too). There are cases (mail
         # payloads for example) in which we already have the encoding in the
         # headers, so we don't need to guess it.
-        return self._defer(
-            "create_doc", _convert_to_unicode(content), doc_id=doc_id)
+        return self._defer("create_doc", content, doc_id=doc_id)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -655,7 +679,7 @@ class Soledad(object):
 
     @property
     def userid(self):
-        return self._userid
+        return self.uuid
 
     #
     # ISyncableStorage
@@ -974,44 +998,6 @@ class Soledad(object):
     def _set_token_for_service(self, service, token):
         doc = {'type': 'servicetoken', 'service': service, 'token': token}
         return self.create_doc(doc)
-
-
-def _convert_to_unicode(content):
-    """
-    Convert content to unicode (or all the strings in content).
-
-    NOTE: Even though this method supports any type, it will
-    currently ignore contents of lists, tuple or any other
-    iterable than dict. We don't need support for these at the
-    moment
-
-    :param content: content to convert
-    :type content: object
-
-    :rtype: object
-    """
-    # Chardet doesn't guess very well with some smallish payloads.
-    # This parameter might need some empirical tweaking.
-    CUTOFF_CONFIDENCE = 0.90
-
-    if isinstance(content, unicode):
-        return content
-    elif isinstance(content, str):
-        encoding = "utf-8"
-        result = chardet.detect(content)
-        if result["confidence"] > CUTOFF_CONFIDENCE:
-            encoding = result["encoding"]
-        try:
-            content = content.decode(encoding)
-        except UnicodeError as e:
-            logger.error("Unicode error: {0!r}. Using 'replace'".format(e))
-            content = content.decode(encoding, 'replace')
-        return content
-    else:
-        if isinstance(content, dict):
-            for key in content.keys():
-                content[key] = _convert_to_unicode(content[key])
-    return content
 
 
 def create_path_if_not_exists(path):

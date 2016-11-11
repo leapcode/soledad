@@ -49,9 +49,7 @@ synchronization is handled by the `leap.soledad.server.auth` module.
 Shared database
 ---------------
 
-Each user may store password-encrypted recovery data in the shared database,
-as well as obtain a lock on the shared database in order to prevent creation
-of multiple secrets in parallel.
+Each user may store password-encrypted recovery data in the shared database.
 
 Recovery documents are stored in the database without any information that
 may identify the user. In order to achieve this, the doc_id of recovery
@@ -77,26 +75,19 @@ This has some implications:
   * Because of the above, it is recommended that recovery documents expire
     (not implemented yet) to prevent excess storage.
 
-Lock documents, on the other hand, may be more thoroughly protected by the
-server. Their doc_id's are calculated from the SHARED_DB_LOCK_DOC_ID_PREFIX
-and the user's uid.
-
 The authorization for creating, updating, deleting and retrieving recovery
-and lock documents on the shared database is handled by
-`leap.soledad.server.auth` module.
+documents on the shared database is handled by `leap.soledad.server.auth`
+module.
 """
 
 import configparser
 import urlparse
 import sys
 
-from u1db.remote import http_app, utils
-
-from ._version import get_versions
+from leap.soledad.common.l2db.remote import http_app, utils
 
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
-from leap.soledad.server.lock_resource import LockResource
 from leap.soledad.server.sync import (
     SyncResource,
     MAX_REQUEST_SIZE,
@@ -106,6 +97,8 @@ from leap.soledad.server.sync import (
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common.backend import SoledadBackend
 from leap.soledad.common.couch.state import CouchServerState
+
+from ._version import get_versions
 
 # ----------------------------------------------------------------------------
 # Soledad WSGI application
@@ -155,7 +148,6 @@ http_app.url_to_resource.register(http_app.DocsResource)
 http_app.url_to_resource.register(http_app.DocResource)
 
 # register Soledad's new or modified resources
-http_app.url_to_resource.register(LockResource)
 http_app.url_to_resource.register(SyncResource)
 
 
@@ -312,16 +304,34 @@ def load_configuration(file_path):
 # Run as Twisted WSGI Resource
 # ----------------------------------------------------------------------------
 
-def application(environ, start_response):
+
+def _load_config():
     conf = load_configuration('/etc/soledad/soledad-server.conf')
-    conf = conf['soledad-server']
+    return conf['soledad-server']
+
+
+def _get_couch_state():
+    conf = _load_config()
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
-    SoledadBackend.BATCH_SUPPORT = conf['batching']
-    # WSGI application that may be used by `twistd -web`
+    SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
+    return state
+
+
+def application(environ, start_response):
+    """return WSGI application that may be used by `twistd -web`"""
+    state = _get_couch_state()
     application = GzipMiddleware(
         SoledadTokenAuthMiddleware(SoledadApp(state)))
-
     return application(environ, start_response)
+
+
+def debug_local_application_do_not_use(environ, start_response):
+    """in where we bypass token auth middleware for ease of mind while
+    debugging in your local environment"""
+    state = _get_couch_state()
+    application = SoledadApp(state)
+    return application(environ, start_response)
+
 
 __version__ = get_versions()['version']
 del get_versions

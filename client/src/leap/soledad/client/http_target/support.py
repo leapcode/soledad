@@ -16,19 +16,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import warnings
 import json
-from u1db import errors
-from u1db.remote import http_errors
+
 from twisted.internet import defer
 from twisted.web.client import _ReadBodyProtocol
 from twisted.web.client import PartialDownloadError
 from twisted.web._newclient import ResponseDone
 from twisted.web._newclient import PotentialDataLoss
 
+from leap.soledad.common.l2db import errors
+from leap.soledad.common.l2db.remote import http_errors
 
 # we want to make sure that HTTP errors will raise appropriate u1db errors,
 # that is, fire errbacks with the appropriate failures, in the context of
 # twisted. Because of that, we redefine the http body reader used by the HTTP
 # client below.
+
 
 class ReadBodyProtocol(_ReadBodyProtocol):
     """

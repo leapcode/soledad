@@ -3,10 +3,10 @@ Soledad common package
 
 This package contains Soledad bits used by both server and client.
 
-Couch U1DB Backend
+Couch L2DB Backend
 ------------------
 
-U1DB backends rely on some atomic operations that modify documents contents
+L2DB backends rely on some atomic operations that modify documents contents
 and metadata (conflicts, transaction ids and indexes). The only atomic
 operation in Couch is a document put, so every u1db atomic operation has to be
 mapped to a couch document put.

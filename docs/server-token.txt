@@ -1,0 +1,8 @@
+Requests to the soledad server use a slightly different format than bonafide:
+
+<pre>
+Authentication: 'Token <[base64-encoded]uid:token>'
+</pre>
+
+where @<...>@ is a base64-encoded string that concatenates the user id and the
+token.

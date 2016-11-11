@@ -21,11 +21,11 @@ from __future__ import print_function
 import datetime
 import os
 
-import u1db
 from twisted.internet import defer, reactor
 
 from leap.soledad.client import adbapi
 from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.common import l2db
 
 
 folder = os.environ.get("TMPDIR", "tmp")
@@ -68,7 +68,7 @@ def countDocs(_):
 
 
 def printResult(r):
-    if isinstance(r, u1db.Document):
+    if isinstance(r, l2db.Document):
         debug(r.doc_id, r.content['number'])
     else:
         len_results = len(r[1])
