@@ -21,16 +21,13 @@ A L2DB implementation that uses SQLite as its persistence layer.
 
 import errno
 import os
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
-from sqlite3 import dbapi2
+import json
 import sys
 import time
 import uuid
-
 import pkg_resources
+
+from sqlite3 import dbapi2
 
 from leap.soledad.common.l2db.backends import CommonBackend, CommonSyncTarget
 from leap.soledad.common.l2db import (

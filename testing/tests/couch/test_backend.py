@@ -39,12 +39,8 @@ class TestCouchBackendImpl(CouchDBTestCase):
 
     def test__allocate_doc_id(self):
         db = couch.CouchDatabase.open_database(
-            urljoin(
-                'http://localhost:' + str(self.couch_port),
-                ('test-%s' % uuid4().hex)
-            ),
-            create=True,
-            ensure_ddocs=True)
+            urljoin(self.couch_url, 'test-%s' % uuid4().hex),
+            create=True)
         doc_id1 = db._allocate_doc_id()
         self.assertTrue(doc_id1.startswith('D-'))
         self.assertEqual(34, len(doc_id1))

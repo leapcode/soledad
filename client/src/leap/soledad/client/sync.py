@@ -18,17 +18,16 @@
 Soledad synchronization utilities.
 """
 import os
-import time
-import logging
 
 from twisted.internet import defer
 
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.sync import Synchronizer
 from leap.soledad.common.errors import BackendNotReadyError
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # we may want to collect statistics from the sync process
@@ -97,21 +96,17 @@ class SoledadSynchronizer(Synchronizer):
                 sync_target.get_sync_info(self.source._replica_uid)
         except (errors.DatabaseDoesNotExist, BackendNotReadyError) as e:
             logger.debug("Database isn't ready on server. Will be created.")
-            logger.debug("Reason: %s", e.__class__)
+            logger.debug("Reason: %s" % e.__class__)
             self.target_replica_uid = None
             target_gen, target_trans_id = 0, ''
             target_my_gen, target_my_trans_id = 0, ''
 
-        logger.debug(
-            "Soledad target sync info:\n"
-            "  target replica uid: %s\n"
-            "  target generation: %d\n"
-            "  target trans id: %s\n"
-            "  target my gen: %d\n"
-            "  target my trans_id: %s\n"
-            "  source replica_uid: %s\n"
-            % (self.target_replica_uid, target_gen, target_trans_id,
-               target_my_gen, target_my_trans_id, self.source._replica_uid))
+        logger.debug("target replica uid: %s" % self.target_replica_uid)
+        logger.debug("target generation: %d" % target_gen)
+        logger.debug("target trans id: %s" % target_trans_id)
+        logger.debug("target my gen: %d" % target_my_gen)
+        logger.debug("target my trans_id: %s" % target_my_trans_id)
+        logger.debug("source replica_uid: %s" % self.source._replica_uid)
 
         # make sure we'll have access to target replica uid once it exists
         if self.target_replica_uid is None:
@@ -134,8 +129,7 @@ class SoledadSynchronizer(Synchronizer):
 
         # what's changed since that generation and this current gen
         my_gen, _, changes = self.source.whats_changed(target_my_gen)
-        logger.debug("Soledad sync: there are %d documents to send."
-                     % len(changes))
+        logger.debug("there are %d documents to send" % len(changes))
 
         # get source last-seen database generation for the target
         if self.target_replica_uid is None:
@@ -144,11 +138,10 @@ class SoledadSynchronizer(Synchronizer):
             target_last_known_gen, target_last_known_trans_id = \
                 self.source._get_replica_gen_and_trans_id(
                     self.target_replica_uid)
-        logger.debug(
-            "Soledad source sync info:\n"
-            "  last target gen known to source: %d\n"
-            "  last target trans_id known to source: %s"
-            % (target_last_known_gen, target_last_known_trans_id))
+            logger.debug(
+                "last known target gen: %d" % target_last_known_gen)
+            logger.debug(
+                "last known target trans_id: %s" % target_last_known_trans_id)
 
         # validate transaction ids
         if not changes and target_last_known_gen == target_gen:
@@ -181,11 +174,8 @@ class SoledadSynchronizer(Synchronizer):
             target_last_known_gen, target_last_known_trans_id,
             self._insert_doc_from_target, ensure_callback=ensure_callback,
             defer_decryption=defer_decryption)
-        logger.debug(
-            "Soledad source sync info after sync exchange:\n"
-            "  source known target gen: %d\n"
-            "  source known target trans_id: %s"
-            % (new_gen, new_trans_id))
+        logger.debug("target gen after sync: %d" % new_gen)
+        logger.debug("target trans_id after sync: %s" % new_trans_id)
         info = {
             "target_replica_uid": self.target_replica_uid,
             "new_gen": new_gen,
@@ -224,7 +214,7 @@ class SoledadSynchronizer(Synchronizer):
         :return: A deferred which will fire when the sync has been completed.
         :rtype: twisted.internet.defer.Deferred
         """
-        logger.debug("Completing deferred last step in SYNC...")
+        logger.debug("completing deferred last step in sync...")
 
         # record target synced-up-to generation including applying what we
         # sent

@@ -23,22 +23,21 @@ during synchronization.
 
 
 import json
-import logging
 from uuid import uuid4
 
 from twisted.internet.task import LoopingCall
 from twisted.internet import threads
 from twisted.internet import defer
-from twisted.python import log
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common import soledad_assert
+from leap.soledad.common.log import getLogger
 
 from leap.soledad.client.crypto import encrypt_docstr
 from leap.soledad.client.crypto import decrypt_doc_dict
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 #
@@ -155,7 +154,7 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
         Start the encrypter pool.
         """
         SyncEncryptDecryptPool.start(self)
-        logger.debug("Starting the encryption loop...")
+        logger.debug("starting the encryption loop...")
 
     def stop(self):
         """
@@ -230,10 +229,10 @@ class SyncEncrypterPool(SyncEncryptDecryptPool):
                 % self.TABLE_NAME
         result = yield self._runQuery(query, (doc_id, doc_rev))
         if result:
-            logger.debug("Found doc on sync db: %s" % doc_id)
+            logger.debug("found doc on sync db: %s" % doc_id)
             val = result.pop()
             defer.returnValue(val[0])
-        logger.debug("Did not find doc on sync db: %s" % doc_id)
+        logger.debug("did not find doc on sync db: %s" % doc_id)
         defer.returnValue(None)
 
     def delete_encrypted_doc(self, doc_id, doc_rev):
@@ -344,6 +343,9 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
 
         self._loop = LoopingCall(self._decrypt_and_recurse)
 
+    def _start_pool(self, period):
+        self._loop.start(period)
+
     def start(self, docs_to_process):
         """
         Set the number of documents we expect to process.
@@ -360,7 +362,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         self._docs_to_process = docs_to_process
         self._deferred = defer.Deferred()
         d = self._init_db()
-        d.addCallback(lambda _: self._loop.start(self.DECRYPT_LOOP_PERIOD))
+        d.addCallback(lambda _: self._start_pool(self.DECRYPT_LOOP_PERIOD))
         return d
 
     def stop(self):
@@ -390,7 +392,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         return d
 
     def _errback(self, failure):
-        log.err(failure)
+        logger.error(failure)
         self._deferred.errback(failure)
         self._processed_docs = 0
         self._last_inserted_idx = 0
@@ -503,7 +505,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :rtype: twisted.internet.defer.Deferred
         """
         doc_id, rev, content, gen, trans_id, idx = result
-        logger.debug("Sync decrypter pool: decrypted doc %s: %s %s %s"
+        logger.debug("sync decrypter pool: decrypted doc %s: %s %s %s"
                      % (doc_id, rev, gen, trans_id))
         return self.insert_received_doc(
             doc_id, rev, content, gen, trans_id, idx)
@@ -553,6 +555,12 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         while next_index in self._decrypted_docs_indexes:
             sequence.append(str(next_index))
             next_index += 1
+            if len(sequence) > 900:
+                # 999 is the default value of SQLITE_MAX_VARIABLE_NUMBER
+                # if we try to query more, SQLite will refuse
+                # we need to find a way to improve this
+                # being researched in #7669
+                break
         # Then fetch all the ones ready for insertion.
         if sequence:
             insertable_docs = yield self._get_docs(encrypted=False,
@@ -602,7 +610,7 @@ class SyncDecrypterPool(SyncEncryptDecryptPool):
         :type trans_id: str
         """
         # could pass source_replica in params for callback chain
-        logger.debug("Sync decrypter pool: inserting doc in local db: "
+        logger.debug("sync decrypter pool: inserting doc in local db: "
                      "%s:%s %s" % (doc_id, doc_rev, gen))
 
         # convert deleted documents to avoid error on document creation

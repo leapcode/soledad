@@ -17,6 +17,8 @@
 """
 Test Leap backend bits: soledad docs
 """
+import pytest
+
 from testscenarios import TestWithScenarios
 
 from test_soledad.u1db_tests import test_document
@@ -28,6 +30,7 @@ from test_soledad.util import make_soledad_document_for_test
 # The following tests come from `u1db.tests.test_document`.
 # -----------------------------------------------------------------------------
 
+@pytest.mark.usefixtures('method_tmpdir')
 class TestSoledadDocument(
         TestWithScenarios,
         test_document.TestDocument, BaseSoledadTest):
@@ -37,6 +40,7 @@ class TestSoledadDocument(
             'make_document_for_test': make_soledad_document_for_test})])
 
 
+@pytest.mark.usefixtures('method_tmpdir')
 class TestSoledadPyDocument(
         TestWithScenarios,
         test_document.TestPyDocument, BaseSoledadTest):

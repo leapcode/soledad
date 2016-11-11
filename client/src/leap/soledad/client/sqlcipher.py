@@ -41,7 +41,6 @@ So, as the statements above were introduced for backwards compatibility with
 SQLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
-import logging
 import os
 import json
 
@@ -55,8 +54,9 @@ from twisted.internet import defer
 from twisted.enterprise import adbapi
 
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.common import l2db
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import errors as u1db_errors
+from leap.soledad.common.l2db import Document
 from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.errors import DatabaseAccessError
 
@@ -65,7 +65,7 @@ from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client import pragmas
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
@@ -448,7 +448,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         self.received_docs = []
 
         self.running = False
-        self.shutdownID = None
         self._db_handle = None
 
         # initialize the main db before scheduling a start
@@ -465,8 +464,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
     def _start(self):
         if not self.running:
-            self.shutdownID = self._reactor.addSystemEventTrigger(
-                'during', 'shutdown', self.finalClose)
             self.running = True
 
     def _initialize_main_db(self):
@@ -561,13 +558,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # XXX this SHOULD BE a callback
         return self._get_generation()
 
-    def finalClose(self):
-        """
-        This should only be called by the shutdown trigger.
-        """
-        self.shutdownID = None
-        self.running = False
-
     def close(self):
         """
         Close the syncer and syncdb orderly
@@ -578,6 +568,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             _, syncer = self._syncers[url]
             syncer.close()
             del self._syncers[url]
+        self.running = False
 
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
@@ -595,7 +586,7 @@ class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
-        self._factory = l2db.Document
+        self._factory = Document
 
 
 class SoledadSQLCipherWrapper(SQLCipherDatabase):

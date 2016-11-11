@@ -194,12 +194,12 @@ def user_db_create(args):
     url = 'http://localhost:%d/user-%s' % (args.port, args.uuid)
     try:
         CouchDatabase.open_database(
-            url=url, create=False, replica_uid=None, ensure_ddocs=True)
+            url=url, create=False, replica_uid=None)
         print '[*] error: database "user-%s" already exists' % args.uuid
         exit(1)
     except DatabaseDoesNotExist:
         CouchDatabase.open_database(
-            url=url, create=True, replica_uid=None, ensure_ddocs=True)
+            url=url, create=True, replica_uid=None)
         print '[+] database created: user-%s' % args.uuid
 
 
@@ -372,7 +372,10 @@ CERT_CONFIG_FILE = os.path.join(
 def cert_create(args):
     private_key = os.path.join(args.basedir, args.private_key)
     cert_key = os.path.join(args.basedir, args.cert_key)
-    os.mkdir(args.basedir)
+    try:
+        os.mkdir(args.basedir)
+    except OSError:
+        pass
     call([
         'openssl',
         'req',
@@ -389,8 +392,11 @@ def cert_create(args):
 def cert_delete(args):
     private_key = os.path.join(args.basedir, args.private_key)
     cert_key = os.path.join(args.basedir, args.cert_key)
-    os.unlink(private_key)
-    os.unlink(cert_key)
+    try:
+        os.unlink(private_key)
+        os.unlink(cert_key)
+    except OSError:
+        pass
 
 
 #

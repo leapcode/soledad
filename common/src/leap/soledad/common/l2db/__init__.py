@@ -16,10 +16,7 @@
 
 """L2DB"""
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from leap.soledad.common.l2db.errors import InvalidJSON, InvalidContent
 

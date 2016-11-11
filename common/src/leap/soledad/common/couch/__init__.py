@@ -23,21 +23,17 @@ import json
 import re
 import uuid
 import binascii
-import time
-import functools
 
 
 from StringIO import StringIO
 from urlparse import urljoin
 from contextlib import contextmanager
-from multiprocessing.pool import ThreadPool
 
 
 from couchdb.client import Server, Database
 from couchdb.http import (
     ResourceConflict,
     ResourceNotFound,
-    ServerError,
     Session,
     urljoin as couch_urljoin,
     Resource,
@@ -50,9 +46,6 @@ from leap.soledad.common.l2db.errors import (
 from leap.soledad.common.l2db.remote import http_app
 
 
-from leap.soledad.common import ddocs
-from .errors import raise_server_error
-from .errors import raise_missing_design_doc_error
 from .support import MultipartWriter
 from leap.soledad.common.errors import InvalidURLError
 from leap.soledad.common.document import ServerDocument
@@ -100,7 +93,19 @@ def couch_server(url):
     yield server
 
 
-THREAD_POOL = ThreadPool(20)
+def _get_gen_doc_id(gen):
+    return 'gen-%s' % str(gen).zfill(10)
+
+
+GENERATION_KEY = 'gen'
+TRANSACTION_ID_KEY = 'trans_id'
+REPLICA_UID_KEY = 'replica_uid'
+DOC_ID_KEY = 'doc_id'
+SCHEMA_VERSION_KEY = 'schema_version'
+
+CONFIG_DOC_ID = '_local/config'
+SYNC_DOC_ID_PREFIX = '_local/sync_'
+SCHEMA_VERSION = 1
 
 
 class CouchDatabase(object):
@@ -111,7 +116,7 @@ class CouchDatabase(object):
     """
 
     @classmethod
-    def open_database(cls, url, create, ensure_ddocs=False, replica_uid=None,
+    def open_database(cls, url, create, replica_uid=None,
                       database_security=None):
         """
         Open a U1DB database using CouchDB as backend.
@@ -122,8 +127,6 @@ class CouchDatabase(object):
         :type create: bool
         :param replica_uid: an optional unique replica identifier
         :type replica_uid: str
-        :param ensure_ddocs: Ensure that the design docs exist on server.
-        :type ensure_ddocs: bool
         :param database_security: security rules as CouchDB security doc
         :type database_security: dict
 
@@ -144,21 +147,20 @@ class CouchDatabase(object):
                     server.create(dbname)
                 else:
                     raise DatabaseDoesNotExist()
-        db = cls(url,
-                 dbname, ensure_ddocs=ensure_ddocs,
+        db = cls(url, dbname, ensure_security=create,
                  database_security=database_security)
         return SoledadBackend(
             db, replica_uid=replica_uid)
 
-    def __init__(self, url, dbname, ensure_ddocs=True,
+    def __init__(self, url, dbname, ensure_security=False,
                  database_security=None):
         """
         :param url: Couch server URL with necessary credentials
         :type url: string
         :param dbname: Couch database name
         :type dbname: string
-        :param ensure_ddocs: Ensure that the design docs exist on server.
-        :type ensure_ddocs: bool
+        :param ensure_security: will PUT a _security ddoc if set
+        :type ensure_security: bool
         :param database_security: security rules as CouchDB security doc
         :type database_security: dict
         """
@@ -169,8 +171,7 @@ class CouchDatabase(object):
         self.batching = False
         self.batch_generation = None
         self.batch_docs = {}
-        if ensure_ddocs:
-            self.ensure_ddocs_on_db()
+        if ensure_security:
             self.ensure_security_ddoc(database_security)
 
     def batch_start(self):
@@ -204,22 +205,6 @@ class CouchDatabase(object):
                 self._session)
         except ResourceNotFound:
             raise DatabaseDoesNotExist()
-
-    def ensure_ddocs_on_db(self):
-        """
-        Ensure that the design documents used by the backend exist on the
-        couch database.
-        """
-        for ddoc_name in ['docs', 'syncs', 'transactions']:
-            try:
-                self.json_from_resource(['_design'] +
-                                        ddoc_name.split('/') + ['_info'],
-                                        check_missing_ddoc=False)
-            except ResourceNotFound:
-                ddoc = json.loads(
-                    binascii.a2b_base64(
-                        getattr(ddocs, ddoc_name)))
-                self._database.save(ddoc)
 
     def ensure_security_ddoc(self, security_config=None):
         """
@@ -261,13 +246,14 @@ class CouchDatabase(object):
         """
         try:
             # set on existent config document
-            doc = self._database['u1db_config']
-            doc['replica_uid'] = replica_uid
+            doc = self._database[CONFIG_DOC_ID]
+            doc[REPLICA_UID_KEY] = replica_uid
         except ResourceNotFound:
             # or create the config document
             doc = {
-                '_id': 'u1db_config',
-                'replica_uid': replica_uid,
+                '_id': CONFIG_DOC_ID,
+                REPLICA_UID_KEY: replica_uid,
+                SCHEMA_VERSION_KEY: SCHEMA_VERSION,
             }
         self._database.save(doc)
 
@@ -280,8 +266,8 @@ class CouchDatabase(object):
         """
         try:
             # grab replica_uid from server
-            doc = self._database['u1db_config']
-            replica_uid = doc['replica_uid']
+            doc = self._database[CONFIG_DOC_ID]
+            replica_uid = doc[REPLICA_UID_KEY]
             return replica_uid
         except ResourceNotFound:
             # create a unique replica_uid
@@ -308,8 +294,8 @@ class CouchDatabase(object):
         """
 
         generation, _ = self.get_generation_info()
-        results = list(self.get_docs(self._database,
-                                     include_deleted=include_deleted))
+        results = list(
+            self._get_docs(None, True, include_deleted))
         return (generation, results)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
@@ -330,24 +316,37 @@ class CouchDatabase(object):
                  in matching doc_ids order.
         :rtype: iterable
         """
-        # Workaround for:
-        #
-        #   http://bugs.python.org/issue7980
-        #   https://leap.se/code/issues/5449
-        #
-        # python-couchdb uses time.strptime, which is not thread safe. In
-        # order to avoid the problem described on the issues above, we preload
-        # strptime here by evaluating the conversion of an arbitrary date.
-        # This will not be needed when/if we switch from python-couchdb to
-        # paisley.
-        time.strptime('Mar 8 1917', '%b %d %Y')
-        get_one = functools.partial(
-            self.get_doc, check_for_conflicts=check_for_conflicts)
-        docs = [THREAD_POOL.apply_async(get_one, [doc_id])
-                for doc_id in doc_ids]
-        for doc in docs:
-            doc = doc.get()
-            if not doc or not include_deleted and doc.is_tombstone():
+        return self._get_docs(doc_ids, check_for_conflicts, include_deleted)
+
+    def _get_docs(self, doc_ids, check_for_conflicts, include_deleted):
+        """
+        Use couch's `_all_docs` view to get the documents indicated in
+        `doc_ids`,
+
+        :param doc_ids: A list of document identifiers or None for all.
+        :type doc_ids: list
+        :param check_for_conflicts: If set to False, then the conflict check
+                                    will be skipped, and 'None' will be
+                                    returned instead of True/False.
+        :type check_for_conflicts: bool
+        :param include_deleted: If set to True, deleted documents will be
+                                returned with empty content. Otherwise deleted
+                                documents will not be included in the results.
+
+        :return: iterable giving the Document object for each document id
+                 in matching doc_ids order.
+        :rtype: iterable
+        """
+        params = {'include_docs': 'true', 'attachments': 'true'}
+        if doc_ids is not None:
+            params['keys'] = doc_ids
+        view = self._database.view("_all_docs", **params)
+        for row in view.rows:
+            result = row['doc']
+            doc = self.__parse_doc_from_couch(
+                result, result['_id'], check_for_conflicts=check_for_conflicts)
+            # filter out non-u1db or deleted documents
+            if not doc or (not include_deleted and doc.is_tombstone()):
                 continue
             yield doc
 
@@ -434,8 +433,6 @@ class CouchDatabase(object):
                         result['_attachments']['u1db_conflicts']['data']))))
         # store couch revision
         doc.couch_rev = result['_rev']
-        # store transactions
-        doc.transactions = result['u1db_transactions']
         return doc
 
     def _build_conflicts(self, doc_id, attached_conflicts):
@@ -471,14 +468,11 @@ class CouchDatabase(object):
         """
         if generation == 0:
             return ''
-        # query a couch list function
-        ddoc_path = [
-            '_design', 'transactions', '_list', 'trans_id_for_gen', 'log'
-        ]
-        response = self.json_from_resource(ddoc_path, gen=generation)
-        if response == {}:
+        log = self._get_transaction_log(start=generation, end=generation)
+        if not log:
             raise InvalidGeneration
-        return response['transaction_id']
+        _, _, trans_id = log[0]
+        return trans_id
 
     def get_replica_gen_and_trans_id(self, other_replica_uid):
         """
@@ -499,18 +493,19 @@ class CouchDatabase(object):
                  synchronized with the replica, this is (0, '').
         :rtype: (int, str)
         """
-        doc_id = 'u1db_sync_%s' % other_replica_uid
+        doc_id = '%s%s' % (SYNC_DOC_ID_PREFIX, other_replica_uid)
         try:
             doc = self._database[doc_id]
         except ResourceNotFound:
             doc = {
                 '_id': doc_id,
-                'generation': 0,
-                'transaction_id': '',
+                GENERATION_KEY: 0,
+                REPLICA_UID_KEY: str(other_replica_uid),
+                TRANSACTION_ID_KEY: '',
             }
             self._database.save(doc)
-        result = doc['generation'], doc['transaction_id']
-        return result
+        gen, trans_id = doc[GENERATION_KEY], doc[TRANSACTION_ID_KEY]
+        return gen, trans_id
 
     def get_doc_conflicts(self, doc_id, couch_rev=None):
         """
@@ -537,7 +532,6 @@ class CouchDatabase(object):
 
         try:
             response = self.json_from_resource([doc_id, 'u1db_conflicts'],
-                                               check_missing_ddoc=False,
                                                **params)
             return conflicts + self._build_conflicts(
                 doc_id, json.loads(response.read()))
@@ -562,13 +556,13 @@ class CouchDatabase(object):
                                      generation.
         :type other_transaction_id: str
         """
-        doc_id = 'u1db_sync_%s' % other_replica_uid
+        doc_id = '%s%s' % (SYNC_DOC_ID_PREFIX, other_replica_uid)
         try:
             doc = self._database[doc_id]
         except ResourceNotFound:
             doc = {'_id': doc_id}
-        doc['generation'] = other_generation
-        doc['transaction_id'] = other_transaction_id
+        doc[GENERATION_KEY] = other_generation
+        doc[TRANSACTION_ID_KEY] = other_transaction_id
         self._database.save(doc)
 
     def get_transaction_log(self):
@@ -578,12 +572,35 @@ class CouchDatabase(object):
         :return: The complete transaction log.
         :rtype: [(str, str)]
         """
-        # query a couch view
-        ddoc_path = ['_design', 'transactions', '_view', 'log']
-        response = self.json_from_resource(ddoc_path)
-        return map(
-            lambda row: (row['id'], row['value']),
-            response['rows'])
+        log = self._get_transaction_log()
+        return map(lambda i: (i[1], i[2]), log)
+
+    def _get_gen_docs(
+            self, start=0, end=9999999999, descending=None, limit=None):
+        params = {}
+        if descending:
+            params['descending'] = 'true'
+            # honor couch way of traversing the view tree in reverse order
+            start, end = end, start
+        params['startkey'] = _get_gen_doc_id(start)
+        params['endkey'] = _get_gen_doc_id(end)
+        params['include_docs'] = 'true'
+        if limit:
+            params['limit'] = limit
+        view = self._database.view("_all_docs", **params)
+        return view.rows
+
+    def _get_transaction_log(self, start=0, end=9999999999):
+        # get current gen and trans_id
+        rows = self._get_gen_docs(start=start, end=end)
+        log = []
+        for row in rows:
+            doc = row['doc']
+            log.append((
+                doc[GENERATION_KEY],
+                doc[DOC_ID_KEY],
+                doc[TRANSACTION_ID_KEY]))
+        return log
 
     def whats_changed(self, old_generation=0):
         """
@@ -602,32 +619,16 @@ class CouchDatabase(object):
                  changes first)
         :rtype: (int, str, [(str, int, str)])
         """
-        # query a couch list function
-        ddoc_path = [
-            '_design', 'transactions', '_list', 'whats_changed', 'log'
-        ]
-        response = self.json_from_resource(ddoc_path, old_gen=old_generation)
-        results = map(
-            lambda row:
-                (row['generation'], row['doc_id'], row['transaction_id']),
-            response['transactions'])
-        results.reverse()
-        cur_gen = old_generation
-        seen = set()
         changes = []
-        newest_trans_id = ''
-        for generation, doc_id, trans_id in results:
+        cur_generation, last_trans_id = self.get_generation_info()
+        relevant_tail = self._get_transaction_log(start=old_generation + 1)
+        seen = set()
+        for generation, doc_id, trans_id in reversed(relevant_tail):
             if doc_id not in seen:
                 changes.append((doc_id, generation, trans_id))
                 seen.add(doc_id)
-        if changes:
-            cur_gen = changes[0][1]  # max generation
-            newest_trans_id = changes[0][2]
-            changes.reverse()
-        else:
-            cur_gen, newest_trans_id = self.get_generation_info()
-
-        return cur_gen, newest_trans_id, changes
+        changes.reverse()
+        return (cur_generation, last_trans_id, changes)
 
     def get_generation_info(self):
         """
@@ -638,53 +639,74 @@ class CouchDatabase(object):
         """
         if self.batching and self.batch_generation:
             return self.batch_generation
-        # query a couch list function
-        ddoc_path = ['_design', 'transactions', '_list', 'generation', 'log']
-        info = self.json_from_resource(ddoc_path)
-        return (info['generation'], info['transaction_id'])
+        rows = self._get_gen_docs(descending=True, limit=1)
+        if not rows:
+            return 0, ''
+        gen_doc = rows.pop()['doc']
+        return gen_doc[GENERATION_KEY], gen_doc[TRANSACTION_ID_KEY]
 
-    def json_from_resource(self, ddoc_path, check_missing_ddoc=True,
-                           **kwargs):
+    def json_from_resource(self, doc_path, **kwargs):
         """
         Get a resource from it's path and gets a doc's JSON using provided
-        parameters, also checking for missing design docs by default.
+        parameters.
 
-        :param ddoc_path: The path to resource.
-        :type ddoc_path: [str]
-        :param check_missing_ddoc: Raises info on what design doc is missing.
-        :type check_missin_ddoc: bool
+        :param doc_path: The path to resource.
+        :type doc_path: [str]
 
         :return: The request's data parsed from JSON to a dict.
         :rtype: dict
-
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
         """
-        if ddoc_path is not None:
-            resource = self._database.resource(*ddoc_path)
+        if doc_path is not None:
+            resource = self._database.resource(*doc_path)
         else:
             resource = self._database.resource()
-        try:
-            _, _, data = resource.get_json(**kwargs)
-            return data
-        except ResourceNotFound as e:
-            if check_missing_ddoc:
-                raise_missing_design_doc_error(e, ddoc_path)
-            else:
-                raise e
-        except ServerError as e:
-            raise_server_error(e, ddoc_path)
+        _, _, data = resource.get_json(**kwargs)
+        return data
+
+    def _allocate_new_generation(self, doc_id, transaction_id):
+        """
+        Allocate a new generation number for a document modification.
+
+        We need to allocate a new generation to this document modification by
+        creating a new gen doc. In order to avoid concurrent database updates
+        from allocating the same new generation, we will try to create the
+        document until we succeed, meaning that no other piece of code holds
+        the same generation number as ours.
+
+        The loop below would only be executed more than once if:
+
+          1. there's more than one thread trying to modify the user's database,
+             and
+
+          2. the execution of getting the current generation and saving the gen
+             doc different threads get interleaved (one of them will succeed
+             and the others will fail and try again).
+
+        Number 1 only happens when more than one user device is syncing at the
+        same time. Number 2 depends on not-so-frequent coincidence of
+        code execution.
+
+        Also, in the race between threads for a generation number there's
+        always one thread that wins. so if there are N threads in the race, the
+        expected number of repetitions of the loop for each thread would be
+        N/2. If N is equal to the number of devices that the user has, the
+        number of possible repetitions of the loop should always be low.
+        """
+        while True:
+            try:
+                # add the gen document
+                gen, _ = self.get_generation_info()
+                new_gen = gen + 1
+                gen_doc = {
+                    '_id': _get_gen_doc_id(new_gen),
+                    GENERATION_KEY: new_gen,
+                    DOC_ID_KEY: doc_id,
+                    TRANSACTION_ID_KEY: transaction_id,
+                }
+                self._database.save(gen_doc)
+                break  # succeeded allocating a new generation, proceed
+            except ResourceConflict:
+                pass  # try again!
 
     def save_document(self, old_doc, doc, transaction_id):
         """
@@ -701,19 +723,6 @@ class CouchDatabase(object):
 
         :raise RevisionConflict: Raised when trying to update a document but
                                  couch revisions mismatch.
-        :raise MissingDesignDocError: Raised when tried to access a missing
-                                      design document.
-        :raise MissingDesignDocListFunctionError: Raised when trying to access
-                                                  a missing list function on a
-                                                  design document.
-        :raise MissingDesignDocNamedViewError: Raised when trying to access a
-                                               missing named view on a design
-                                               document.
-        :raise MissingDesignDocDeletedError: Raised when trying to access a
-                                             deleted design document.
-        :raise MissingDesignDocUnknownError: Raised when failed to access a
-                                             design document for an yet
-                                             unknown reason.
         """
         attachments = {}  # we save content and conflicts as attachments
         parts = []  # and we put it using couch's multipart PUT
@@ -726,6 +735,7 @@ class CouchDatabase(object):
                 'length': len(content),
             }
             parts.append(content)
+
         # save conflicts as attachment
         if doc.has_conflicts is True:
             conflicts = json.dumps(
@@ -737,21 +747,11 @@ class CouchDatabase(object):
                 'length': len(conflicts),
             }
             parts.append(conflicts)
-        # store old transactions, if any
-        transactions = old_doc.transactions[:] if old_doc is not None else []
-        # create a new transaction id and timestamp it so the transaction log
-        # is consistent when querying the database.
-        transactions.append(
-            # here we store milliseconds to keep consistent with javascript
-            # Date.prototype.getTime() which was used before inside a couchdb
-            # update handler.
-            (int(time.time() * 1000),
-             transaction_id))
+
         # build the couch document
         couch_doc = {
             '_id': doc.doc_id,
             'u1db_rev': doc.rev,
-            'u1db_transactions': transactions,
             '_attachments': attachments,
         }
         # if we are updating a doc we have to add the couch doc revision
@@ -761,7 +761,19 @@ class CouchDatabase(object):
         if not self.batching:
             buf = StringIO()
             envelope = MultipartWriter(buf)
-            envelope.add('application/json', json.dumps(couch_doc))
+            # the order in which attachments are described inside the
+            # serialization of the couch document must match the order in
+            # which they are actually written in the multipart structure.
+            # Because of that, we use `sorted_keys=True` in the json
+            # serialization (so "u1db_conflicts" comes before
+            # "u1db_content" on the couch document attachments
+            # description), and also reverse the order of the parts before
+            # writing them, so the "conflict" part is written before the
+            # "content" part.
+            envelope.add(
+                'application/json',
+                json.dumps(couch_doc, sort_keys=True))
+            parts.reverse()
             for part in parts:
                 envelope.add('application/octet-stream', part)
             envelope.close()
@@ -778,12 +790,14 @@ class CouchDatabase(object):
                 del attachment['follows']
                 del attachment['length']
                 index = 0 if name is 'u1db_content' else 1
-                attachment['data'] = binascii.b2a_base64(parts[index]).strip()
+                attachment['data'] = binascii.b2a_base64(
+                    parts[index]).strip()
             couch_doc['_attachments'] = attachments
             self.batch_docs[doc.doc_id] = couch_doc
             last_gen, last_trans_id = self.batch_generation
             self.batch_generation = (last_gen + 1, transaction_id)
-        return transactions[-1][1]
+
+        self._allocate_new_generation(doc.doc_id, transaction_id)
 
     def _new_resource(self, *path):
         """

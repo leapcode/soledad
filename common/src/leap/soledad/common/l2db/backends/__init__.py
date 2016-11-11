@@ -17,10 +17,7 @@
 """Abstract classes and common implementations for the backends."""
 
 import re
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 import uuid
 
 from leap.soledad.common import l2db

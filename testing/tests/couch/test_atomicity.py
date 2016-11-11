@@ -18,7 +18,7 @@
 Test atomicity of couch operations.
 """
 import os
-import tempfile
+import pytest
 import threading
 
 from urlparse import urljoin
@@ -41,6 +41,7 @@ from test_soledad.u1db_tests import TestCaseWithServer
 REPEAT_TIMES = 20
 
 
+@pytest.mark.usefixtures('method_tmpdir')
 class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 
     @staticmethod
@@ -90,9 +91,7 @@ class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
         self.db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + self.user),
             create=True,
-            replica_uid='replica',
-            ensure_ddocs=True)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
+            replica_uid='replica')
         self.startTwistedServer()
 
     def tearDown(self):
