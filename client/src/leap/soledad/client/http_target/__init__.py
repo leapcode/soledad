@@ -31,6 +31,7 @@ from twisted.internet import reactor
 from leap.soledad.client.http_target.send import HTTPDocSender
 from leap.soledad.client.http_target.api import SyncTargetAPI
 from leap.soledad.client.http_target.fetch import HTTPDocFetcher
+from leap.soledad.client import crypto as old_crypto
 
 
 logger = getLogger(__name__)
@@ -87,6 +88,8 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self._uuid = None
         self.set_creds(creds)
         self._crypto = crypto
+        # TODO: DEPRECATED CRYPTO
+        self._deprecated_crypto = old_crypto.SoledadCrypto(crypto.secret)
         self._sync_db = sync_db
         self._insert_doc_cb = None
         # asynchronous encryption/decryption attributes

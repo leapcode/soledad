@@ -25,6 +25,7 @@ from leap.soledad.common.log import getLogger
 from leap.soledad.client._crypto import is_symmetrically_encrypted
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.l2db import errors
+from leap.soledad.client import crypto as old_crypto
 
 from . import fetch_protocol
 
@@ -112,10 +113,10 @@ class HTTPDocFetcher(object):
         # document and insert into local database
 
         doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
-
-        if is_symmetrically_encrypted(content):
+        if is_symmetrically_encrypted(doc):
             content = yield self._crypto.decrypt_doc(doc)
-
+        elif old_crypto.is_symmetrically_encrypted(doc):
+            content = self._deprecated_crypto.decrypt_doc(doc)
         doc.set_json(content)
 
         # TODO insert blobs here on the blob backend
