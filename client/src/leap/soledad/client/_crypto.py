@@ -372,11 +372,16 @@ class AESDecryptor(object):
         self.done = True
 
 
-def is_symmetrically_encrypted(payload):
-    if not payload or len(payload) < 24 \
-            or not payload.startswith('{"raw": "'):
+def is_symmetrically_encrypted(doc):
+    payload = doc.content
+    if not payload or 'raw' not in payload:
         return False
-    header = base64.urlsafe_b64decode(payload[9:24] + '==')
+    payload = str(payload['raw'])
+    if len(payload) < 16:
+        return False
+    header = base64.urlsafe_b64decode(payload[:18] + '==')
+    if six.indexbytes(header, 0) != 0x80:
+        return False
     ts, sch, meth = struct.unpack('Qbb', header[1:11])
     return sch == ENC_SCHEME.symkey and meth == ENC_METHOD.aes_256_ctr
 
