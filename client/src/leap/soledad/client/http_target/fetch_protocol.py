@@ -90,11 +90,8 @@ class DocStreamReceiver(ReadBodyProtocol):
         lines = self.consumeBufferLines()
         while lines:
             line, _ = utils.check_and_strip_comma(lines.pop(0))
-            try:
-                self.lineReceived(line)
-                self._line += 1
-            except AssertionError, e:
-                raise errors.BrokenSyncStream(e)
+            self.lineReceived(line)
+            self._line += 1
 
     def lineReceived(self, line):
         """
@@ -105,18 +102,22 @@ class DocStreamReceiver(ReadBodyProtocol):
         (odd):  {data},\r\n
         (last): ]
         """
-        assert not self._properly_finished
+        if self._properly_finished:
+            raise errors.BrokenSyncStream("Reading a finished stream")
         if ']' == line:
             self._properly_finished = True
         elif self._line == 0:
-            assert line == '['
+            if line is not '[':
+                raise errors.BrokenSyncStream("Invalid start")
         elif self._line == 1:
             self.metadata = line
-            assert 'error' not in self.metadata
+            if 'error' in self.metadata:
+                raise errors.BrokenSyncStream("Error from server: %s" % line)
             self.total = json.loads(line).get('number_of_changes', -1)
         elif (self._line % 2) == 0:
             self.current_doc = json.loads(line)
-            assert 'error' not in self.current_doc
+            if 'error' in self.current_doc:
+                raise errors.BrokenSyncStream("Error from server: %s" % line)
         else:
             self._doc_reader(
                 self.current_doc, line.strip() or None, self.total)
