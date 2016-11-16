@@ -178,13 +178,16 @@ class RequestBody(object):
             entry = json.dumps(entry_dict)
         self.entries.append(entry)
 
-    def pop(self, amount=10):
+    def pop(self, amount=10, leave_open=False):
         """
-        Removes all entries and returns it formatted and ready
+        Removes entries and returns it formatted and ready
         to be sent.
 
-        :param number: number of entries to pop and format
-        :type number: int
+        :param amount: number of entries to pop and format
+        :type amount: int
+
+        :param leave_open: flag to skip stream closing
+        :type amount: bool
 
         :return: formatted body ready to be sent
         :rtype: str
@@ -193,7 +196,7 @@ class RequestBody(object):
         amount = min([len(self.entries), amount])
         entries = [self.entries.pop(0) for i in xrange(amount)]
         self.consumed += amount
-        end = len(self.entries) == 0
+        end = len(self.entries) == 0 if not leave_open else False
         return self.entries_to_str(entries, start, end)
 
     def __str__(self):
