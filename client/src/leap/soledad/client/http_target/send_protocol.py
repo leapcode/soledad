@@ -28,14 +28,14 @@ class DocStreamProducer(object):
 
     implements(IBodyProducer)
 
-    def __init__(self, parser_producer):
+    def __init__(self, producer):
         """
         Initialize the string produer.
 
-        :param body: The body of the request.
-        :type body: str
+        :param producer: A RequestBody instance and a list of producer calls
+        :type producer: (.support.RequestBody, [(function, *args)])
         """
-        self.body, self.producer = parser_producer
+        self.body, self.producer = producer
         self.length = UNKNOWN_LENGTH
         self.pause = False
         self.stop = False
@@ -51,16 +51,14 @@ class DocStreamProducer(object):
         :return: A Deferred that fires when production ends.
         :rtype: twisted.internet.defer.Deferred
         """
-        call = self.producer.pop(0)
-        yield call[0](*call[1:])
         while self.producer and not self.stop:
             if self.pause:
                 yield self.sleep(0.001)
                 continue
             call = self.producer.pop(0)
             yield call[0](*call[1:])
-            consumer.write(self.body.pop(1))
-        consumer.write(self.body.pop(1))
+            consumer.write(self.body.pop(1, leave_open=True))
+        consumer.write(self.body.pop(0))  # close stream
 
     def sleep(self, secs):
         d = defer.Deferred()
