@@ -59,8 +59,8 @@ class AESTest(unittest.TestCase):
         data = snowden1
         block = 16
 
-        for i in range(len(data)/block):
-            chunk = data[i * block:(i+1)*block]
+        for i in range(len(data) / block):
+            chunk = data[i * block:(i + 1) * block]
             aes.write(chunk)
         aes.end()
 
@@ -68,7 +68,6 @@ class AESTest(unittest.TestCase):
         ciphertext = _aes_encrypt(key, iv, data)
 
         assert ciphertext_chunked == ciphertext
-
 
     def test_decrypt(self):
         key = 'A' * 32
@@ -82,14 +81,13 @@ class AESTest(unittest.TestCase):
         fd = BytesIO()
         aes = _crypto.AESDecryptor(key, iv, fd)
 
-        for i in range(len(ciphertext)/block):
-            chunk = ciphertext[i * block:(i+1)*block]
+        for i in range(len(ciphertext) / block):
+            chunk = ciphertext[i * block:(i + 1) * block]
             aes.write(chunk)
         aes.end()
 
         cleartext_chunked = fd.getvalue()
         assert cleartext_chunked == data
-
 
 
 class BlobTestCase(unittest.TestCase):
@@ -108,13 +106,13 @@ class BlobTestCase(unittest.TestCase):
 
         blob = _crypto.BlobEncryptor(
             self.doc_info, inf, result=outf,
-            secret='A' * 96, iv='B'*16)
+            secret='A' * 96, iv='B' * 16)
 
         encrypted = yield blob.encrypt()
         data = base64.urlsafe_b64decode(encrypted.getvalue())
 
         assert data[0] == '\x80'
-        ts, sch, meth  = struct.unpack(
+        ts, sch, meth = struct.unpack(
             'Qbb', data[1:11])
         assert sch == 1
         assert meth == 1
@@ -128,12 +126,11 @@ class BlobTestCase(unittest.TestCase):
 
         ciphertext = data[71:-64]
         aes_key = _crypto._get_sym_key_for_doc(
-            self.doc_info.doc_id, 'A'*96)
-        assert ciphertext == _aes_encrypt(aes_key, 'B'*16, snowden1)
+            self.doc_info.doc_id, 'A' * 96)
+        assert ciphertext == _aes_encrypt(aes_key, 'B' * 16, snowden1)
 
-        decrypted = _aes_decrypt(aes_key, 'B'*16, ciphertext)
+        decrypted = _aes_decrypt(aes_key, 'B' * 16, ciphertext)
         assert str(decrypted) == snowden1
-
 
     @defer.inlineCallbacks
     def test_blob_decryptor(self):
@@ -154,7 +151,6 @@ class BlobTestCase(unittest.TestCase):
         decrypted = yield decryptor.decrypt()
         assert decrypted.getvalue() == snowden1
 
-
     @defer.inlineCallbacks
     def test_encrypt_and_decrypt(self):
         """
@@ -172,7 +168,6 @@ class BlobTestCase(unittest.TestCase):
         decrypted = yield crypto.decrypt_doc(doc2)
         assert len(decrypted) != 0
         assert json.loads(decrypted) == payload
-
 
     @defer.inlineCallbacks
     def test_decrypt_with_wrong_mac_raises(self):
@@ -193,8 +188,7 @@ class BlobTestCase(unittest.TestCase):
         doc2.set_json(json.dumps({"raw": str(newraw)}))
 
         with pytest.raises(_crypto.InvalidBlob):
-            decrypted = yield crypto.decrypt_doc(doc2)
-
+            yield crypto.decrypt_doc(doc2)
 
 
 class RecoveryDocumentTestCase(BaseSoledadTest):
@@ -281,7 +275,6 @@ class SoledadSecretsTestCase(BaseSoledadTest):
         self.assertTrue(
             self._soledad._secrets._has_secret(),
             "Should have a secret at this point")
-
 
 
 class SoledadCryptoAESTestCase(BaseSoledadTest):

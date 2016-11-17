@@ -271,6 +271,7 @@ def _get_couch_state():
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
     return state
 
+
 try:
     _couch_state = _get_couch_state()
     # a WSGI application that may be used by `twistd -web`

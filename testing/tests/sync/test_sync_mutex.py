@@ -66,6 +66,7 @@ def _timed_sync(self):
     d.addBoth(_store_finish_time)
     return d
 
+
 SoledadSynchronizer.sync = _timed_sync
 
 # -- end of monkey-patching

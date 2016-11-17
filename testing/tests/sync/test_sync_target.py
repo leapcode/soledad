@@ -412,7 +412,8 @@ class SoledadDatabaseSyncTargetTests(
         This test was adapted to decrypt remote content before assert.
         """
         docs_by_gen = [
-            ((self.make_document, ('doc-id', 'replica:1', tests.simple_doc,), {}),
+            ((self.make_document,
+              ('doc-id', 'replica:1', tests.simple_doc,), {}),
                 10, 'T-sid')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
@@ -519,7 +520,8 @@ class SoledadDatabaseSyncTargetTests(
         doc = self.db.create_doc_from_json('{}')
         edit_rev = 'replica:1|' + doc.rev
         docs_by_gen = [
-            ((self.make_document, (doc.doc_id, edit_rev, None), {}), 10, 'T-sid')]
+            ((self.make_document, (doc.doc_id, edit_rev, None), {}),
+             10, 'T-sid')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
@@ -662,8 +664,8 @@ class SoledadDatabaseSyncTargetTests(
         doc = self.db.create_doc_from_json(tests.simple_doc)
         docs_by_gen = [
             ((self.make_document, ('new', 'other:1', '{}'), {}), 4, 'T-foo'),
-            ((self.make_document, (doc.doc_id, doc.rev, doc.get_json()), {}), 5,
-             'T-bar')]
+            ((self.make_document, (doc.doc_id, doc.rev, doc.get_json()), {}),
+                5, 'T-bar')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'other-replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
@@ -745,6 +747,7 @@ class SoledadDatabaseSyncTargetTests(
         yield self.st.sync_exchange([], 'replica', 0, None, self.receive_doc)
         yield self.st.record_sync_info('replica', 0, 'T-sid')
         self.assertEqual(expected, called)
+
 
 WAIT_STEP = 1
 MAX_WAIT = 10

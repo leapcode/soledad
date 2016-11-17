@@ -710,6 +710,7 @@ def make_local_db_and_soledad_target(
         source_replica_uid=source_replica_uid)
     return db, st
 
+
 target_scenarios = [
     ('leap', {
         'create_db_and_target': make_local_db_and_soledad_target,
