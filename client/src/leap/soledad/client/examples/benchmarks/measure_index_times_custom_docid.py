@@ -58,6 +58,7 @@ def debug(*args):
     if not silent:
         print(*args)
 
+
 debug("[+] db path:", tmpdb)
 debug("[+] num docs", numdocs)
 
@@ -73,6 +74,7 @@ dbpool = adbapi.getConnectionPool(opts)
 
 def createDoc(doc, doc_id):
     return dbpool.runU1DBQuery("create_doc", doc, doc_id=doc_id)
+
 
 db_indexes = {
     'by-chash': ['chash'],
@@ -167,6 +169,7 @@ def insert_docs(_):
                        lambda e: e.printTraceback())
         deferreds.append(d)
     return defer.gatherResults(deferreds, consumeErrors=True)
+
 
 d = create_indexes(None)
 d.addCallback(insert_docs)

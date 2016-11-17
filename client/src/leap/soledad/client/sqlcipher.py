@@ -594,6 +594,7 @@ def soledad_doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
     return SoledadDocument(doc_id=doc_id, rev=rev, json=json,
                            has_conflicts=has_conflicts, syncable=syncable)
 
+
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)
 
 

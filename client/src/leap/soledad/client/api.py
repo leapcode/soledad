@@ -935,6 +935,7 @@ def create_path_if_not_exists(path):
 # Monkey patching u1db to be able to provide a custom SSL cert
 # ----------------------------------------------------------------------------
 
+
 # We need a more reasonable timeout (in seconds)
 SOLEDAD_TIMEOUT = 120
 

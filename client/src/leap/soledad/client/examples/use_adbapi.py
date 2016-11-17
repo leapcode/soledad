@@ -39,6 +39,7 @@ def debug(*args):
     if not silent:
         print(*args)
 
+
 debug("[+] db path:", tmpdb)
 debug("[+] times", times)
 
@@ -86,6 +87,7 @@ def allDone(_):
         end_time = datetime.datetime.now()
         print((end_time - start_time).total_seconds())
     reactor.stop()
+
 
 deferreds = []
 payload = open('manifest.phk').read()

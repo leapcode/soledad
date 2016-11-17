@@ -5,7 +5,7 @@ SIZE_LIMT environment variable.
 
 For instance, to keep the maximum payload at 1MB:
 
-SIZE_LIMIT=1E6 py.test -s tests/perf/test_crypto.py 
+SIZE_LIMIT=1E6 py.test -s tests/perf/test_crypto.py
 """
 import pytest
 import os
@@ -45,7 +45,7 @@ def create_doc_decryption(size):
         doc = SoledadDocument(
             doc_id=uuid4().hex, rev='rev',
             json=json.dumps(DOC_CONTENT))
-        
+
         encrypted_doc = yield crypto.encrypt_doc(doc)
         doc.set_json(encrypted_doc)
 
@@ -74,16 +74,16 @@ def create_raw_decryption(size):
 # plugin.
 
 encryption_tests = [
-    ('10k',  1E4),
+    ('10k', 1E4),
     ('100k', 1E5),
     ('500k', 5E5),
-    ('1M',   1E6),
-    ('10M',  1E7), 
-    ('50M',  5E7), 
+    ('1M', 1E6),
+    ('10M', 1E7),
+    ('50M', 5E7),
 ]
 
 for name, size in encryption_tests:
-    if size <  LIMIT:
+    if size < LIMIT:
         sz = int(size)
         globals()['test_encrypt_doc_' + name] = create_doc_encryption(sz)
         globals()['test_decrypt_doc_' + name] = create_doc_decryption(sz)

@@ -923,4 +923,5 @@ class SQLitePartialExpandDatabase(SQLiteDatabase):
             raw_doc = json.loads(doc)
             self._update_indexes(doc_id, raw_doc, getters, c)
 
+
 SQLiteDatabase.register_implementation(SQLitePartialExpandDatabase)

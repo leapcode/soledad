@@ -194,6 +194,7 @@ class URLToResource(object):
         resource_cls = params.pop('resource_cls')
         return resource_cls, params
 
+
 url_to_resource = URLToResource()
 
 

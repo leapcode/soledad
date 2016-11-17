@@ -36,6 +36,7 @@ def debug(*args):
     if not silent:
         print(*args)
 
+
 debug("[+] db path:", tmpdb)
 debug("[+] times", times)
 
@@ -51,6 +52,7 @@ db = sqlcipher.SQLCipherDatabase(opts)
 
 def allDone():
     debug("ALL DONE!")
+
 
 payload = open('manifest.phk').read()
 
