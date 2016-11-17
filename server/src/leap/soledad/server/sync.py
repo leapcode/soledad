@@ -27,7 +27,7 @@ from leap.soledad.server.state import ServerSyncState
 from leap.soledad.common.document import ServerDocument
 
 
-MAX_REQUEST_SIZE = 6000  # in Mb
+MAX_REQUEST_SIZE = float('inf')  # It's a stream.
 MAX_ENTRY_SIZE = 200  # in Mb
 ENTRY_CACHE_SIZE = 8192 * 1024
 
