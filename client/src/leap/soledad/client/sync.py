@@ -141,18 +141,7 @@ class SoledadSynchronizer(Synchronizer):
             self.sync_phase[0] += 1
         # --------------------------------------------------------------------
 
-        # prepare to send all the changed docs
-        # changed_doc_ids = [doc_id for doc_id, _, _ in changes]
-        # docs_to_send = self.source.get_docs(
-        #     changed_doc_ids, check_for_conflicts=False, include_deleted=True)
         ids_sent = [doc_id for doc_id, _, _ in changes]
-        # docs_by_generation = []
-        # idx = 0
-        # for doc in docs_to_send:
-        #     _, gen, trans = changes[idx]
-        #     docs_by_generation.append((doc, gen, trans))
-        #     idx += 1
-        #     ids_sent.append(doc.doc_id)
         docs_by_generation = []
         for doc_id, gen, trans in changes:
             get_doc = (self.source.get_doc, doc_id)
@@ -166,8 +155,8 @@ class SoledadSynchronizer(Synchronizer):
             self._insert_doc_from_target, ensure_callback=ensure_callback)
         logger.debug("target gen after sync: %d" % new_gen)
         logger.debug("target trans_id after sync: %s" % new_trans_id)
-        if hasattr(self.source, 'commit'):
-            self.source.commit()  # sync worked, commit
+        if hasattr(self.source, 'commit'):  # sqlcipher backend speed up
+            self.source.commit()  # insert it all in a single transaction
         info = {
             "target_replica_uid": self.target_replica_uid,
             "new_gen": new_gen,
