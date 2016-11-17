@@ -141,11 +141,7 @@ class SoledadSynchronizer(Synchronizer):
             self.sync_phase[0] += 1
         # --------------------------------------------------------------------
 
-        ids_sent = [doc_id for doc_id, _, _ in changes]
-        docs_by_generation = []
-        for doc_id, gen, trans in changes:
-            get_doc = (self.source.get_doc, doc_id)
-            docs_by_generation.append((get_doc, gen, trans))
+        docs_by_generation = self._docs_by_gen_from_changes(changes)
 
         # exchange documents and try to insert the returned ones with
         # the target, return target synced-up-to gen.
@@ -153,6 +149,7 @@ class SoledadSynchronizer(Synchronizer):
             docs_by_generation, self.source._replica_uid,
             target_last_known_gen, target_last_known_trans_id,
             self._insert_doc_from_target, ensure_callback=ensure_callback)
+        ids_sent = [doc_id for doc_id, _, _ in changes]
         logger.debug("target gen after sync: %d" % new_gen)
         logger.debug("target trans_id after sync: %s" % new_trans_id)
         if hasattr(self.source, 'commit'):  # sqlcipher backend speed up
@@ -184,6 +181,14 @@ class SoledadSynchronizer(Synchronizer):
         # --------------------------------------------------------------------
 
         defer.returnValue(my_gen)
+
+    def _docs_by_gen_from_changes(self, changes):
+        docs_by_generation = []
+        kwargs = {'include_deleted': True}
+        for doc_id, gen, trans in changes:
+            get_doc = (self.source.get_doc, (doc_id,), kwargs)
+            docs_by_generation.append((get_doc, gen, trans))
+        return docs_by_generation
 
     def complete_sync(self):
         """
