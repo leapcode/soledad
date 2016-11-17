@@ -2,3 +2,5 @@ pysqlcipher>2.6.3
 scrypt
 zope.proxy
 twisted
+six
+cryptography
