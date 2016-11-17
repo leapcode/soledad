@@ -86,21 +86,17 @@ class HTTPDocSender(object):
 
     @defer.inlineCallbacks
     def _prepare_one_doc(self, entry, body, idx, total):
-        get_doc, gen, trans_id = entry
-        doc, content = yield self._encrypt_doc(get_doc)
+        get_doc_call, gen, trans_id = entry
+        doc, content = yield self._encrypt_doc(get_doc_call)
         body.insert_info(
             id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
             trans_id=trans_id, number_of_docs=total,
             doc_idx=idx)
 
     @defer.inlineCallbacks
-    def _encrypt_doc(self, get_doc):
-        if type(get_doc) == tuple:
-            f, args = get_doc
-            doc = yield f(args)
-        else:
-            # tests
-            doc = get_doc
+    def _encrypt_doc(self, get_doc_call):
+        f, args, kwargs = get_doc_call
+        doc = yield f(*args, **kwargs)
         if doc.is_tombstone():
             defer.returnValue((doc, None))
         else:
