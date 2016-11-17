@@ -162,20 +162,15 @@ class RequestBody(object):
     def insert_info(self, **entry_dict):
         """
         Dumps an entry into JSON format and add it to entries list.
+        Adds 'content' key on a new line if it's present.
 
         :param entry_dict: Entry as a dictionary
         :type entry_dict: dict
-
-        :return: length of the entry after JSON dumps
-        :rtype: int
         """
+        content = ''
         if 'content' in entry_dict:
-            content = entry_dict['content'] or ''
-            del entry_dict['content']
-            entry = json.dumps(entry_dict)
-            entry = entry + ',\r\n' + content
-        else:
-            entry = json.dumps(entry_dict)
+            content = ',\r\n' + (entry_dict['content'] or '')
+        entry = json.dumps(entry_dict) + content
         self.entries.append(entry)
 
     def pop(self, amount=10, leave_open=False):
