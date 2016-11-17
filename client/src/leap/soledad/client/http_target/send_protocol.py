@@ -56,7 +56,8 @@ class DocStreamProducer(object):
                 yield self.sleep(0.001)
                 continue
             call = self.producer.pop(0)
-            yield call[0](*call[1:])
+            fun, args = call[0], call[1:]
+            yield fun(*args)
             consumer.write(self.body.pop(1, leave_open=True))
         consumer.write(self.body.pop(0))  # close stream
 
