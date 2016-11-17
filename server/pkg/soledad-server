@@ -12,7 +12,6 @@
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 PIDFILE=/var/run/soledad.pid
 OBJ=leap.soledad.server.application
-LOGFILE=/var/log/soledad.log
 HTTPS_PORT=2424
 CONFDIR=/etc/soledad
 CERT_PATH="${CONFDIR}/soledad-server.pem"
@@ -37,7 +36,8 @@ case "${1}" in
             --exec ${TWISTD_PATH} -- \
             --uid=${USER} --gid=${GROUP} \
             --pidfile=${PIDFILE} \
-            --logfile=${LOGFILE} \
+	    --syslog \
+	    --prefix=soledad-server \
             web \
             --wsgi=${OBJ} \
             --port=ssl:${HTTPS_PORT}:privateKey=${PRIVKEY_PATH}:certKey=${CERT_PATH}:sslmethod=${SSL_METHOD}

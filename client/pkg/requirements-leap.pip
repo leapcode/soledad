@@ -1,2 +1,2 @@
 leap.common>=0.4.3
-leap.soledad.common>=0.7.0
+leap.soledad.common>=0.9.0

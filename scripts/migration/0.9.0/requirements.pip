@@ -1,0 +1,3 @@
+couchdb
+leap.soledad.common==0.9.0
+leap.soledad.server==0.9.0

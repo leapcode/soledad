@@ -17,13 +17,8 @@
 """
 setup file for leap.soledad.common
 """
-import binascii
-import json
-from os import listdir
-from os.path import realpath, dirname, isdir, join, isfile, basename
 import re
 
-from distutils.command.build import build as _build
 from setuptools import setup
 from setuptools import find_packages
 from setuptools import Command
@@ -110,117 +105,6 @@ def get_versions():
         with open(versioneer_cfg.versionfile_source, 'w') as f:
             f.write(subst_template)
 
-cmdclass = versioneer.get_cmdclass()
-
-#
-# Couch backend design docs file generation.
-#
-
-old_cmd_sdist = cmdclass["sdist"]
-
-
-def build_ddocs_py(basedir=None, with_src=True):
-    """
-    Build `ddocs.py` file.
-
-    For ease of development, couch backend design documents are stored as
-    `.js` files in  subdirectories of `src/leap/soledad/common/ddocs`. This
-    function scans that directory for javascript files, builds the design
-    documents structure, and encode those structures in the `ddocs.py` file.
-
-    This function is used when installing in develop mode, building or
-    generating source distributions (see the next classes and the `cmdclass`
-    setuptools parameter.
-
-    This funciton uses the following conventions to generate design documents:
-
-      - Design documents are represented by directories in the form
-        `<prefix>/<ddoc>`, there prefix is the `src/leap/soledad/common/ddocs`
-        directory.
-      - Design document directories might contain `views`, `lists` and
-        `updates` subdirectories.
-      - Views subdirectories must contain a `map.js` file and may contain a
-        `reduce.js` file.
-      - List and updates subdirectories may contain any number of javascript
-        files (i.e. ending in `.js`) whose names will be mapped to the
-        corresponding list or update function name.
-    """
-    cur_pwd = dirname(realpath(__file__))
-    common_path = ('src', 'leap', 'soledad', 'common')
-    dest_common_path = common_path
-    if not with_src:
-        dest_common_path = common_path[1:]
-    prefix = join(cur_pwd, *common_path)
-
-    dest_prefix = prefix
-    if basedir is not None:
-        # we're bulding a sdist
-        dest_prefix = join(basedir, *dest_common_path)
-
-    ddocs_prefix = join(prefix, 'ddocs')
-
-    if not isdir(ddocs_prefix):
-        print "No ddocs/ folder, bailing out..."
-        return
-
-    ddocs = {}
-
-    # design docs are represented by subdirectories of `ddocs_prefix`
-    for ddoc in [f for f in listdir(ddocs_prefix)
-                 if isdir(join(ddocs_prefix, f))]:
-
-        ddocs[ddoc] = {'_id': '_design/%s' % ddoc}
-
-        for t in ['views', 'lists', 'updates']:
-            tdir = join(ddocs_prefix, ddoc, t)
-            if isdir(tdir):
-
-                ddocs[ddoc][t] = {}
-
-                if t == 'views':  # handle views (with map/reduce functions)
-                    for view in [f for f in listdir(tdir)
-                                 if isdir(join(tdir, f))]:
-                        # look for map.js and reduce.js
-                        mapfile = join(tdir, view, 'map.js')
-                        reducefile = join(tdir, view, 'reduce.js')
-                        mapfun = None
-                        reducefun = None
-                        try:
-                            with open(mapfile) as f:
-                                mapfun = f.read()
-                        except IOError:
-                            pass
-                        try:
-                            with open(reducefile) as f:
-                                reducefun = f.read()
-                        except IOError:
-                            pass
-                        ddocs[ddoc]['views'][view] = {}
-
-                        if mapfun is not None:
-                            ddocs[ddoc]['views'][view]['map'] = mapfun
-                        if reducefun is not None:
-                            ddocs[ddoc]['views'][view]['reduce'] = reducefun
-
-                else:  # handle lists, updates, etc
-                    for fun in [f for f in listdir(tdir)
-                                if isfile(join(tdir, f))]:
-                        funfile = join(tdir, fun)
-                        funname = basename(funfile).replace('.js', '')
-                        try:
-                            with open(funfile) as f:
-                                ddocs[ddoc][t][funname] = f.read()
-                        except IOError:
-                            pass
-    # write file containing design docs strings
-    ddoc_filename = "ddocs.py"
-    with open(join(dest_prefix, ddoc_filename), 'w') as f:
-        for ddoc in ddocs:
-            f.write(
-                "%s = '%s'\n" %
-                (ddoc, binascii.b2a_base64(json.dumps(ddocs[ddoc]))[:-1]))
-    print "Wrote design docs in %s" % (dest_prefix + '/' + ddoc_filename,)
-
 
 class cmd_develop(_cmd_develop):
     def run(self):
@@ -230,17 +114,10 @@ class cmd_develop(_cmd_develop):
         # unless we update this, the command will keep using the old version
         self.distribution.metadata.version = versions["version"]
         _cmd_develop.run(self)
-        build_ddocs_py()
 
 
-class cmd_build(_build):
-    def run(self):
-        _build.run(self)
-        build_ddocs_py(basedir=self.build_lib, with_src=False)
-
-
+cmdclass = versioneer.get_cmdclass()
 cmdclass["freeze_debianver"] = freeze_debianver
-cmdclass["build"] = cmd_build
 cmdclass["develop"] = cmd_develop
 
 
@@ -250,13 +127,13 @@ requirements = utils.parse_requirements()
 
 if utils.is_develop_mode():
     print
-    print ("[WARNING] Skipping leap-specific dependencies "
-           "because development mode is detected.")
-    print ("[WARNING] You can install "
-           "the latest published versions with "
-           "'pip install -r pkg/requirements-leap.pip'")
-    print ("[WARNING] Or you can instead do 'python setup.py develop' "
-           "from the parent folder of each one of them.")
+    print("[WARNING] Skipping leap-specific dependencies "
+          "because development mode is detected.")
+    print("[WARNING] You can install "
+          "the latest published versions with "
+          "'pip install -r pkg/requirements-leap.pip'")
+    print("[WARNING] Or you can instead do 'python setup.py develop' "
+          "from the parent folder of each one of them.")
     print
 else:
     requirements += utils.parse_requirements(
@@ -287,6 +164,4 @@ setup(
     package_data={'': ["*.sql"]},
     test_suite='leap.soledad.common.tests',
     install_requires=requirements,
-    tests_require=utils.parse_requirements(
-        reqfiles=['pkg/requirements-testing.pip']),
 )

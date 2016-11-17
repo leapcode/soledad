@@ -13,20 +13,17 @@ nested_doc = tests.nested_doc
 
 
 def make_couch_database_for_test(test, replica_uid):
-    port = str(test.couch_port)
     dbname = ('test-%s' % uuid4().hex)
     db = couch.CouchDatabase.open_database(
-        urljoin('http://localhost:' + port, dbname),
+        urljoin(test.couch_url, dbname),
         create=True,
-        replica_uid=replica_uid or 'test',
-        ensure_ddocs=True)
+        replica_uid=replica_uid or 'test')
     test.addCleanup(test.delete_db, dbname)
     return db
 
 
 def copy_couch_database_for_test(test, db):
-    port = str(test.couch_port)
-    couch_url = 'http://localhost:' + port
+    couch_url = test.couch_url
     new_dbname = db._dbname + '_copy'
     new_db = couch.CouchDatabase.open_database(
         urljoin(couch_url, new_dbname),
@@ -41,15 +38,10 @@ def copy_couch_database_for_test(test, db):
         # bypass u1db_config document
         if doc_id == 'u1db_config':
             pass
-        # copy design docs
-        elif doc_id.startswith('_design'):
-            del doc['_rev']
-            new_couch_db.save(doc)
         # copy u1db docs
         elif 'u1db_rev' in doc:
             new_doc = {
                 '_id': doc['_id'],
-                'u1db_transactions': doc['u1db_transactions'],
                 'u1db_rev': doc['u1db_rev']
             }
             attachments = []
@@ -65,6 +57,8 @@ def copy_couch_database_for_test(test, db):
                 if (att is not None):
                     new_couch_db.put_attachment(new_doc, att,
                                                 filename=att_name)
+        elif doc_id.startswith('gen-'):
+            new_couch_db.save(doc)
     # cleanup connections to prevent file descriptor leaking
     return new_db
 

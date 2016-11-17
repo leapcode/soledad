@@ -20,7 +20,7 @@ Tests for server-related functionality.
 import binascii
 import mock
 import os
-import tempfile
+import pytest
 
 from hashlib import sha512
 from pkg_resources import resource_filename
@@ -43,8 +43,8 @@ from test_soledad.util import (
 
 from leap.soledad.common import crypto
 from leap.soledad.client import Soledad
-from leap.soledad.server import load_configuration
-from leap.soledad.server import CONFIG_DEFAULTS
+from leap.soledad.server.config import load_configuration
+from leap.soledad.server.config import CONFIG_DEFAULTS
 from leap.soledad.server.auth import URLToAuthorization
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
@@ -287,6 +287,7 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
                 self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
 
 
+@pytest.mark.usefixtures("method_tmpdir")
 class EncryptedSyncTestCase(
         CouchDBTestCase, TestCaseWithServer):
 
@@ -349,11 +350,7 @@ class EncryptedSyncTestCase(
         return self.make_app_with_state(self.request_state)
 
     def setUp(self):
-        # the order of the following initializations is crucial because of
-        # dependencies.
-        # XXX explain better
         CouchDBTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         TestCaseWithServer.setUp(self)
 
     def tearDown(self):
@@ -391,8 +388,7 @@ class EncryptedSyncTestCase(
         # ensure remote db exists before syncing
         db = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + user),
-            create=True,
-            ensure_ddocs=True)
+            create=True)
 
         def _db1AssertEmptyDocList(results):
             _, doclist = results

@@ -18,10 +18,9 @@
 Test sqlcipher backend internals.
 """
 import os
+import pytest
 import time
 import threading
-import tempfile
-import shutil
 
 from pysqlcipher import dbapi2
 from testscenarios import TestWithScenarios
@@ -33,7 +32,6 @@ from leap.soledad.common.l2db.backends.sqlite_backend \
     import SQLitePartialExpandDatabase
 
 # soledad stuff.
-from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
 from leap.soledad.client.sqlcipher import SQLCipherOptions
@@ -109,6 +107,7 @@ class SQLCipherIndexTests(
 # The following tests come from `u1db.tests.test_sqlite_backend`.
 # -----------------------------------------------------------------------------
 
+@pytest.mark.usefixtures('method_tmpdir')
 class TestSQLCipherDatabase(tests.TestCase):
     """
     Tests from u1db.tests.test_sqlite_backend.TestSQLiteDatabase.
@@ -117,8 +116,7 @@ class TestSQLCipherDatabase(tests.TestCase):
     def test_atomic_initialize(self):
         # This test was modified to ensure that db2.close() is called within
         # the thread that created the database.
-        tmpdir = self.createTempDir()
-        dbname = os.path.join(tmpdir, 'atomic.db')
+        dbname = os.path.join(self.tempdir, 'atomic.db')
 
         t2 = None  # will be a thread
 
@@ -164,6 +162,7 @@ class TestSQLCipherDatabase(tests.TestCase):
         db1.close()
 
 
+@pytest.mark.usefixtures('method_tmpdir')
 class TestSQLCipherPartialExpandDatabase(tests.TestCase):
     """
     Tests from u1db.tests.test_sqlite_backend.TestSQLitePartialExpandDatabase.
@@ -226,8 +225,7 @@ class TestSQLCipherPartialExpandDatabase(tests.TestCase):
         pass
 
     def test__open_database_non_existent(self):
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path = temp_dir + '/non-existent.sqlite'
+        path = self.tempdir + '/non-existent.sqlite'
         self.assertRaises(errors.DatabaseDoesNotExist,
                           sqlcipher_open,
                           path, PASSWORD, create=False)
@@ -243,8 +241,7 @@ class TestSQLCipherPartialExpandDatabase(tests.TestCase):
         # This test was modified to ensure that an empty database file will
         # raise a DatabaseIsNotEncrypted exception instead of a
         # dbapi2.OperationalError exception.
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path1 = temp_dir + '/invalid1.db'
+        path1 = self.tempdir + '/invalid1.db'
         with open(path1, 'wb') as f:
             f.write("")
         self.assertRaises(DatabaseIsNotEncrypted,
@@ -270,8 +267,7 @@ class TestSQLCipherPartialExpandDatabase(tests.TestCase):
     def test_open_database_create(self):
         # SQLCipherDatabas has no open_database() method, so we just test for
         # the actual database constructor effects.
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path = temp_dir + '/new.sqlite'
+        path = self.tempdir + '/new.sqlite'
         db1 = sqlcipher_open(path, PASSWORD, create=True)
         db2 = sqlcipher_open(path, PASSWORD, create=False)
         self.assertIsInstance(db2, SQLCipherDatabase)
@@ -395,8 +391,7 @@ class TestSQLCipherPartialExpandDatabase(tests.TestCase):
                          c.fetchall())
 
     def test__ensure_schema_rollback(self):
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path = temp_dir + '/rollback.db'
+        path = self.tempdir + '/rollback.db'
 
         class SQLitePartialExpandDbTesting(SQLCipherDatabase):
 
@@ -414,15 +409,13 @@ class TestSQLCipherPartialExpandDatabase(tests.TestCase):
         db._initialize(db._db_handle.cursor())
 
     def test_open_database_non_existent(self):
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path = temp_dir + '/non-existent.sqlite'
+        path = self.tempdir + '/non-existent.sqlite'
         self.assertRaises(errors.DatabaseDoesNotExist,
                           sqlcipher_open, path, "123",
                           create=False)
 
     def test_delete_database_existent(self):
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path = temp_dir + '/new.sqlite'
+        path = self.tempdir + '/new.sqlite'
         db = sqlcipher_open(path, "123", create=True)
         db.close()
         SQLCipherDatabase.delete_database(path)
@@ -431,8 +424,7 @@ class TestSQLCipherPartialExpandDatabase(tests.TestCase):
                           create=False)
 
     def test_delete_database_nonexistent(self):
-        temp_dir = self.createTempDir(prefix='u1db-test-')
-        path = temp_dir + '/non-existent.sqlite'
+        path = self.tempdir + '/non-existent.sqlite'
         self.assertRaises(errors.DatabaseDoesNotExist,
                           SQLCipherDatabase.delete_database, path)
 
@@ -630,37 +622,13 @@ class SQLCipherEncryptionTests(BaseSoledadTest):
                 os.unlink(dbfile)
 
     def setUp(self):
-        # the following come from BaseLeapTest.setUpClass, because
-        # twisted.trial doesn't support such class methods for setting up
-        # test classes.
-        self.old_path = os.environ['PATH']
-        self.old_home = os.environ['HOME']
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
-        self.home = self.tempdir
-        bin_tdir = os.path.join(
-            self.tempdir,
-            'bin')
-        os.environ["PATH"] = bin_tdir
-        os.environ["HOME"] = self.tempdir
-        # this is our own stuff
+        BaseSoledadTest.setUp(self)
         self.DB_FILE = os.path.join(self.tempdir, 'test.db')
         self._delete_dbfiles()
 
     def tearDown(self):
         self._delete_dbfiles()
-        # the following come from BaseLeapTest.tearDownClass, because
-        # twisted.trial doesn't support such class methods for tearing down
-        # test classes.
-        os.environ["PATH"] = self.old_path
-        os.environ["HOME"] = self.old_home
-        # safety check! please do not wipe my home...
-        # XXX needs to adapt to non-linuces
-        soledad_assert(
-            self.tempdir.startswith('/tmp/leap_tests-') or
-            self.tempdir.startswith('/var/folder'),
-            "beware! tried to remove a dir which does not "
-            "live in temporal folder!")
-        shutil.rmtree(self.tempdir)
+        BaseSoledadTest.tearDown(self)
 
     def test_try_to_open_encrypted_db_with_sqlite_backend(self):
         """

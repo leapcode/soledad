@@ -17,15 +17,15 @@
 """
 Different pragmas used in the initialization of the SQLCipher database.
 """
-import logging
 import string
 import threading
 import os
 
 from leap.soledad.common import soledad_assert
+from leap.soledad.common.log import getLogger
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 _db_init_lock = threading.Lock()
@@ -321,7 +321,7 @@ def set_synchronous_off(db_handle):
     """
     Change the setting of the "synchronous" flag to OFF.
     """
-    logger.debug("SQLCIPHER: SETTING SYNCHRONOUS OFF")
+    logger.debug("sqlcipher: setting synchronous off")
     db_handle.cursor().execute('PRAGMA synchronous=OFF')
 
 
@@ -329,7 +329,7 @@ def set_synchronous_normal(db_handle):
     """
     Change the setting of the "synchronous" flag to NORMAL.
     """
-    logger.debug("SQLCIPHER: SETTING SYNCHRONOUS NORMAL")
+    logger.debug("sqlcipher: setting synchronous normal")
     db_handle.cursor().execute('PRAGMA synchronous=NORMAL')
 
 
@@ -337,7 +337,7 @@ def set_mem_temp_store(db_handle):
     """
     Use a in-memory store for temporary tables.
     """
-    logger.debug("SQLCIPHER: SETTING TEMP_STORE MEMORY")
+    logger.debug("sqlcipher: setting temp_store memory")
     db_handle.cursor().execute('PRAGMA temp_store=MEMORY')
 
 
@@ -362,7 +362,7 @@ def set_write_ahead_logging(db_handle):
     requirements of the application. The default strategy is to run a
     checkpoint once the WAL reaches 1000 pages"
     """
-    logger.debug("SQLCIPHER: SETTING WRITE-AHEAD LOGGING")
+    logger.debug("sqlcipher: setting write-ahead logging")
     db_handle.cursor().execute('PRAGMA journal_mode=WAL')
 
     # The optimum value can still use a little bit of tuning, but we favor

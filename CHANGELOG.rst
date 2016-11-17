@@ -1,3 +1,41 @@
+0.9.0 - 11 November, 2016
++++++++++++++++++++++++++
+
+Main features
+~~~~~~~~~~~~~
+
+- Server-side changes in couch backend schema.
+- Use of tox and pytest to run tests.
+- Performance tests.
+
+Server
+======
+
+*** Attention: Migration needed! ***
+
+This version of soledad uses a different database schema in the server couch
+backend. The difference from the old schema is that the use of design documents
+for storing and accessing soledad db metadata was removed because incurred in
+too much memory and time overhead for passing data to the javascript
+interpreter.
+
+Because of that, you need to run a migration script on your database. Check the
+`scripts/migration/0.9.0/` diretctory for instructions on how to run the
+migration script on your database. Don't forget to backup before running the
+script!
+
+Bugfixes
+~~~~~~~~
+- Fix order of multipart serialization when writing to couch.
+
+Features
+~~~~~~~~
+- Log to syslog.
+- Remove usage of design documents in couch backend.
+- Use _local couch docs for metadata storage.
+- Other small improvements in couch backend.
+
+
 0.8.1 - 14 July, 2016
 +++++++++++++++++++++
 

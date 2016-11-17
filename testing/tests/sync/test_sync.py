@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
-import tempfile
 import threading
 import time
 
@@ -60,7 +59,6 @@ class InterruptableSyncTestCase(
     def setUp(self):
         TestCaseWithServer.setUp(self)
         CouchDBTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
 
     def tearDown(self):
         CouchDBTestCase.tearDown(self)
@@ -101,8 +99,7 @@ class InterruptableSyncTestCase(
         # ensure remote db exists before syncing
         db = couch.CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-user-uuid'),
-            create=True,
-            ensure_ddocs=True)
+            create=True)
 
         # create interruptor thread
         t = _SyncInterruptor(sol, db)

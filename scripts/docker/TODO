@@ -1,1 +1,5 @@
 - limit resources of containers (mem and cpu)
+- allow running couchdb on another container
+- use a config file to get defaults for running tests
+- use the /builds directory as base of git repo
+- save the test state to a directory to make it reproducible

@@ -15,8 +15,6 @@
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
 """State for servers exposing a set of U1DB databases."""
-import os
-import errno
 
 
 class ServerState(object):

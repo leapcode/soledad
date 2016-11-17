@@ -18,8 +18,7 @@ def start_couchdb_wrapper():
 def get_u1db_database(dbname, port):
     return CouchDatabase.open_database(
         'http://127.0.0.1:%d/%s' % (port, dbname),
-        True,
-        ensure_ddocs=True)
+        True)
 
 
 def create_tokens_database(port, uuid, token_value):
@@ -38,5 +37,5 @@ def get_couchdb_wrapper_and_u1db(uuid, token_value):
     couchdb_u1db = get_u1db_database('user-%s' % uuid, couchdb_wrapper.port)
     get_u1db_database('shared', couchdb_wrapper.port)
     create_tokens_database(couchdb_wrapper.port, uuid, token_value)
-    
+
     return couchdb_wrapper, couchdb_u1db

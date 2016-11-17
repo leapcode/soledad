@@ -19,30 +19,24 @@ An asyncrhonous interface to soledad using sqlcipher backend.
 It uses twisted.enterprise.adbapi.
 """
 import re
-import os
 import sys
-import logging
 
 from functools import partial
 
 from twisted.enterprise import adbapi
 from twisted.internet.defer import DeferredSemaphore
-from twisted.python import log
 from zope.proxy import ProxyBase, setProxiedObject
 from pysqlcipher import dbapi2
 
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client import sqlcipher as soledad_sqlcipher
 from leap.soledad.client.pragmas import set_init_pragmas
 
 
-logger = logging.getLogger(name=__name__)
+logger = getLogger(__name__)
 
-
-DEBUG_SQL = os.environ.get("LEAP_DEBUG_SQL")
-if DEBUG_SQL:
-    log.startLogging(sys.stdout)
 
 """
 How long the SQLCipher connection should wait for the lock to go away until
@@ -221,13 +215,12 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         def _errback(failure):
             failure.trap(dbapi2.OperationalError)
             if failure.getErrorMessage() == "database is locked":
-                logger.warning("Database operation timed out.")
+                logger.warn("database operation timed out")
                 should_retry = semaphore.acquire()
                 if should_retry:
-                    logger.warning(
-                        "Database operation timed out while waiting for "
-                        "lock, trying again...")
+                    logger.warn("trying again...")
                     return _run_interaction()
+                logger.warn("giving up!")
             return failure
 
         d = _run_interaction()
@@ -286,7 +279,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
             try:
                 conn.rollback()
             except:
-                log.err(None, "Rollback failed")
+                logger.error(None, "Rollback failed")
             raise excType, excValue, excTraceback
 
     def finalClose(self):

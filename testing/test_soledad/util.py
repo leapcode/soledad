@@ -22,11 +22,10 @@ Utilities used by multiple test suites.
 
 
 import os
-import tempfile
-import shutil
 import random
 import string
 import couchdb
+import pytest
 
 from uuid import uuid4
 from mock import Mock
@@ -42,7 +41,6 @@ from leap.soledad.common import l2db
 from leap.soledad.common.l2db import sync
 from leap.soledad.common.l2db.remote import http_database
 
-from leap.soledad.common import soledad_assert
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import CouchServerState
@@ -225,6 +223,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
     """
     defer_sync_encryption = False
 
+    @pytest.mark.usefixtures("method_tmpdir")
     def setUp(self):
         # The following snippet comes from BaseLeapTest.setUpClass, but we
         # repeat it here because twisted.trial does not work with
@@ -232,7 +231,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
 
         self.old_path = os.environ['PATH']
         self.old_home = os.environ['HOME']
-        self.tempdir = tempfile.mkdtemp(prefix="leap_tests-")
         self.home = self.tempdir
         bin_tdir = os.path.join(
             self.tempdir,
@@ -275,14 +273,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                       self._soledad.secrets.secrets_path]:
                 if os.path.isfile(f):
                     os.unlink(f)
-            # The following snippet comes from BaseLeapTest.setUpClass, but we
-            # repeat it here because twisted.trial does not work with
-            # setUpClass/tearDownClass.
-            soledad_assert(
-                self.tempdir.startswith('/tmp/leap_tests-'),
-                "beware! tried to remove a dir which does not "
-                "live in temporal folder!")
-            shutil.rmtree(self.tempdir)
 
         from twisted.internet import reactor
         reactor.addSystemEventTrigger(
@@ -344,6 +334,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self.assertEqual(exp_doc.content, doc.content)
 
 
+@pytest.mark.usefixtures("couch_url")
 class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
 
     """
@@ -354,8 +345,6 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
         """
         Make sure we have a CouchDB instance for a test.
         """
-        self.couch_port = 5984
-        self.couch_url = 'http://localhost:%d' % self.couch_port
         self.couch_server = couchdb.Server(self.couch_url)
 
     def delete_db(self, name):
@@ -391,8 +380,7 @@ class CouchServerStateForTests(CouchServerState):
         db = CouchDatabase.open_database(
             urljoin(self.couch_url, dbname),
             True,
-            replica_uid=replica_uid or 'test',
-            ensure_ddocs=True)
+            replica_uid=replica_uid or 'test')
         self.dbs.append(db)
         return db
 

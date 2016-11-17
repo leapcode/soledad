@@ -16,10 +16,7 @@
 
 """SyncTarget API implementation to a remote HTTP server."""
 
-try:
-    import simplejson as json
-except ImportError:
-    import json  # noqa
+import json
 
 from leap.soledad.common.l2db import Document, SyncTarget
 from leap.soledad.common.l2db.errors import BrokenSyncStream

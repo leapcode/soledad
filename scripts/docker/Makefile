@@ -16,7 +16,7 @@
 # Some configurations you might override when calling this makefile #
 #####################################################################
 
-IMAGE_NAME           ?= leap/soledad:1.0
+IMAGE_NAME           ?= leapcode/soledad:latest
 SOLEDAD_REMOTE       ?= https://0xacab.org/leap/soledad.git
 SOLEDAD_BRANCH       ?= develop
 SOLEDAD_PRELOAD_NUM  ?= 100
@@ -27,10 +27,13 @@ MEMORY               ?= 512m
 # Docker image generation (main make target) #
 ##############################################
 
-all: image
+all: soledad-image couchdb-image
 
-image:
+soledad-image:
 	docker build -t $(IMAGE_NAME) .
+
+couchdb-image:
+	(cd couchdb/ && make)
 
 ##################################################
 # Run a Soledad Server inside a docker container #
@@ -69,23 +72,37 @@ run-client-bootstrap:
 	  /usr/local/soledad/run-client-bootstrap.sh
 
 #################################################
-# Run all trial tests inside a docker container #
+# Run all tests inside a docker container       #
 #################################################
 
-run-trial:
+run-tox:
+	name=$$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1); \
+	docker run -d --name $${name} leap/couchdb; \
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
 	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  --env="COUCH_URL=http://$${name}:5984" \
+	  --link $${name} \
 	  $(IMAGE_NAME) \
-	  /usr/local/soledad/run-trial.sh
+	  /usr/local/soledad/run-tox.sh
 
 ############################################
 # Performance tests and graphic generation #
 ############################################
 
-run-perf-test:
-	helper/run-test.sh perf
+run-perf:
+	name=$$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1); \
+	docker run -d --name $${name} leap/couchdb; \
+	docker run -t -i \
+	  --memory="$(MEMORY)" \
+	  --env="SOLEDAD_REMOTE=$(SOLEDAD_REMOTE)" \
+	  --env="SOLEDAD_BRANCH=$(SOLEDAD_BRANCH)" \
+	  --env="SOLEDAD_PRELOAD_NUM=$(SOLEDAD_PRELOAD_NUM)" \
+	  --env="COUCH_URL=http://$${name}:5984" \
+	  --link $${name} \
+	  $(IMAGE_NAME) \
+	  /usr/local/soledad/run-perf.sh
 
 run-client-perf:
 	@if [ -z "$(CONTAINER_ID_FILE)" ]; then \
@@ -123,7 +140,7 @@ cp-perf-result:
 # Other helper targets #
 ########################
 
-run-shell: image
+run-shell: soledad-image
 	docker run -t -i \
 	  --memory="$(MEMORY)" \
 	  $(IMAGE_NAME) \

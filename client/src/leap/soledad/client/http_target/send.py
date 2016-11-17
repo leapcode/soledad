@@ -15,15 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
-import logging
 
 from twisted.internet import defer
 
+from leap.soledad.common.log import getLogger
 from leap.soledad.client.events import emit_async
 from leap.soledad.client.events import SOLEDAD_SYNC_SEND_STATUS
 from leap.soledad.client.http_target.support import RequestBody
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class HTTPDocSender(object):
@@ -82,7 +82,6 @@ class HTTPDocSender(object):
         if self._defer_encryption:
             self._delete_sent(sent)
 
-        user_data = {'uuid': self.uuid, 'userid': self.userid}
         _emit_send_status(self.uuid, body.consumed, total)
         defer.returnValue(result)
 

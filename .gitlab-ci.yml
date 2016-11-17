@@ -1,3 +1,36 @@
-trial:
+stages:
+  - code-check
+  - tests
+  - benchmark
+
+# Cache tox envs between builds
+cache:
+  paths:
+  - testing/.tox/
+
+code-check:
+  stage: code-check
   script:
-  - cd testing; tox
+    - cd testing
+    - tox -e code-check
+
+tests:
+  stage: tests
+  image: leapcode/soledad:latest
+  services:
+    - couchdb
+  script:
+    - cd testing
+    - tox -- --couch-url http://couchdb:5984
+
+benchmark:
+  stage: benchmark
+  image: leapcode/soledad:latest
+  services:
+    - couchdb
+  script:
+    - cd testing
+    - tox -e perf -- --couch-url http://couchdb:5984
+  tags:
+    - docker
+    - benchmark

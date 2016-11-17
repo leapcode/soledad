@@ -126,8 +126,8 @@ class Synchronizer(object):
             target_last_known_gen, target_last_known_trans_id = 0, ''
         else:
             target_last_known_gen, target_last_known_trans_id = (
-            self.source._get_replica_gen_and_trans_id(  # nopep8
-                self.target_replica_uid))
+                self.source._get_replica_gen_and_trans_id(  # nopep8
+                    self.target_replica_uid))
         if not changes and target_last_known_gen == target_gen:
             if target_trans_id != target_last_known_trans_id:
                 raise errors.InvalidTransactionId

@@ -23,7 +23,6 @@ Soledad secrets handling.
 
 import os
 import scrypt
-import logging
 import binascii
 import errno
 import json
@@ -33,11 +32,12 @@ from hashlib import sha256
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
+from leap.soledad.common.log import getLogger
 from leap.soledad.client import events
 from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
 
 
-logger = logging.getLogger(name=__name__)
+logger = getLogger(__name__)
 
 
 #
@@ -193,42 +193,42 @@ class SoledadSecrets(object):
         """
         # STAGE 1 - verify if secrets exist locally
         try:
-            logger.info("Trying to load secrets from local storage...")
+            logger.info("trying to load secrets from local storage...")
             version = self._load_secrets_from_local_file()
             # eventually migrate local and remote stored documents from old
             # format version
             if version < self.RECOVERY_DOC_VERSION:
                 self._store_secrets()
                 self._upload_crypto_secrets()
-            logger.info("Found secrets in local storage.")
+            logger.info("found secrets in local storage")
             return
 
         except NoStorageSecret:
-            logger.info("Could not find secrets in local storage.")
+            logger.info("could not find secrets in local storage")
 
         # STAGE 2 - there are no secrets in local storage and this is the
         #           first time we are running soledad with the specified
         #           secrets_path. Try to fetch encrypted secrets from
         #           server.
         try:
-            logger.info('Trying to fetch secrets from remote storage...')
+            logger.info('trying to fetch secrets from remote storage...')
             version = self._download_crypto_secrets()
             self._store_secrets()
             # eventually migrate remote stored document from old format
             # version
             if version < self.RECOVERY_DOC_VERSION:
                 self._upload_crypto_secrets()
-            logger.info('Found secrets in remote storage.')
+            logger.info('found secrets in remote storage.')
             return
         except NoStorageSecret:
-            logger.info("Could not find secrets in remote storage.")
+            logger.info("could not find secrets in remote storage.")
 
         # STAGE 3 - there are no secrets in server also, so we want to
         #           generate the secrets and store them in the remote
         #           db.
-        logger.info("Generating secrets...")
+        logger.info("generating secrets...")
         self._gen_crypto_secrets()
-        logger.info("Uploading secrets...")
+        logger.info("uploading secrets...")
         self._upload_crypto_secrets()
 
     def _has_secret(self):
@@ -298,7 +298,7 @@ class SoledadSecrets(object):
         """
         Generate the crypto secrets.
         """
-        logger.info('No cryptographic secrets found, creating new secrets...')
+        logger.info('no cryptographic secrets found, creating new secrets...')
         secret_id = self._gen_secret()
         self.set_secret_id(secret_id)
 
@@ -445,7 +445,7 @@ class SoledadSecrets(object):
                             encrypted_secret)
                     secret_count += 1
                 except SecretsException as e:
-                    logger.error("Failed to decrypt storage secret: %s"
+                    logger.error("failed to decrypt storage secret: %s"
                                  % str(e))
         return secret_count, active_secret
 
@@ -461,7 +461,7 @@ class SoledadSecrets(object):
         events.emit_async(events.SOLEDAD_DOWNLOADING_KEYS, user_data)
         db = self._shared_db
         if not db:
-            logger.warning('No shared db found')
+            logger.warn('no shared db found')
             return
         doc = db.get_doc(self._shared_db_doc_id())
         user_data = {'userid': self._userid, 'uuid': self._uuid}
@@ -492,7 +492,7 @@ class SoledadSecrets(object):
         events.emit_async(events.SOLEDAD_UPLOADING_KEYS, user_data)
         db = self._shared_db
         if not db:
-            logger.warning('No shared db found')
+            logger.warn('no shared db found')
             return
         db.put_doc(doc)
         events.emit_async(events.SOLEDAD_DONE_UPLOADING_KEYS, user_data)

@@ -28,7 +28,6 @@ remote storage in the server side.
 import binascii
 import errno
 import httplib
-import logging
 import os
 import socket
 import ssl
@@ -49,6 +48,7 @@ from leap.common.plugins import collect_plugins
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
+from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db.remote import http_client
 from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
 from leap.soledad.common.errors import DatabaseAccessError
@@ -62,7 +62,7 @@ from leap.soledad.client.shared_db import SoledadSharedDatabase
 from leap.soledad.client import sqlcipher
 from leap.soledad.client import encdecpool
 
-logger = logging.getLogger(name=__name__)
+logger = getLogger(__name__)
 
 
 # we may want to collect statistics from the sync process
@@ -337,7 +337,7 @@ class Soledad(object):
         """
         Close underlying U1DB database.
         """
-        logger.debug("Closing soledad")
+        logger.debug("closing soledad")
         self._dbpool.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
@@ -736,6 +736,8 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
+        if not self._dbsyncer:
+            return
         d = self._dbsyncer.sync(
             sync_url,
             creds=self._creds,
@@ -761,7 +763,7 @@ class Soledad(object):
         def _sync_errback(failure):
             s = StringIO()
             failure.printDetailedTraceback(file=s)
-            msg = "Soledad exception when syncing!\n" + s.getvalue()
+            msg = "got exception when syncing!\n" + s.getvalue()
             logger.error(msg)
             return failure
 
@@ -1003,7 +1005,7 @@ class Soledad(object):
 def create_path_if_not_exists(path):
     try:
         if not os.path.isdir(path):
-            logger.info('Creating directory: %s.' % path)
+            logger.info('creating directory: %s.' % path)
         os.makedirs(path)
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(path):
