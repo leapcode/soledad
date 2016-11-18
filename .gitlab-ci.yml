@@ -30,7 +30,7 @@ benchmark:
     - couchdb
   script:
     - cd testing
-    - tox -e perf -- --couch-url http://couchdb:5984
+    - tox -e benchmark -- --couch-url http://couchdb:5984
   tags:
     - docker
     - benchmark

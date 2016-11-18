@@ -1,6 +1,6 @@
 import pytest
 
-pytestmark = pytest.mark.perf
+pytestmark = pytest.mark.benchmark
 
 
 @pytest.mark.benchmark(group="test_instance")
