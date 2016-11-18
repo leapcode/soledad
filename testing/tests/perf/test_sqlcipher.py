@@ -5,6 +5,8 @@ import pytest
 
 from twisted.internet.defer import gatherResults
 
+pytestmark = pytest.mark.perf
+
 
 def load_up(client, amount, payload, defer=True):
     results = [client.create_doc({'content': payload}) for _ in xrange(amount)]

@@ -26,9 +26,6 @@ server.ensure_server()
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--couch-url", type="string", default="http://127.0.0.1:5984",
-        help="the url for the couch server to be used during tests")
-    parser.addoption(
         "--num-docs", type="int", default=100,
         help="the number of documents to use in performance tests")
 
