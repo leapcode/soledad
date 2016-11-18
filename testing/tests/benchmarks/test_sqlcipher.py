@@ -5,7 +5,7 @@ import pytest
 
 from twisted.internet.defer import gatherResults
 
-pytestmark = pytest.mark.perf
+pytestmark = pytest.mark.benchmark
 
 
 def load_up(client, amount, payload, defer=True):

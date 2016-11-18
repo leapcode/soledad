@@ -18,7 +18,7 @@ from leap.soledad.client import _crypto
 LIMIT = int(float(os.environ.get('SIZE_LIMIT', 50 * 1000 * 1000)))
 
 
-pytestmark = pytest.mark.perf
+pytestmark = pytest.mark.benchmark
 
 
 def create_doc_encryption(size):
