@@ -223,14 +223,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         # repeat it here because twisted.trial does not work with
         # setUpClass/tearDownClass.
 
-        self.old_path = os.environ['PATH']
-        self.old_home = os.environ['HOME']
         self.home = self.tempdir
-        bin_tdir = os.path.join(
-            self.tempdir,
-            'bin')
-        os.environ["PATH"] = bin_tdir
-        os.environ["HOME"] = self.tempdir
 
         # config info
         self.db1_file = os.path.join(self.tempdir, "db1.u1db")
@@ -256,10 +249,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self._db1.close()
         self._db2.close()
         self._soledad.close()
-
-        # restore paths
-        os.environ["PATH"] = self.old_path
-        os.environ["HOME"] = self.old_home
 
         def _delete_temporary_dirs():
             # XXX should not access "private" attrs
