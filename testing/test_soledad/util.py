@@ -56,7 +56,7 @@ from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
 PASSWORD = '123456'
-ADDRESS = 'leap@leap.se'
+ADDRESS = 'user-1234'
 
 
 def make_local_db_and_target(test):
