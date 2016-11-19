@@ -73,7 +73,6 @@ class HTTPDocSender(object):
                          entry, body, idx, total))
         result = yield self._send_request(body, calls)
 
-        _emit_send_status(self.uuid, body.consumed, total)
         defer.returnValue(result)
 
     def _send_request(self, body, calls):
@@ -92,6 +91,7 @@ class HTTPDocSender(object):
             id=doc.doc_id, rev=doc.rev, content=content, gen=gen,
             trans_id=trans_id, number_of_docs=total,
             doc_idx=idx)
+        _emit_send_status(self.uuid, body.consumed, total)
 
     @defer.inlineCallbacks
     def _encrypt_doc(self, get_doc_call):
