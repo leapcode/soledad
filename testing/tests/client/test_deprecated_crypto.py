@@ -1,11 +1,16 @@
 import json
-import pytest
+from twisted.internet import defer
+from uuid import uuid4
+from urlparse import urljoin
 
 from leap.soledad.client import crypto as old_crypto
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common import crypto as common_crypto
 
 from test_soledad.u1db_tests import simple_doc
+from test_soledad.util import SoledadWithCouchServerMixin
+from test_soledad.util import make_token_soledad_app
+from test_soledad.u1db_tests import TestCaseWithServer
 
 
 def deprecate_client_crypto(client):
@@ -20,48 +25,67 @@ def couch_database(couch_url, uuid):
     return db
 
 
-@pytest.inlineCallbacks
-def test_touch_updates_remote_representation(
-        soledad_client, request):
+class DeprecatedCryptoTest(SoledadWithCouchServerMixin, TestCaseWithServer):
 
-    client = soledad_client()
-    deprecated_client = deprecate_client_crypto(soledad_client())
+    def setUp(self):
+        SoledadWithCouchServerMixin.setUp(self)
+        TestCaseWithServer.setUp(self)
 
-    couch_url = request.config.option.couch_url
-    remote = couch_database(couch_url, client._uuid)
+    def tearDown(self):
+        SoledadWithCouchServerMixin.tearDown(self)
+        TestCaseWithServer.tearDown(self)
 
-    # ensure remote db is empty
-    gen, docs = remote.get_all_docs()
-    assert gen == 0
-    assert len(docs) == 0
+    @staticmethod
+    def make_app_with_state(state):
+        return make_token_soledad_app(state)
 
-    # create a doc with deprecated client and sync
-    yield deprecated_client.create_doc(json.loads(simple_doc))
-    yield deprecated_client.sync()
+    @defer.inlineCallbacks
+    def test_touch_updates_remote_representation(self):
+        self.startTwistedServer()
+        user = 'user-' + uuid4().hex
+        server_url = 'http://%s:%d' % (self.server_address)
+        client = self._soledad_instance(user=user, server_url=server_url)
+        deprecated_client = deprecate_client_crypto(
+            self._soledad_instance(user=user, server_url=server_url))
 
-    # check for doc in remote db
-    gen, docs = remote.get_all_docs()
-    assert gen == 1
-    assert len(docs) == 1
-    doc = docs.pop()
-    content = doc.content
-    assert common_crypto.ENC_JSON_KEY in content
-    assert common_crypto.ENC_SCHEME_KEY in content
-    assert common_crypto.ENC_METHOD_KEY in content
-    assert common_crypto.ENC_IV_KEY in content
-    assert common_crypto.MAC_KEY in content
-    assert common_crypto.MAC_METHOD_KEY in content
+        self.make_app()
+        remote = self.request_state._create_database(replica_uid=client._uuid)
+        remote = CouchDatabase.open_database(
+            urljoin(self.couch_url, 'user-' + user),
+            create=True)
 
-    # "touch" the document with a newer client and synx
-    _, docs = yield client.get_all_docs()
-    yield client.put_doc(doc)
-    yield client.sync()
+        # ensure remote db is empty
+        gen, docs = remote.get_all_docs()
+        assert gen == 0
+        assert len(docs) == 0
 
-    # check for newer representation of doc in remote db
-    gen, docs = remote.get_all_docs()
-    assert gen == 2
-    assert len(docs) == 1
-    doc = docs.pop()
-    content = doc.content
-    assert len(content) == 1
-    assert 'raw' in content
+        # create a doc with deprecated client and sync
+        yield deprecated_client.create_doc(json.loads(simple_doc))
+        yield deprecated_client.sync()
+
+        # check for doc in remote db
+        gen, docs = remote.get_all_docs()
+        assert gen == 1
+        assert len(docs) == 1
+        doc = docs.pop()
+        content = doc.content
+        assert common_crypto.ENC_JSON_KEY in content
+        assert common_crypto.ENC_SCHEME_KEY in content
+        assert common_crypto.ENC_METHOD_KEY in content
+        assert common_crypto.ENC_IV_KEY in content
+        assert common_crypto.MAC_KEY in content
+        assert common_crypto.MAC_METHOD_KEY in content
+
+        # "touch" the document with a newer client and synx
+        _, docs = yield client.get_all_docs()
+        yield client.put_doc(doc)
+        yield client.sync()
+
+        # check for newer representation of doc in remote db
+        gen, docs = remote.get_all_docs()
+        assert gen == 2
+        assert len(docs) == 1
+        doc = docs.pop()
+        content = doc.content
+        assert len(content) == 1
+        assert 'raw' in content
