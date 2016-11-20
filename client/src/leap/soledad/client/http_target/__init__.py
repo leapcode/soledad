@@ -54,8 +54,7 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
     the parsed documents that the remote send us, before being decrypted and
     written to the main database.
     """
-    def __init__(self, url, source_replica_uid, creds, crypto, cert_file,
-                 sync_db=None):
+    def __init__(self, url, source_replica_uid, creds, crypto, cert_file):
         """
         Initialize the sync target.
 
@@ -68,17 +67,11 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         :type creds: creds
         :param crypto: An instance of SoledadCrypto so we can encrypt/decrypt
                         document contents when syncing.
-        :type crypto: soledad.crypto.SoledadCrypto
+        :type crypto: soledad._crypto.SoledadCrypto
         :param cert_file: Path to the certificate of the ca used to validate
                           the SSL certificate used by the remote soledad
                           server.
         :type cert_file: str
-        :param sync_db: Optional. handler for the db with the symmetric
-                        encryption of the syncing documents. If
-                        None, encryption will be done in-place,
-                        instead of retreiving it from the dedicated
-                        database.
-        :type sync_db: Sqlite handler
         """
         if url.endswith("/"):
             url = url[:-1]
@@ -90,15 +83,9 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self._crypto = crypto
         # TODO: DEPRECATED CRYPTO
         self._deprecated_crypto = old_crypto.SoledadCrypto(crypto.secret)
-        self._sync_db = sync_db
         self._insert_doc_cb = None
-        # asynchronous encryption/decryption attributes
-        self._decryption_callback = None
-        self._sync_decr_pool = None
 
-        # XXX Increasing timeout of simple requests to avoid chances of hitting
-        # the duplicated syncing bug. This could be reduced to the 30s default
-        # after implementing Cancellable Sync. See #7382
+        # Twisted default Agent with our own ssl context factory
         self._http = Agent(reactor,
                            get_compatible_ssl_context_factory(cert_file))
 
