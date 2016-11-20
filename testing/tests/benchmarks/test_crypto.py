@@ -20,7 +20,8 @@ LIMIT = int(float(os.environ.get('SIZE_LIMIT', 50 * 1000 * 1000)))
 
 def create_doc_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_encrypt_doc")
-    def test_doc_encryption(soledad_client, benchmark, payload):
+    @pytest.inlineCallbacks
+    def test_doc_encryption(soledad_client, txbenchmark, payload):
         crypto = soledad_client()._crypto
 
         DOC_CONTENT = {'payload': payload(size)}
@@ -28,7 +29,7 @@ def create_doc_encryption(size):
             doc_id=uuid4().hex, rev='rev',
             json=json.dumps(DOC_CONTENT))
 
-        benchmark(crypto.encrypt_doc, doc)
+        yield txbenchmark(crypto.encrypt_doc, doc)
     return test_doc_encryption
 
 
