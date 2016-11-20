@@ -72,6 +72,7 @@ class HTTPDocSender(object):
             calls.append((self._prepare_one_doc,
                          entry, body, idx, total))
         result = yield self._send_request(body, calls)
+        _emit_send_status(self.uuid, body.consumed, total)
 
         defer.returnValue(result)
 

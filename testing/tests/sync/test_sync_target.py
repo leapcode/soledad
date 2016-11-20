@@ -310,6 +310,37 @@ class TestSoledadSyncTarget(
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
 
+    @defer.inlineCallbacks
+    def test_sync_exchange_send_events(self):
+        """
+        Test for sync exchange's SOLEDAD_SYNC_SEND_STATUS event.
+        """
+        remote_target = self.getSyncTarget()
+        uuid = remote_target.uuid
+        events = []
+
+        def mocked_events(*args):
+            events.append((args))
+        self.patch(
+            target.send, '_emit_send_status', mocked_events)
+
+        doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        doc2 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        doc3 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        get_doc = (lambda _: doc, (1,), {})
+        get_doc2 = (lambda _: doc2, (1,), {})
+        get_doc3 = (lambda _: doc3, (1,), {})
+        docs = [(get_doc, 10, 'T-sid'),
+                (get_doc2, 11, 'T-sid2'), (get_doc3, 12, 'T-sid3')]
+        new_gen, trans_id = yield remote_target.sync_exchange(
+            docs, 'replica', last_known_generation=0,
+            last_known_trans_id=None, insert_doc_cb=lambda _: 1,
+            ensure_callback=lambda _: 1)
+        self.assertEqual(1, new_gen)
+        self.assertEqual(4, len(events))
+        self.assertEquals([(uuid, 0, 3), (uuid, 1, 3), (uuid, 2, 3),
+                           (uuid, 3, 3)], events)
+
     def test_sync_exchange_in_stream_error(self):
         self.skipTest("bypass this test because our sync_exchange process "
                       "does not return u1db error 503 \"unavailable\" for "
