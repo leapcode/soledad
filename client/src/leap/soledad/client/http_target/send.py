@@ -33,8 +33,6 @@ class HTTPDocSender(object):
     They need to be encrypted and metadata prepared before sending.
     """
 
-    MAX_BATCH_SIZE = 0  # disabled by now, this is being tested yet
-
     # The uuid of the local replica.
     # Any class inheriting from this one should provide a meaningful attribute
     # if the sync status event is meant to be used somewhere else.
@@ -63,14 +61,10 @@ class HTTPDocSender(object):
 
     @defer.inlineCallbacks
     def _send_batch(self, body, docs):
-        total = len(docs)
-        missing = total - body.consumed
-        calls = []
-        for i in xrange(1, missing + 1):
-            idx = body.consumed + i
-            entry = docs[idx - 1]
+        total, calls = len(docs), []
+        for i, entry in enumerate(docs):
             calls.append((self._prepare_one_doc,
-                         entry, body, idx, total))
+                         entry, body, i + 1, total))
         result = yield self._send_request(body, calls)
         _emit_send_status(self.uuid, body.consumed, total)
 
@@ -101,8 +95,6 @@ class HTTPDocSender(object):
         if doc.is_tombstone():
             defer.returnValue((doc, None))
         else:
-            # TODO -- for blobs, should stream the doc raw content
-            # TODO -- get rid of this json encoding
             content = yield self._crypto.encrypt_doc(doc)
             defer.returnValue((doc, content))
 

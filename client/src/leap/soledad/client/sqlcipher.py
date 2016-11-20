@@ -396,16 +396,13 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     """
     ENCRYPT_LOOP_PERIOD = 1
 
-    def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
-                 sync_db=None):
+    def __init__(self, opts, soledad_crypto, replica_uid, cert_file):
 
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto
         self.__replica_uid = replica_uid
         self._cert_file = cert_file
-
-        self._sync_db = sync_db
 
         # storage for the documents received during a sync
         self.received_docs = []
@@ -494,8 +491,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                 self._replica_uid,
                 creds=creds,
                 crypto=self._crypto,
-                cert_file=self._cert_file,
-                sync_db=self._sync_db))
+                cert_file=self._cert_file))
 
     #
     # Symmetric encryption of syncing docs
