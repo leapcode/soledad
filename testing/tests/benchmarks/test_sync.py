@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.benchmark
-
 
 @pytest.inlineCallbacks
 def load_up(client, amount, payload):
