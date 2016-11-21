@@ -256,7 +256,7 @@ def soledad_server_start(args):
         '--logfile=%s' % logfile,
         '--pidfile=%s' % pidfile,
         'web',
-        '--wsgi=leap.soledad.server.application',
+        '--wsgi=leap.soledad.server.application.wsgi_application',
         '--port=%s' % port
     ]
     if args.no_daemonize:

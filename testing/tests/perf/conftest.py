@@ -162,7 +162,7 @@ class SoledadServer(object):
             '--logfile=%s' % self._logfile,
             '--pidfile=%s' % self._pidfile,
             'web',
-            '--wsgi=leap.soledad.server.application',
+            '--wsgi=leap.soledad.server.application.wsgi_application',
             '--port=2424'
         ])
 
