@@ -25,7 +25,9 @@ General information
 This is written as a Twisted application and intended to be run using the
 twistd command. To start the soledad server, run:
 
-    twistd -n web --wsgi=leap.soledad.server.application --port=X
+    twistd -n web \
+        --wsgi=leap.soledad.server.application.wsgi_application \
+        --port=X
 
 An initscript is included and will be installed system wide to make it
 feasible to start and stop the Soledad server service using a standard
@@ -84,24 +86,17 @@ import urlparse
 import sys
 
 from leap.soledad.common.l2db.remote import http_app, utils
+from leap.soledad.common import SHARED_DB_NAME
 
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
-from leap.soledad.server.gzip_middleware import GzipMiddleware
 from leap.soledad.server.sync import SyncResource
 from leap.soledad.server.sync import MAX_REQUEST_SIZE
 from leap.soledad.server.sync import MAX_ENTRY_SIZE
-from leap.soledad.server.config import load_configuration
-
-from leap.soledad.common import SHARED_DB_NAME
-from leap.soledad.common.backend import SoledadBackend
-from leap.soledad.common.couch.state import CouchServerState
 
 from ._version import get_versions
 
 
 __all__ = [
     'SoledadApp',
-    'application',
     '__version__',
 ]
 
@@ -250,38 +245,6 @@ class HTTPInvocationByMethodWithBody(
 
 # monkey patch server with new http invocation
 http_app.HTTPInvocationByMethodWithBody = HTTPInvocationByMethodWithBody
-
-
-# ----------------------------------------------------------------------------
-# Run as Twisted WSGI Resource
-# ----------------------------------------------------------------------------
-
-
-def _load_config():
-    conf = load_configuration('/etc/soledad/soledad-server.conf')
-    return conf['soledad-server']
-
-
-def _get_couch_state():
-    conf = _load_config()
-    state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'],
-                             check_schema_versions=True)
-    SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
-    return state
-
-
-try:
-    _couch_state = _get_couch_state()
-    # a WSGI application that may be used by `twistd -web`
-    application = GzipMiddleware(
-        SoledadTokenAuthMiddleware(SoledadApp(_couch_state)))
-except:
-    pass
-
-
-# another WSGI application in which we bypass token auth middleware for ease of
-# mind while debugging in your local environment
-# debug_local_application_do_not_use = SoledadApp(_couch_state)
 
 
 __version__ = get_versions()['version']
