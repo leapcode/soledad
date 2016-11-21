@@ -46,6 +46,7 @@ class DocStreamReceiver(ReadBodyProtocol):
         self.message = response.phrase if response else None
         self.headers = response.headers if response else {}
         self.delimiter = '\r\n'
+        self.metadata = ''
         self._doc_reader = doc_reader
         self.reset()
 

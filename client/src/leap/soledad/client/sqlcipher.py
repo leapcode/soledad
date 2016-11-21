@@ -217,10 +217,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         # ensure the db is encrypted if the file already exists
         if os.path.isfile(opts.path):
-            _assert_db_is_encrypted(opts)
-
-        # connect to the sqlcipher database
-        self._db_handle = initialize_sqlcipher_db(opts)
+            self._db_handle = _assert_db_is_encrypted(opts)
+        else:
+            # connect to the sqlcipher database
+            self._db_handle = initialize_sqlcipher_db(opts)
 
         # TODO ---------------------------------------------------
         # Everything else in this initialization has to be factored
@@ -565,7 +565,7 @@ def _assert_db_is_encrypted(opts):
         # assert that we can access it using SQLCipher with the given
         # key
         dummy_query = ('SELECT count(*) FROM sqlite_master',)
-        initialize_sqlcipher_db(opts, on_init=dummy_query)
+        return initialize_sqlcipher_db(opts, on_init=dummy_query)
     else:
         raise DatabaseIsNotEncrypted()
 

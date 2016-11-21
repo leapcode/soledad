@@ -56,17 +56,13 @@ class SyncExchange(sync.SyncExchange):
         # recover sync state
         self._sync_state = ServerSyncState(self.source_replica_uid, sync_id)
 
-    def find_changes_to_return(self, received):
+    def find_changes_to_return(self):
         """
         Find changes to return.
 
         Find changes since last_known_generation in db generation
         order using whats_changed. It excludes documents ids that have
         already been considered (superseded by the sender, etc).
-
-        :param received: How many documents the source replica has already
-                         received during the current sync process.
-        :type received: int
 
         :return: the generation of this database, which the caller can
                  consider themselves to be synchronized after processing
@@ -252,14 +248,9 @@ class SyncResource(http_app.SyncResource):
             self._staging = []
             self._staging_size = 0
 
-    @http_app.http_method(received=int, content_as_args=True)
-    def post_get(self, received):
+    def post_get(self):
         """
-        Return one syncing document to the client.
-
-        :param received: How many documents have already been received by the
-                         client on the current sync session.
-        :type received: int
+        Return syncing documents to the client.
         """
         def send_doc(doc, gen, trans_id):
             entry = dict(id=doc.doc_id, rev=doc.rev,
@@ -278,7 +269,7 @@ class SyncResource(http_app.SyncResource):
                 self.responder.stream_entry('')
 
         new_gen, number_of_changes = \
-            self.sync_exch.find_changes_to_return(received)
+            self.sync_exch.find_changes_to_return()
         self.responder.content_type = 'application/x-u1db-sync-response'
         self.responder.start_response(200)
         self.responder.start_stream(),
