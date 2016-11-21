@@ -240,10 +240,8 @@ class HTTPInvocationByMethodWithBody(
                     return meth_end()
                 # handle outgoing documents
                 elif content_type == 'application/x-soledad-sync-get':
-                    line = body_getline()
-                    entry = line.strip()
                     meth_get = self._lookup('%s_get' % method)
-                    return meth_get({}, line)
+                    return meth_get()
                 else:
                     raise http_app.BadRequest()
             else:
