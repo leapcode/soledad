@@ -101,10 +101,15 @@ class CouchServerState(ServerState):
             config_doc = db.get(CONFIG_DOC_ID)
             if config_doc:
                 if config_doc[SCHEMA_VERSION_KEY] != SCHEMA_VERSION:
+                    logger.error(
+                        "Unsupported database schema in database %s" % dbname)
                     raise WrongCouchSchemaVersionError(dbname)
             else:
                 result = db.view('_all_docs', limit=1)
                 if result.total_rows != 0:
+                    logger.error(
+                        "Missing couch config document in database %s"
+                        % dbname)
                     raise MissingCouchConfigDocumentError(dbname)
 
     def open_database(self, dbname):
