@@ -343,9 +343,13 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
 
     TOKEN_AUTH_ERROR_STRING = "Incorrect address or token."
 
-    def __init__(self, app):
-        self._state = app.state
-        super(SoledadTokenAuthMiddleware, self).__init__(app)
+    def _get_state(self):
+        return self._app.state
+
+    def _set_state(self, state):
+        self._app.state = state
+
+    state = property(_get_state, _set_state)
 
     def _verify_authentication_scheme(self, scheme):
         """
@@ -379,7 +383,7 @@ class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
         """
         token = auth_data  # we expect a cleartext token at this point
         try:
-            return self._state.verify_token(uuid, token)
+            return self.state.verify_token(uuid, token)
         except Exception as e:
             logger.error(e)
             return False
