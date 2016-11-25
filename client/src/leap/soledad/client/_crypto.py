@@ -146,12 +146,11 @@ def encrypt_sym(data, key):
         encoded as base64.
     :rtype: (str, str)
     """
-    iv = os.urandom(16)
-    encryptor = AESEncryptor(key, iv)
+    encryptor = AESEncryptor(key)
     encryptor.write(data)
     encryptor.end()
     ciphertext = encryptor.fd.getvalue()
-    return base64.b64encode(iv), ciphertext
+    return base64.b64encode(encryptor.iv), ciphertext
 
 
 def decrypt_sym(data, key, iv):
@@ -188,13 +187,7 @@ class BlobEncryptor(object):
     Both the production input and output are file descriptors, so they can be
     applied to a stream of data.
     """
-    def __init__(self, doc_info, content_fd, result=None, secret=None,
-                 iv=None):
-        if iv is None:
-            iv = os.urandom(16)
-        else:
-            log.warn('Using a fixed IV. Use only for testing!')
-        self.iv = iv
+    def __init__(self, doc_info, content_fd, result=None, secret=None):
         if not secret:
             raise EncryptionDecryptionError('no secret given')
 
@@ -206,19 +199,21 @@ class BlobEncryptor(object):
         self._content_fd = content_fd
 
         self._preamble = BytesIO()
-        if result is None:
-            result = BytesIO()
-        self.result = result
+        self.result = result or BytesIO()
 
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
 
         self._aes_fd = BytesIO()
-        self._aes = AESEncryptor(sym_key, self.iv, self._aes_fd)
+        self._aes = AESEncryptor(sym_key, self._aes_fd)
         self._hmac = HMACWriter(mac_key)
         self._write_preamble()
 
         self._crypter = VerifiedEncrypter(self._aes, self._hmac)
+
+    @property
+    def iv(self):
+        return self._aes.iv
 
     def encrypt(self):
         """
@@ -298,9 +293,7 @@ class BlobDecryptor(object):
         self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         self.mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
 
-        if result is None:
-            result = BytesIO()
-        self.result = result
+        self.result = result or BytesIO()
 
     def decrypt(self):
         try:
@@ -360,18 +353,15 @@ class AESEncryptor(object):
     """
     implements(interfaces.IConsumer)
 
-    def __init__(self, key, iv, fd=None):
+    def __init__(self, key, fd=None):
         if len(key) != 32:
             raise EncryptionDecryptionError('key is not 256 bits')
-        if len(iv) != 16:
-            raise EncryptionDecryptionError('iv is not 128 bits')
+        self.iv = os.urandom(16)
 
-        cipher = _get_aes_ctr_cipher(key, iv)
+        cipher = _get_aes_ctr_cipher(key, self.iv)
         self.encryptor = cipher.encryptor()
 
-        if fd is None:
-            fd = BytesIO()
-        self.fd = fd
+        self.fd = fd or BytesIO()
 
         self.done = False
 
@@ -429,8 +419,7 @@ class AESDecryptor(object):
     implements(interfaces.IConsumer)
 
     def __init__(self, key, iv, fd=None):
-        if iv is None:
-            iv = os.urandom(16)
+        iv = iv or os.urandom(16)
         if len(key) != 32:
             raise EncryptionDecryptionError('key is not 256 bits')
         if len(iv) != 16:
@@ -439,9 +428,7 @@ class AESDecryptor(object):
         cipher = _get_aes_ctr_cipher(key, iv)
         self.decryptor = cipher.decryptor()
 
-        if fd is None:
-            fd = BytesIO()
-        self.fd = fd
+        self.fd = fd or BytesIO()
         self.done = False
         self.deferred = defer.Deferred()
 
