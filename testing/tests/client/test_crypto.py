@@ -51,10 +51,10 @@ class AESTest(unittest.TestCase):
 
     def test_chunked_encryption(self):
         key = 'A' * 32
-        iv = 'A' * 16
 
         fd = BytesIO()
-        aes = _crypto.AESEncryptor(key, iv, fd)
+        aes = _crypto.AESEncryptor(key, fd)
+        iv = aes.iv
 
         data = snowden1
         block = 16
@@ -99,14 +99,11 @@ class BlobTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_blob_encryptor(self):
 
-        inf = BytesIO()
-        inf.write(snowden1)
-        inf.seek(0)
-        outf = BytesIO()
+        inf = BytesIO(snowden1)
 
         blob = _crypto.BlobEncryptor(
-            self.doc_info, inf, result=outf,
-            secret='A' * 96, iv='B' * 16)
+            self.doc_info, inf,
+            secret='A' * 96)
 
         encrypted = yield blob.encrypt()
         data = base64.urlsafe_b64decode(encrypted.getvalue())
@@ -117,7 +114,7 @@ class BlobTestCase(unittest.TestCase):
         assert sch == 1
         assert meth == 1
         iv = data[11:27]
-        assert iv == 'B' * 16
+        assert iv == blob.iv
         doc_id = data[27:37]
         assert doc_id == 'D-deadbeef'
 
@@ -127,26 +124,23 @@ class BlobTestCase(unittest.TestCase):
         ciphertext = data[71:-64]
         aes_key = _crypto._get_sym_key_for_doc(
             self.doc_info.doc_id, 'A' * 96)
-        assert ciphertext == _aes_encrypt(aes_key, 'B' * 16, snowden1)
+        assert ciphertext == _aes_encrypt(aes_key, blob.iv, snowden1)
 
-        decrypted = _aes_decrypt(aes_key, 'B' * 16, ciphertext)
+        decrypted = _aes_decrypt(aes_key, blob.iv, ciphertext)
         assert str(decrypted) == snowden1
 
     @defer.inlineCallbacks
     def test_blob_decryptor(self):
 
-        inf = BytesIO()
-        inf.write(snowden1)
-        inf.seek(0)
-        outf = BytesIO()
+        inf = BytesIO(snowden1)
 
         blob = _crypto.BlobEncryptor(
-            self.doc_info, inf, result=outf,
-            secret='A' * 96, iv='B' * 16)
-        yield blob.encrypt()
+            self.doc_info, inf,
+            secret='A' * 96)
+        ciphertext = yield blob.encrypt()
 
         decryptor = _crypto.BlobDecryptor(
-            self.doc_info, outf,
+            self.doc_info, ciphertext,
             secret='A' * 96)
         decrypted = yield decryptor.decrypt()
         assert decrypted.getvalue() == snowden1
