@@ -75,11 +75,30 @@ docinfo = namedtuple('docinfo', 'doc_id rev')
 
 
 class SoledadCrypto(object):
-
+    """
+    This class provides convenient methods for document encryption and
+    decryption using BlobEncryptor and BlobDecryptor classes.
+    """
     def __init__(self, secret):
+        """
+        Initialize the crypto object.
+
+        :param secret: The Soledad remote storage secret.
+        :type secret: str
+        """
         self.secret = secret
 
     def encrypt_doc(self, doc):
+        """
+        Creates and configures a BlobEncryptor, asking it to start encryption
+        and wrapping the result as a simple JSON string with a "raw" key.
+
+        :param doc: the document to be encrypted.
+        :type doc: SoledadDocument
+        :return: A deferred whose callback will be invoked with a JSON string
+            containing the ciphertext as the value of "raw" key.
+        :rtype: twisted.internet.defer.Deferred
+        """
 
         def put_raw(blob):
             raw = blob.getvalue()
@@ -95,6 +114,15 @@ class SoledadCrypto(object):
         return d
 
     def decrypt_doc(self, doc):
+        """
+        Creates and configures a BlobDecryptor, asking it decrypt and returning
+        the decrypted cleartext content from the encrypted document.
+
+        :param doc: the document to be decrypted.
+        :type doc: SoledadDocument
+        :return: The decrypted cleartext content of the document.
+        :rtype: str
+        """
         info = docinfo(doc.doc_id, doc.rev)
         ciphertext = BytesIO()
         payload = doc.content['raw']
@@ -106,6 +134,18 @@ class SoledadCrypto(object):
 
 
 def encrypt_sym(data, key):
+    """
+    Encrypt data using AES-256 cipher in CTR mode.
+
+    :param data: The data to be encrypted.
+    :type data: str
+    :param key: The key used to encrypt data (must be 256 bits long).
+    :type key: str
+
+    :return: A tuple with the initialization vector and the ciphertext, both
+        encoded as base64.
+    :rtype: (str, str)
+    """
     iv = os.urandom(16)
     encryptor = AESEncryptor(key, iv)
     encryptor.write(data)
@@ -115,6 +155,20 @@ def encrypt_sym(data, key):
 
 
 def decrypt_sym(data, key, iv):
+    """
+    Decrypt data using AES-256 cipher in CTR mode.
+
+    :param data: The data to be decrypted.
+    :type data: str
+    :param key: The symmetric key used to decrypt data (must be 256 bits
+                long).
+    :type key: str
+    :param iv: The base64 encoded initialization vector.
+    :type iv: str
+
+    :return: The decrypted data.
+    :rtype: str
+    """
     _iv = base64.b64decode(str(iv))
     decryptor = AESDecryptor(key, _iv)
     decryptor.write(data)
@@ -124,11 +178,16 @@ def decrypt_sym(data, key, iv):
 
 
 class BlobEncryptor(object):
-
     """
-    Encrypts a payload associated with a given Document.
+    Produces encrypted data from the cleartext data associated with a given
+    SoledadDocument using AES-256 cipher in CTR mode, together with a
+    HMAC-SHA512 Message Authentication Code.
+    The production happens using a Twisted's FileBodyProducer, which uses a
+    Cooperator to schedule calls and can be paused/resumed. Each call takes at
+    most 65536 bytes from the input.
+    Both the production input and output are file descriptors, so they can be
+    applied to a stream of data.
     """
-
     def __init__(self, doc_info, content_fd, result=None, secret=None,
                  iv=None):
         if iv is None:
@@ -162,11 +221,25 @@ class BlobEncryptor(object):
         self._crypter = VerifiedEncrypter(self._aes, self._hmac)
 
     def encrypt(self):
+        """
+        Starts producing encrypted data from the cleartext data.
+
+        :return: A deferred which will be fired when encryption ends and whose
+            callback will be invoked with the resulting ciphertext.
+        :rtype: twisted.internet.defer.Deferred
+        """
         d = self._producer.startProducing(self._crypter)
         d.addCallback(self._end_crypto_stream)
         return d
 
     def encrypt_whole(self):
+        """
+        Encrypts the input data at once and returns the resulting ciphertext
+        wrapped into a JSON string under the "raw" key.
+
+        :return: The resulting ciphertext JSON string.
+        :rtype: str
+        """
         self._crypter.write(self._content_fd.getvalue())
         self._end_crypto_stream(None)
         return '{"raw":"' + self.result.getvalue() + '"}'
@@ -281,7 +354,10 @@ class BlobDecryptor(object):
 
 
 class AESEncryptor(object):
-
+    """
+    A Twisted's Consumer implementation that takes an input file descriptor and
+    applies AES-256 cipher in CTR mode.
+    """
     implements(interfaces.IConsumer)
 
     def __init__(self, key, iv, fd=None):
@@ -311,7 +387,10 @@ class AESEncryptor(object):
 
 
 class HMACWriter(object):
-
+    """
+    A Twisted's Consumer implementation that takes an input file descriptor and
+    produces a HMAC-SHA512 Message Authentication Code.
+    """
     implements(interfaces.IConsumer)
     hashtype = 'sha512'
 
@@ -327,7 +406,10 @@ class HMACWriter(object):
 
 
 class VerifiedEncrypter(object):
-
+    """
+    A Twisted's Consumer implementation combining AESEncryptor and HMACWriter.
+    It directs the resulting ciphertext into HMAC-SHA512 processing.
+    """
     implements(interfaces.IConsumer)
 
     def __init__(self, crypter, hmac):
@@ -340,7 +422,10 @@ class VerifiedEncrypter(object):
 
 
 class AESDecryptor(object):
-
+    """
+    A Twisted's Consumer implementation that consumes data encrypted with
+    AES-256 in CTR mode from a file descriptor and generates decrypted data.
+    """
     implements(interfaces.IConsumer)
 
     def __init__(self, key, iv, fd=None):
@@ -373,6 +458,14 @@ class AESDecryptor(object):
 
 
 def is_symmetrically_encrypted(doc):
+    """
+    Return True if the document was symmetrically encrypted.
+
+    :param doc: The document to check.
+    :type doc: SoledadDocument
+
+    :rtype: bool
+    """
     payload = doc.content
     if not payload or 'raw' not in payload:
         return False
