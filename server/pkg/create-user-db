@@ -22,7 +22,7 @@ import argparse
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import is_db_name_valid
 from leap.soledad.common.couch import list_users_dbs
-from leap.soledad.server import load_configuration
+from leap.soledad.server.config import load_configuration
 
 
 BYPASS_AUTH = os.environ.get('SOLEDAD_BYPASS_AUTH', False)
