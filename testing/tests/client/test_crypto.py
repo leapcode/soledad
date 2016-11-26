@@ -139,7 +139,7 @@ class BlobTestCase(unittest.TestCase):
             self.doc_info, ciphertext,
             secret='A' * 96)
         decrypted = yield decryptor.decrypt()
-        assert decrypted.getvalue() == snowden1
+        assert decrypted == snowden1
 
     @defer.inlineCallbacks
     def test_encrypt_and_decrypt(self):
