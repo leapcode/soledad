@@ -136,7 +136,7 @@ class DocStreamReceiver(ReadBodyProtocol):
         Checks that ']' came and stream was properly closed.
         """
         if not self._properly_finished:
-            raise errors.BrokenSyncStream()
+            raise errors.BrokenSyncStream('Stream not properly closed')
         content = self._buffer.getvalue()[0:self._buffer.tell()]
         self._buffer.close()
         return content

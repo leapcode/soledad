@@ -149,7 +149,7 @@ class HTTPDocFetcher(object):
             return (metadata['number_of_changes'], metadata['new_generation'],
                     metadata['new_transaction_id'])
         except (ValueError, KeyError):
-            raise errors.BrokenSyncStream
+            raise errors.BrokenSyncStream('Metadata parsing failed')
 
 
 def _emit_receive_status(user_data, received_docs, total):
