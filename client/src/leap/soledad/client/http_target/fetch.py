@@ -108,6 +108,11 @@ class HTTPDocFetcher(object):
         :param total: The total number of operations.
         :type total: int
         """
+        yield self.semaphore.run(self.__atomic_doc_parse, doc_info, content,
+                                 total)
+
+    @defer.inlineCallbacks
+    def __atomic_doc_parse(self, doc_info, content, total):
         doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
         if is_symmetrically_encrypted(doc):
             content = yield self._crypto.decrypt_doc(doc)
@@ -120,8 +125,8 @@ class HTTPDocFetcher(object):
         # from multiple threads is dangerous. We should bring the dbpool here
         # or find an alternative.  Deferring to a thread only helps releasing
         # the reactor for other tasks as this is an IO intensive call.
-        yield self.semaphore.run(threads.deferToThread, self._insert_doc_cb,
-                                 doc, doc_info['gen'], doc_info['trans_id'])
+        yield threads.deferToThread(self._insert_doc_cb,
+                                    doc, doc_info['gen'], doc_info['trans_id'])
         self._received_docs += 1
         user_data = {'uuid': self.uuid, 'userid': self.userid}
         _emit_receive_status(user_data, self._received_docs, total=total)
