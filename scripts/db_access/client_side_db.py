@@ -1,13 +1,13 @@
 #!/usr/bin/python
 
 import os
+import sys
 import argparse
 import tempfile
 import getpass
 import requests
 import srp._pysrp as srp
 import binascii
-import logging
 import json
 import time
 
@@ -15,6 +15,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 
 from leap.soledad.client import Soledad
+from leap.soledad.common.log import getLogger
 from leap.keymanager import KeyManager
 from leap.keymanager.openpgp import OpenPGPKey
 
@@ -39,9 +40,9 @@ Use the --help option to see available options.
 
 
 # create a logger
-logger = logging.getLogger(__name__)
-LOG_FORMAT = '%(asctime)s %(message)s'
-logging.basicConfig(format=LOG_FORMAT, level=logging.DEBUG)
+logger = getLogger(__name__)
+from twisted.python import log
+log.startLogging(sys.stdout)
 
 
 safe_unhexlify = lambda x: binascii.unhexlify(x) if (
