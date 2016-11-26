@@ -20,8 +20,11 @@ from cStringIO import StringIO
 from twisted.web._newclient import ResponseDone
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.remote import utils
+from leap.soledad.common.log import getLogger
 from .support import ReadBodyProtocol
 from .support import readBody
+
+logger = getLogger(__name__)
 
 
 class DocStreamReceiver(ReadBodyProtocol):
@@ -120,8 +123,13 @@ class DocStreamReceiver(ReadBodyProtocol):
             if 'error' in self.current_doc:
                 raise errors.BrokenSyncStream("Error from server: %s" % line)
         else:
-            self._doc_reader(
+            d = self._doc_reader(
                 self.current_doc, line.strip() or None, self.total)
+            d.addErrback(self._error)
+
+    def _error(self, reason):
+        logger.error(reason)
+        self.transport.loseConnection()
 
     def finish(self):
         """
