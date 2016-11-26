@@ -39,9 +39,6 @@ from twisted.internet import interfaces
 from twisted.logger import Logger
 from twisted.web.client import FileBodyProducer
 
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.hmac import HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends.multibackend import MultiBackend
 from cryptography.hazmat.backends.openssl.backend \
@@ -133,8 +130,7 @@ class SoledadCrypto(object):
         del doc
         ciphertext.write(str(payload))
         decryptor = BlobDecryptor(info, ciphertext, secret=self.secret)
-        buf = decryptor.decrypt()
-        return buf.getvalue()
+        return decryptor.decrypt()
 
 
 def encrypt_sym(data, key):
@@ -291,29 +287,45 @@ class BlobDecryptor(object):
 
     def __init__(self, doc_info, ciphertext_fd, result=None,
                  secret=None):
+        if not secret:
+            raise EncryptionDecryptionError('no secret given')
+        ciphertext_fd.seek(0)
+
         self.doc_id = doc_info.doc_id
         self.rev = doc_info.rev
-
-        self.ciphertext = ciphertext_fd
 
         self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         self.mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
 
+        self._read_preamble(ciphertext_fd)
+
+        self._producer = FileBodyProducer(self.ciphertext, readSize=2**16)
+        self._content_fd = self.ciphertext
+
         self.result = result or BytesIO()
 
-    def decrypt(self):
+        self._aes_fd = BytesIO()
+        self._aes = AESDecryptor(self.sym_key, self.iv, self.result)
+        self._hmac = HMACWriter(self.mac_key)
+        self._hmac.write(self.preamble)
+
+        self._decrypter = VerifiedDecrypter(self._aes, self._hmac)
+
+    def _read_preamble(self, ciphertext):
         try:
-            preamble, ciphertext = _split(self.ciphertext.getvalue())
-            hmac, ciphertext = ciphertext[-64:], ciphertext[:-64]
+            self.preamble, ciphertext = _split(ciphertext.getvalue())
+            self.doc_hmac, self.ciphertext = ciphertext[-64:], ciphertext[:-64]
         except (TypeError, binascii.Error):
             raise InvalidBlob
-        self.ciphertext.close()
-        if len(preamble) != PACMAN.size:
+        self.ciphertext = BytesIO(self.ciphertext)
+
+        if len(self.preamble) != PACMAN.size:
             raise InvalidBlob
 
         try:
-            unpacked_data = PACMAN.unpack(preamble)
+            unpacked_data = PACMAN.unpack(self.preamble)
             pad, ts, sch, meth, iv, doc_id, rev = unpacked_data
+            self.iv = iv
         except struct.error:
             raise InvalidBlob
         if pad != '\x80':
@@ -329,18 +341,28 @@ class BlobDecryptor(object):
         if rev != self.rev:
             raise InvalidBlob('invalid revision')
 
-        h = HMAC(self.mac_key, hashes.SHA512(), backend=crypto_backend)
-        h.update(preamble)
-        h.update(ciphertext)
-        try:
-            h.verify(hmac)
-        except InvalidSignature:
+    def _check_hmac(self):
+        if self._hmac._hmac.digest() != self.doc_hmac:
             raise InvalidBlob('HMAC could not be verifed')
 
-        decryptor = _get_aes_ctr_cipher(self.sym_key, iv).decryptor()
+    def decrypt(self):
+        """
+        Starts producing encrypted data from the cleartext data.
 
-        # TODO pass chunks, streaming, instead
-        # Use AESDecryptor below
+        :return: A deferred which will be fired when encryption ends and whose
+            callback will be invoked with the resulting ciphertext.
+        :rtype: twisted.internet.defer.Deferred
+        """
+        d = self._producer.startProducing(self._decrypter)
+        d.addCallback(lambda _: self._check_hmac())
+        d.addCallback(lambda _: self.result.getvalue())
+        return d
+
+    def decrypt_whole(self):
+        ciphertext = self.ciphertext.getvalue()
+        self.hmac_obj.update(ciphertext)
+        self._check_hmac()
+        decryptor = _get_aes_ctr_cipher(self.sym_key, self.iv).decryptor()
 
         self.result.write(decryptor.update(ciphertext))
         self.result.write(decryptor.finalize())
@@ -410,6 +432,23 @@ class VerifiedEncrypter(object):
     def write(self, data):
         enc_chunk = self.crypter.write(data)
         self.hmac.write(enc_chunk)
+
+
+class VerifiedDecrypter(object):
+    """
+    A Twisted's Consumer implementation combining AESDecryptor and HMACWriter.
+    It directs the resulting ciphertext into HMAC-SHA512 processing, then
+    decrypt.
+    """
+    implements(interfaces.IConsumer)
+
+    def __init__(self, decrypter, hmac):
+        self.decrypter = decrypter
+        self.hmac = hmac
+
+    def write(self, enc_chunk):
+        self.hmac.write(enc_chunk)
+        self.decrypter.write(enc_chunk)
 
 
 class AESDecryptor(object):

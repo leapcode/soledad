@@ -39,7 +39,7 @@ def create_doc_encryption(size):
 def create_doc_decryption(size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_crypto_decrypt_doc")
-    def test_doc_decryption(soledad_client, benchmark, payload):
+    def test_doc_decryption(soledad_client, txbenchmark, payload):
         crypto = soledad_client()._crypto
 
         DOC_CONTENT = {'payload': payload(size)}
@@ -50,7 +50,7 @@ def create_doc_decryption(size):
         encrypted_doc = yield crypto.encrypt_doc(doc)
         doc.set_json(encrypted_doc)
 
-        benchmark(crypto.decrypt_doc, doc)
+        yield txbenchmark(crypto.decrypt_doc, doc)
     return test_doc_decryption
 
 
