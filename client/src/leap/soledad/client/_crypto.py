@@ -24,10 +24,12 @@ import base64
 import hashlib
 import hmac
 import os
+import re
 import struct
 import time
 
 from io import BytesIO
+from itertools import imap
 from collections import namedtuple
 
 import six
@@ -53,6 +55,8 @@ log = Logger()
 MAC_KEY_LENGTH = 64
 
 crypto_backend = MultiBackend([OpenSSLBackend()])
+
+PACMAN = struct.Struct('cQbb16s255p255p')
 
 
 class ENC_SCHEME:
@@ -247,15 +251,14 @@ class BlobEncryptor(object):
 
         current_time = int(time.time())
 
-        write(b'\x80')
-        write(struct.pack(
-            'Qbb',
+        write(PACMAN.pack(
+            '\x80',
             current_time,
             ENC_SCHEME.symkey,
-            ENC_METHOD.aes_256_ctr))
-        write(self.iv)
-        write(str(self.doc_id))
-        write(str(self.rev))
+            ENC_METHOD.aes_256_ctr,
+            self.iv,
+            str(self.doc_id),
+            str(self.rev)))
 
     def _end_crypto_stream(self, ignored):
         self._aes.end()
@@ -267,7 +270,10 @@ class BlobEncryptor(object):
         hmac = self._hmac.result.getvalue()
 
         self.result.write(
-            base64.urlsafe_b64encode(preamble + encrypted + hmac))
+            base64.urlsafe_b64encode(preamble))
+        self.result.write(' ')
+        self.result.write(
+            base64.urlsafe_b64encode(encrypted + hmac))
         self._preamble.close()
         self._aes_fd.close()
         self._hmac.result.close()
@@ -297,16 +303,20 @@ class BlobDecryptor(object):
 
     def decrypt(self):
         try:
-            data = base64.urlsafe_b64decode(self.ciphertext.getvalue())
+            preamble, ciphertext = _split(self.ciphertext.getvalue())
+            hmac, ciphertext = ciphertext[-64:], ciphertext[:-64]
         except (TypeError, binascii.Error):
             raise InvalidBlob
         self.ciphertext.close()
-
-        if not data or six.indexbytes(data, 0) != 0x80:
+        if len(preamble) != PACMAN.size:
             raise InvalidBlob
+
         try:
-            ts, sch, meth = struct.unpack("Qbb", data[1:11])
+            unpacked_data = PACMAN.unpack(preamble)
+            pad, ts, sch, meth, iv, doc_id, rev = unpacked_data
         except struct.error:
+            raise InvalidBlob
+        if pad != '\x80':
             raise InvalidBlob
 
         # TODO check timestamp
@@ -316,21 +326,12 @@ class BlobDecryptor(object):
         if meth != ENC_METHOD.aes_256_ctr:
             raise InvalidBlob('invalid encryption scheme')
 
-        iv = data[11:27]
-        docidlen = len(self.doc_id)
-        ciph_idx = 26 + docidlen
-        revlen = len(self.rev)
-        rev_idx = ciph_idx + 1 + revlen
-        rev = data[ciph_idx + 1:rev_idx]
-
         if rev != self.rev:
             raise InvalidBlob('invalid revision')
 
-        ciphertext = data[rev_idx:-64]
-        hmac = data[-64:]
-
         h = HMAC(self.mac_key, hashes.SHA512(), backend=crypto_backend)
-        h.update(data[:-64])
+        h.update(preamble)
+        h.update(ciphertext)
         try:
             h.verify(hmac)
         except InvalidSignature:
@@ -457,12 +458,13 @@ def is_symmetrically_encrypted(doc):
     if not payload or 'raw' not in payload:
         return False
     payload = str(payload['raw'])
-    if len(payload) < 16:
+    if len(payload) < PACMAN.size:
         return False
-    header = base64.urlsafe_b64decode(payload[:18] + '==')
-    if six.indexbytes(header, 0) != 0x80:
+    payload = _split(payload).next()
+    if six.indexbytes(payload, 0) != 0x80:
         return False
-    ts, sch, meth = struct.unpack('Qbb', header[1:11])
+    unpacked = PACMAN.unpack(payload)
+    ts, sch, meth = unpacked[1:4]
     return sch == ENC_SCHEME.symkey and meth == ENC_METHOD.aes_256_ctr
 
 
@@ -485,3 +487,7 @@ def _get_sym_key_for_doc(doc_id, secret):
 
 def _get_aes_ctr_cipher(key, iv):
     return Cipher(algorithms.AES(key), modes.CTR(iv), backend=crypto_backend)
+
+
+def _split(base64_raw_payload):
+    return imap(base64.urlsafe_b64decode, re.split(' ', base64_raw_payload))

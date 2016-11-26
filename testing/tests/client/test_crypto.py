@@ -22,7 +22,6 @@ import base64
 import hashlib
 import json
 import os
-import struct
 
 from io import BytesIO
 
@@ -106,22 +105,19 @@ class BlobTestCase(unittest.TestCase):
             secret='A' * 96)
 
         encrypted = yield blob.encrypt()
-        data = base64.urlsafe_b64decode(encrypted.getvalue())
+        preamble, ciphertext = _crypto._split(encrypted.getvalue())
+        ciphertext = ciphertext[:-64]
 
-        assert data[0] == '\x80'
-        ts, sch, meth = struct.unpack(
-            'Qbb', data[1:11])
+        assert len(preamble) == _crypto.PACMAN.size
+        unpacked_data = _crypto.PACMAN.unpack(preamble)
+        pad, ts, sch, meth, iv, doc_id, rev = unpacked_data
+        assert pad == '\x80'
         assert sch == 1
         assert meth == 1
-        iv = data[11:27]
         assert iv == blob.iv
-        doc_id = data[27:37]
         assert doc_id == 'D-deadbeef'
-
-        rev = data[37:71]
         assert rev == self.doc_info.rev
 
-        ciphertext = data[71:-64]
         aes_key = _crypto._get_sym_key_for_doc(
             self.doc_info.doc_id, 'A' * 96)
         assert ciphertext == _aes_encrypt(aes_key, blob.iv, snowden1)
@@ -159,6 +155,7 @@ class BlobTestCase(unittest.TestCase):
         assert 'raw' in encrypted
         doc2 = SoledadDocument('id1', '1')
         doc2.set_json(encrypted)
+        assert _crypto.is_symmetrically_encrypted(doc2)
         decrypted = yield crypto.decrypt_doc(doc2)
         assert len(decrypted) != 0
         assert json.loads(decrypted) == payload
@@ -174,10 +171,12 @@ class BlobTestCase(unittest.TestCase):
 
         encrypted = yield crypto.encrypt_doc(doc1)
         encdict = json.loads(encrypted)
-        raw = base64.urlsafe_b64decode(str(encdict['raw']))
+        preamble, raw = _crypto._split(str(encdict['raw']))
         # mess with MAC
         messed = raw[:-64] + '0' * 64
-        newraw = base64.urlsafe_b64encode(str(messed))
+
+        preamble = base64.urlsafe_b64encode(preamble)
+        newraw = preamble + ' ' + base64.urlsafe_b64encode(str(messed))
         doc2 = SoledadDocument('id1', '1')
         doc2.set_json(json.dumps({"raw": str(newraw)}))
 
