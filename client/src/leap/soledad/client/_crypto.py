@@ -201,7 +201,7 @@ class BlobEncryptor(object):
         self._hmac_writer = HMACWriter(mac_key)
         self._write_preamble()
 
-        self._crypter = VerifiedEncrypter(_aes, self._hmac_writer)
+        self._crypter = PipeableWriter(_aes, self._hmac_writer)
 
     @property
     def iv(self):
@@ -276,7 +276,7 @@ class BlobDecryptor(object):
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         _aes = AESConsumer(sym_key, iv, self.result,
                            operation=AESConsumer.decrypt)
-        self._decrypter = VerifiedDecrypter(_aes, _hmac_writer)
+        self._decrypter = PipeableWriter(_aes, _hmac_writer, pipe=False)
 
         self._producer = FileBodyProducer(ciphertext_fd, readSize=2**16)
 
@@ -354,46 +354,31 @@ class HMACWriter(object):
         return self.result.getvalue()
 
 
-class VerifiedEncrypter(object):
+class PipeableWriter(object):
     """
-    A Twisted's Consumer implementation combining AESEncryptor and HMACWriter.
-    It directs the resulting ciphertext into HMAC-SHA512 processing.
+    A Twisted's Consumer implementation that flows data into two writers.
+    Here we can combine AESEncryptor and HMACWriter.
+    It directs the resulting ciphertext into HMAC-SHA512 processing if
+    pipe=True or writes the ciphertext to both (fan out, which is the case when
+    decrypting).
     """
     implements(interfaces.IConsumer)
 
-    def __init__(self, crypter, hmac_writer):
-        self.crypter = crypter
+    def __init__(self, aes_writer, hmac_writer, pipe=True):
+        self.pipe = pipe
+        self.aes_writer = aes_writer
         self.hmac_writer = hmac_writer
 
     def write(self, data):
-        enc_chunk = self.crypter.write(data)
+        enc_chunk = self.aes_writer.write(data)
+        if not self.pipe:
+            enc_chunk = data
         self.hmac_writer.write(enc_chunk)
 
     def end(self):
-        ciphertext = self.crypter.end()
+        ciphertext = self.aes_writer.end()
         content_hmac = self.hmac_writer.end()
         return ciphertext, content_hmac
-
-
-class VerifiedDecrypter(object):
-    """
-    A Twisted's Consumer implementation combining AESDecryptor and HMACWriter.
-    It directs the resulting ciphertext into HMAC-SHA512 processing, then
-    decrypt.
-    """
-    implements(interfaces.IConsumer)
-
-    def __init__(self, decrypter, hmac_writer):
-        self.decrypter = decrypter
-        self.hmac_writer = hmac_writer
-
-    def write(self, enc_chunk):
-        self.hmac_writer.write(enc_chunk)
-        self.decrypter.write(enc_chunk)
-
-    def end(self):
-        self.decrypter.end()
-        self.hmac_writer.end()
 
 
 class AESConsumer(object):
