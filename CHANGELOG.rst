@@ -1,3 +1,15 @@
+0.9.1 - 27 November, 2016
++++++++++++++++++++++++++
+
+Server side bug fixes
+~~~~~~~~~~~~~~~~~~~~~
+
+- fix import on create-user-db script
+- patch twisted logger so it works with twistd --syslog
+- delay couch state initialization
+- improve missing couch config doc error logging
+- separate server application into another file
+
 0.9.0 - 11 November, 2016
 +++++++++++++++++++++++++
 
