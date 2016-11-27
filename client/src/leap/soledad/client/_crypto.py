@@ -137,10 +137,9 @@ def encrypt_sym(data, key):
         encoded as base64.
     :rtype: (str, str)
     """
-    encryptor = AESConsumer(key)
+    encryptor = AESWriter(key)
     encryptor.write(data)
-    encryptor.end()
-    ciphertext = encryptor.buffer.getvalue()
+    ciphertext = encryptor.end()
     return base64.b64encode(encryptor.iv), ciphertext
 
 
@@ -160,10 +159,9 @@ def decrypt_sym(data, key, iv):
     :rtype: str
     """
     _iv = base64.b64decode(str(iv))
-    decryptor = AESConsumer(key, _iv, operation=AESConsumer.decrypt)
+    decryptor = AESWriter(key, _iv, encrypt=False)
     decryptor.write(data)
-    decryptor.end()
-    plaintext = decryptor.buffer.getvalue()
+    plaintext = decryptor.end()
     return plaintext
 
 
@@ -196,12 +194,12 @@ class BlobEncryptor(object):
         mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
 
         self._aes_fd = BytesIO()
-        _aes = AESConsumer(sym_key, _buffer=self._aes_fd)
+        _aes = AESWriter(sym_key, _buffer=self._aes_fd)
         self.__iv = _aes.iv
         self._hmac_writer = HMACWriter(mac_key)
         self._write_preamble()
 
-        self._crypter = PipeableWriter(_aes, self._hmac_writer)
+        self._crypter = VerifiedAESWriter(_aes, self._hmac_writer)
 
     @property
     def iv(self):
@@ -274,9 +272,9 @@ class BlobDecryptor(object):
 
         self.result = result or BytesIO()
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
-        _aes = AESConsumer(sym_key, iv, self.result,
-                           operation=AESConsumer.decrypt)
-        self._decrypter = PipeableWriter(_aes, _hmac_writer, pipe=False)
+        _aes = AESWriter(sym_key, iv, self.result,
+                         encrypt=False)
+        self._decrypter = VerifiedAESWriter(_aes, _hmac_writer, encrypt=False)
 
         self._producer = FileBodyProducer(ciphertext_fd, readSize=2**16)
 
@@ -334,27 +332,55 @@ class BlobDecryptor(object):
         return d
 
 
-class HMACWriter(object):
+class GenericWriter(object):
+    """
+    A Twisted's Consumer implementation that can perform one opearation at the
+    written data and another at the end of the stream.
+    """
+    implements(interfaces.IConsumer)
+
+    def __init__(self, operator, closer, result=None):
+        self.result = result or BytesIO()
+        self.operator, self.closer = operator, closer
+
+    def write(self, data):
+        out = self.operator(data)
+        if out:
+            self.result.write(out)
+        return out
+
+    def end(self):
+        self.result.write(self.closer())
+        return self.result.getvalue()
+
+
+class HMACWriter(GenericWriter):
     """
     A Twisted's Consumer implementation that takes an input file descriptor and
     produces a HMAC-SHA512 Message Authentication Code.
     """
-    implements(interfaces.IConsumer)
     hashtype = 'sha512'
 
     def __init__(self, key, result=None):
-        self._hmac = hmac.new(key, '', getattr(hashlib, self.hashtype))
-        self.result = result or BytesIO('')
-
-    def write(self, data):
-        self._hmac.update(data)
-
-    def end(self):
-        self.result.write(self._hmac.digest())
-        return self.result.getvalue()
+        hmac_obj = hmac.new(key, '', getattr(hashlib, self.hashtype))
+        GenericWriter.__init__(self, hmac_obj.update, hmac_obj.digest, result)
 
 
-class PipeableWriter(object):
+class AESWriter(GenericWriter):
+    """
+    A Twisted's Consumer implementation that takes an input file descriptor and
+    applies AES-256 cipher in CTR mode.
+    """
+    def __init__(self, key, iv=None, _buffer=None, encrypt=True):
+        if len(key) != 32:
+            raise EncryptionDecryptionError('key is not 256 bits')
+        self.iv = iv or os.urandom(16)
+        cipher = _get_aes_ctr_cipher(key, self.iv)
+        cipher = cipher.encryptor() if encrypt else cipher.decryptor()
+        GenericWriter.__init__(self, cipher.update, cipher.finalize, _buffer)
+
+
+class VerifiedAESWriter(object):
     """
     A Twisted's Consumer implementation that flows data into two writers.
     Here we can combine AESEncryptor and HMACWriter.
@@ -364,57 +390,17 @@ class PipeableWriter(object):
     """
     implements(interfaces.IConsumer)
 
-    def __init__(self, aes_writer, hmac_writer, pipe=True):
-        self.pipe = pipe
+    def __init__(self, aes_writer, hmac_writer, encrypt=True):
+        self.encrypt = encrypt
         self.aes_writer = aes_writer
         self.hmac_writer = hmac_writer
 
     def write(self, data):
         enc_chunk = self.aes_writer.write(data)
-        if not self.pipe:
-            enc_chunk = data
-        self.hmac_writer.write(enc_chunk)
+        self.hmac_writer.write(enc_chunk if self.encrypt else data)
 
     def end(self):
-        ciphertext = self.aes_writer.end()
-        content_hmac = self.hmac_writer.end()
-        return ciphertext, content_hmac
-
-
-class AESConsumer(object):
-    """
-    A Twisted's Consumer implementation that takes an input file descriptor and
-    applies AES-256 cipher in CTR mode.
-    """
-    implements(interfaces.IConsumer)
-    encrypt = 1
-    decrypt = 2
-
-    def __init__(self, key, iv=None, _buffer=None, operation=encrypt):
-        if len(key) != 32:
-            raise EncryptionDecryptionError('key is not 256 bits')
-        self.iv = iv or os.urandom(16)
-        self.buffer = _buffer or BytesIO()
-        self.deferred = defer.Deferred()
-        self.done = False
-
-        cipher = _get_aes_ctr_cipher(key, self.iv)
-        if operation == self.encrypt:
-            self.operator = cipher.encryptor()
-        else:
-            self.operator = cipher.decryptor()
-
-    def write(self, data):
-        consumed = self.operator.update(data)
-        self.buffer.write(consumed)
-        return consumed
-
-    def end(self):
-        if not self.done:
-            self.buffer.write(self.operator.finalize())
-            self.deferred.callback(self.buffer)
-        self.done = True
-        return self.buffer.getvalue()
+        return self.aes_writer.end(), self.hmac_writer.end()
 
 
 def is_symmetrically_encrypted(doc):
