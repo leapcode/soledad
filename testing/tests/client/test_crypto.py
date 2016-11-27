@@ -52,7 +52,7 @@ class AESTest(unittest.TestCase):
         key = 'A' * 32
 
         fd = BytesIO()
-        aes = _crypto.AESEncryptor(key, fd)
+        aes = _crypto.AESConsumer(key, _buffer=fd)
         iv = aes.iv
 
         data = snowden1
@@ -78,7 +78,8 @@ class AESTest(unittest.TestCase):
         ciphertext = _aes_encrypt(key, iv, data)
 
         fd = BytesIO()
-        aes = _crypto.AESDecryptor(key, iv, fd)
+        operation = _crypto.AESConsumer.decrypt
+        aes = _crypto.AESConsumer(key, iv, fd, operation)
 
         for i in range(len(ciphertext) / block):
             chunk = ciphertext[i * block:(i + 1) * block]
