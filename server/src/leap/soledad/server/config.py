@@ -24,7 +24,7 @@ CONFIG_DEFAULTS = {
         'couch_url': 'http://localhost:5984',
         'create_cmd': None,
         'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
-        'batching': False
+        'batching': True
     },
     'database-security': {
         'members': ['soledad'],
