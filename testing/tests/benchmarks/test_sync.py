@@ -1,11 +1,14 @@
 import pytest
+from twisted.internet.defer import gatherResults
 
 
 @pytest.inlineCallbacks
 def load_up(client, amount, payload):
     # create a bunch of local documents
+    deferreds = []
     for i in xrange(amount):
-        yield client.create_doc({'content': payload})
+        deferreds.append(client.create_doc({'content': payload}))
+    yield gatherResults(deferreds)
 
 
 def create_upload(uploads, size):
