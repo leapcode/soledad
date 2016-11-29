@@ -195,7 +195,7 @@ class BlobEncryptor(object):
 
         self._aes_fd = BytesIO()
         _aes = AESWriter(sym_key, _buffer=self._aes_fd)
-        self.__iv = _aes.iv
+        self._iv = _aes.iv
         self._hmac_writer = HMACWriter(mac_key)
         self._write_preamble()
 
@@ -203,7 +203,7 @@ class BlobEncryptor(object):
 
     @property
     def iv(self):
-        return self.__iv
+        return self._iv
 
     def encrypt(self):
         """
@@ -292,16 +292,15 @@ class BlobDecryptor(object):
 
         try:
             unpacked_data = PACMAN.unpack(preamble)
-            pad, ts, sch, meth, iv, doc_id, rev = unpacked_data
+            magic, ts, sch, meth, iv, doc_id, rev = unpacked_data
         except struct.error:
             raise InvalidBlob
 
-        if pad != '\x80':
+        if magic != '\x80':
             raise InvalidBlob
         # TODO check timestamp
         if sch != ENC_SCHEME.symkey:
             raise InvalidBlob('invalid scheme')
-        # TODO should adapt the assymetric-gpg too, rigth?
         if meth != ENC_METHOD.aes_256_ctr:
             raise InvalidBlob('invalid encryption scheme')
         if rev != self.rev:
@@ -339,18 +338,18 @@ class GenericWriter(object):
     """
     implements(interfaces.IConsumer)
 
-    def __init__(self, operator, closer, result=None):
+    def __init__(self, process, close, result=None):
         self.result = result or BytesIO()
-        self.operator, self.closer = operator, closer
+        self.process, self.close = process, close
 
     def write(self, data):
-        out = self.operator(data)
+        out = self.process(data)
         if out:
             self.result.write(out)
         return out
 
     def end(self):
-        self.result.write(self.closer())
+        self.result.write(self.close())
         return self.result.getvalue()
 
 
@@ -359,6 +358,7 @@ class HMACWriter(GenericWriter):
     A Twisted's Consumer implementation that takes an input file descriptor and
     produces a HMAC-SHA512 Message Authentication Code.
     """
+    implements(interfaces.IConsumer)
     hashtype = 'sha512'
 
     def __init__(self, key, result=None):
@@ -371,6 +371,8 @@ class AESWriter(GenericWriter):
     A Twisted's Consumer implementation that takes an input file descriptor and
     applies AES-256 cipher in CTR mode.
     """
+    implements(interfaces.IConsumer)
+
     def __init__(self, key, iv=None, _buffer=None, encrypt=True):
         if len(key) != 32:
             raise EncryptionDecryptionError('key is not 256 bits')
