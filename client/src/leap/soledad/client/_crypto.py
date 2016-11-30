@@ -32,8 +32,6 @@ from io import BytesIO
 from itertools import imap
 from collections import namedtuple
 
-import six
-
 from twisted.internet import defer
 from twisted.internet import interfaces
 from twisted.web.client import FileBodyProducer
@@ -50,7 +48,8 @@ MAC_KEY_LENGTH = 64
 
 CRYPTO_BACKEND = MultiBackend([OpenSSLBackend()])
 
-PACMAN = struct.Struct('cQbb16s255p255p')
+PACMAN = struct.Struct('2sbbQ16s255p255p')
+BLOB_SIGNATURE_MAGIC = '\x13\x37'
 
 
 ENC_SCHEME = namedtuple('SCHEME', 'symkey')(1)
@@ -226,10 +225,10 @@ class BlobEncryptor(object):
         current_time = int(time.time())
 
         write(PACMAN.pack(
-            '\x80',
-            current_time,
+            BLOB_SIGNATURE_MAGIC,
             ENC_SCHEME.symkey,
             ENC_METHOD.aes_256_ctr,
+            current_time,
             self.iv,
             str(self.doc_id),
             str(self.rev)))
@@ -292,11 +291,11 @@ class BlobDecryptor(object):
 
         try:
             unpacked_data = PACMAN.unpack(preamble)
-            magic, ts, sch, meth, iv, doc_id, rev = unpacked_data
+            magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
         except struct.error:
             raise InvalidBlob
 
-        if magic != '\x80':
+        if magic != BLOB_SIGNATURE_MAGIC:
             raise InvalidBlob
         # TODO check timestamp
         if sch != ENC_SCHEME.symkey:
@@ -405,27 +404,18 @@ class VerifiedAESWriter(object):
         return self.aes_writer.end(), self.hmac_writer.end()
 
 
-def is_symmetrically_encrypted(doc):
+def is_symmetrically_encrypted(content):
     """
-    Return True if the document was symmetrically encrypted.
+    Returns True if the document was symmetrically encrypted.
+    'EzcB' is the base64 encoding of \x13\x37 magic number and 1 (symmetrically
+    encrypted value for enc_scheme flag).
 
-    :param doc: The document to check.
-    :type doc: SoledadDocument
+    :param doc: The document content as string
+    :type doc: str
 
     :rtype: bool
     """
-    payload = doc.content
-    if not payload or 'raw' not in payload:
-        return False
-    payload = str(payload['raw'])
-    if len(payload) < PACMAN.size:
-        return False
-    payload = _split(payload).next()
-    if six.indexbytes(payload, 0) != 0x80:
-        return False
-    unpacked = PACMAN.unpack(payload)
-    ts, sch, meth = unpacked[1:4]
-    return sch == ENC_SCHEME.symkey and meth == ENC_METHOD.aes_256_ctr
+    return content and content[:13] == '{"raw": "EzcB'
 
 
 # utils
