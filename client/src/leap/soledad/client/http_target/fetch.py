@@ -114,7 +114,7 @@ class HTTPDocFetcher(object):
     @defer.inlineCallbacks
     def __atomic_doc_parse(self, doc_info, content, total):
         doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
-        if is_symmetrically_encrypted(doc):
+        if is_symmetrically_encrypted(content):
             content = yield self._crypto.decrypt_doc(doc)
         elif old_crypto.is_symmetrically_encrypted(doc):
             content = self._deprecated_crypto.decrypt_doc(doc)

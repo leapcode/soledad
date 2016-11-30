@@ -413,7 +413,8 @@ class EncryptedSyncTestCase(
                 self.assertEqual(soldoc.rev, couchdoc.rev)
                 couch_content = couchdoc.content.keys()
                 self.assertEqual(['raw'], couch_content)
-                self.assertTrue(_crypto.is_symmetrically_encrypted(couchdoc))
+                content = couchdoc.get_json()
+                self.assertTrue(_crypto.is_symmetrically_encrypted(content))
 
         d = sol1.get_all_docs()
         d.addCallback(_db1AssertEmptyDocList)

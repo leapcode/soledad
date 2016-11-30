@@ -110,8 +110,8 @@ class BlobTestCase(unittest.TestCase):
 
         assert len(preamble) == _crypto.PACMAN.size
         unpacked_data = _crypto.PACMAN.unpack(preamble)
-        pad, ts, sch, meth, iv, doc_id, rev = unpacked_data
-        assert pad == '\x80'
+        magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
+        assert magic == _crypto.BLOB_SIGNATURE_MAGIC
         assert sch == 1
         assert meth == 1
         assert iv == blob.iv
@@ -155,7 +155,7 @@ class BlobTestCase(unittest.TestCase):
         assert 'raw' in encrypted
         doc2 = SoledadDocument('id1', '1')
         doc2.set_json(encrypted)
-        assert _crypto.is_symmetrically_encrypted(doc2)
+        assert _crypto.is_symmetrically_encrypted(encrypted)
         decrypted = yield crypto.decrypt_doc(doc2)
         assert len(decrypted) != 0
         assert json.loads(decrypted) == payload
