@@ -25,12 +25,8 @@ tests:
 
 benchmark:
   stage: benchmark
-  image: leapcode/soledad:latest
-  services:
-    - couchdb
   script:
     - cd testing
-    - tox -e benchmark -- --couch-url http://couchdb:5984
+    - tox -e benchmark
   tags:
-    - docker
     - benchmark
