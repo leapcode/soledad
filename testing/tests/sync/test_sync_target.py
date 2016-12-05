@@ -838,7 +838,7 @@ class TestSoledadDbSync(
         # already created on some setUp method.
         import binascii
         tohex = binascii.b2a_hex
-        key = tohex(self._soledad.secrets.get_local_storage_key())
+        key = tohex(self._soledad.secrets.local)
         dbpath = self._soledad._local_db_path
 
         self.opts = SQLCipherOptions(

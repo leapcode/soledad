@@ -45,7 +45,6 @@ from zope.interface import implements
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
 
-from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common.log import getLogger
@@ -57,8 +56,7 @@ from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
 from leap.soledad.client import interfaces as soledad_interfaces
 from leap.soledad.client import sqlcipher
-from leap.soledad.client.secrets import SoledadSecrets
-from leap.soledad.client.shared_db import SoledadSharedDatabase
+from leap.soledad.client._secrets import Secrets
 from leap.soledad.client._crypto import SoledadCrypto
 
 logger = getLogger(__name__)
@@ -130,7 +128,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, syncable=True):
+                 auth_token=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -185,8 +183,6 @@ class Soledad(object):
         self._secrets_path = None
         self._dbsyncer = None
 
-        self.shared_db = shared_db
-
         # configure SSL certificate
         global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
@@ -198,21 +194,15 @@ class Soledad(object):
 
         self._secrets_path = secrets_path
 
-        # Initialize shared recovery database
-        self.init_shared_db(server_url, uuid, self._creds, syncable=syncable)
+        self._init_secrets(shared_db=shared_db)
 
-        # The following can raise BootstrapSequenceError, that will be
-        # propagated upwards.
-        self._init_secrets()
-
-        self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
+        self._crypto = SoledadCrypto(self._secrets.remote)
 
         try:
             # initialize database access, trap any problems so we can shutdown
             # smoothly.
             self._init_u1db_sqlcipher_backend()
-            if syncable:
-                self._init_u1db_syncer()
+            self._init_u1db_syncer()
         except DatabaseAccessError:
             # oops! something went wrong with backend initialization. We
             # have to close any thread-related stuff we have already opened
@@ -255,14 +245,13 @@ class Soledad(object):
         for path in paths:
             create_path_if_not_exists(path)
 
-    def _init_secrets(self):
+    def _init_secrets(self, shared_db=None):
         """
         Initialize Soledad secrets.
         """
-        self._secrets = SoledadSecrets(
-            self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db, userid=self.userid)
-        self._secrets.bootstrap()
+        self._secrets = Secrets(
+            self._uuid, self._passphrase, self._server_url, self._secrets_path,
+            self._creds, self.userid, shared_db=shared_db)
 
     def _init_u1db_sqlcipher_backend(self):
         """
@@ -279,7 +268,7 @@ class Soledad(object):
         """
         tohex = binascii.b2a_hex
         # sqlcipher only accepts the hex version
-        key = tohex(self._secrets.get_local_storage_key())
+        key = tohex(self._secrets.local)
 
         opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,
@@ -659,21 +648,6 @@ class Soledad(object):
     # ISyncableStorage
     #
 
-    def set_syncable(self, syncable):
-        """
-        Toggle the syncable state for this database.
-
-        This can be used to start a database with offline state and switch it
-        online afterwards. Or the opposite: stop syncs when connection is lost.
-
-        :param syncable: new status for syncable.
-        :type syncable: bool
-        """
-        # TODO should check that we've got a token!
-        self.shared_db.syncable = syncable
-        if syncable and not self._dbsyncer:
-            self._init_u1db_syncer()
-
     def sync(self):
         """
         Synchronize documents with the server replica.
@@ -760,13 +734,6 @@ class Soledad(object):
         """
         return self.sync_lock.locked
 
-    @property
-    def syncable(self):
-        if self.shared_db:
-            return self.shared_db.syncable
-        else:
-            return False
-
     def _set_token(self, token):
         """
         Set the authentication token for remote database access.
@@ -803,58 +770,13 @@ class Soledad(object):
     # ISecretsStorage
     #
 
-    def init_shared_db(self, server_url, uuid, creds, syncable=True):
-        """
-        Initialize the shared database.
-
-        :param server_url: URL of the remote database.
-        :type server_url: str
-        :param uuid: The user's unique id.
-        :type uuid: str
-        :param creds: A tuple containing the authentication method and
-            credentials.
-        :type creds: tuple
-        :param syncable:
-            If syncable is False, the database will not attempt to sync against
-            a remote replica.
-        :type syncable: bool
-        """
-        # only case this is False is for testing purposes
-        if self.shared_db is None:
-            shared_db_url = urlparse.urljoin(server_url, SHARED_DB_NAME)
-            self.shared_db = SoledadSharedDatabase.open_database(
-                shared_db_url,
-                uuid,
-                creds=creds,
-                syncable=syncable)
-
-    @property
-    def storage_secret(self):
-        """
-        Return the secret used for local storage encryption.
-
-        :return: The secret used for local storage encryption.
-        :rtype: str
-        """
-        return self._secrets.storage_secret
-
-    @property
-    def remote_storage_secret(self):
-        """
-        Return the secret used for encryption of remotely stored data.
-
-        :return: The secret used for remote storage  encryption.
-        :rtype: str
-        """
-        return self._secrets.remote_storage_secret
-
     @property
     def secrets(self):
         """
         Return the secrets object.
 
         :return: The secrets object.
-        :rtype: SoledadSecrets
+        :rtype: Secrets
         """
         return self._secrets
 

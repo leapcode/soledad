@@ -17,7 +17,7 @@
 """
 A shared database for storing/retrieving encrypted key material.
 """
-from leap.soledad.common.l2db.remote import http_database
+from leap.soledad.common.l2db.remote.http_database import HTTPDatabase
 
 from leap.soledad.client.auth import TokenBasedAuth
 
@@ -47,7 +47,7 @@ class ImproperlyConfiguredError(Exception):
     """
 
 
-class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
+class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
     """
     This is a shared recovery database that enables users to store their
     encryption secrets in the server and retrieve them afterwards.
@@ -134,20 +134,16 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         raise Unauthorized("Can't delete shared database.")
 
-    def __init__(self, url, uuid, document_factory=None, creds=None):
+    def __init__(self, url, document_factory=None, creds=None):
         """
         Initialize database with auth token and encryption powers.
 
         :param url: URL of the remote database.
         :type url: str
-        :param uuid: The user's unique id.
-        :type uuid: str
         :param document_factory: A factory for U1BD documents.
         :type document_factory: u1db.Document
         :param creds: A tuple containing the authentication method and
             credentials.
         :type creds: tuple
         """
-        http_database.HTTPDatabase.__init__(self, url, document_factory,
-                                            creds)
-        self._uuid = uuid
+        HTTPDatabase.__init__(self, url, document_factory, creds)

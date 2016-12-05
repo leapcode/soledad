@@ -1,5 +1,7 @@
 import json
-from twisted.internet import defer
+
+from pytest import inlineCallbacks
+
 from uuid import uuid4
 from urlparse import urljoin
 
@@ -39,7 +41,7 @@ class DeprecatedCryptoTest(SoledadWithCouchServerMixin, TestCaseWithServer):
     def make_app_with_state(state):
         return make_token_soledad_app(state)
 
-    @defer.inlineCallbacks
+    @inlineCallbacks
     def test_touch_updates_remote_representation(self):
         self.startTwistedServer()
         user = 'user-' + uuid4().hex
