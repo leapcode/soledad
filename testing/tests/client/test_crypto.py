@@ -29,6 +29,7 @@ import pytest
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from cryptography.exceptions import InvalidTag
 
 from leap.soledad.common.document import SoledadDocument
 from test_soledad.util import BaseSoledadTest
@@ -64,7 +65,7 @@ class AESTest(unittest.TestCase):
         aes.end()
 
         ciphertext_chunked = fd.getvalue()
-        ciphertext = _aes_encrypt(key, iv, data)
+        ciphertext, tag = _aes_encrypt(key, iv, data)
 
         assert ciphertext_chunked == ciphertext
 
@@ -75,10 +76,10 @@ class AESTest(unittest.TestCase):
         data = snowden1
         block = 16
 
-        ciphertext = _aes_encrypt(key, iv, data)
+        ciphertext, tag = _aes_encrypt(key, iv, data)
 
         fd = BytesIO()
-        aes = _crypto.AESWriter(key, iv, fd, encrypt=False)
+        aes = _crypto.AESWriter(key, iv, fd, tag=tag)
 
         for i in range(len(ciphertext) / block):
             chunk = ciphertext[i * block:(i + 1) * block]
@@ -106,7 +107,7 @@ class BlobTestCase(unittest.TestCase):
 
         encrypted = yield blob.encrypt()
         preamble, ciphertext = _crypto._split(encrypted.getvalue())
-        ciphertext = ciphertext[:-64]
+        ciphertext = ciphertext[:-16]
 
         assert len(preamble) == _crypto.PACMAN.size
         unpacked_data = _crypto.PACMAN.unpack(preamble)
@@ -120,9 +121,10 @@ class BlobTestCase(unittest.TestCase):
 
         aes_key = _crypto._get_sym_key_for_doc(
             self.doc_info.doc_id, 'A' * 96)
-        assert ciphertext == _aes_encrypt(aes_key, blob.iv, snowden1)
+        assert ciphertext == _aes_encrypt(aes_key, blob.iv, snowden1)[0]
 
-        decrypted = _aes_decrypt(aes_key, blob.iv, ciphertext)
+        decrypted = _aes_decrypt(aes_key, blob.iv, blob.tag, ciphertext,
+                                 preamble)
         assert str(decrypted) == snowden1
 
     @defer.inlineCallbacks
@@ -173,7 +175,7 @@ class BlobTestCase(unittest.TestCase):
         encdict = json.loads(encrypted)
         preamble, raw = _crypto._split(str(encdict['raw']))
         # mess with MAC
-        messed = raw[:-64] + '0' * 64
+        messed = raw[:-16] + '0' * 16
 
         preamble = base64.urlsafe_b64encode(preamble)
         newraw = preamble + ' ' + base64.urlsafe_b64encode(str(messed))
@@ -275,16 +277,16 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
     def test_encrypt_decrypt_sym(self):
         # generate 256-bit key
         key = os.urandom(32)
-        iv, cyphertext = _crypto.encrypt_sym('data', key)
+        iv, tag, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
-        plaintext = _crypto.decrypt_sym(cyphertext, key, iv)
+        plaintext = _crypto.decrypt_sym(cyphertext, key, iv, tag)
         self.assertEqual('data', plaintext)
 
-    def test_decrypt_with_wrong_iv_fails(self):
+    def test_decrypt_with_wrong_iv_raises(self):
         key = os.urandom(32)
-        iv, cyphertext = _crypto.encrypt_sym('data', key)
+        iv, tag, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -293,13 +295,13 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         wrongiv = rawiv
         while wrongiv == rawiv:
             wrongiv = os.urandom(1) + rawiv[1:]
-        plaintext = _crypto.decrypt_sym(
-            cyphertext, key, iv=binascii.b2a_base64(wrongiv))
-        self.assertNotEqual('data', plaintext)
+        with pytest.raises(InvalidTag):
+            _crypto.decrypt_sym(
+                cyphertext, key, iv=binascii.b2a_base64(wrongiv), tag=tag)
 
-    def test_decrypt_with_wrong_key_fails(self):
+    def test_decrypt_with_wrong_key_raises(self):
         key = os.urandom(32)
-        iv, cyphertext = _crypto.encrypt_sym('data', key)
+        iv, tag, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -307,19 +309,21 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         # ensure keys are different in case we are extremely lucky
         while wrongkey == key:
             wrongkey = os.urandom(32)
-        plaintext = _crypto.decrypt_sym(cyphertext, wrongkey, iv)
-        self.assertNotEqual('data', plaintext)
+        with pytest.raises(InvalidTag):
+            _crypto.decrypt_sym(cyphertext, wrongkey, iv, tag)
 
 
 def _aes_encrypt(key, iv, data):
     backend = default_backend()
-    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=backend)
     encryptor = cipher.encryptor()
-    return encryptor.update(data) + encryptor.finalize()
+    return encryptor.update(data) + encryptor.finalize(), encryptor.tag
 
 
-def _aes_decrypt(key, iv, data):
+def _aes_decrypt(key, iv, tag, data, aead=''):
     backend = default_backend()
-    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=backend)
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag), backend=backend)
     decryptor = cipher.decryptor()
+    if aead:
+        decryptor.authenticate_additional_data(aead)
     return decryptor.update(data) + decryptor.finalize()
