@@ -200,8 +200,9 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         encrypted_secret = rd[
             self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id]
         self.assertTrue(self._soledad.secrets.CIPHER_KEY in encrypted_secret)
-        self.assertTrue(
-            encrypted_secret[self._soledad.secrets.CIPHER_KEY] == 'aes256')
+        self.assertEquals(
+            _crypto.ENC_METHOD.aes_256_gcm,
+            encrypted_secret[self._soledad.secrets.CIPHER_KEY])
         self.assertTrue(self._soledad.secrets.LENGTH_KEY in encrypted_secret)
         self.assertTrue(self._soledad.secrets.SECRET_KEY in encrypted_secret)
 

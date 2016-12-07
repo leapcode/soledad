@@ -142,7 +142,7 @@ class SoledadSecrets(object):
     KDF_SALT_KEY = 'kdf_salt'
     KDF_LENGTH_KEY = 'kdf_length'
     KDF_SCRYPT = 'scrypt'
-    CIPHER_AES256 = 'aes256'  # deprecated, AES-GCM
+    CIPHER_AES256 = 'aes256'  # deprecated, AES-CTR
     CIPHER_AES256_GCM = _crypto.ENC_METHOD.aes_256_gcm
     RECOVERY_DOC_VERSION_KEY = 'version'
     RECOVERY_DOC_VERSION = 1
@@ -451,6 +451,7 @@ class SoledadSecrets(object):
                 except SecretsException as e:
                     logger.error("failed to decrypt storage secret: %s"
                                  % str(e))
+                    raise e
         return secret_count, active_secret
 
     def _get_secrets_from_shared_db(self):
@@ -549,7 +550,12 @@ class SoledadSecrets(object):
         iv, ciphertext = encrypted_secret_dict[self.SECRET_KEY].split(
             self.SEPARATOR, 1)
         ciphertext = binascii.a2b_base64(ciphertext)
-        decrypted_secret = _crypto.decrypt_sym(ciphertext, key, iv, doc_cipher)
+        try:
+            decrypted_secret = _crypto.decrypt_sym(
+                ciphertext, key, iv, doc_cipher)
+        except Exception as e:
+            logger.error(e)
+            raise SecretsException("Unable to decrypt secret.")
         if encrypted_secret_dict[self.LENGTH_KEY] != len(decrypted_secret):
             raise SecretsException("Wrong length of decrypted secret.")
         return decrypted_secret
@@ -583,7 +589,7 @@ class SoledadSecrets(object):
         salt = os.urandom(self.SALT_LENGTH)
         # get a 256-bit key
         key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
-        doc_cipher = doc_cipher or self.CIPHER_AES256
+        doc_cipher = doc_cipher or self.CIPHER_AES256_GCM
         iv, ciphertext = _crypto.encrypt_sym(decrypted_secret, key, doc_cipher)
         ciphertext = binascii.b2a_base64(ciphertext)
         encrypted_secret_dict = {
