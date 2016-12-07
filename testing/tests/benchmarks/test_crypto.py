@@ -66,8 +66,8 @@ def create_raw_decryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_decrypt")
     def test_raw_decrypt(benchmark, payload):
         key = payload(32)
-        iv, tag, ciphertext = _crypto.encrypt_sym(payload(size), key)
-        benchmark(_crypto.decrypt_sym, ciphertext, key, iv, tag)
+        iv, ciphertext = _crypto.encrypt_sym(payload(size), key)
+        benchmark(_crypto.decrypt_sym, ciphertext, key, iv)
     return test_raw_decrypt
 
 
