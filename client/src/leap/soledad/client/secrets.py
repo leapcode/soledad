@@ -34,7 +34,7 @@ from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
 from leap.soledad.common.log import getLogger
 from leap.soledad.client import events
-from leap.soledad.client._crypto import encrypt_sym, decrypt_sym
+from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
 
 
 logger = getLogger(__name__)

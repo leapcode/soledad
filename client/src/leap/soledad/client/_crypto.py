@@ -36,6 +36,7 @@ from twisted.internet import defer
 from twisted.internet import interfaces
 from twisted.web.client import FileBodyProducer
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends.multibackend import MultiBackend
 from cryptography.hazmat.backends.openssl.backend \
@@ -44,7 +45,7 @@ from cryptography.hazmat.backends.openssl.backend \
 from zope.interface import implements
 
 
-MAC_KEY_LENGTH = 64
+SECRET_LENGTH = 64
 
 CRYPTO_BACKEND = MultiBackend([OpenSSLBackend()])
 
@@ -53,7 +54,7 @@ BLOB_SIGNATURE_MAGIC = '\x13\x37'
 
 
 ENC_SCHEME = namedtuple('SCHEME', 'symkey')(1)
-ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr')(1)
+ENC_METHOD = namedtuple('METHOD', 'aes_256_gcm')(1)
 DocInfo = namedtuple('DocInfo', 'doc_id rev')
 
 
@@ -95,8 +96,7 @@ class SoledadCrypto(object):
             raw = blob.getvalue()
             return '{"raw": "' + raw + '"}'
 
-        content = BytesIO()
-        content.write(str(doc.get_json()))
+        content = BytesIO(str(doc.get_json()))
         info = DocInfo(doc.doc_id, doc.rev)
         del doc
         encryptor = BlobEncryptor(info, content, secret=self.secret)
@@ -125,7 +125,7 @@ class SoledadCrypto(object):
 
 def encrypt_sym(data, key):
     """
-    Encrypt data using AES-256 cipher in CTR mode.
+    Encrypt data using AES-256 cipher in GCM mode.
 
     :param data: The data to be encrypted.
     :type data: str
@@ -138,13 +138,15 @@ def encrypt_sym(data, key):
     """
     encryptor = AESWriter(key)
     encryptor.write(data)
-    ciphertext = encryptor.end()
-    return base64.b64encode(encryptor.iv), ciphertext
+    _, ciphertext = encryptor.end()
+    iv = base64.b64encode(encryptor.iv)
+    tag = base64.b64encode(encryptor.tag)
+    return iv, tag, ciphertext
 
 
-def decrypt_sym(data, key, iv):
+def decrypt_sym(data, key, iv, tag):
     """
-    Decrypt data using AES-256 cipher in CTR mode.
+    Decrypt data using AES-256 cipher in GCM mode.
 
     :param data: The data to be decrypted.
     :type data: str
@@ -158,51 +160,43 @@ def decrypt_sym(data, key, iv):
     :rtype: str
     """
     _iv = base64.b64decode(str(iv))
-    decryptor = AESWriter(key, _iv, encrypt=False)
+    tag = base64.b64decode(str(tag))
+    decryptor = AESWriter(key, _iv, tag=tag)
     decryptor.write(data)
-    plaintext = decryptor.end()
+    _, plaintext = decryptor.end()
     return plaintext
 
 
 class BlobEncryptor(object):
     """
     Produces encrypted data from the cleartext data associated with a given
-    SoledadDocument using AES-256 cipher in CTR mode, together with a
-    HMAC-SHA512 Message Authentication Code.
+    SoledadDocument using AES-256 cipher in GCM mode.
     The production happens using a Twisted's FileBodyProducer, which uses a
     Cooperator to schedule calls and can be paused/resumed. Each call takes at
     most 65536 bytes from the input.
     Both the production input and output are file descriptors, so they can be
     applied to a stream of data.
     """
-    def __init__(self, doc_info, content_fd, result=None, secret=None):
+    def __init__(self, doc_info, content_fd, secret=None):
         if not secret:
             raise EncryptionDecryptionError('no secret given')
 
         self.doc_id = doc_info.doc_id
         self.rev = doc_info.rev
-
-        content_fd.seek(0)
-        self._producer = FileBodyProducer(content_fd, readSize=2**16)
         self._content_fd = content_fd
-
-        self._preamble = BytesIO()
-        self.result = result or BytesIO()
+        self._producer = FileBodyProducer(content_fd, readSize=2**16)
 
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
-        mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
-
-        self._aes_fd = BytesIO()
-        _aes = AESWriter(sym_key, _buffer=self._aes_fd)
-        self._iv = _aes.iv
-        self._hmac_writer = HMACWriter(mac_key)
-        self._write_preamble()
-
-        self._crypter = VerifiedAESWriter(_aes, self._hmac_writer)
+        self._aes = AESWriter(sym_key)
+        self._aes.authenticate(self._make_preamble())
 
     @property
     def iv(self):
-        return self._iv
+        return self._aes.iv
+
+    @property
+    def tag(self):
+        return self._aes.tag
 
     def encrypt(self):
         """
@@ -212,39 +206,31 @@ class BlobEncryptor(object):
             callback will be invoked with the resulting ciphertext.
         :rtype: twisted.internet.defer.Deferred
         """
-        d = self._producer.startProducing(self._crypter)
+        d = self._producer.startProducing(self._aes)
         d.addCallback(lambda _: self._end_crypto_stream())
         return d
 
-    def _write_preamble(self):
-
-        def write(data):
-            self._preamble.write(data)
-            self._hmac_writer.write(data)
-
+    def _make_preamble(self):
         current_time = int(time.time())
 
-        write(PACMAN.pack(
+        return PACMAN.pack(
             BLOB_SIGNATURE_MAGIC,
             ENC_SCHEME.symkey,
-            ENC_METHOD.aes_256_ctr,
+            ENC_METHOD.aes_256_gcm,
             current_time,
             self.iv,
             str(self.doc_id),
-            str(self.rev)))
+            str(self.rev))
 
     def _end_crypto_stream(self):
-        encrypted, content_hmac = self._crypter.end()
-
-        preamble = self._preamble.getvalue()
-
-        self.result.write(
+        preamble, encrypted = self._aes.end()
+        result = BytesIO()
+        result.write(
             base64.urlsafe_b64encode(preamble))
-        self.result.write(' ')
-        self.result.write(
-            base64.urlsafe_b64encode(encrypted + content_hmac))
-        self.result.seek(0)
-        return defer.succeed(self.result)
+        result.write(' ')
+        result.write(
+            base64.urlsafe_b64encode(encrypted + self.tag))
+        return defer.succeed(result)
 
 
 class BlobDecryptor(object):
@@ -252,7 +238,7 @@ class BlobDecryptor(object):
     Decrypts an encrypted blob associated with a given Document.
 
     Will raise an exception if the blob doesn't have the expected structure, or
-    if the HMAC doesn't verify.
+    if the GCM tag doesn't verify.
     """
 
     def __init__(self, doc_info, ciphertext_fd, result=None,
@@ -264,16 +250,11 @@ class BlobDecryptor(object):
         self.rev = doc_info.rev
 
         ciphertext_fd, preamble, iv = self._consume_preamble(ciphertext_fd)
-        mac_key = _get_mac_key_for_doc(doc_info.doc_id, secret)
-        self._current_hmac = BytesIO()
-        _hmac_writer = HMACWriter(mac_key, self._current_hmac)
-        _hmac_writer.write(preamble)
 
         self.result = result or BytesIO()
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
-        _aes = AESWriter(sym_key, iv, self.result,
-                         encrypt=False)
-        self._decrypter = VerifiedAESWriter(_aes, _hmac_writer, encrypt=False)
+        self._aes = AESWriter(sym_key, iv, self.result, tag=self.tag)
+        self._aes.authenticate(preamble)
 
         self._producer = FileBodyProducer(ciphertext_fd, readSize=2**16)
 
@@ -281,7 +262,7 @@ class BlobDecryptor(object):
         ciphertext_fd.seek(0)
         try:
             preamble, ciphertext = _split(ciphertext_fd.getvalue())
-            self.doc_hmac, ciphertext = ciphertext[-64:], ciphertext[:-64]
+            self.tag, ciphertext = ciphertext[-16:], ciphertext[:-16]
         except (TypeError, binascii.Error):
             raise InvalidBlob
         ciphertext_fd.close()
@@ -300,7 +281,7 @@ class BlobDecryptor(object):
         # TODO check timestamp
         if sch != ENC_SCHEME.symkey:
             raise InvalidBlob('invalid scheme')
-        if meth != ENC_METHOD.aes_256_ctr:
+        if meth != ENC_METHOD.aes_256_gcm:
             raise InvalidBlob('invalid encryption scheme')
         if rev != self.rev:
             raise InvalidBlob('invalid revision')
@@ -308,14 +289,11 @@ class BlobDecryptor(object):
             raise InvalidBlob('invalid revision')
         return BytesIO(ciphertext), preamble, iv
 
-    def _check_hmac(self):
-        if self._current_hmac.getvalue() != self.doc_hmac:
-            raise InvalidBlob('HMAC could not be verifed')
-
     def _end_stream(self):
-        self._decrypter.end()
-        self._check_hmac()
-        return self.result.getvalue()
+        try:
+            return self._aes.end()[1]
+        except InvalidTag:
+            raise InvalidBlob('Invalid Tag. Blob authentication failed.')
 
     def decrypt(self):
         """
@@ -325,83 +303,41 @@ class BlobDecryptor(object):
             callback will be invoked with the resulting ciphertext.
         :rtype: twisted.internet.defer.Deferred
         """
-        d = self._producer.startProducing(self._decrypter)
+        d = self._producer.startProducing(self._aes)
         d.addCallback(lambda _: self._end_stream())
         return d
 
 
-class GenericWriter(object):
-    """
-    A Twisted's Consumer implementation that can perform one opearation at the
-    written data and another at the end of the stream.
-    """
-    implements(interfaces.IConsumer)
-
-    def __init__(self, process, close, result=None):
-        self.result = result or BytesIO()
-        self.process, self.close = process, close
-
-    def write(self, data):
-        out = self.process(data)
-        if out:
-            self.result.write(out)
-        return out
-
-    def end(self):
-        self.result.write(self.close())
-        return self.result.getvalue()
-
-
-class HMACWriter(GenericWriter):
+class AESWriter(object):
     """
     A Twisted's Consumer implementation that takes an input file descriptor and
-    produces a HMAC-SHA512 Message Authentication Code.
-    """
-    implements(interfaces.IConsumer)
-    hashtype = 'sha512'
-
-    def __init__(self, key, result=None):
-        hmac_obj = hmac.new(key, '', getattr(hashlib, self.hashtype))
-        GenericWriter.__init__(self, hmac_obj.update, hmac_obj.digest, result)
-
-
-class AESWriter(GenericWriter):
-    """
-    A Twisted's Consumer implementation that takes an input file descriptor and
-    applies AES-256 cipher in CTR mode.
+    applies AES-256 cipher in GCM mode.
     """
     implements(interfaces.IConsumer)
 
-    def __init__(self, key, iv=None, _buffer=None, encrypt=True):
+    def __init__(self, key, iv=None, _buffer=None, tag=None):
         if len(key) != 32:
             raise EncryptionDecryptionError('key is not 256 bits')
         self.iv = iv or os.urandom(16)
-        cipher = _get_aes_ctr_cipher(key, self.iv)
-        cipher = cipher.encryptor() if encrypt else cipher.decryptor()
-        GenericWriter.__init__(self, cipher.update, cipher.finalize, _buffer)
+        self.buffer = _buffer or BytesIO()
+        cipher = _get_aes_gcm_cipher(key, self.iv, tag)
+        cipher = cipher.decryptor() if tag else cipher.encryptor()
+        self.cipher, self.aead = cipher, ''
 
+    def authenticate(self, data):
+        self.aead += data
+        self.cipher.authenticate_additional_data(data)
 
-class VerifiedAESWriter(object):
-    """
-    A Twisted's Consumer implementation that flows data into two writers.
-    Here we can combine AESEncryptor and HMACWriter.
-    It directs the resulting ciphertext into HMAC-SHA512 processing if
-    pipe=True or writes the ciphertext to both (fan out, which is the case when
-    decrypting).
-    """
-    implements(interfaces.IConsumer)
-
-    def __init__(self, aes_writer, hmac_writer, encrypt=True):
-        self.encrypt = encrypt
-        self.aes_writer = aes_writer
-        self.hmac_writer = hmac_writer
+    @property
+    def tag(self):
+        return self.cipher.tag
 
     def write(self, data):
-        enc_chunk = self.aes_writer.write(data)
-        self.hmac_writer.write(enc_chunk if self.encrypt else data)
+        self.buffer.write(self.cipher.update(data))
 
     def end(self):
-        return self.aes_writer.end(), self.hmac_writer.end()
+        self.buffer.write(self.cipher.finalize())
+        return self.aead, self.buffer.getvalue()
 
 
 def is_symmetrically_encrypted(content):
@@ -425,18 +361,14 @@ def _hmac_sha256(key, data):
     return hmac.new(key, data, hashlib.sha256).digest()
 
 
-def _get_mac_key_for_doc(doc_id, secret):
-    key = secret[:MAC_KEY_LENGTH]
-    return _hmac_sha256(key, doc_id)
-
-
 def _get_sym_key_for_doc(doc_id, secret):
-    key = secret[MAC_KEY_LENGTH:]
+    key = secret[SECRET_LENGTH:]
     return _hmac_sha256(key, doc_id)
 
 
-def _get_aes_ctr_cipher(key, iv):
-    return Cipher(algorithms.AES(key), modes.CTR(iv), backend=CRYPTO_BACKEND)
+def _get_aes_gcm_cipher(key, iv, tag):
+    mode = modes.GCM(iv, tag)
+    return Cipher(algorithms.AES(key), mode, backend=CRYPTO_BACKEND)
 
 
 def _split(base64_raw_payload):
