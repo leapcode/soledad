@@ -54,7 +54,7 @@ BLOB_SIGNATURE_MAGIC = '\x13\x37'
 
 
 ENC_SCHEME = namedtuple('SCHEME', 'symkey')(1)
-ENC_METHOD = namedtuple('METHOD', 'aes_256_gcm')(1)
+ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr aes_256_gcm')(1, 2)
 DocInfo = namedtuple('DocInfo', 'doc_id rev')
 
 
@@ -123,9 +123,9 @@ class SoledadCrypto(object):
         return decryptor.decrypt()
 
 
-def encrypt_sym(data, key):
+def encrypt_sym(data, key, method=ENC_METHOD.aes_256_gcm):
     """
-    Encrypt data using AES-256 cipher in GCM mode.
+    Encrypt data using AES-256 cipher in selected mode.
 
     :param data: The data to be encrypted.
     :type data: str
@@ -136,17 +136,18 @@ def encrypt_sym(data, key):
         encoded as base64.
     :rtype: (str, str)
     """
-    encryptor = AESWriter(key)
+    mode = _mode_by_method(method)
+    encryptor = AESWriter(key, mode=mode)
     encryptor.write(data)
     _, ciphertext = encryptor.end()
     iv = base64.b64encode(encryptor.iv)
-    tag = base64.b64encode(encryptor.tag)
-    return iv, tag, ciphertext
+    tag = encryptor.tag or ''
+    return iv, ciphertext + tag
 
 
-def decrypt_sym(data, key, iv, tag):
+def decrypt_sym(data, key, iv, method=ENC_METHOD.aes_256_gcm):
     """
-    Decrypt data using AES-256 cipher in GCM mode.
+    Decrypt data using AES-256 cipher in selected mode.
 
     :param data: The data to be decrypted.
     :type data: str
@@ -160,8 +161,11 @@ def decrypt_sym(data, key, iv, tag):
     :rtype: str
     """
     _iv = base64.b64decode(str(iv))
-    tag = base64.b64decode(str(tag))
-    decryptor = AESWriter(key, _iv, tag=tag)
+    mode = _mode_by_method(method)
+    tag = None
+    if mode == modes.GCM:
+        data, tag = data[:-16], data[-16:]
+    decryptor = AESWriter(key, _iv, tag=tag, mode=mode)
     decryptor.write(data)
     _, plaintext = decryptor.end()
     return plaintext
@@ -315,12 +319,12 @@ class AESWriter(object):
     """
     implements(interfaces.IConsumer)
 
-    def __init__(self, key, iv=None, _buffer=None, tag=None):
+    def __init__(self, key, iv=None, _buffer=None, tag=None, mode=modes.GCM):
         if len(key) != 32:
             raise EncryptionDecryptionError('key is not 256 bits')
         self.iv = iv or os.urandom(16)
         self.buffer = _buffer or BytesIO()
-        cipher = _get_aes_gcm_cipher(key, self.iv, tag)
+        cipher = _get_aes_cipher(key, self.iv, tag, mode)
         cipher = cipher.decryptor() if tag else cipher.encryptor()
         self.cipher, self.aead = cipher, ''
 
@@ -330,7 +334,7 @@ class AESWriter(object):
 
     @property
     def tag(self):
-        return self.cipher.tag
+        return getattr(self.cipher, 'tag', None)
 
     def write(self, data):
         self.buffer.write(self.cipher.update(data))
@@ -366,10 +370,17 @@ def _get_sym_key_for_doc(doc_id, secret):
     return _hmac_sha256(key, doc_id)
 
 
-def _get_aes_gcm_cipher(key, iv, tag):
-    mode = modes.GCM(iv, tag)
+def _get_aes_cipher(key, iv, tag, mode=modes.GCM):
+    mode = mode(iv, tag) if mode == modes.GCM else mode(iv)
     return Cipher(algorithms.AES(key), mode, backend=CRYPTO_BACKEND)
 
 
 def _split(base64_raw_payload):
     return imap(base64.urlsafe_b64decode, re.split(' ', base64_raw_payload))
+
+
+def _mode_by_method(method):
+    if method == ENC_METHOD.aes_256_gcm:
+        return modes.GCM
+    else:
+        return modes.CTR

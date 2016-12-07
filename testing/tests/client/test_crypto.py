@@ -114,7 +114,7 @@ class BlobTestCase(unittest.TestCase):
         magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
         assert magic == _crypto.BLOB_SIGNATURE_MAGIC
         assert sch == 1
-        assert meth == 1
+        assert meth == _crypto.ENC_METHOD.aes_256_gcm
         assert iv == blob.iv
         assert doc_id == 'D-deadbeef'
         assert rev == self.doc_info.rev
@@ -163,7 +163,7 @@ class BlobTestCase(unittest.TestCase):
         assert json.loads(decrypted) == payload
 
     @defer.inlineCallbacks
-    def test_decrypt_with_wrong_mac_raises(self):
+    def test_decrypt_with_wrong_tag_raises(self):
         """
         Trying to decrypt a document with wrong MAC should raise.
         """
@@ -174,7 +174,7 @@ class BlobTestCase(unittest.TestCase):
         encrypted = yield crypto.encrypt_doc(doc1)
         encdict = json.loads(encrypted)
         preamble, raw = _crypto._split(str(encdict['raw']))
-        # mess with MAC
+        # mess with tag
         messed = raw[:-16] + '0' * 16
 
         preamble = base64.urlsafe_b64encode(preamble)
@@ -205,8 +205,8 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
         self.assertTrue(self._soledad.secrets.LENGTH_KEY in encrypted_secret)
         self.assertTrue(self._soledad.secrets.SECRET_KEY in encrypted_secret)
 
-    def test_import_recovery_document(self):
-        rd = self._soledad.secrets._export_recovery_document()
+    def test_import_recovery_document(self, cipher='aes256'):
+        rd = self._soledad.secrets._export_recovery_document(cipher)
         s = self._soledad_instance()
         s.secrets._import_recovery_document(rd)
         s.secrets.set_secret_id(self._soledad.secrets._secret_id)
@@ -214,6 +214,14 @@ class RecoveryDocumentTestCase(BaseSoledadTest):
                          s.storage_secret,
                          'Failed settinng secret for symmetric encryption.')
         s.close()
+
+    def test_import_GCM_recovery_document(self):
+        cipher = self._soledad.secrets.CIPHER_AES256_GCM
+        self.test_import_recovery_document(cipher)
+
+    def test_import_legacy_CTR_recovery_document(self):
+        cipher = self._soledad.secrets.CIPHER_AES256
+        self.test_import_recovery_document(cipher)
 
 
 class SoledadSecretsTestCase(BaseSoledadTest):
@@ -277,16 +285,16 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
     def test_encrypt_decrypt_sym(self):
         # generate 256-bit key
         key = os.urandom(32)
-        iv, tag, cyphertext = _crypto.encrypt_sym('data', key)
+        iv, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
-        plaintext = _crypto.decrypt_sym(cyphertext, key, iv, tag)
+        plaintext = _crypto.decrypt_sym(cyphertext, key, iv)
         self.assertEqual('data', plaintext)
 
     def test_decrypt_with_wrong_iv_raises(self):
         key = os.urandom(32)
-        iv, tag, cyphertext = _crypto.encrypt_sym('data', key)
+        iv, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -297,11 +305,11 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
             wrongiv = os.urandom(1) + rawiv[1:]
         with pytest.raises(InvalidTag):
             _crypto.decrypt_sym(
-                cyphertext, key, iv=binascii.b2a_base64(wrongiv), tag=tag)
+                cyphertext, key, iv=binascii.b2a_base64(wrongiv))
 
     def test_decrypt_with_wrong_key_raises(self):
         key = os.urandom(32)
-        iv, tag, cyphertext = _crypto.encrypt_sym('data', key)
+        iv, cyphertext = _crypto.encrypt_sym('data', key)
         self.assertTrue(cyphertext is not None)
         self.assertTrue(cyphertext != '')
         self.assertTrue(cyphertext != 'data')
@@ -310,7 +318,7 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
         while wrongkey == key:
             wrongkey = os.urandom(32)
         with pytest.raises(InvalidTag):
-            _crypto.decrypt_sym(cyphertext, wrongkey, iv, tag)
+            _crypto.decrypt_sym(cyphertext, wrongkey, iv)
 
 
 def _aes_encrypt(key, iv, data):
