@@ -22,6 +22,8 @@ tests:
   script:
     - cd testing
     - tox -- --couch-url http://couchdb:5984
+  tags:
+    - couchdb
 
 benchmark:
   stage: benchmark
