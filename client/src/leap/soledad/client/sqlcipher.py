@@ -59,6 +59,7 @@ from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
+from leap.soledad.client.http_target import newCookieAgent
 from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client import pragmas
 
@@ -397,7 +398,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     ENCRYPT_LOOP_PERIOD = 1
 
     def __init__(self, opts, soledad_crypto, replica_uid, cert_file):
-
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto
@@ -406,6 +406,10 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         # storage for the documents received during a sync
         self.received_docs = []
+
+        # setup an http agent capable of storing cookies, so we can use
+        # server's session persistence feature
+        self._agent = newCookieAgent(cert_file)
 
         self.running = False
         self._db_handle = None
@@ -491,7 +495,8 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                 self._replica_uid,
                 creds=creds,
                 crypto=self._crypto,
-                cert_file=self._cert_file))
+                cert_file=self._cert_file,
+                agent=self._agent))
 
     #
     # Symmetric encryption of syncing docs

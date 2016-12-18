@@ -24,10 +24,14 @@ after receiving.
 
 import os
 
-from leap.soledad.common.log import getLogger
-from leap.common.certs import get_compatible_ssl_context_factory
+from cookielib import CookieJar
+
 from twisted.web.client import Agent
+from twisted.web.client import CookieAgent
 from twisted.internet import reactor
+
+from leap.common.certs import get_compatible_ssl_context_factory
+from leap.soledad.common.log import getLogger
 from leap.soledad.client.http_target.send import HTTPDocSender
 from leap.soledad.client.http_target.api import SyncTargetAPI
 from leap.soledad.client.http_target.fetch import HTTPDocFetcher
@@ -43,6 +47,14 @@ if os.environ.get('SOLEDAD_STATS'):
     DO_STATS = True
 
 
+def newCookieAgent(cert_file):
+    _factory = get_compatible_ssl_context_factory(cert_file)
+    _agent = Agent(reactor, _factory)
+    _cookieJar = CookieJar()
+    agent = CookieAgent(_agent, _cookieJar)
+    return agent
+
+
 class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
 
     """
@@ -54,7 +66,8 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
     the parsed documents that the remote send us, before being decrypted and
     written to the main database.
     """
-    def __init__(self, url, source_replica_uid, creds, crypto, cert_file):
+    def __init__(self, url, source_replica_uid, creds, crypto, cert_file,
+                 agent=None):
         """
         Initialize the sync target.
 
@@ -72,6 +85,8 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
                           the SSL certificate used by the remote soledad
                           server.
         :type cert_file: str
+        :param agent: an http agent
+        :type agent: twisted.web.client.Agent
         """
         if url.endswith("/"):
             url = url[:-1]
@@ -86,8 +101,9 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self._insert_doc_cb = None
 
         # Twisted default Agent with our own ssl context factory
-        self._http = Agent(reactor,
-                           get_compatible_ssl_context_factory(cert_file))
+        if not agent:
+            agent = newCookieAgent(cert_file)
+        self._http = agent
 
         if DO_STATS:
             self.sync_exchange_phase = [0]
