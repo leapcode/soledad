@@ -18,11 +18,9 @@
 Tests for server-related functionality.
 """
 import binascii
-import mock
 import os
 import pytest
 
-from hashlib import sha512
 from pkg_resources import resource_filename
 from urlparse import urljoin
 from uuid import uuid4
@@ -46,36 +44,6 @@ from leap.soledad.client import Soledad
 from leap.soledad.server.config import load_configuration
 from leap.soledad.server.config import CONFIG_DEFAULTS
 from leap.soledad.server.auth import URLMapper
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
-
-
-class ServerAuthenticationMiddlewareTestCase(CouchDBTestCase):
-
-    def setUp(self):
-        super(ServerAuthenticationMiddlewareTestCase, self).setUp()
-        app = mock.Mock()
-        self._state = CouchServerState(self.couch_url)
-        app.state = self._state
-        self.auth_middleware = SoledadTokenAuthMiddleware(app)
-        self._authorize('valid-uuid', 'valid-token')
-
-    def _authorize(self, uuid, token):
-        token_doc = {}
-        token_doc['_id'] = sha512(token).hexdigest()
-        token_doc[self._state.TOKENS_USER_ID_KEY] = uuid
-        token_doc[self._state.TOKENS_TYPE_KEY] = \
-            self._state.TOKENS_TYPE_DEF
-        dbname = self._state._tokens_dbname()
-        db = self.couch_server.create(dbname)
-        db.save(token_doc)
-        self.addCleanup(self.delete_db, db.name)
-
-    def test_authorized_user(self):
-        is_authorized = self.auth_middleware._verify_authentication_data
-        self.assertTrue(is_authorized('valid-uuid', 'valid-token'))
-        self.assertFalse(is_authorized('valid-uuid', 'invalid-token'))
-        self.assertFalse(is_authorized('invalid-uuid', 'valid-token'))
-        self.assertFalse(is_authorized('eve', 'invalid-token'))
 
 
 class ServerAuthorizationTestCase(BaseSoledadTest):
@@ -89,12 +57,6 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
 
     def tearDown(self):
         pass
-
-    def _make_environ(self, path_info, request_method):
-        return {
-            'PATH_INFO': path_info,
-            'REQUEST_METHOD': request_method,
-        }
 
     def test_verify_action_with_correct_dbnames(self):
         """
@@ -120,146 +82,94 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
         dbname = 'user-%s' % uuid
 
         # test global auth
-        match = urlmap.match(self._make_environ('/', 'GET'))
+        match = urlmap.match('/', 'GET')
+        self.assertIsNotNone(match)
 
         # test shared-db database resource auth
-        match = urlmap.match(
-            self._make_environ('/shared', 'GET'))
+        match = urlmap.match('/shared', 'GET')
         self.assertIsNotNone(match)
 
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared', 'PUT')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared', 'DELETE')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared', 'POST')))
-
-        # test shared-db docs resource auth
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/docs', 'GET')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/docs', 'PUT')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/docs', 'DELETE')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/docs', 'POST')))
-
-        # test shared-db doc resource auth
-        match = urlmap.match(
-            self._make_environ('/shared/doc/x', 'GET'))
-        self.assertIsNotNone(match)
-        self.assertEqual('x', match.get('id'))
-
-        match = urlmap.match(
-            self._make_environ('/shared/doc/x', 'PUT'))
-        self.assertIsNotNone(match)
-        self.assertEqual('x', match.get('id'))
-
-        match = urlmap.match(
-            self._make_environ('/shared/doc/x', 'DELETE'))
-        self.assertEqual('x', match.get('id'))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/doc/x', 'POST')))
-
-        # test shared-db sync resource auth
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/sync-from/x', 'GET')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/sync-from/x', 'PUT')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/sync-from/x', 'DELETE')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/shared/sync-from/x', 'POST')))
-
-        # test user-db database resource auth
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s' % dbname, 'GET')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s' % dbname, 'PUT')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s' % dbname, 'DELETE')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s' % dbname, 'POST')))
-
-        # test user-db docs resource auth
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/docs' % dbname, 'GET')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/docs' % dbname, 'PUT')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/docs' % dbname, 'DELETE')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/docs' % dbname, 'POST')))
-
-        # test user-db doc resource auth
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/doc/x' % dbname, 'GET')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/doc/x' % dbname, 'PUT')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/doc/x' % dbname, 'DELETE')))
-
-        self.assertIsNone(
-            urlmap.match(
-                self._make_environ('/%s/doc/x' % dbname, 'POST')))
-
-        # test user-db sync resource auth
-        match = urlmap.match(
-            self._make_environ('/%s/sync-from/x' % dbname, 'GET'))
-        self.assertEqual(uuid, match.get('uuid'))
-        self.assertEqual('x', match.get('source_replica_uid'))
-
-        match = urlmap.match(
-            self._make_environ('/%s/sync-from/x' % dbname, 'PUT'))
-        self.assertEqual(uuid, match.get('uuid'))
-        self.assertEqual('x', match.get('source_replica_uid'))
-
-        match = urlmap.match(
-            self._make_environ('/%s/sync-from/x' % dbname, 'DELETE'))
+        match = urlmap.match('/shared', 'PUT')
         self.assertIsNone(match)
 
-        match = urlmap.match(
-            self._make_environ('/%s/sync-from/x' % dbname, 'POST'))
+        match = urlmap.match('/shared', 'DELETE')
+        self.assertIsNone(match)
+
+        match = urlmap.match('/shared', 'POST')
+        self.assertIsNone(match)
+
+        # test shared-db docs resource auth
+        self.assertIsNone(urlmap.match('/shared/docs', 'GET'))
+
+        self.assertIsNone(urlmap.match('/shared/docs', 'PUT'))
+
+        self.assertIsNone(urlmap.match('/shared/docs', 'DELETE'))
+
+        self.assertIsNone(urlmap.match('/shared/docs', 'POST'))
+
+        # test shared-db doc resource auth
+        match = urlmap.match('/shared/doc/x', 'GET')
+        self.assertIsNotNone(match)
+        self.assertEqual('x', match.get('id'))
+
+        match = urlmap.match('/shared/doc/x', 'PUT')
+        self.assertIsNotNone(match)
+        self.assertEqual('x', match.get('id'))
+
+        match = urlmap.match('/shared/doc/x', 'DELETE')
+        self.assertEqual('x', match.get('id'))
+
+        self.assertIsNone(urlmap.match('/shared/doc/x', 'POST'))
+
+        # test shared-db sync resource auth
+        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'GET'))
+
+        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'PUT'))
+
+        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'DELETE'))
+
+        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'POST'))
+
+        # test user-db database resource auth
+        self.assertIsNone(urlmap.match('/%s' % dbname, 'GET'))
+
+        self.assertIsNone(urlmap.match('/%s' % dbname, 'PUT'))
+
+        self.assertIsNone(urlmap.match('/%s' % dbname, 'DELETE'))
+
+        self.assertIsNone(urlmap.match('/%s' % dbname, 'POST'))
+
+        # test user-db docs resource auth
+        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'GET'))
+
+        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'PUT'))
+
+        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'DELETE'))
+
+        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'POST'))
+
+        # test user-db doc resource auth
+        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'GET'))
+
+        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'PUT'))
+
+        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'DELETE'))
+
+        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'POST'))
+
+        # test user-db sync resource auth
+        match = urlmap.match('/%s/sync-from/x' % dbname, 'GET')
+        self.assertEqual(uuid, match.get('uuid'))
+        self.assertEqual('x', match.get('source_replica_uid'))
+
+        match = urlmap.match('/%s/sync-from/x' % dbname, 'PUT')
+        self.assertEqual(uuid, match.get('uuid'))
+        self.assertEqual('x', match.get('source_replica_uid'))
+
+        match = urlmap.match('/%s/sync-from/x' % dbname, 'DELETE')
+        self.assertIsNone(match)
+
+        match = urlmap.match('/%s/sync-from/x' % dbname, 'POST')
         self.assertEqual(uuid, match.get('uuid'))
         self.assertEqual('x', match.get('source_replica_uid'))
 

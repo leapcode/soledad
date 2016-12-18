@@ -24,7 +24,6 @@ Use it like this:
 from twisted.internet import reactor
 
 from leap.soledad.server import SoledadApp
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
 from leap.soledad.server.config import load_configuration
 from leap.soledad.common.backend import SoledadBackend
@@ -35,20 +34,25 @@ from leap.soledad.common.log import getLogger
 __all__ = ['wsgi_application']
 
 
-def _load_config():
-    conf = load_configuration('/etc/soledad/soledad-server.conf')
-    return conf['soledad-server']
+_config = None
+
+
+def get_config():
+    global _config
+    if not _config:
+        _config = load_configuration('/etc/soledad/soledad-server.conf')
+    return _config['soledad-server']
 
 
 def _get_couch_state():
-    conf = _load_config()
+    conf = get_config()
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'],
                              check_schema_versions=True)
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
     return state
 
 
-_app = SoledadTokenAuthMiddleware(SoledadApp(None))  # delay state init
+_app = SoledadApp(None)  # delay state init
 wsgi_application = GzipMiddleware(_app)
 
 

@@ -15,20 +15,110 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Authentication facilities for Soledad Server.
+Twisted http token auth.
 """
-import httplib
-import json
+import binascii
+import time
 
-from abc import ABCMeta, abstractmethod
+from hashlib import sha512
 from routes.mapper import Mapper
+from zope.interface import implementer
 
-from leap.soledad.common.log import getLogger
-from leap.soledad.common.l2db import DBNAME_CONSTRAINTS, errors as u1db_errors
+from twisted.cred import error
+from twisted.cred.checkers import ICredentialsChecker
+from twisted.cred.credentials import IUsernamePassword
+from twisted.cred.credentials import UsernamePassword
+from twisted.cred.portal import IRealm
+from twisted.cred.portal import Portal
+from twisted.web.iweb import ICredentialFactory
+from twisted.web.resource import IResource
+
 from leap.soledad.common import SHARED_DB_NAME
+from leap.soledad.common.couch import couch_server
+from leap.soledad.common.l2db import DBNAME_CONSTRAINTS
+from leap.soledad.server.resource import SoledadResource
+from leap.soledad.server.application import get_config
 
 
-logger = getLogger(__name__)
+@implementer(IRealm)
+class SoledadRealm(object):
+
+    def requestAvatar(self, avatarId, mind, *interfaces):
+        if IResource in interfaces:
+            return (IResource, SoledadResource(avatarId), lambda: None)
+        raise NotImplementedError()
+
+
+@implementer(ICredentialsChecker)
+class TokenChecker(object):
+
+    credentialInterfaces = [IUsernamePassword]
+
+    TOKENS_DB_PREFIX = "tokens_"
+    TOKENS_DB_EXPIRE = 30 * 24 * 3600  # 30 days in seconds
+    TOKENS_TYPE_KEY = "type"
+    TOKENS_TYPE_DEF = "Token"
+    TOKENS_USER_ID_KEY = "user_id"
+
+    def __init__(self):
+        config = get_config()
+        self.couch_url = config['couch_url']
+
+    def _tokens_dbname(self):
+        dbname = self.TOKENS_DB_PREFIX + \
+            str(int(time.time() / self.TOKENS_DB_EXPIRE))
+        return dbname
+
+    def requestAvatarId(self, credentials):
+        uuid = credentials.username
+        token = credentials.password
+        with couch_server(self.couch_url) as server:
+            # the tokens db rotates every 30 days, and the current db name is
+            # "tokens_NNN", where NNN is the number of seconds since epoch
+            # divide dby the rotate period in seconds. When rotating, old and
+            # new tokens db coexist during a certain window of time and valid
+            # tokens are replicated from the old db to the new one. See:
+            # https://leap.se/code/issues/6785
+            dbname = self._tokens_dbname()
+            db = server[dbname]
+        # lookup key is a hash of the token to prevent timing attacks.
+        token = db.get(sha512(token).hexdigest())
+        if token is None:
+            return False
+        # we compare uuid hashes to avoid possible timing attacks that
+        # might exploit python's builtin comparison operator behaviour,
+        # which fails immediatelly when non-matching bytes are found.
+        couch_uuid_hash = sha512(token[self.TOKENS_USER_ID_KEY]).digest()
+        req_uuid_hash = sha512(uuid).digest()
+        if token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF \
+                or couch_uuid_hash != req_uuid_hash:
+            return False
+        return True
+
+
+@implementer(ICredentialFactory)
+class TokenCredentialFactory(object):
+
+    scheme = 'token'
+
+    def getChallenge(self, request):
+        return {}
+
+    def decode(self, response, request):
+        try:
+            creds = response.decode('base64')
+        except binascii.Error:
+            raise error.LoginFailed('Invalid credentials')
+
+        creds = creds.split(b':', 1)
+        if len(creds) == 2:
+            return UsernamePassword(*creds)
+        else:
+            raise error.LoginFailed('Invalid credentials')
+
+
+portal = Portal(SoledadRealm(), [TokenChecker()])
+credentialFactory = TokenCredentialFactory()
 
 
 class URLMapper(object):
@@ -41,7 +131,8 @@ class URLMapper(object):
         self._connect_urls()
         self._map.create_regs()
 
-    def match(self, environ):
+    def match(self, path, method):
+        environ = {'PATH_INFO': path, 'REQUEST_METHOD': method}
         return self._map.match(environ=environ)
 
     def _connect(self, pattern, http_methods):
@@ -81,272 +172,15 @@ class URLMapper(object):
                       ['GET', 'PUT', 'POST'])
 
 
-class SoledadAuthMiddleware(object):
-    """
-    Soledad Authentication WSGI middleware.
+@implementer(IResource)
+class UnauthorizedResource(object):
+    isLeaf = True
 
-    This class must be extended to implement specific authentication methods
-    (see SoledadTokenAuthMiddleware below).
+    def render(self, request):
+        request.setResponseCode(401)
+        if request.method == b'HEAD':
+            return b''
+        return b'Unauthorized'
 
-    It expects an HTTP_AUTHORIZATION header containing the concatenation of
-    the following strings:
-
-        1. The authentication scheme. It will be verified by the
-           _verify_authentication_scheme() method.
-
-        2. A space character.
-
-        3. The base64 encoded string of the concatenation of the user uuid with
-           the authentication data, separated by a collon, like this:
-
-               base64("<uuid>:<auth_data>")
-
-    After authentication check, the class performs an authorization check to
-    verify whether the user is authorized to perform the requested action.
-
-    On client-side, 2 methods must be implemented so the soledad client knows
-    how to send authentication headers to server:
-
-        * set_<method>_credentials: store authentication credentials in the
-          class.
-
-        * _sign_request: format and include custom authentication data in
-          the HTTP_AUTHORIZATION header.
-
-    See leap.soledad.auth and u1db.remote.http_client.HTTPClient to understand
-    how to do it.
-    """
-
-    __metaclass__ = ABCMeta
-
-    HTTP_AUTH_KEY = "HTTP_AUTHORIZATION"
-    PATH_INFO_KEY = "PATH_INFO"
-
-    CONTENT_TYPE_JSON = ('content-type', 'application/json')
-
-    def __init__(self, app):
-        """
-        Initialize the Soledad Authentication Middleware.
-
-        @param app: The application to run on successfull authentication.
-        @type app: u1db.remote.http_app.HTTPApp
-        @param prefix: Auth app path prefix.
-        @type prefix: str
-        """
-        self._app = app
-        self._mapper = URLMapper()
-
-    def _error(self, start_response, status, description, message=None):
-        """
-        Send a JSON serialized error to WSGI client.
-
-        @param start_response: Callable of the form start_response(status,
-            response_headers, exc_info=None).
-        @type start_response: callable
-        @param status: Status string of the form "999 Message here"
-        @type status: str
-        @param response_headers: A list of (header_name, header_value) tuples
-            describing the HTTP response header.
-        @type response_headers: list
-        @param description: The error description.
-        @type description: str
-        @param message: The error message.
-        @type message: str
-
-        @return: List with JSON serialized error message.
-        @rtype list
-        """
-        start_response("%d %s" % (status, httplib.responses[status]),
-                       [self.CONTENT_TYPE_JSON])
-        err = {"error": description}
-        if message:
-            err['message'] = message
-        return [json.dumps(err)]
-
-    def _unauthorized_error(self, start_response, message):
-        """
-        Send a unauth error.
-
-        @param message: The error message.
-        @type message: str
-        @param start_response: Callable of the form start_response(status,
-            response_headers, exc_info=None).
-        @type start_response: callable
-
-        @return: List with JSON serialized error message.
-        @rtype list
-        """
-        return self._error(
-            start_response,
-            401,
-            "unauthorized",
-            message)
-
-    def __call__(self, environ, start_response):
-        """
-        Handle a WSGI call to the authentication application.
-
-        @param environ: Dictionary containing CGI variables.
-        @type environ: dict
-        @param start_response: Callable of the form start_response(status,
-            response_headers, exc_info=None).
-        @type start_response: callable
-
-        @return: Target application results if authentication succeeds, an
-        error message otherwise.
-        @rtype: list
-        """
-        # check for authentication header
-        auth = environ.get(self.HTTP_AUTH_KEY)
-        if not auth:
-            return self._unauthorized_error(
-                start_response, "Missing authentication header.")
-
-        # get authentication data
-        scheme, encoded = auth.split(None, 1)
-        uuid, auth_data = encoded.decode('base64').split(':', 1)
-        if not self._verify_authentication_scheme(scheme):
-            return self._unauthorized_error(
-                start_response, "Wrong authentication scheme")
-
-        # verify if user is athenticated
-        try:
-            if not self._verify_authentication_data(uuid, auth_data):
-                return self._unauthorized_error(
-                    start_response,
-                    self._get_auth_error_string())
-        except u1db_errors.Unauthorized as e:
-            return self._error(
-                start_response,
-                401,
-                e.wire_description)
-
-        # verify if user is authorized to perform action
-        if not self._verify_authorization(environ, uuid):
-            return self._unauthorized_error(
-                start_response,
-                "Unauthorized action.")
-
-        # move on to the real Soledad app
-        del environ[self.HTTP_AUTH_KEY]
-        return self._app(environ, start_response)
-
-    @abstractmethod
-    def _verify_authentication_scheme(self, scheme):
-        """
-        Verify if authentication scheme is valid.
-
-        @param scheme: Auth scheme extracted from the HTTP_AUTHORIZATION
-            header.
-        @type scheme: str
-
-        @return: Whether the authentitcation scheme is valid.
-        """
-        return None
-
-    @abstractmethod
-    def _verify_authentication_data(self, uuid, auth_data):
-        """
-        Verify valid authenticatiion for this request.
-
-        @param uuid: The user's uuid.
-        @type uuid: str
-        @param auth_data: Authentication data.
-        @type auth_data: str
-
-        @return: Whether the token is valid for authenticating the request.
-        @rtype: bool
-
-        @raise Unauthorized: Raised when C{auth_data} is not enough to
-                             authenticate C{uuid}.
-        """
-        return None
-
-    def _verify_authorization(self, environ, uuid):
-        """
-        Verify if the user is authorized to perform the requested action over
-        the requested database.
-
-        @param environ: Dictionary containing CGI variables.
-        @type environ: dict
-        @param uuid: The user's uuid from the Authorization header.
-        @type uuid: str
-
-        @return: Whether the user is authorized to perform the requested action
-            over the requested db.
-        @rtype: bool
-        """
-        match = self._mapper.match(environ)
-        if not match:
-            return False
-        return uuid == match.get('uuid')
-
-    @abstractmethod
-    def _get_auth_error_string(self):
-        """
-        Return an error string specific for each kind of authentication method.
-
-        @return: The error string.
-        """
-        return None
-
-
-class SoledadTokenAuthMiddleware(SoledadAuthMiddleware):
-    """
-    Token based authentication.
-    """
-
-    TOKEN_AUTH_ERROR_STRING = "Incorrect address or token."
-
-    def _get_state(self):
-        return self._app.state
-
-    def _set_state(self, state):
-        self._app.state = state
-
-    state = property(_get_state, _set_state)
-
-    def _verify_authentication_scheme(self, scheme):
-        """
-        Verify if authentication scheme is valid.
-
-        @param scheme: Auth scheme extracted from the HTTP_AUTHORIZATION
-            header.
-        @type scheme: str
-
-        @return: Whether the authentitcation scheme is valid.
-        """
-        if scheme.lower() != 'token':
-            return False
-        return True
-
-    def _verify_authentication_data(self, uuid, auth_data):
-        """
-        Extract token from C{auth_data} and proceed with verification of
-        C{uuid} authentication.
-
-        @param uuid: The user UID.
-        @type uuid: str
-        @param auth_data: Authentication data (i.e. the token).
-        @type auth_data: str
-
-        @return: Whether the token is valid for authenticating the request.
-        @rtype: bool
-
-        @raise Unauthorized: Raised when C{auth_data} is not enough to
-                             authenticate C{uuid}.
-        """
-        token = auth_data  # we expect a cleartext token at this point
-        try:
-            return self.state.verify_token(uuid, token)
-        except Exception as e:
-            logger.error(e)
-            return False
-
-    def _get_auth_error_string(self):
-        """
-        Get the error string for token auth.
-
-        @return: The error string.
-        """
-        return self.TOKEN_AUTH_ERROR_STRING
+    def getChildWithDefault(self, path, request):
+        return self

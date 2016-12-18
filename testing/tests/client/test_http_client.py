@@ -24,7 +24,6 @@ from testscenarios import TestWithScenarios
 from leap.soledad.client import auth
 from leap.soledad.common.l2db.remote import http_client
 from test_soledad.u1db_tests import test_http_client
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
 # -----------------------------------------------------------------------------
@@ -67,7 +66,7 @@ class TestSoledadClientBase(
             return res
         # mime solead application here.
         if '/token' in environ['PATH_INFO']:
-            auth = environ.get(SoledadTokenAuthMiddleware.HTTP_AUTH_KEY)
+            auth = environ.get('HTTP_AUTHORIZATION')
             if not auth:
                 start_response("401 Unauthorized",
                                [('Content-Type', 'application/json')])

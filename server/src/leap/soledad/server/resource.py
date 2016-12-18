@@ -17,7 +17,6 @@
 """
 A twisted resource that serves the Soledad Server.
 """
-
 from twisted.web.resource import Resource
 from twisted.web.wsgi import WSGIResource
 from twisted.internet import reactor
@@ -42,7 +41,8 @@ class SoledadResource(Resource):
     for the Soledad Server.
     """
 
-    def __init__(self):
+    def __init__(self, uuid):
+        self._uuid = uuid
         self.children = {'': wsgi_resource}
 
     def getChild(self, path, request):
