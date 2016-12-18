@@ -45,7 +45,7 @@ from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
 from leap.soledad.server.config import load_configuration
 from leap.soledad.server.config import CONFIG_DEFAULTS
-from leap.soledad.server.auth import URLToAuthorization
+from leap.soledad.server.auth import URLMapper
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
@@ -116,175 +116,152 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
             /user-db/sync-from/{source}   | GET, PUT, POST
         """
         uuid = uuid4().hex
-        authmap = URLToAuthorization(uuid,)
-        dbname = authmap._user_db_name
-        # test global auth
-        self.assertTrue(
-            authmap.is_authorized(self._make_environ('/', 'GET')))
-        # test shared-db database resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'POST')))
-        # test shared-db docs resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'POST')))
-        # test shared-db doc resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'GET')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'PUT')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'POST')))
-        # test shared-db sync resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'POST')))
-        # test user-db database resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'POST')))
-        # test user-db docs resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'POST')))
-        # test user-db doc resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'POST')))
-        # test user-db sync resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'GET')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'DELETE')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
+        urlmap = URLMapper()
+        dbname = 'user-%s' % uuid
 
-    def test_verify_action_with_wrong_dbnames(self):
-        """
-        Test if authorization fails for a wrong dbname.
-        """
-        uuid = uuid4().hex
-        authmap = URLToAuthorization(uuid)
-        dbname = 'somedb'
-        # test wrong-db database resource auth
-        self.assertFalse(
-            authmap.is_authorized(
+        # test global auth
+        match = urlmap.match(self._make_environ('/', 'GET'))
+
+        # test shared-db database resource auth
+        match = urlmap.match(
+            self._make_environ('/shared', 'GET'))
+        self.assertIsNotNone(match)
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared', 'PUT')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared', 'DELETE')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared', 'POST')))
+
+        # test shared-db docs resource auth
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/docs', 'GET')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/docs', 'PUT')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/docs', 'DELETE')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/docs', 'POST')))
+
+        # test shared-db doc resource auth
+        match = urlmap.match(
+            self._make_environ('/shared/doc/x', 'GET'))
+        self.assertIsNotNone(match)
+        self.assertEqual('x', match.get('id'))
+
+        match = urlmap.match(
+            self._make_environ('/shared/doc/x', 'PUT'))
+        self.assertIsNotNone(match)
+        self.assertEqual('x', match.get('id'))
+
+        match = urlmap.match(
+            self._make_environ('/shared/doc/x', 'DELETE'))
+        self.assertEqual('x', match.get('id'))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/doc/x', 'POST')))
+
+        # test shared-db sync resource auth
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/sync-from/x', 'GET')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/sync-from/x', 'PUT')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/sync-from/x', 'DELETE')))
+
+        self.assertIsNone(
+            urlmap.match(
+                self._make_environ('/shared/sync-from/x', 'POST')))
+
+        # test user-db database resource auth
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s' % dbname, 'POST')))
-        # test wrong-db docs resource auth
-        self.assertFalse(
-            authmap.is_authorized(
+
+        # test user-db docs resource auth
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/docs' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/docs' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/docs' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/docs' % dbname, 'POST')))
-        # test wrong-db doc resource auth
-        self.assertFalse(
-            authmap.is_authorized(
+
+        # test user-db doc resource auth
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/doc/x' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/doc/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/doc/x' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
+
+        self.assertIsNone(
+            urlmap.match(
                 self._make_environ('/%s/doc/x' % dbname, 'POST')))
-        # test wrong-db sync resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
+
+        # test user-db sync resource auth
+        match = urlmap.match(
+            self._make_environ('/%s/sync-from/x' % dbname, 'GET'))
+        self.assertEqual(uuid, match.get('uuid'))
+        self.assertEqual('x', match.get('source_replica_uid'))
+
+        match = urlmap.match(
+            self._make_environ('/%s/sync-from/x' % dbname, 'PUT'))
+        self.assertEqual(uuid, match.get('uuid'))
+        self.assertEqual('x', match.get('source_replica_uid'))
+
+        match = urlmap.match(
+            self._make_environ('/%s/sync-from/x' % dbname, 'DELETE'))
+        self.assertIsNone(match)
+
+        match = urlmap.match(
+            self._make_environ('/%s/sync-from/x' % dbname, 'POST'))
+        self.assertEqual(uuid, match.get('uuid'))
+        self.assertEqual('x', match.get('source_replica_uid'))
 
 
 @pytest.mark.usefixtures("method_tmpdir")

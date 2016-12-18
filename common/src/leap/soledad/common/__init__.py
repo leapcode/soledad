@@ -30,8 +30,6 @@ Soledad routines common to client and server.
 #
 
 SHARED_DB_NAME = 'shared'
-SHARED_DB_LOCK_DOC_ID_PREFIX = 'lock-'
-USER_DB_PREFIX = 'user-'
 
 
 #

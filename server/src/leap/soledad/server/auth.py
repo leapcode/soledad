@@ -26,67 +26,31 @@ from routes.mapper import Mapper
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import DBNAME_CONSTRAINTS, errors as u1db_errors
 from leap.soledad.common import SHARED_DB_NAME
-from leap.soledad.common import USER_DB_PREFIX
 
 
 logger = getLogger(__name__)
 
 
-class URLToAuthorization(object):
+class URLMapper(object):
     """
-    Verify if actions can be performed by a user.
+    Maps the URLs users can access.
     """
 
-    HTTP_METHOD_GET = 'GET'
-    HTTP_METHOD_PUT = 'PUT'
-    HTTP_METHOD_DELETE = 'DELETE'
-    HTTP_METHOD_POST = 'POST'
-
-    def __init__(self, uuid):
-        """
-        Initialize the mapper.
-
-        The C{uuid} is used to create the rules that will either allow or
-        disallow the user to perform specific actions.
-
-        @param uuid: The user uuid.
-        @type uuid: str
-        @param user_db_prefix: The string prefix of users' databases.
-        @type user_db_prefix: str
-        """
+    def __init__(self):
         self._map = Mapper(controller_scan=None)
-        self._user_db_name = "%s%s" % (USER_DB_PREFIX, uuid)
-        self._uuid = uuid
-        self._register_auth_info()
+        self._connect_urls()
+        self._map.create_regs()
 
-    def is_authorized(self, environ):
-        """
-        Return whether an HTTP request that produced the CGI C{environ}
-        corresponds to an authorized action.
+    def match(self, environ):
+        return self._map.match(environ=environ)
 
-        @param environ: Dictionary containing CGI variables.
-        @type environ: dict
-
-        @return: Whether the action is authorized or not.
-        @rtype: bool
-        """
-        return self._map.match(environ=environ) is not None
-
-    def _register(self, pattern, http_methods):
-        """
-        Register a C{pattern} in the mapper as valid for C{http_methods}.
-
-        @param pattern: The URL pattern that corresponds to the user action.
-        @type pattern: str
-        @param http_methods: A list of authorized HTTP methods.
-        @type http_methods: list of str
-        """
+    def _connect(self, pattern, http_methods):
         self._map.connect(
             None, pattern, http_methods=http_methods,
             conditions=dict(method=http_methods),
             requirements={'dbname': DBNAME_CONSTRAINTS})
 
-    def _register_auth_info(self):
+    def _connect_urls(self):
         """
         Register the authorization info in the mapper using C{SHARED_DB_NAME}
         as the user's database name.
@@ -106,21 +70,15 @@ class URLToAuthorization(object):
             /user-db/sync-from/{source}   | GET, PUT, POST
         """
         # auth info for global resource
-        self._register('/', [self.HTTP_METHOD_GET])
+        self._connect('/', ['GET'])
         # auth info for shared-db database resource
-        self._register('/%s' % SHARED_DB_NAME, [self.HTTP_METHOD_GET])
+        self._connect('/%s' % SHARED_DB_NAME, ['GET'])
         # auth info for shared-db doc resource
-        self._register(
-            '/%s/doc/{id:.*}' % SHARED_DB_NAME,
-            [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
-             self.HTTP_METHOD_DELETE])
+        self._connect('/%s/doc/{id:.*}' % SHARED_DB_NAME,
+                      ['GET', 'PUT', 'DELETE'])
         # auth info for user-db sync resource
-        self._register(
-            '/%s/sync-from/{source_replica_uid}' % self._user_db_name,
-            [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
-             self.HTTP_METHOD_POST])
-        # generate the regular expressions
-        self._map.create_regs()
+        self._connect('/user-{uuid}/sync-from/{source_replica_uid}',
+                      ['GET', 'PUT', 'POST'])
 
 
 class SoledadAuthMiddleware(object):
@@ -176,6 +134,7 @@ class SoledadAuthMiddleware(object):
         @type prefix: str
         """
         self._app = app
+        self._mapper = URLMapper()
 
     def _error(self, start_response, status, description, message=None):
         """
@@ -310,14 +269,17 @@ class SoledadAuthMiddleware(object):
 
         @param environ: Dictionary containing CGI variables.
         @type environ: dict
-        @param uuid: The user's uuid.
+        @param uuid: The user's uuid from the Authorization header.
         @type uuid: str
 
-        @return: Whether the user is authorize to perform the requested action
+        @return: Whether the user is authorized to perform the requested action
             over the requested db.
         @rtype: bool
         """
-        return URLToAuthorization(uuid).is_authorized(environ)
+        match = self._mapper.match(environ)
+        if not match:
+            return False
+        return uuid == match.get('uuid')
 
     @abstractmethod
     def _get_auth_error_string(self):
