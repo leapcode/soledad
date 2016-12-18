@@ -100,7 +100,7 @@ class URLToAuthorization(object):
             /shared-db/docs               | -
             /shared-db/doc/{any_id}       | GET, PUT, DELETE
             /shared-db/sync-from/{source} | -
-            /user-db                      | GET, PUT, DELETE
+            /user-db                      | -
             /user-db/docs                 | -
             /user-db/doc/{id}             | -
             /user-db/sync-from/{source}   | GET, PUT, POST
@@ -108,17 +108,10 @@ class URLToAuthorization(object):
         # auth info for global resource
         self._register('/', [self.HTTP_METHOD_GET])
         # auth info for shared-db database resource
-        self._register(
-            '/%s' % SHARED_DB_NAME,
-            [self.HTTP_METHOD_GET])
+        self._register('/%s' % SHARED_DB_NAME, [self.HTTP_METHOD_GET])
         # auth info for shared-db doc resource
         self._register(
             '/%s/doc/{id:.*}' % SHARED_DB_NAME,
-            [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
-             self.HTTP_METHOD_DELETE])
-        # auth info for user-db database resource
-        self._register(
-            '/%s' % self._user_db_name,
             [self.HTTP_METHOD_GET, self.HTTP_METHOD_PUT,
              self.HTTP_METHOD_DELETE])
         # auth info for user-db sync resource

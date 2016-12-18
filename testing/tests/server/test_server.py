@@ -110,7 +110,7 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
             /shared-db/docs               | -
             /shared-db/doc/{id}           | GET, PUT, DELETE
             /shared-db/sync-from/{source} | -
-            /user-db                      | GET, PUT, DELETE
+            /user-db                      | -
             /user-db/docs                 | -
             /user-db/doc/{id}             | -
             /user-db/sync-from/{source}   | GET, PUT, POST
@@ -174,13 +174,13 @@ class ServerAuthorizationTestCase(BaseSoledadTest):
             authmap.is_authorized(
                 self._make_environ('/shared/sync-from/x', 'POST')))
         # test user-db database resource auth
-        self.assertTrue(
+        self.assertFalse(
             authmap.is_authorized(
                 self._make_environ('/%s' % dbname, 'GET')))
-        self.assertTrue(
+        self.assertFalse(
             authmap.is_authorized(
                 self._make_environ('/%s' % dbname, 'PUT')))
-        self.assertTrue(
+        self.assertFalse(
             authmap.is_authorized(
                 self._make_environ('/%s' % dbname, 'DELETE')))
         self.assertFalse(
