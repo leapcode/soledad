@@ -41,8 +41,7 @@ class SoledadResource(Resource):
     for the Soledad Server.
     """
 
-    def __init__(self, uuid):
-        self._uuid = uuid
+    def __init__(self):
         self.children = {'': wsgi_resource}
 
     def getChild(self, path, request):

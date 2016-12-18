@@ -45,7 +45,7 @@ class SoledadRealm(object):
 
     def requestAvatar(self, avatarId, mind, *interfaces):
         if IResource in interfaces:
-            return (IResource, SoledadResource(avatarId), lambda: None)
+            return (IResource, SoledadResource(), lambda: None)
         raise NotImplementedError()
 
 
