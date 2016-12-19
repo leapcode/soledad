@@ -43,7 +43,7 @@ from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
 from leap.soledad.server.config import load_configuration
 from leap.soledad.server.config import CONFIG_DEFAULTS
-from leap.soledad.server.auth import URLMapper
+from leap.soledad.server.url_mapper import URLMapper
 
 
 class ServerAuthorizationTestCase(BaseSoledadTest):

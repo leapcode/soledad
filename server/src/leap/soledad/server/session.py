@@ -30,10 +30,9 @@ from twisted.web.server import Session
 from zope.interface import Interface
 from zope.interface import Attribute
 
-from leap.soledad.server.auth import URLMapper
 from leap.soledad.server.auth import portal
 from leap.soledad.server.auth import credentialFactory
-from leap.soledad.server.auth import UnauthorizedResource
+from leap.soledad.server.urlmapper import URLMapper
 from leap.soledad.server.resource import SoledadResource
 
 
@@ -56,6 +55,20 @@ def _sessionData(request):
     session = request.getSession()
     data = ISessionData(session)
     return data
+
+
+@implementer(IResource)
+class UnauthorizedResource(object):
+    isLeaf = True
+
+    def render(self, request):
+        request.setResponseCode(401)
+        if request.method == b'HEAD':
+            return b''
+        return b'Unauthorized'
+
+    def getChildWithDefault(self, path, request):
+        return self
 
 
 @implementer(IResource)
