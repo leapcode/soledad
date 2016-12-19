@@ -1,7 +1,6 @@
 stages:
   - code-check
   - tests
-  - benchmark
 
 # Cache tox envs between builds
 cache:
@@ -24,11 +23,3 @@ tests:
     - tox -- --couch-url http://couchdb:5984
   tags:
     - couchdb
-
-benchmark:
-  stage: benchmark
-  script:
-    - cd testing
-    - tox -e benchmark
-  tags:
-    - benchmark
