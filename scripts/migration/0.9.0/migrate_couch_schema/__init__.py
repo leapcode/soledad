@@ -30,7 +30,7 @@ def _get_couch_server(couch_url):
     return Server(couch_url)
 
 
-def _is_migrateable(db):
+def _has_u1db_config_doc(db):
     config_doc = db.get('u1db_config')
     return bool(config_doc)
 
@@ -63,6 +63,35 @@ def _get_user_dbs(server):
 # migration main functions
 #
 
+def _report_missing_u1db_config_doc(dbname, db):
+    config_doc = db.get(CONFIG_DOC_ID)
+    if not config_doc:
+        logger.warning(
+            "[%s] no '%s' or '%s' documents found, possibly an empty db? I "
+            "don't know what to do with this db, so I am skipping it."
+            % (dbname, 'u1db_config', CONFIG_DOC_ID))
+    else:
+        if SCHEMA_VERSION_KEY in config_doc:
+            version = config_doc[SCHEMA_VERSION_KEY]
+            if version == SCHEMA_VERSION:
+                logger.info(
+                    "[%s] '%s' document exists, and schema versions match "
+                    "(expected %r and found %r). This database reports to be "
+                    "using the new schema version, so I am skipping it."
+                    % (dbname, CONFIG_DOC_ID))
+            else:
+                logger.error(
+                    "[%s] '%s' document exists, but schema versions don't "
+                    "match (expected %r, found %r instead). I don't know "
+                    "how to migrate such a db, so I am skipping it."
+                    % (dbname, CONFIG_DOC_ID, SCHEMA_VERSION, version))
+        else:
+            logger.error(
+                "[%s] '%s' document exists, but has no schema version "
+                "information in it. I don't know how to migrate such a db, "
+                "so I am skipping it." % (dbname, CONFIG_DOC_ID))
+
+
 def migrate(args, target_version):
     server = _get_couch_server(args.couch_url)
     logger.info('starting couch schema migration to %s' % target_version)
@@ -71,8 +100,8 @@ def migrate(args, target_version):
     user_dbs = _get_user_dbs(server)
     for dbname in user_dbs:
         db = server[dbname]
-        if not _is_migrateable(db):
-            logger.warning("[%s] skipping not migrateable user db" % dbname)
+        if not _has_u1db_config_doc(db):
+            _report_missing_u1db_config_doc(dbname, db)
             continue
         logger.info("[%s] starting migration of user db" % dbname)
         try:
