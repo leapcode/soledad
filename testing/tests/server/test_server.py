@@ -36,7 +36,6 @@ from test_soledad.util import (
     make_token_soledad_app,
     make_soledad_document_for_test,
     soledad_sync_target,
-    BaseSoledadTest,
 )
 
 from leap.soledad.client import _crypto
@@ -46,132 +45,111 @@ from leap.soledad.server.config import CONFIG_DEFAULTS
 from leap.soledad.server.url_mapper import URLMapper
 
 
-class ServerAuthorizationTestCase(BaseSoledadTest):
-
+class URLMapperTestCase(unittest.TestCase):
     """
-    Tests related to Soledad server authorization.
+    Test if the URLMapper behaves as expected.
+
+    The following table lists the authorized actions among all possible
+    u1db remote actions:
+
+        URL path                      | Authorized actions
+        --------------------------------------------------
+        /                             | GET
+        /shared-db                    | GET
+        /shared-db/docs               | -
+        /shared-db/doc/{id}           | -
+        /shared-db/sync-from/{source} | -
+        /user-db                      | -
+        /user-db/docs                 | -
+        /user-db/doc/{id}             | -
+        /user-db/sync-from/{source}   | GET, PUT, POST
     """
 
     def setUp(self):
-        pass
+        self._uuid = uuid4().hex
+        self._urlmap = URLMapper()
+        self._dbname = 'user-%s' % self._uuid
 
-    def tearDown(self):
-        pass
-
-    def test_verify_action_with_correct_dbnames(self):
-        """
-        Test encrypting and decrypting documents.
-
-        The following table lists the authorized actions among all possible
-        u1db remote actions:
-
-            URL path                      | Authorized actions
-            --------------------------------------------------
-            /                             | GET
-            /shared-db                    | GET
-            /shared-db/docs               | -
-            /shared-db/doc/{id}           | GET, PUT, DELETE
-            /shared-db/sync-from/{source} | -
-            /user-db                      | -
-            /user-db/docs                 | -
-            /user-db/doc/{id}             | -
-            /user-db/sync-from/{source}   | GET, PUT, POST
-        """
-        uuid = uuid4().hex
-        urlmap = URLMapper()
-        dbname = 'user-%s' % uuid
-
-        # test global auth
-        match = urlmap.match('/', 'GET')
+    def test_root_authorized(self):
+        match = self._urlmap.match('/', 'GET')
         self.assertIsNotNone(match)
 
-        # test shared-db database resource auth
-        match = urlmap.match('/shared', 'GET')
-        self.assertIsNotNone(match)
+    def test_shared_authorized(self):
+        self.assertIsNotNone(self._urlmap.match('/shared', 'GET'))
 
-        match = urlmap.match('/shared', 'PUT')
-        self.assertIsNone(match)
+    def test_shared_unauthorized(self):
+        self.assertIsNone(self._urlmap.match('/shared', 'PUT'))
+        self.assertIsNone(self._urlmap.match('/shared', 'DELETE'))
+        self.assertIsNone(self._urlmap.match('/shared', 'POST'))
 
-        match = urlmap.match('/shared', 'DELETE')
-        self.assertIsNone(match)
+    def test_shared_docs_unauthorized(self):
+        self.assertIsNone(self._urlmap.match('/shared/docs', 'GET'))
+        self.assertIsNone(self._urlmap.match('/shared/docs', 'PUT'))
+        self.assertIsNone(self._urlmap.match('/shared/docs', 'DELETE'))
+        self.assertIsNone(self._urlmap.match('/shared/docs', 'POST'))
 
-        match = urlmap.match('/shared', 'POST')
-        self.assertIsNone(match)
-
-        # test shared-db docs resource auth
-        self.assertIsNone(urlmap.match('/shared/docs', 'GET'))
-
-        self.assertIsNone(urlmap.match('/shared/docs', 'PUT'))
-
-        self.assertIsNone(urlmap.match('/shared/docs', 'DELETE'))
-
-        self.assertIsNone(urlmap.match('/shared/docs', 'POST'))
-
-        # test shared-db doc resource auth
-        match = urlmap.match('/shared/doc/x', 'GET')
+    def test_shared_doc_authorized(self):
+        match = self._urlmap.match('/shared/doc/x', 'GET')
         self.assertIsNotNone(match)
         self.assertEqual('x', match.get('id'))
 
-        match = urlmap.match('/shared/doc/x', 'PUT')
+        match = self._urlmap.match('/shared/doc/x', 'PUT')
         self.assertIsNotNone(match)
         self.assertEqual('x', match.get('id'))
 
-        match = urlmap.match('/shared/doc/x', 'DELETE')
+        match = self._urlmap.match('/shared/doc/x', 'DELETE')
+        self.assertIsNotNone(match)
         self.assertEqual('x', match.get('id'))
 
-        self.assertIsNone(urlmap.match('/shared/doc/x', 'POST'))
+    def test_shared_doc_unauthorized(self):
+        self.assertIsNone(self._urlmap.match('/shared/doc/x', 'POST'))
 
-        # test shared-db sync resource auth
-        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'GET'))
+    def test_shared_sync_unauthorized(self):
+        self.assertIsNone(self._urlmap.match('/shared/sync-from/x', 'GET'))
+        self.assertIsNone(self._urlmap.match('/shared/sync-from/x', 'PUT'))
+        self.assertIsNone(self._urlmap.match('/shared/sync-from/x', 'DELETE'))
+        self.assertIsNone(self._urlmap.match('/shared/sync-from/x', 'POST'))
 
-        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'PUT'))
+    def test_user_db_unauthorized(self):
+        dbname = self._dbname
+        self.assertIsNone(self._urlmap.match('/%s' % dbname, 'GET'))
+        self.assertIsNone(self._urlmap.match('/%s' % dbname, 'PUT'))
+        self.assertIsNone(self._urlmap.match('/%s' % dbname, 'DELETE'))
+        self.assertIsNone(self._urlmap.match('/%s' % dbname, 'POST'))
 
-        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'DELETE'))
+    def test_user_db_docs_unauthorized(self):
+        dbname = self._dbname
+        self.assertIsNone(self._urlmap.match('/%s/docs' % dbname, 'GET'))
+        self.assertIsNone(self._urlmap.match('/%s/docs' % dbname, 'PUT'))
+        self.assertIsNone(self._urlmap.match('/%s/docs' % dbname, 'DELETE'))
+        self.assertIsNone(self._urlmap.match('/%s/docs' % dbname, 'POST'))
 
-        self.assertIsNone(urlmap.match('/shared/sync-from/x', 'POST'))
+    def test_user_db_doc_unauthorized(self):
+        dbname = self._dbname
+        self.assertIsNone(self._urlmap.match('/%s/doc/x' % dbname, 'GET'))
+        self.assertIsNone(self._urlmap.match('/%s/doc/x' % dbname, 'PUT'))
+        self.assertIsNone(self._urlmap.match('/%s/doc/x' % dbname, 'DELETE'))
+        self.assertIsNone(self._urlmap.match('/%s/doc/x' % dbname, 'POST'))
 
-        # test user-db database resource auth
-        self.assertIsNone(urlmap.match('/%s' % dbname, 'GET'))
-
-        self.assertIsNone(urlmap.match('/%s' % dbname, 'PUT'))
-
-        self.assertIsNone(urlmap.match('/%s' % dbname, 'DELETE'))
-
-        self.assertIsNone(urlmap.match('/%s' % dbname, 'POST'))
-
-        # test user-db docs resource auth
-        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'GET'))
-
-        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'PUT'))
-
-        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'DELETE'))
-
-        self.assertIsNone(urlmap.match('/%s/docs' % dbname, 'POST'))
-
-        # test user-db doc resource auth
-        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'GET'))
-
-        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'PUT'))
-
-        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'DELETE'))
-
-        self.assertIsNone(urlmap.match('/%s/doc/x' % dbname, 'POST'))
-
-        # test user-db sync resource auth
-        match = urlmap.match('/%s/sync-from/x' % dbname, 'GET')
+    def test_user_db_sync_authorized(self):
+        uuid = self._uuid
+        dbname = self._dbname
+        match = self._urlmap.match('/%s/sync-from/x' % dbname, 'GET')
         self.assertEqual(uuid, match.get('uuid'))
         self.assertEqual('x', match.get('source_replica_uid'))
 
-        match = urlmap.match('/%s/sync-from/x' % dbname, 'PUT')
+        match = self._urlmap.match('/%s/sync-from/x' % dbname, 'PUT')
         self.assertEqual(uuid, match.get('uuid'))
         self.assertEqual('x', match.get('source_replica_uid'))
 
-        match = urlmap.match('/%s/sync-from/x' % dbname, 'DELETE')
-        self.assertIsNone(match)
-
-        match = urlmap.match('/%s/sync-from/x' % dbname, 'POST')
+        match = self._urlmap.match('/%s/sync-from/x' % dbname, 'POST')
         self.assertEqual(uuid, match.get('uuid'))
         self.assertEqual('x', match.get('source_replica_uid'))
+
+    def test_user_db_sync_unauthorized(self):
+        dbname = self._dbname
+        self.assertIsNone(
+            self._urlmap.match('/%s/sync-from/x' % dbname, 'DELETE'))
 
 
 @pytest.mark.usefixtures("method_tmpdir")
