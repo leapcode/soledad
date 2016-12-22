@@ -1,3 +1,26 @@
+0.9.2 - 22 December, 2016
++++++++++++++++++++++++++
+
+Performance improvements
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- use AES 256 GCM mode instead of CTR+HMAC.
+- streaming encryption/decryption and data transfer.
+
+Server
+~~~~~~
+
+- move server to a twisted resource entrypoint.
+
+Client
+~~~~~~
+
+- use twisted http agent in the client.
+- maintain backwards compatibility with old crypto scheme (AES 256 CTR+HMAC).
+  No migration for now, only in 0.10.
+- remove the encryption/decryption pools, replace for inline streaming crypto.
+- use sqlcipher transactions on sync.
+
 0.9.1 - 27 November, 2016
 +++++++++++++++++++++++++
 
