@@ -32,7 +32,7 @@ from zope.interface import Attribute
 
 from leap.soledad.server.auth import portal
 from leap.soledad.server.auth import credentialFactory
-from leap.soledad.server.urlmapper import URLMapper
+from leap.soledad.server.url_mapper import URLMapper
 from leap.soledad.server.resource import SoledadResource
 
 
