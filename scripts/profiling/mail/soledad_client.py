@@ -30,8 +30,7 @@ class SoledadClient(object):
             server_url=self._server_url,
             cert_file=None,
             auth_token=self._auth_token,
-            secret_id=None,
-            defer_encryption=True)
+            secret_id=None)
 
     def close(self):
         if self._soledad is not None:

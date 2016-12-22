@@ -30,10 +30,11 @@ from testscenarios import TestWithScenarios
 from twisted.internet import defer
 
 from leap.soledad.client import http_target as target
-from leap.soledad.client import crypto
+from leap.soledad.client.http_target.fetch_protocol import DocStreamReceiver
 from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
+from leap.soledad.client import _crypto
 
 from leap.soledad.common import l2db
 
@@ -44,6 +45,7 @@ from test_soledad.util import make_soledad_app
 from test_soledad.util import make_token_soledad_app
 from test_soledad.util import make_soledad_document_for_test
 from test_soledad.util import soledad_sync_target
+from twisted.trial import unittest
 from test_soledad.util import SoledadWithCouchServerMixin
 from test_soledad.util import ADDRESS
 from test_soledad.util import SQLCIPHER_SCENARIOS
@@ -53,92 +55,69 @@ from test_soledad.util import SQLCIPHER_SCENARIOS
 # The following tests come from `u1db.tests.test_remote_sync_target`.
 # -----------------------------------------------------------------------------
 
-class TestSoledadParseReceivedDocResponse(SoledadWithCouchServerMixin):
+class TestSoledadParseReceivedDocResponse(unittest.TestCase):
 
     """
     Some tests had to be copied to this class so we can instantiate our own
     target.
     """
 
-    def setUp(self):
-        SoledadWithCouchServerMixin.setUp(self)
-        creds = {'token': {
-            'uuid': 'user-uuid',
-            'token': 'auth-token',
-        }}
-        self.target = target.SoledadHTTPSyncTarget(
-            self.couch_url,
-            uuid4().hex,
-            creds,
-            self._soledad._crypto,
-            None)
-
-    def tearDown(self):
-        self.target.close()
-        SoledadWithCouchServerMixin.tearDown(self)
+    def parse(self, stream):
+        parser = DocStreamReceiver(None, None, lambda *_: defer.succeed(42))
+        parser.dataReceived(stream)
+        parser.finish()
 
     def test_extra_comma(self):
-        """
-        Test adapted to use encrypted content.
-        """
         doc = SoledadDocument('i', rev='r')
-        doc.content = {}
-        _crypto = self._soledad._crypto
-        key = _crypto.doc_passphrase(doc.doc_id)
-        secret = _crypto.secret
+        doc.content = {'a': 'b'}
 
-        enc_json = crypto.encrypt_docstr(
-            doc.get_json(), doc.doc_id, doc.rev,
-            key, secret)
+        encrypted_docstr = _crypto.SoledadCrypto('safe').encrypt_doc(doc)
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n{},\r\n]")
+            self.parse("[\r\n{},\r\n]")
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 ('[\r\n{},\r\n{"id": "i", "rev": "r", ' +
-                 '"content": %s, "gen": 3, "trans_id": "T-sid"}' +
-                 ',\r\n]') % json.dumps(enc_json))
+                 '"gen": 3, "trans_id": "T-sid"},\r\n' +
+                 '%s,\r\n]') % encrypted_docstr)
 
     def test_wrong_start(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("{}\r\n]")
+            self.parse("{}\r\n]")
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("\r\n{}\r\n]")
-
-        with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("")
+            self.parse("\r\n{}\r\n]")
 
     def test_wrong_end(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n{}")
+            self.parse("[\r\n{}")
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n")
+            self.parse("[\r\n")
 
     def test_missing_comma(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 '[\r\n{}\r\n{"id": "i", "rev": "r", '
                 '"content": "c", "gen": 3}\r\n]')
 
     def test_no_entries(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response("[\r\n]")
+            self.parse("[\r\n]")
 
     def test_error_in_stream(self):
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 '[\r\n{"new_generation": 0},'
                 '\r\n{"error": "unavailable"}\r\n')
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response(
+            self.parse(
                 '[\r\n{"error": "unavailable"}\r\n')
 
         with self.assertRaises(l2db.errors.BrokenSyncStream):
-            self.target._parse_received_doc_response('[\r\n{"error": "?"}\r\n')
+            self.parse('[\r\n{"error": "?"}\r\n')
 
 #
 # functions for TestRemoteSyncTargets
@@ -151,13 +130,9 @@ def make_local_db_and_soledad_target(
     test.startTwistedServer()
     replica_uid = os.path.basename(path)
     db = test.request_state._create_database(replica_uid)
-    sync_db = test._soledad._sync_db
-    sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
         test, db._dbname,
-        source_replica_uid=source_replica_uid,
-        sync_db=sync_db,
-        sync_enc_pool=sync_enc_pool)
+        source_replica_uid=source_replica_uid)
     return db, st
 
 
@@ -188,16 +163,11 @@ class TestSoledadSyncTarget(
     def getSyncTarget(self, path=None, source_replica_uid=uuid4().hex):
         if self.port is None:
             self.startTwistedServer()
-        sync_db = self._soledad._sync_db
-        sync_enc_pool = self._soledad._sync_enc_pool
         if path is None:
             path = self.db2._dbname
         target = self.sync_target(
             self, path,
-            source_replica_uid=source_replica_uid,
-            sync_db=sync_db,
-            sync_enc_pool=sync_enc_pool)
-        self.addCleanup(target.close)
+            source_replica_uid=source_replica_uid)
         return target
 
     def setUp(self):
@@ -229,10 +199,10 @@ class TestSoledadSyncTarget(
             other_docs.append((doc.doc_id, doc.rev, doc.get_json()))
 
         doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        get_doc = (lambda _: doc, (1,), {})
         new_gen, trans_id = yield remote_target.sync_exchange(
-            [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=receive_doc,
-            defer_decryption=False)
+            [(get_doc, 10, 'T-sid')], 'replica', last_known_generation=0,
+            last_known_trans_id=None, insert_doc_cb=receive_doc)
         self.assertEqual(1, new_gen)
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
@@ -278,15 +248,16 @@ class TestSoledadSyncTarget(
         doc1 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
         doc2 = self.make_document('doc-here2', 'replica:1',
                                   '{"value": "here2"}')
+        get_doc1 = (lambda _: doc1, (1,), {})
+        get_doc2 = (lambda _: doc2, (2,), {})
 
         with self.assertRaises(l2db.errors.U1DBError):
             yield remote_target.sync_exchange(
-                [(doc1, 10, 'T-sid'), (doc2, 11, 'T-sud')],
+                [(get_doc1, 10, 'T-sid'), (get_doc2, 11, 'T-sud')],
                 'replica',
                 last_known_generation=0,
                 last_known_trans_id=None,
-                insert_doc_cb=receive_doc,
-                defer_decryption=False)
+                insert_doc_cb=receive_doc)
 
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}',
@@ -297,9 +268,8 @@ class TestSoledadSyncTarget(
         # retry
         trigger_ids = []
         new_gen, trans_id = yield remote_target.sync_exchange(
-            [(doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=receive_doc,
-            defer_decryption=False)
+            [(get_doc2, 11, 'T-sud')], 'replica', last_known_generation=0,
+            last_known_trans_id=None, insert_doc_cb=receive_doc)
         self.assertGetEncryptedDoc(
             db, 'doc-here2', 'replica:1', '{"value": "here2"}',
             False)
@@ -328,16 +298,48 @@ class TestSoledadSyncTarget(
             replica_uid_box.append(replica_uid)
 
         doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        get_doc = (lambda _: doc, (1,), {})
         new_gen, trans_id = yield remote_target.sync_exchange(
-            [(doc, 10, 'T-sid')], 'replica', last_known_generation=0,
+            [(get_doc, 10, 'T-sid')], 'replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=receive_doc,
-            ensure_callback=ensure_cb, defer_decryption=False)
+            ensure_callback=ensure_cb)
         self.assertEqual(1, new_gen)
         db = self.db2
         self.assertEqual(1, len(replica_uid_box))
         self.assertEqual(db._replica_uid, replica_uid_box[0])
         self.assertGetEncryptedDoc(
             db, 'doc-here', 'replica:1', '{"value": "here"}', False)
+
+    @defer.inlineCallbacks
+    def test_sync_exchange_send_events(self):
+        """
+        Test for sync exchange's SOLEDAD_SYNC_SEND_STATUS event.
+        """
+        remote_target = self.getSyncTarget()
+        uuid = remote_target.uuid
+        events = []
+
+        def mocked_events(*args):
+            events.append((args))
+        self.patch(
+            target.send, '_emit_send_status', mocked_events)
+
+        doc = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        doc2 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        doc3 = self.make_document('doc-here', 'replica:1', '{"value": "here"}')
+        get_doc = (lambda _: doc, (1,), {})
+        get_doc2 = (lambda _: doc2, (1,), {})
+        get_doc3 = (lambda _: doc3, (1,), {})
+        docs = [(get_doc, 10, 'T-sid'),
+                (get_doc2, 11, 'T-sid2'), (get_doc3, 12, 'T-sid3')]
+        new_gen, trans_id = yield remote_target.sync_exchange(
+            docs, 'replica', last_known_generation=0,
+            last_known_trans_id=None, insert_doc_cb=lambda _: 1,
+            ensure_callback=lambda _: 1)
+        self.assertEqual(1, new_gen)
+        self.assertEqual(4, len(events))
+        self.assertEquals([(uuid, 0, 3), (uuid, 1, 3), (uuid, 2, 3),
+                           (uuid, 3, 3)], events)
 
     def test_sync_exchange_in_stream_error(self):
         self.skipTest("bypass this test because our sync_exchange process "
@@ -421,7 +423,6 @@ class SoledadDatabaseSyncTargetTests(
 
     def tearDown(self):
         self.db.close()
-        self.st.close()
         tests.TestCaseWithServer.tearDown(self)
         SoledadWithCouchServerMixin.tearDown(self)
 
@@ -442,12 +443,12 @@ class SoledadDatabaseSyncTargetTests(
         This test was adapted to decrypt remote content before assert.
         """
         docs_by_gen = [
-            (self.make_document('doc-id', 'replica:1', tests.simple_doc), 10,
-             'T-sid')]
+            ((self.make_document,
+              ('doc-id', 'replica:1', tests.simple_doc,), {}),
+                10, 'T-sid')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertGetEncryptedDoc(
             self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertTransactionLog(['doc-id'], self.db)
@@ -465,14 +466,13 @@ class SoledadDatabaseSyncTargetTests(
         This test was adapted to decrypt remote content before assert.
         """
         docs_by_gen = [
-            (self.make_document(
-                'doc-id', 'replica:1', tests.simple_doc), 10, 'T-1'),
-            (self.make_document(
-                'doc-id2', 'replica:1', tests.nested_doc), 11, 'T-2')]
+            ((self.make_document,
+                ('doc-id', 'replica:1', tests.simple_doc), {}), 10, 'T-1'),
+            ((self.make_document,
+                ('doc-id2', 'replica:1', tests.nested_doc), {}), 11, 'T-2')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertGetEncryptedDoc(
             self.db, 'doc-id', 'replica:1', tests.simple_doc, False)
         self.assertGetEncryptedDoc(
@@ -498,8 +498,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
         new_gen, _ = yield self.st.sync_exchange(
             [], 'other-replica', last_known_generation=0,
-            last_known_trans_id=None, insert_doc_cb=self.receive_doc,
-            defer_decryption=False)
+            last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id, doc2.doc_id], self.db)
         self.assertEqual(2, new_gen)
         self.assertEqual(
@@ -552,7 +551,8 @@ class SoledadDatabaseSyncTargetTests(
         doc = self.db.create_doc_from_json('{}')
         edit_rev = 'replica:1|' + doc.rev
         docs_by_gen = [
-            (self.make_document(doc.doc_id, edit_rev, None), 10, 'T-sid')]
+            ((self.make_document, (doc.doc_id, edit_rev, None), {}),
+             10, 'T-sid')]
         new_gen, trans_id = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
@@ -571,7 +571,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         new_doc = '{"key": "altval"}'
         docs_by_gen = [
-            (self.make_document(doc.doc_id, 'replica:1', new_doc), 10,
+            ((self.make_document, (doc.doc_id, 'replica:1', new_doc), {}), 10,
              'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=0,
@@ -591,7 +591,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         gen, txid = self.db._get_generation_info()
         docs_by_gen = [
-            (self.make_document(doc.doc_id, doc.rev, tests.simple_doc),
+            ((self.make_document, (doc.doc_id, doc.rev, tests.simple_doc), {}),
              10, 'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'replica', last_known_generation=gen,
@@ -624,9 +624,9 @@ class SoledadDatabaseSyncTargetTests(
             [], 'other-replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
         self.assertTransactionLog([doc.doc_id, doc.doc_id], self.db)
+        self.assertEqual(2, new_gen)
         self.assertEqual(
             (doc.doc_id, doc.rev, None, 2), self.other_changes[0][:-1])
-        self.assertEqual(2, new_gen)
         if self.whitebox:
             self.assertEqual(self.db._last_exchange_log['return'],
                              {'last_gen': 2, 'docs': [(doc.doc_id, doc.rev)]})
@@ -637,7 +637,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         new_doc = '{"key": "altval"}'
         docs_by_gen = [
-            (self.make_document(doc.doc_id, 'test:1|z:2', new_doc), 10,
+            ((self.make_document, (doc.doc_id, 'test:1|z:2', new_doc), {}), 10,
              'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'other-replica', last_known_generation=0,
@@ -662,7 +662,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         new_doc = '{"key": "altval"}'
         docs_by_gen = [
-            (self.make_document(doc.doc_id, 'test:1|z:2', new_doc), 10,
+            ((self.make_document, (doc.doc_id, 'test:1|z:2', new_doc), {}), 10,
              'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'other-replica', last_known_generation=0,
@@ -683,7 +683,7 @@ class SoledadDatabaseSyncTargetTests(
         self.assertTransactionLog([doc.doc_id], self.db)
         new_doc = '{"key": "altval"}'
         docs_by_gen = [
-            (self.make_document(doc.doc_id, 'test:1|z:2', new_doc), 10,
+            ((self.make_document, (doc.doc_id, 'test:1|z:2', new_doc), {}), 10,
              'T-sid')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'other-replica', last_known_generation=0,
@@ -694,9 +694,9 @@ class SoledadDatabaseSyncTargetTests(
     def test_sync_exchange_converged_handling(self):
         doc = self.db.create_doc_from_json(tests.simple_doc)
         docs_by_gen = [
-            (self.make_document('new', 'other:1', '{}'), 4, 'T-foo'),
-            (self.make_document(doc.doc_id, doc.rev, doc.get_json()), 5,
-             'T-bar')]
+            ((self.make_document, ('new', 'other:1', '{}'), {}), 4, 'T-foo'),
+            ((self.make_document, (doc.doc_id, doc.rev, doc.get_json()), {}),
+                5, 'T-bar')]
         new_gen, _ = yield self.st.sync_exchange(
             docs_by_gen, 'other-replica', last_known_generation=0,
             last_known_trans_id=None, insert_doc_cb=self.receive_doc)
@@ -780,9 +780,6 @@ class SoledadDatabaseSyncTargetTests(
         self.assertEqual(expected, called)
 
 
-# Just to make clear how this test is different... :)
-DEFER_DECRYPTION = False
-
 WAIT_STEP = 1
 MAX_WAIT = 10
 DBPASS = "pass"
@@ -842,12 +839,10 @@ class TestSoledadDbSync(
         import binascii
         tohex = binascii.b2a_hex
         key = tohex(self._soledad.secrets.get_local_storage_key())
-        sync_db_key = tohex(self._soledad.secrets.get_sync_db_key())
         dbpath = self._soledad._local_db_path
 
         self.opts = SQLCipherOptions(
-            dbpath, key, is_raw_key=True, create=False,
-            defer_encryption=True, sync_db_key=sync_db_key)
+            dbpath, key, is_raw_key=True, create=False)
         self.db1 = SQLCipherDatabase(self.opts)
 
         self.db2 = self.request_state._create_database(replica_uid='test')
@@ -886,12 +881,10 @@ class TestSoledadDbSync(
                 self.opts,
                 crypto,
                 replica_uid,
-                None,
-                defer_encryption=True)
+                None)
             self.dbsyncer = dbsyncer
             return dbsyncer.sync(target_url,
-                                 creds=creds,
-                                 defer_decryption=DEFER_DECRYPTION)
+                                 creds=creds)
         else:
             return self._do_sync(self, target_name)
 

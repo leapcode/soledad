@@ -20,6 +20,7 @@
 
 
 import json
+import copy
 import re
 import uuid
 import binascii
@@ -295,31 +296,14 @@ class CouchDatabase(object):
 
         generation, _ = self.get_generation_info()
         results = list(
-            self._get_docs(None, True, include_deleted))
+            self.get_docs(None, True, include_deleted))
         return (generation, results)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
-                 include_deleted=False):
+                 include_deleted=False, read_content=True):
         """
         Get the JSON content for many documents.
 
-        :param doc_ids: A list of document identifiers or None for all.
-        :type doc_ids: list
-        :param check_for_conflicts: If set to False, then the conflict check
-                                    will be skipped, and 'None' will be
-                                    returned instead of True/False.
-        :type check_for_conflicts: bool
-        :param include_deleted: If set to True, deleted documents will be
-                                returned with empty content. Otherwise deleted
-                                documents will not be included in the results.
-        :return: iterable giving the Document object for each document id
-                 in matching doc_ids order.
-        :rtype: iterable
-        """
-        return self._get_docs(doc_ids, check_for_conflicts, include_deleted)
-
-    def _get_docs(self, doc_ids, check_for_conflicts, include_deleted):
-        """
         Use couch's `_all_docs` view to get the documents indicated in
         `doc_ids`,
 
@@ -337,14 +321,21 @@ class CouchDatabase(object):
                  in matching doc_ids order.
         :rtype: iterable
         """
-        params = {'include_docs': 'true', 'attachments': 'true'}
+        params = {'include_docs': 'true', 'attachments': 'false'}
         if doc_ids is not None:
             params['keys'] = doc_ids
         view = self._database.view("_all_docs", **params)
         for row in view.rows:
-            result = row['doc']
+            result = copy.deepcopy(row['doc'])
+            for file_name in result.get('_attachments', {}).keys():
+                data = self._database.get_attachment(result, file_name)
+                if data:
+                    if read_content:
+                        data = data.read()
+                    result['_attachments'][file_name] = {'data': data}
             doc = self.__parse_doc_from_couch(
-                result, result['_id'], check_for_conflicts=check_for_conflicts)
+                result, result['_id'],
+                check_for_conflicts=check_for_conflicts, decode=False)
             # filter out non-u1db or deleted documents
             if not doc or (not include_deleted and doc.is_tombstone()):
                 continue
@@ -409,7 +400,7 @@ class CouchDatabase(object):
         return rev
 
     def __parse_doc_from_couch(self, result, doc_id,
-                               check_for_conflicts=False):
+                               check_for_conflicts=False, decode=True):
         # restrict to u1db documents
         if 'u1db_rev' not in result:
             return None
@@ -418,19 +409,23 @@ class CouchDatabase(object):
         if '_attachments' not in result \
                 or 'u1db_content' not in result['_attachments']:
             doc.make_tombstone()
-        else:
+        elif decode:
             doc.content = json.loads(
                 binascii.a2b_base64(
                     result['_attachments']['u1db_content']['data']))
+        else:
+            doc._json = result['_attachments']['u1db_content']['data']
         # determine if there are conflicts
         if check_for_conflicts \
                 and '_attachments' in result \
                 and 'u1db_conflicts' in result['_attachments']:
-            doc.set_conflicts(
-                self._build_conflicts(
-                    doc.doc_id,
-                    json.loads(binascii.a2b_base64(
-                        result['_attachments']['u1db_conflicts']['data']))))
+            if decode:
+                conflicts = binascii.a2b_base64(
+                    result['_attachments']['u1db_conflicts']['data'])
+            else:
+                conflicts = result['_attachments']['u1db_conflicts']['data']
+            conflicts = json.loads(conflicts)
+            doc.set_conflicts(self._build_conflicts(doc.doc_id, conflicts))
         # store couch revision
         doc.couch_rev = result['_rev']
         return doc
@@ -663,7 +658,7 @@ class CouchDatabase(object):
         _, _, data = resource.get_json(**kwargs)
         return data
 
-    def _allocate_new_generation(self, doc_id, transaction_id):
+    def _allocate_new_generation(self, doc_id, transaction_id, save=True):
         """
         Allocate a new generation number for a document modification.
 
@@ -703,10 +698,12 @@ class CouchDatabase(object):
                     DOC_ID_KEY: doc_id,
                     TRANSACTION_ID_KEY: transaction_id,
                 }
-                self._database.save(gen_doc)
+                if save:
+                    self._database.save(gen_doc)
                 break  # succeeded allocating a new generation, proceed
             except ResourceConflict:
                 pass  # try again!
+        return gen_doc
 
     def save_document(self, old_doc, doc, transaction_id):
         """
@@ -785,6 +782,7 @@ class CouchDatabase(object):
                     headers=envelope.headers)
             except ResourceConflict:
                 raise RevisionConflict()
+            self._allocate_new_generation(doc.doc_id, transaction_id)
         else:
             for name, attachment in attachments.items():
                 del attachment['follows']
@@ -793,11 +791,12 @@ class CouchDatabase(object):
                 attachment['data'] = binascii.b2a_base64(
                     parts[index]).strip()
             couch_doc['_attachments'] = attachments
+            gen_doc = self._allocate_new_generation(
+                doc.doc_id, transaction_id, save=False)
             self.batch_docs[doc.doc_id] = couch_doc
+            self.batch_docs[gen_doc['_id']] = gen_doc
             last_gen, last_trans_id = self.batch_generation
             self.batch_generation = (last_gen + 1, transaction_id)
-
-        self._allocate_new_generation(doc.doc_id, transaction_id)
 
     def _new_resource(self, *path):
         """

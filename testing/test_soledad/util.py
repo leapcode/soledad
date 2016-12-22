@@ -15,11 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
 """
 Utilities used by multiple test suites.
 """
-
 
 import os
 import random
@@ -45,21 +43,20 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import CouchServerState
 
-from leap.soledad.common.crypto import ENC_SCHEME_KEY
 
 from leap.soledad.client import Soledad
 from leap.soledad.client import http_target
 from leap.soledad.client import auth
-from leap.soledad.client.crypto import decrypt_doc_dict
 from leap.soledad.client.sqlcipher import SQLCipherDatabase
 from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client._crypto import is_symmetrically_encrypted
 
 from leap.soledad.server import SoledadApp
 from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
 PASSWORD = '123456'
-ADDRESS = 'leap@leap.se'
+ADDRESS = 'user-1234'
 
 
 def make_local_db_and_target(test):
@@ -193,8 +190,7 @@ class MockedSharedDBTest(object):
 
 
 def soledad_sync_target(
-        test, path, source_replica_uid=uuid4().hex,
-        sync_db=None, sync_enc_pool=None):
+        test, path, source_replica_uid=uuid4().hex):
     creds = {'token': {
         'uuid': 'user-uuid',
         'token': 'auth-token',
@@ -204,14 +200,13 @@ def soledad_sync_target(
         source_replica_uid,
         creds,
         test._soledad._crypto,
-        None,  # cert_file
-        sync_db=sync_db,
-        sync_enc_pool=sync_enc_pool)
+        None)  # cert_file
 
 
 # redefine the base leap test class so it inherits from twisted trial's
 # TestCase. This is needed so trial knows that it has to manage a reactor and
 # wait for deferreds returned by tests to be fired.
+
 BaseLeapTest = type(
     'BaseLeapTest', (unittest.TestCase,), dict(BaseLeapTest.__dict__))
 
@@ -221,7 +216,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
     """
     Instantiates Soledad for usage in tests.
     """
-    defer_sync_encryption = False
 
     @pytest.mark.usefixtures("method_tmpdir")
     def setUp(self):
@@ -229,14 +223,7 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         # repeat it here because twisted.trial does not work with
         # setUpClass/tearDownClass.
 
-        self.old_path = os.environ['PATH']
-        self.old_home = os.environ['HOME']
         self.home = self.tempdir
-        bin_tdir = os.path.join(
-            self.tempdir,
-            'bin')
-        os.environ["PATH"] = bin_tdir
-        os.environ["HOME"] = self.tempdir
 
         # config info
         self.db1_file = os.path.join(self.tempdir, "db1.u1db")
@@ -262,10 +249,6 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
         self._db1.close()
         self._db2.close()
         self._soledad.close()
-
-        # restore paths
-        os.environ["PATH"] = self.old_path
-        os.environ["HOME"] = self.old_home
 
         def _delete_temporary_dirs():
             # XXX should not access "private" attrs
@@ -305,12 +288,12 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                 self.tempdir, prefix, local_db_path),
             server_url=server_url,  # Soledad will fail if not given an url
             cert_file=cert_file,
-            defer_encryption=self.defer_sync_encryption,
             shared_db=MockSharedDB(),
             auth_token=auth_token)
         self.addCleanup(soledad.close)
         return soledad
 
+    @pytest.inlineCallbacks
     def assertGetEncryptedDoc(
             self, db, doc_id, doc_rev, content, has_conflicts):
         """
@@ -320,13 +303,9 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
                                      has_conflicts=has_conflicts)
         doc = db.get_doc(doc_id)
 
-        if ENC_SCHEME_KEY in doc.content:
-            # XXX check for SYM_KEY too
-            key = self._soledad._crypto.doc_passphrase(doc.doc_id)
-            secret = self._soledad._crypto.secret
-            decrypted = decrypt_doc_dict(
-                doc.content, doc.doc_id, doc.rev,
-                key, secret)
+        if is_symmetrically_encrypted(doc.content['raw']):
+            crypt = self._soledad._crypto
+            decrypted = yield crypt.decrypt_doc(doc)
             doc.set_json(decrypted)
         self.assertEqual(exp_doc.doc_id, doc.doc_id)
         self.assertEqual(exp_doc.rev, doc.rev)

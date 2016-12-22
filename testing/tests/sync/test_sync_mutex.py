@@ -47,7 +47,7 @@ from test_soledad.util import soledad_sync_target
 _old_sync = SoledadSynchronizer.sync
 
 
-def _timed_sync(self, defer_decryption=True):
+def _timed_sync(self):
     t = time.time()
 
     sync_id = uuid.uuid4()
@@ -62,9 +62,10 @@ def _timed_sync(self, defer_decryption=True):
         self.source.sync_times[sync_id]['end'] = t
         return passthrough
 
-    d = _old_sync(self, defer_decryption=defer_decryption)
+    d = _old_sync(self)
     d.addBoth(_store_finish_time)
     return d
+
 
 SoledadSynchronizer.sync = _timed_sync
 

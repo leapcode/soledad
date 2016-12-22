@@ -34,7 +34,7 @@ from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import document
 from leap.soledad.common.log import getLogger
 from leap.soledad.client import events
-from leap.soledad.client.crypto import encrypt_sym, decrypt_sym
+from leap.soledad.client import _crypto
 
 
 logger = getLogger(__name__)
@@ -126,7 +126,7 @@ class SoledadSecrets(object):
     instantiates Soledad.
     """
 
-    IV_SEPARATOR = ":"
+    SEPARATOR = ":"
     """
     A separator used for storing the encryption initial value prepended to the
     ciphertext.
@@ -142,7 +142,8 @@ class SoledadSecrets(object):
     KDF_SALT_KEY = 'kdf_salt'
     KDF_LENGTH_KEY = 'kdf_length'
     KDF_SCRYPT = 'scrypt'
-    CIPHER_AES256 = 'aes256'
+    CIPHER_AES256 = 'aes256'  # deprecated, AES-CTR
+    CIPHER_AES256_GCM = _crypto.ENC_METHOD.aes_256_gcm
     RECOVERY_DOC_VERSION_KEY = 'version'
     RECOVERY_DOC_VERSION = 1
     """
@@ -343,7 +344,7 @@ class SoledadSecrets(object):
             '%s%s' %
             (self._passphrase_as_string(), self._uuid)).hexdigest()
 
-    def _export_recovery_document(self):
+    def _export_recovery_document(self, cipher=None):
         """
         Export the storage secrets.
 
@@ -364,6 +365,9 @@ class SoledadSecrets(object):
         Note that multiple storage secrets might be stored in one recovery
         document.
 
+        :param cipher: (Optional) The ciper to use. Defaults to AES256
+        :type cipher: str
+
         :return: The recovery document.
         :rtype: dict
         """
@@ -371,7 +375,7 @@ class SoledadSecrets(object):
         encrypted_secrets = {}
         for secret_id in self._secrets:
             encrypted_secrets[secret_id] = self._encrypt_storage_secret(
-                self._secrets[secret_id])
+                self._secrets[secret_id], doc_cipher=cipher)
         # create the recovery document
         data = {
             self.STORAGE_SECRETS_KEY: encrypted_secrets,
@@ -447,6 +451,7 @@ class SoledadSecrets(object):
                 except SecretsException as e:
                     logger.error("failed to decrypt storage secret: %s"
                                  % str(e))
+                    raise e
         return secret_count, active_secret
 
     def _get_secrets_from_shared_db(self):
@@ -537,18 +542,25 @@ class SoledadSecrets(object):
         )
         if encrypted_secret_dict[self.KDF_LENGTH_KEY] != len(key):
             raise SecretsException("Wrong length of decryption key.")
-        if encrypted_secret_dict[self.CIPHER_KEY] != self.CIPHER_AES256:
+        supported_ciphers = [self.CIPHER_AES256, self.CIPHER_AES256_GCM]
+        doc_cipher = encrypted_secret_dict[self.CIPHER_KEY]
+        if doc_cipher not in supported_ciphers:
             raise SecretsException("Unknown cipher in stored secret.")
         # recover the initial value and ciphertext
         iv, ciphertext = encrypted_secret_dict[self.SECRET_KEY].split(
-            self.IV_SEPARATOR, 1)
+            self.SEPARATOR, 1)
         ciphertext = binascii.a2b_base64(ciphertext)
-        decrypted_secret = decrypt_sym(ciphertext, key, iv)
+        try:
+            decrypted_secret = _crypto.decrypt_sym(
+                ciphertext, key, iv, doc_cipher)
+        except Exception as e:
+            logger.error(e)
+            raise SecretsException("Unable to decrypt secret.")
         if encrypted_secret_dict[self.LENGTH_KEY] != len(decrypted_secret):
             raise SecretsException("Wrong length of decrypted secret.")
         return decrypted_secret
 
-    def _encrypt_storage_secret(self, decrypted_secret):
+    def _encrypt_storage_secret(self, decrypted_secret, doc_cipher=None):
         """
         Encrypt the storage secret.
 
@@ -567,6 +579,8 @@ class SoledadSecrets(object):
 
         :param decrypted_secret: The decrypted storage secret.
         :type decrypted_secret: str
+        :param cipher: (Optional) The ciper to use. Defaults to AES256
+        :type cipher: str
 
         :return: The encrypted storage secret.
         :rtype: dict
@@ -575,17 +589,18 @@ class SoledadSecrets(object):
         salt = os.urandom(self.SALT_LENGTH)
         # get a 256-bit key
         key = scrypt.hash(self._passphrase_as_string(), salt, buflen=32)
-        iv, ciphertext = encrypt_sym(decrypted_secret, key)
+        doc_cipher = doc_cipher or self.CIPHER_AES256_GCM
+        iv, ciphertext = _crypto.encrypt_sym(decrypted_secret, key, doc_cipher)
+        ciphertext = binascii.b2a_base64(ciphertext)
         encrypted_secret_dict = {
             # leap.soledad.crypto submodule uses AES256 for symmetric
             # encryption.
             self.KDF_KEY: self.KDF_SCRYPT,
             self.KDF_SALT_KEY: binascii.b2a_base64(salt),
             self.KDF_LENGTH_KEY: len(key),
-            self.CIPHER_KEY: self.CIPHER_AES256,
+            self.CIPHER_KEY: doc_cipher,
             self.LENGTH_KEY: len(decrypted_secret),
-            self.SECRET_KEY: '%s%s%s' % (
-                str(iv), self.IV_SEPARATOR, binascii.b2a_base64(ciphertext)),
+            self.SECRET_KEY: self.SEPARATOR.join([str(iv), ciphertext])
         }
         return encrypted_secret_dict
 

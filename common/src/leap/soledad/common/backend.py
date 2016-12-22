@@ -73,8 +73,8 @@ class SoledadBackend(CommonBackend):
     def batch_end(self):
         if not self.BATCH_SUPPORT:
             return
-        self.batching = False
         self._database.batch_end()
+        self.batching = False
         for name in self.after_batch_callbacks:
             self.after_batch_callbacks[name]()
         self.after_batch_callbacks = None
@@ -570,7 +570,7 @@ class SoledadBackend(CommonBackend):
         self._put_doc(cur_doc, doc)
 
     def get_docs(self, doc_ids, check_for_conflicts=True,
-                 include_deleted=False):
+                 include_deleted=False, read_content=True):
         """
         Get the JSON content for many documents.
 
@@ -588,7 +588,7 @@ class SoledadBackend(CommonBackend):
         :rtype: iterable
         """
         return self._database.get_docs(doc_ids, check_for_conflicts,
-                                       include_deleted)
+                                       include_deleted, read_content)
 
     def _prune_conflicts(self, doc, doc_vcr):
         """

@@ -50,8 +50,7 @@ How many times a SQLCipher query should be retried in case of timeout.
 SQLCIPHER_MAX_RETRIES = 10
 
 
-def getConnectionPool(opts, openfun=None, driver="pysqlcipher",
-                      sync_enc_pool=None):
+def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
     """
     Return a connection pool.
 
@@ -72,7 +71,7 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher",
     if openfun is None and driver == "pysqlcipher":
         openfun = partial(set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
-        opts, sync_enc_pool,
+        opts,
         # the following params are relayed "as is" to twisted's
         # ConnectionPool.
         "%s.dbapi2" % driver, opts.path, timeout=SQLCIPHER_CONNECTION_TIMEOUT,
@@ -89,7 +88,7 @@ class U1DBConnection(adbapi.Connection):
     The U1DB wrapper to use.
     """
 
-    def __init__(self, pool, sync_enc_pool, init_u1db=False):
+    def __init__(self, pool, init_u1db=False):
         """
         :param pool: The pool of connections to that owns this connection.
         :type pool: adbapi.ConnectionPool
@@ -97,7 +96,6 @@ class U1DBConnection(adbapi.Connection):
         :type init_u1db: bool
         """
         self.init_u1db = init_u1db
-        self._sync_enc_pool = sync_enc_pool
         try:
             adbapi.Connection.__init__(self, pool)
         except dbapi2.DatabaseError as e:
@@ -116,8 +114,7 @@ class U1DBConnection(adbapi.Connection):
         if self.init_u1db:
             self._u1db = self.u1db_wrapper(
                 self._connection,
-                self._pool.opts,
-                self._sync_enc_pool)
+                self._pool.opts)
 
     def __getattr__(self, name):
         """
@@ -162,12 +159,11 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
     connectionFactory = U1DBConnection
     transactionFactory = U1DBTransaction
 
-    def __init__(self, opts, sync_enc_pool, *args, **kwargs):
+    def __init__(self, opts, *args, **kwargs):
         """
         Initialize the connection pool.
         """
         self.opts = opts
-        self._sync_enc_pool = sync_enc_pool
         try:
             adbapi.ConnectionPool.__init__(self, *args, **kwargs)
         except dbapi2.DatabaseError as e:
@@ -182,7 +178,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
 
         try:
             conn = self.connectionFactory(
-                self, self._sync_enc_pool, init_u1db=True)
+                self, init_u1db=True)
             replica_uid = conn._u1db._real_replica_uid
             setProxiedObject(self.replica_uid, replica_uid)
         except DatabaseAccessError as e:
@@ -257,7 +253,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
         tid = self.threadID()
         u1db = self._u1dbconnections.get(tid)
         conn = self.connectionFactory(
-            self, self._sync_enc_pool, init_u1db=not bool(u1db))
+            self, init_u1db=not bool(u1db))
 
         if self.replica_uid is None:
             replica_uid = conn._u1db._real_replica_uid

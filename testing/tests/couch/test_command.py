@@ -25,6 +25,7 @@ class CommandBasedDBCreationTest(unittest.TestCase):
                           state.ensure_database, "user-1337")
 
     def test_raises_unauthorized_by_default(self):
-        state = couch_state.CouchServerState("url", check_schema_versions=False)
+        state = couch_state.CouchServerState("url",
+                                             check_schema_versions=False)
         self.assertRaises(u1db_errors.Unauthorized,
                           state.ensure_database, "user-1337")

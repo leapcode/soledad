@@ -41,7 +41,7 @@ from test_soledad.util import (
     BaseSoledadTest,
 )
 
-from leap.soledad.common import crypto
+from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
 from leap.soledad.server.config import load_configuration
 from leap.soledad.server.config import CONFIG_DEFAULTS
@@ -412,13 +412,9 @@ class EncryptedSyncTestCase(
                 self.assertEqual(soldoc.doc_id, couchdoc.doc_id)
                 self.assertEqual(soldoc.rev, couchdoc.rev)
                 couch_content = couchdoc.content.keys()
-                self.assertEqual(6, len(couch_content))
-                self.assertTrue(crypto.ENC_JSON_KEY in couch_content)
-                self.assertTrue(crypto.ENC_SCHEME_KEY in couch_content)
-                self.assertTrue(crypto.ENC_METHOD_KEY in couch_content)
-                self.assertTrue(crypto.ENC_IV_KEY in couch_content)
-                self.assertTrue(crypto.MAC_KEY in couch_content)
-                self.assertTrue(crypto.MAC_METHOD_KEY in couch_content)
+                self.assertEqual(['raw'], couch_content)
+                content = couchdoc.get_json()
+                self.assertTrue(_crypto.is_symmetrically_encrypted(content))
 
         d = sol1.get_all_docs()
         d.addCallback(_db1AssertEmptyDocList)
@@ -472,16 +468,6 @@ class EncryptedSyncTestCase(
         passphrase.
         """
         return self._test_encrypted_sym_sync(passphrase=u'ãáàäéàëíìïóòöõúùüñç')
-
-    def test_sync_very_large_files(self):
-        """
-        Test if Soledad can sync very large files.
-        """
-        self.skipTest(
-            "Work in progress. For reference, see: "
-            "https://leap.se/code/issues/7370")
-        length = 100 * (10 ** 6)  # 100 MB
-        return self._test_encrypted_sym_sync(doc_size=length, number_of_docs=1)
 
     def test_sync_many_small_files(self):
         """

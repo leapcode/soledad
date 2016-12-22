@@ -1,7 +1,6 @@
 stages:
   - code-check
   - tests
-  - benchmark
 
 # Cache tox envs between builds
 cache:
@@ -22,15 +21,5 @@ tests:
   script:
     - cd testing
     - tox -- --couch-url http://couchdb:5984
-
-benchmark:
-  stage: benchmark
-  image: leapcode/soledad:latest
-  services:
-    - couchdb
-  script:
-    - cd testing
-    - tox -e perf -- --couch-url http://couchdb:5984
   tags:
-    - docker
-    - benchmark
+    - couchdb

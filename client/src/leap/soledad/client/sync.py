@@ -56,22 +56,9 @@ class SoledadSynchronizer(Synchronizer):
             self.sync_exchange_phase = None
 
     @defer.inlineCallbacks
-    def sync(self, defer_decryption=True):
+    def sync(self):
         """
         Synchronize documents between source and target.
-
-        Differently from u1db `Synchronizer.sync` method, this one allows to
-        pass a `defer_decryption` flag that will postpone the last
-        step in the synchronization dance, namely, the setting of the last
-        known generation and transaction id for a given remote replica.
-
-        This is done to allow the ongoing parallel decryption of the incoming
-        docs to proceed without `InvalidGeneration` conflicts.
-
-        :param defer_decryption: Whether to defer the decryption process using
-                                 the intermediate database. If False,
-                                 decryption will be done inline.
-        :type defer_decryption: bool
 
         :return: A deferred which will fire after the sync has finished with
                  the local generation before the synchronization was performed.
@@ -154,28 +141,19 @@ class SoledadSynchronizer(Synchronizer):
             self.sync_phase[0] += 1
         # --------------------------------------------------------------------
 
-        # prepare to send all the changed docs
-        changed_doc_ids = [doc_id for doc_id, _, _ in changes]
-        docs_to_send = self.source.get_docs(
-            changed_doc_ids, check_for_conflicts=False, include_deleted=True)
-        ids_sent = []
-        docs_by_generation = []
-        idx = 0
-        for doc in docs_to_send:
-            _, gen, trans = changes[idx]
-            docs_by_generation.append((doc, gen, trans))
-            idx += 1
-            ids_sent.append(doc.doc_id)
+        docs_by_generation = self._docs_by_gen_from_changes(changes)
 
         # exchange documents and try to insert the returned ones with
         # the target, return target synced-up-to gen.
         new_gen, new_trans_id = yield sync_target.sync_exchange(
             docs_by_generation, self.source._replica_uid,
             target_last_known_gen, target_last_known_trans_id,
-            self._insert_doc_from_target, ensure_callback=ensure_callback,
-            defer_decryption=defer_decryption)
+            self._insert_doc_from_target, ensure_callback=ensure_callback)
+        ids_sent = [doc_id for doc_id, _, _ in changes]
         logger.debug("target gen after sync: %d" % new_gen)
         logger.debug("target trans_id after sync: %s" % new_trans_id)
+        if hasattr(self.source, 'commit'):  # sqlcipher backend speed up
+            self.source.commit()  # insert it all in a single transaction
         info = {
             "target_replica_uid": self.target_replica_uid,
             "new_gen": new_gen,
@@ -204,6 +182,14 @@ class SoledadSynchronizer(Synchronizer):
 
         defer.returnValue(my_gen)
 
+    def _docs_by_gen_from_changes(self, changes):
+        docs_by_generation = []
+        kwargs = {'include_deleted': True}
+        for doc_id, gen, trans in changes:
+            get_doc = (self.source.get_doc, (doc_id,), kwargs)
+            docs_by_generation.append((get_doc, gen, trans))
+        return docs_by_generation
+
     def complete_sync(self):
         """
         Last stage of the synchronization:
@@ -224,12 +210,6 @@ class SoledadSynchronizer(Synchronizer):
 
         # if gapless record current reached generation with target
         return self._record_sync_info_with_the_target(info["my_gen"])
-
-    def close(self):
-        """
-        Close the synchronizer.
-        """
-        self.sync_target.close()
 
     def _record_sync_info_with_the_target(self, start_generation):
         """
