@@ -19,6 +19,7 @@ import threading
 import time
 
 from urlparse import urljoin
+from mock import Mock
 from twisted.internet import defer
 
 from testscenarios import TestWithScenarios
@@ -184,10 +185,9 @@ class TestSoledadDbSync(
         target = soledad_sync_target(
             self, self.db2._dbname,
             source_replica_uid=self._soledad._dbpool.replica_uid)
-        self.addCleanup(target.close)
         return sync.SoledadSynchronizer(
             self.db,
-            target).sync(defer_decryption=False)
+            target).sync()
 
     @defer.inlineCallbacks
     def test_db_sync(self):
@@ -211,3 +211,21 @@ class TestSoledadDbSync(
             self.db, doc2.doc_id, doc2.rev, tests.nested_doc, False)
 
     # TODO: add u1db.tests.test_sync.TestRemoteSyncIntegration
+
+
+class TestSoledadSynchronizer(BaseSoledadTest):
+
+    def setUp(self):
+        BaseSoledadTest.setUp(self)
+        self.db = Mock()
+        self.target = Mock()
+        self.synchronizer = sync.SoledadSynchronizer(
+            self.db,
+            self.target)
+
+    def test_docs_by_gen_includes_deleted(self):
+        changes = [('id', 'gen', 'trans')]
+        docs_by_gen = self.synchronizer._docs_by_gen_from_changes(changes)
+        f, args, kwargs = docs_by_gen[0][0]
+        self.assertIn('include_deleted', kwargs)
+        self.assertTrue(kwargs['include_deleted'])

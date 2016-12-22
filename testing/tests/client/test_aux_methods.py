@@ -21,10 +21,10 @@ import os
 
 from twisted.internet import defer
 
-from leap.soledad.common.errors import DatabaseAccessError
 from leap.soledad.client import Soledad
 from leap.soledad.client.adbapi import U1DBConnectionPool
 from leap.soledad.client.secrets import PassphraseTooShort
+from leap.soledad.client.secrets import SecretsException
 
 from test_soledad.util import BaseSoledadTest
 
@@ -108,7 +108,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol.change_passphrase(u'654321')
         sol.close()
 
-        with self.assertRaises(DatabaseAccessError):
+        with self.assertRaises(SecretsException):
             self._soledad_instance(
                 'leap@leap.se',
                 passphrase=u'123',

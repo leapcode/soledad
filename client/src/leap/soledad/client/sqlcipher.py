@@ -42,9 +42,7 @@ SQLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
 import os
-import json
 
-from hashlib import sha256
 from functools import partial
 
 from pysqlcipher import dbapi2 as sqlcipher_dbapi2
@@ -117,7 +115,7 @@ class SQLCipherOptions(object):
     @classmethod
     def copy(cls, source, path=None, key=None, create=None,
              is_raw_key=None, cipher=None, kdf_iter=None,
-             cipher_page_size=None, defer_encryption=None, sync_db_key=None):
+             cipher_page_size=None, sync_db_key=None):
         """
         Return a copy of C{source} with parameters different than None
         replaced by new values.
@@ -134,7 +132,7 @@ class SQLCipherOptions(object):
                 args.append(getattr(source, name))
 
         for name in ["create", "is_raw_key", "cipher", "kdf_iter",
-                     "cipher_page_size", "defer_encryption", "sync_db_key"]:
+                     "cipher_page_size", "sync_db_key"]:
             val = local_vars[name]
             if val is not None:
                 kwargs[name] = val
@@ -145,7 +143,7 @@ class SQLCipherOptions(object):
 
     def __init__(self, path, key, create=True, is_raw_key=False,
                  cipher='aes-256-cbc', kdf_iter=4000, cipher_page_size=1024,
-                 defer_encryption=False, sync_db_key=None):
+                 sync_db_key=None):
         """
         :param path: The filesystem path for the database to open.
         :type path: str
@@ -163,10 +161,6 @@ class SQLCipherOptions(object):
         :type kdf_iter: int
         :param cipher_page_size: The page size.
         :type cipher_page_size: int
-        :param defer_encryption:
-            Whether to defer encryption/decryption of documents, or do it
-            inline while syncing.
-        :type defer_encryption: bool
         """
         self.path = path
         self.key = key
@@ -175,7 +169,6 @@ class SQLCipherOptions(object):
         self.cipher = cipher
         self.kdf_iter = kdf_iter
         self.cipher_page_size = cipher_page_size
-        self.defer_encryption = defer_encryption
         self.sync_db_key = sync_db_key
 
     def __str__(self):
@@ -201,7 +194,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
     """
     A U1DB implementation that uses SQLCipher as its persistence layer.
     """
-    defer_encryption = False
 
     # The attribute _index_storage_value will be used as the lookup key for the
     # implementation of the SQLCipher storage backend.
@@ -225,10 +217,10 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         """
         # ensure the db is encrypted if the file already exists
         if os.path.isfile(opts.path):
-            _assert_db_is_encrypted(opts)
-
-        # connect to the sqlcipher database
-        self._db_handle = initialize_sqlcipher_db(opts)
+            self._db_handle = _assert_db_is_encrypted(opts)
+        else:
+            # connect to the sqlcipher database
+            self._db_handle = initialize_sqlcipher_db(opts)
 
         # TODO ---------------------------------------------------
         # Everything else in this initialization has to be factored
@@ -265,27 +257,6 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         c.execute(
             'ALTER TABLE document '
             'ADD COLUMN syncable BOOL NOT NULL DEFAULT TRUE')
-
-    #
-    # Document operations
-    #
-
-    def put_doc(self, doc):
-        """
-        Overwrite the put_doc method, to enqueue the modified document for
-        encryption before sync.
-
-        :param doc: The document to be put.
-        :type doc: u1db.Document
-
-        :return: The new document revision.
-        :rtype: str
-        """
-        doc_rev = sqlite_backend.SQLitePartialExpandDatabase.put_doc(self, doc)
-        if self.defer_encryption:
-            # TODO move to api?
-            self._sync_enc_pool.encrypt_doc(doc)
-        return doc_rev
 
     #
     # SQLCipher API methods
@@ -425,25 +396,14 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     """
     ENCRYPT_LOOP_PERIOD = 1
 
-    def __init__(self, opts, soledad_crypto, replica_uid, cert_file,
-                 defer_encryption=False, sync_db=None, sync_enc_pool=None):
+    def __init__(self, opts, soledad_crypto, replica_uid, cert_file):
 
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto
         self.__replica_uid = replica_uid
         self._cert_file = cert_file
-        self._sync_enc_pool = sync_enc_pool
 
-        self._sync_db = sync_db
-
-        # we store syncers in a dictionary indexed by the target URL. We also
-        # store a hash of the auth info in case auth info expires and we need
-        # to rebuild the syncer for that target. The final self._syncers
-        # format is the following:
-        #
-        #  self._syncers = {'<url>': ('<auth_hash>', syncer), ...}
-        self._syncers = {}
         # storage for the documents received during a sync
         self.received_docs = []
 
@@ -457,6 +417,9 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
 
         if DO_STATS:
             self.sync_phase = None
+
+    def commit(self):
+        self._db_handle.commit()
 
     @property
     def _replica_uid(self):
@@ -477,7 +440,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             raise DatabaseAccessError(str(e))
 
     @defer.inlineCallbacks
-    def sync(self, url, creds=None, defer_decryption=True):
+    def sync(self, url, creds=None):
         """
         Synchronize documents with remote replica exposed at url.
 
@@ -492,10 +455,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :param creds: optional dictionary giving credentials to authorize the
                       operation with the server.
         :type creds: dict
-        :param defer_decryption:
-            Whether to defer the decryption process using the intermediate
-            database. If False, decryption will be done inline.
-        :type defer_decryption: bool
 
         :return:
             A Deferred, that will fire with the local generation (type `int`)
@@ -507,8 +466,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
             self.sync_phase = syncer.sync_phase
             self.syncer = syncer
             self.sync_exchange_phase = syncer.sync_exchange_phase
-        local_gen_before_sync = yield syncer.sync(
-            defer_decryption=defer_decryption)
+        local_gen_before_sync = yield syncer.sync()
         self.received_docs = syncer.received_docs
         defer.returnValue(local_gen_before_sync)
 
@@ -525,29 +483,15 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         :return: A synchronizer.
         :rtype: Synchronizer
         """
-        # we want to store at most one syncer for each url, so we also store a
-        # hash of the connection credentials and replace the stored syncer for
-        # a certain url if credentials have changed.
-        h = sha256(json.dumps([url, creds])).hexdigest()
-        cur_h, syncer = self._syncers.get(url, (None, None))
-        if syncer is None or h != cur_h:
-            syncer = SoledadSynchronizer(
-                self,
-                SoledadHTTPSyncTarget(
-                    url,
-                    # XXX is the replica_uid ready?
-                    self._replica_uid,
-                    creds=creds,
-                    crypto=self._crypto,
-                    cert_file=self._cert_file,
-                    sync_db=self._sync_db,
-                    sync_enc_pool=self._sync_enc_pool))
-            self._syncers[url] = (h, syncer)
-        # in order to reuse the same synchronizer multiple times we have to
-        # reset its state (i.e. the number of documents received from target
-        # and inserted in the local replica).
-        syncer.num_inserted = 0
-        return syncer
+        return SoledadSynchronizer(
+            self,
+            SoledadHTTPSyncTarget(
+                url,
+                # XXX is the replica_uid ready?
+                self._replica_uid,
+                creds=creds,
+                crypto=self._crypto,
+                cert_file=self._cert_file))
 
     #
     # Symmetric encryption of syncing docs
@@ -557,18 +501,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         # FIXME
         # XXX this SHOULD BE a callback
         return self._get_generation()
-
-    def close(self):
-        """
-        Close the syncer and syncdb orderly
-        """
-        super(SQLCipherU1DBSync, self).close()
-        # close all open syncers
-        for url in self._syncers.keys():
-            _, syncer = self._syncers[url]
-            syncer.close()
-            del self._syncers[url]
-        self.running = False
 
 
 class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
@@ -599,14 +531,12 @@ class SoledadSQLCipherWrapper(SQLCipherDatabase):
     It can be used from adbapi to initialize a soledad database after
     getting a regular connection to a sqlcipher database.
     """
-    def __init__(self, conn, opts, sync_enc_pool):
+    def __init__(self, conn, opts):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
         self.set_document_factory(soledad_doc_factory)
         self._prime_replica_uid()
-        self.defer_encryption = opts.defer_encryption
-        self._sync_enc_pool = sync_enc_pool
 
 
 def _assert_db_is_encrypted(opts):
@@ -635,7 +565,7 @@ def _assert_db_is_encrypted(opts):
         # assert that we can access it using SQLCipher with the given
         # key
         dummy_query = ('SELECT count(*) FROM sqlite_master',)
-        initialize_sqlcipher_db(opts, on_init=dummy_query)
+        return initialize_sqlcipher_db(opts, on_init=dummy_query)
     else:
         raise DatabaseIsNotEncrypted()
 
@@ -659,6 +589,7 @@ def soledad_doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
     """
     return SoledadDocument(doc_id=doc_id, rev=rev, json=json,
                            has_conflicts=has_conflicts, syncable=syncable)
+
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)
 

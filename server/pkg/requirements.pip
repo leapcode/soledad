@@ -3,3 +3,4 @@ PyOpenSSL
 twisted>=12.3.0
 Beaker
 couchdb
+python-cjson

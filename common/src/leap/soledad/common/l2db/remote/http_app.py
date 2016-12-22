@@ -194,6 +194,7 @@ class URLToResource(object):
         resource_cls = params.pop('resource_cls')
         return resource_cls, params
 
+
 url_to_resource = URLToResource()
 
 
@@ -501,7 +502,9 @@ class HTTPResponder(object):
             self._write('\r\n')
         else:
             self._write(',\r\n')
-        self._write(json.dumps(entry))
+        if type(entry) == dict:
+            entry = json.dumps(entry)
+        self._write(entry)
 
     def end_stream(self):
         "end stream (array)."

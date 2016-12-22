@@ -15,18 +15,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
-
 from twisted.internet import defer
+from twisted.internet import threads
 
 from leap.soledad.client.events import SOLEDAD_SYNC_RECEIVE_STATUS
 from leap.soledad.client.events import emit_async
-from leap.soledad.client.crypto import is_symmetrically_encrypted
-from leap.soledad.client.encdecpool import SyncDecrypterPool
 from leap.soledad.client.http_target.support import RequestBody
 from leap.soledad.common.log import getLogger
+from leap.soledad.client._crypto import is_symmetrically_encrypted
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.l2db import errors
-from leap.soledad.common.l2db.remote import utils
+from leap.soledad.client import crypto as old_crypto
+
+from . import fetch_protocol
 
 logger = getLogger(__name__)
 
@@ -50,208 +51,105 @@ class HTTPDocFetcher(object):
 
     @defer.inlineCallbacks
     def _receive_docs(self, last_known_generation, last_known_trans_id,
-                      ensure_callback, sync_id, defer_decryption):
-
-        self._queue_for_decrypt = defer_decryption \
-            and self._sync_db is not None
-
+                      ensure_callback, sync_id):
         new_generation = last_known_generation
         new_transaction_id = last_known_trans_id
+        # Acts as a queue, ensuring line order on async processing
+        # as `self._insert_doc_cb` cant be run concurrently or out of order.
+        # DeferredSemaphore solves the concurrency and its implementation uses
+        # a queue, solving the ordering.
+        # FIXME: Find a proper solution to avoid surprises on Twisted changes
+        self.semaphore = defer.DeferredSemaphore(1)
 
-        if self._queue_for_decrypt:
-            logger.debug(
-                "Soledad sync: will queue received docs for decrypting.")
-
-        if defer_decryption:
-            self._setup_sync_decr_pool()
-
-        # ---------------------------------------------------------------------
-        # maybe receive the first document
-        # ---------------------------------------------------------------------
-
-        # we fetch the first document before fetching the rest because we need
-        # to know the total number of documents to be received, and this
-        # information comes as metadata to each request.
-
-        doc = yield self._receive_one_doc(
+        metadata = yield self._fetch_all(
             last_known_generation, last_known_trans_id,
-            sync_id, 0)
-        self._received_docs = 0
-        number_of_changes, ngen, ntrans = self._insert_received_doc(doc, 1, 1)
+            sync_id)
+        number_of_changes, ngen, ntrans = self._parse_metadata(metadata)
+
+        # wait for pending inserts
+        yield self.semaphore.acquire()
 
         if ngen:
             new_generation = ngen
             new_transaction_id = ntrans
 
-        # ---------------------------------------------------------------------
-        # maybe receive the rest of the documents
-        # ---------------------------------------------------------------------
-
-        # launch many asynchronous fetches and inserts of received documents
-        # in the temporary sync db. Will wait for all results before
-        # continuing.
-
-        received = 1
-        deferreds = []
-        while received < number_of_changes:
-            d = self._receive_one_doc(
-                last_known_generation,
-                last_known_trans_id, sync_id, received)
-            d.addCallback(
-                self._insert_received_doc,
-                received + 1,  # the index of the current received doc
-                number_of_changes)
-            deferreds.append(d)
-            received += 1
-        results = yield defer.gatherResults(deferreds)
-
-        # get generation and transaction id of target after insertions
-        if deferreds:
-            _, new_generation, new_transaction_id = results.pop()
-
-        # ---------------------------------------------------------------------
-        # wait for async decryption to finish
-        # ---------------------------------------------------------------------
-
-        if defer_decryption:
-            yield self._sync_decr_pool.deferred
-            self._sync_decr_pool.stop()
-
         defer.returnValue([new_generation, new_transaction_id])
 
-    def _receive_one_doc(self, last_known_generation,
-                         last_known_trans_id, sync_id, received):
+    def _fetch_all(self, last_known_generation,
+                   last_known_trans_id, sync_id):
         # add remote replica metadata to the request
         body = RequestBody(
             last_known_generation=last_known_generation,
             last_known_trans_id=last_known_trans_id,
             sync_id=sync_id,
             ensure=self._ensure_callback is not None)
-        # inform server of how many documents have already been received
-        body.insert_info(received=received)
-        # send headers
+        self._received_docs = 0
+        # build a stream reader with _doc_parser as a callback
+        body_reader = fetch_protocol.build_body_reader(self._doc_parser)
+        # start download stream
         return self._http_request(
             self._url,
             method='POST',
             body=str(body),
-            content_type='application/x-soledad-sync-get')
+            content_type='application/x-soledad-sync-get',
+            body_reader=body_reader)
 
-    def _insert_received_doc(self, response, idx, total):
+    @defer.inlineCallbacks
+    def _doc_parser(self, doc_info, content, total):
         """
-        Insert a received document into the local replica.
+        Insert a received document into the local replica, decrypting
+        if necessary. The case where it's not decrypted is when a doc gets
+        inserted from Server side with a GPG encrypted content.
 
-        :param response: The body and headers of the response.
-        :type response: tuple(str, dict)
-        :param idx: The index count of the current operation.
-        :type idx: int
+        :param doc_info: Dictionary representing Document information.
+        :type doc_info: dict
+        :param content: The Document's content.
+        :type idx: str
         :param total: The total number of operations.
         :type total: int
         """
-        new_generation, new_transaction_id, number_of_changes, doc_id, \
-            rev, content, gen, trans_id = \
-            self._parse_received_doc_response(response)
+        yield self.semaphore.run(self.__atomic_doc_parse, doc_info, content,
+                                 total)
 
-        if self._sync_decr_pool and not self._sync_decr_pool.running:
-            self._sync_decr_pool.start(number_of_changes)
+    @defer.inlineCallbacks
+    def __atomic_doc_parse(self, doc_info, content, total):
+        doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
+        if is_symmetrically_encrypted(content):
+            content = yield self._crypto.decrypt_doc(doc)
+        elif old_crypto.is_symmetrically_encrypted(doc):
+            content = self._deprecated_crypto.decrypt_doc(doc)
+        doc.set_json(content)
 
-        if doc_id is not None:
-            # decrypt incoming document and insert into local database
-            # -------------------------------------------------------------
-            # symmetric decryption of document's contents
-            # -------------------------------------------------------------
-            # If arriving content was symmetrically encrypted, we decrypt it.
-            # We do it inline if defer_decryption flag is False or no sync_db
-            # was defined, otherwise we defer it writing it to the received
-            # docs table.
-            doc = SoledadDocument(doc_id, rev, content)
-            if is_symmetrically_encrypted(doc):
-                if self._queue_for_decrypt:
-                    self._sync_decr_pool.insert_encrypted_received_doc(
-                        doc.doc_id, doc.rev, doc.content, gen, trans_id,
-                        idx)
-                else:
-                    # defer_decryption is False or no-sync-db fallback
-                    doc.set_json(self._crypto.decrypt_doc(doc))
-                    self._insert_doc_cb(doc, gen, trans_id)
-            else:
-                # not symmetrically encrypted doc, insert it directly
-                # or save it in the decrypted stage.
-                if self._queue_for_decrypt:
-                    self._sync_decr_pool.insert_received_doc(
-                        doc.doc_id, doc.rev, doc.content, gen, trans_id,
-                        idx)
-                else:
-                    self._insert_doc_cb(doc, gen, trans_id)
-            # -------------------------------------------------------------
-            # end of symmetric decryption
-            # -------------------------------------------------------------
+        # TODO insert blobs here on the blob backend
+        # FIXME: This is wrong. Using the very same SQLite connection object
+        # from multiple threads is dangerous. We should bring the dbpool here
+        # or find an alternative.  Deferring to a thread only helps releasing
+        # the reactor for other tasks as this is an IO intensive call.
+        yield threads.deferToThread(self._insert_doc_cb,
+                                    doc, doc_info['gen'], doc_info['trans_id'])
         self._received_docs += 1
         user_data = {'uuid': self.uuid, 'userid': self.userid}
-        _emit_receive_status(user_data, self._received_docs, total)
-        return number_of_changes, new_generation, new_transaction_id
+        _emit_receive_status(user_data, self._received_docs, total=total)
 
-    def _parse_received_doc_response(self, response):
+    def _parse_metadata(self, metadata):
         """
-        Parse the response from the server containing the received document.
+        Parse the response from the server containing the sync metadata.
 
-        :param response: The body and headers of the response.
-        :type response: tuple(str, dict)
+        :param response: Metadata as string
+        :type response: str
 
-        :return: (new_gen, new_trans_id, number_of_changes, doc_id, rev,
-                 content, gen, trans_id)
+        :return: (number_of_changes, new_gen, new_trans_id)
         :rtype: tuple
         """
-        # decode incoming stream
-        parts = response.splitlines()
-        if not parts or parts[0] != '[' or parts[-1] != ']':
-            raise errors.BrokenSyncStream
-        data = parts[1:-1]
-        # decode metadata
         try:
-            line, comma = utils.check_and_strip_comma(data[0])
-            metadata = None
-        except (IndexError):
-            raise errors.BrokenSyncStream
-        try:
-            metadata = json.loads(line)
-            new_generation = metadata['new_generation']
-            new_transaction_id = metadata['new_transaction_id']
-            number_of_changes = metadata['number_of_changes']
+            metadata = json.loads(metadata)
+            # make sure we have replica_uid from fresh new dbs
+            if self._ensure_callback and 'replica_uid' in metadata:
+                self._ensure_callback(metadata['replica_uid'])
+            return (metadata['number_of_changes'], metadata['new_generation'],
+                    metadata['new_transaction_id'])
         except (ValueError, KeyError):
-            raise errors.BrokenSyncStream
-        # make sure we have replica_uid from fresh new dbs
-        if self._ensure_callback and 'replica_uid' in metadata:
-            self._ensure_callback(metadata['replica_uid'])
-        # parse incoming document info
-        doc_id = None
-        rev = None
-        content = None
-        gen = None
-        trans_id = None
-        if number_of_changes > 0:
-            try:
-                entry = json.loads(data[1])
-                doc_id = entry['id']
-                rev = entry['rev']
-                content = entry['content']
-                gen = entry['gen']
-                trans_id = entry['trans_id']
-            except (IndexError, KeyError):
-                raise errors.BrokenSyncStream
-        return new_generation, new_transaction_id, number_of_changes, \
-            doc_id, rev, content, gen, trans_id
-
-    def _setup_sync_decr_pool(self):
-        """
-        Set up the SyncDecrypterPool for deferred decryption.
-        """
-        if self._sync_decr_pool is None and self._sync_db is not None:
-            # initialize syncing queue decryption pool
-            self._sync_decr_pool = SyncDecrypterPool(
-                self._crypto,
-                self._sync_db,
-                insert_doc_cb=self._insert_doc_cb,
-                source_replica_uid=self.source_replica_uid)
+            raise errors.BrokenSyncStream('Metadata parsing failed')
 
 
 def _emit_receive_status(user_data, received_docs, total):

@@ -18,10 +18,13 @@ import os
 import json
 import base64
 
+from StringIO import StringIO
 from uuid import uuid4
 
 from twisted.web.error import Error
 from twisted.internet import defer
+from twisted.web.http_headers import Headers
+from twisted.web.client import FileBodyProducer
 
 from leap.soledad.client.http_target.support import readBody
 from leap.soledad.common.errors import InvalidAuthTokenError
@@ -38,14 +41,6 @@ class SyncTargetAPI(SyncTarget):
     """
     Declares public methods and implements u1db.SyncTarget.
     """
-
-    @defer.inlineCallbacks
-    def close(self):
-        if self._sync_enc_pool:
-            self._sync_enc_pool.stop()
-        if self._sync_decr_pool:
-            self._sync_decr_pool.stop()
-        yield self._http.close()
 
     @property
     def uuid(self):
@@ -69,16 +64,20 @@ class SyncTargetAPI(SyncTarget):
     def _base_header(self):
         return self._auth_header.copy() if self._auth_header else {}
 
-    @property
-    def _defer_encryption(self):
-        return self._sync_enc_pool is not None
-
     def _http_request(self, url, method='GET', body=None, headers=None,
-                      content_type=None):
+                      content_type=None, body_reader=readBody,
+                      body_producer=None):
         headers = headers or self._base_header
         if content_type:
             headers.update({'content-type': [content_type]})
-        d = self._http.request(url, method, body, headers, readBody)
+        if not body_producer and body:
+            body = FileBodyProducer(StringIO(body))
+        elif body_producer:
+            # Upload case, check send.py
+            body = body_producer(body)
+        d = self._http.request(
+            method, url, headers=Headers(headers), bodyProducer=body)
+        d.addCallback(body_reader)
         d.addErrback(_unauth_to_invalid_token_error)
         return d
 
@@ -153,7 +152,7 @@ class SyncTargetAPI(SyncTarget):
     def sync_exchange(self, docs_by_generation, source_replica_uid,
                       last_known_generation, last_known_trans_id,
                       insert_doc_cb, ensure_callback=None,
-                      defer_decryption=True, sync_id=None):
+                      sync_id=None):
         """
         Find out which documents the remote database does not know about,
         encrypt and send them. After that, receive documents from the remote
@@ -184,11 +183,6 @@ class SyncTargetAPI(SyncTarget):
                                 replica uid if the target replica was just
                                 created.
         :type ensure_callback: function
-
-        :param defer_decryption: Whether to defer the decryption process using
-                                 the intermediate database. If False,
-                                 decryption will be done inline.
-        :type defer_decryption: bool
 
         :return: A deferred which fires with the new generation and
                  transaction id of the target replica.
@@ -221,8 +215,7 @@ class SyncTargetAPI(SyncTarget):
 
         cur_target_gen, cur_target_trans_id = yield self._receive_docs(
             last_known_generation, last_known_trans_id,
-            ensure_callback, sync_id,
-            defer_decryption=defer_decryption)
+            ensure_callback, sync_id)
 
         # update gen and trans id info in case we just sent and did not
         # receive docs.

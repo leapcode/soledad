@@ -53,6 +53,9 @@ class ReadBodyProtocol(_ReadBodyProtocol):
         if exc_cls is not None:
             message = respdic.get("message")
             self.deferred.errback(exc_cls(message))
+        else:
+            self.deferred.errback(
+                errors.HTTPError(self.status, respdic, self.headers))
     # ---8<--- end of snippet from u1db.remote.http_client
 
     def connectionLost(self, reason):
@@ -91,7 +94,7 @@ class ReadBodyProtocol(_ReadBodyProtocol):
             self.deferred.errback(reason)
 
 
-def readBody(response):
+def readBody(response, protocolClass=ReadBodyProtocol):
     """
     Get the body of an L{IResponse} and return it as a byte string.
 
@@ -116,7 +119,7 @@ def readBody(response):
             abort()
 
     d = defer.Deferred(cancel)
-    protocol = ReadBodyProtocol(response, d)
+    protocol = protocolClass(response, d)
 
     def getAbort():
         return getattr(protocol.transport, 'abortConnection', None)
@@ -155,46 +158,49 @@ class RequestBody(object):
         self.headers = header_dict
         self.entries = []
         self.consumed = 0
-        self.pending_size = 0
 
     def insert_info(self, **entry_dict):
         """
         Dumps an entry into JSON format and add it to entries list.
+        Adds 'content' key on a new line if it's present.
 
         :param entry_dict: Entry as a dictionary
         :type entry_dict: dict
-
-        :return: length of the entry after JSON dumps
-        :rtype: int
         """
-        entry = json.dumps(entry_dict)
+        content = ''
+        if 'content' in entry_dict:
+            content = ',\r\n' + (entry_dict['content'] or '')
+        entry = json.dumps(entry_dict) + content
         self.entries.append(entry)
-        self.pending_size += len(entry)
 
-    def pop(self):
+    def pop(self, amount=10, leave_open=False):
         """
-        Removes all entries and returns it formatted and ready
+        Removes entries and returns it formatted and ready
         to be sent.
 
-        :param number: number of entries to pop and format
-        :type number: int
+        :param amount: number of entries to pop and format
+        :type amount: int
+
+        :param leave_open: flag to skip stream closing
+        :type amount: bool
 
         :return: formatted body ready to be sent
         :rtype: str
         """
-        entries = self.entries[:]
-        self.entries = []
-        self.pending_size = 0
-        self.consumed += len(entries)
-        return self.entries_to_str(entries)
+        start = self.consumed == 0
+        amount = min([len(self.entries), amount])
+        entries = [self.entries.pop(0) for i in xrange(amount)]
+        self.consumed += amount
+        end = len(self.entries) == 0 if not leave_open else False
+        return self.entries_to_str(entries, start, end)
 
     def __str__(self):
-        return self.entries_to_str(self.entries)
+        return self.pop(len(self.entries))
 
     def __len__(self):
         return len(self.entries)
 
-    def entries_to_str(self, entries=None):
+    def entries_to_str(self, entries=None, start=True, end=True):
         """
         Format a list of entries into the body format expected
         by the server.
@@ -205,6 +211,10 @@ class RequestBody(object):
         :return: formatted body ready to be sent
         :rtype: str
         """
-        data = '[\r\n' + json.dumps(self.headers)
+        data = ''
+        if start:
+            data = '[\r\n' + json.dumps(self.headers)
         data += ''.join(',\r\n' + entry for entry in entries)
-        return data + '\r\n]'
+        if end:
+            data += '\r\n]'
+        return data

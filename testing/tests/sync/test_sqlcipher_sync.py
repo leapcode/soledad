@@ -27,8 +27,6 @@ from leap.soledad.common.l2db import sync
 from leap.soledad.common.l2db import vectorclock
 from leap.soledad.common.l2db import errors
 
-from leap.soledad.common.crypto import ENC_SCHEME_KEY
-from leap.soledad.client.crypto import decrypt_doc_dict
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 
 from test_soledad import u1db_tests as tests
@@ -545,13 +543,7 @@ class SQLCipherDatabaseSyncTests(
         self.assertFalse(doc2.has_conflicts)
         self.sync(self.db2, db3)
         doc3 = db3.get_doc('the-doc')
-        if ENC_SCHEME_KEY in doc3.content:
-            _crypto = self._soledad._crypto
-            key = _crypto.doc_passphrase(doc3.doc_id)
-            secret = _crypto.secret
-            doc3.set_json(decrypt_doc_dict(
-                doc3.content,
-                doc3.doc_id, doc3.rev, key, secret))
+
         self.assertEqual(doc4.get_json(), doc3.get_json())
         self.assertFalse(doc3.has_conflicts)
         self.db1.close()
@@ -713,14 +705,11 @@ def make_local_db_and_soledad_target(
     test.startTwistedServer()
     replica_uid = os.path.basename(path)
     db = test.request_state._create_database(replica_uid)
-    sync_db = test._soledad._sync_db
-    sync_enc_pool = test._soledad._sync_enc_pool
     st = soledad_sync_target(
         test, db._dbname,
-        source_replica_uid=source_replica_uid,
-        sync_db=sync_db,
-        sync_enc_pool=sync_enc_pool)
+        source_replica_uid=source_replica_uid)
     return db, st
+
 
 target_scenarios = [
     ('leap', {

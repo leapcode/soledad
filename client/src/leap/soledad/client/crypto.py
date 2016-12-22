@@ -32,9 +32,12 @@ from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common import crypto
 from leap.soledad.common.log import getLogger
+import warnings
 
 
 logger = getLogger(__name__)
+warnings.warn("'soledad.client.crypto' MODULE DEPRECATED",
+              DeprecationWarning, stacklevel=2)
 
 
 MAC_KEY_LENGTH = 64

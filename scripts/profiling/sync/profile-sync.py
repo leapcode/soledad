@@ -91,7 +91,6 @@ def _get_soledad_instance_from_uuid(uuid, passphrase, basedir, server_url,
         server_url=server_url,
         cert_file=cert_file,
         auth_token=token,
-        defer_encryption=True,
         syncable=True)
 
 

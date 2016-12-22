@@ -56,11 +56,10 @@ from leap.soledad.common.errors import DatabaseAccessError
 from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
 from leap.soledad.client import interfaces as soledad_interfaces
-from leap.soledad.client.crypto import SoledadCrypto
+from leap.soledad.client import sqlcipher
 from leap.soledad.client.secrets import SoledadSecrets
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client import sqlcipher
-from leap.soledad.client import encdecpool
+from leap.soledad.client._crypto import SoledadCrypto
 
 logger = getLogger(__name__)
 
@@ -131,7 +130,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, defer_encryption=False, syncable=True):
+                 auth_token=None, syncable=True):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -168,11 +167,6 @@ class Soledad(object):
             Authorization token for accessing remote databases.
         :type auth_token: str
 
-        :param defer_encryption:
-            Whether to defer encryption/decryption of documents, or do it
-            inline while syncing.
-        :type defer_encryption: bool
-
         :param syncable:
             If set to ``False``, this database will not attempt to synchronize
             with remote replicas (default is ``True``)
@@ -188,9 +182,7 @@ class Soledad(object):
         self._passphrase = passphrase
         self._local_db_path = local_db_path
         self._server_url = server_url
-        self._defer_encryption = defer_encryption
         self._secrets_path = None
-        self._sync_enc_pool = None
         self._dbsyncer = None
 
         self.shared_db = shared_db
@@ -226,7 +218,6 @@ class Soledad(object):
             # have to close any thread-related stuff we have already opened
             # here, otherwise there might be zombie threads that may clog the
             # reactor.
-            self._sync_db.close()
             if hasattr(self, '_dbpool'):
                 self._dbpool.close()
             raise
@@ -289,22 +280,12 @@ class Soledad(object):
         tohex = binascii.b2a_hex
         # sqlcipher only accepts the hex version
         key = tohex(self._secrets.get_local_storage_key())
-        sync_db_key = tohex(self._secrets.get_sync_db_key())
 
         opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,
-            is_raw_key=True, create=True,
-            defer_encryption=self._defer_encryption,
-            sync_db_key=sync_db_key,
-        )
+            is_raw_key=True, create=True)
         self._sqlcipher_opts = opts
-
-        # the sync_db is used both for deferred encryption and decryption, so
-        # we want to initialize it anyway to allow for all combinations of
-        # deferred encryption and decryption configurations.
-        self._initialize_sync_db(opts)
-        self._dbpool = adbapi.getConnectionPool(
-            opts, sync_enc_pool=self._sync_enc_pool)
+        self._dbpool = adbapi.getConnectionPool(opts)
 
     def _init_u1db_syncer(self):
         """
@@ -313,10 +294,7 @@ class Soledad(object):
         replica_uid = self._dbpool.replica_uid
         self._dbsyncer = sqlcipher.SQLCipherU1DBSync(
             self._sqlcipher_opts, self._crypto, replica_uid,
-            SOLEDAD_CERT,
-            defer_encryption=self._defer_encryption,
-            sync_db=self._sync_db,
-            sync_enc_pool=self._sync_enc_pool)
+            SOLEDAD_CERT)
 
     def sync_stats(self):
         sync_phase = 0
@@ -341,12 +319,6 @@ class Soledad(object):
         self._dbpool.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
-        # close the sync database
-        if self._sync_db:
-            self._sync_db.close()
-        self._sync_db = None
-        if self._defer_encryption:
-            self._sync_enc_pool.stop()
 
     #
     # ILocalStorage
@@ -385,7 +357,8 @@ class Soledad(object):
             also be updated.
         :rtype: twisted.internet.defer.Deferred
         """
-        return self._defer("put_doc", doc)
+        d = self._defer("put_doc", doc)
+        return d
 
     def delete_doc(self, doc):
         """
@@ -479,7 +452,8 @@ class Soledad(object):
         # create_doc (and probably to put_doc too). There are cases (mail
         # payloads for example) in which we already have the encoding in the
         # headers, so we don't need to guess it.
-        return self._defer("create_doc", content, doc_id=doc_id)
+        d = self._defer("create_doc", content, doc_id=doc_id)
+        return d
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -700,17 +674,12 @@ class Soledad(object):
         if syncable and not self._dbsyncer:
             self._init_u1db_syncer()
 
-    def sync(self, defer_decryption=True):
+    def sync(self):
         """
         Synchronize documents with the server replica.
 
         This method uses a lock to prevent multiple concurrent sync processes
         over the same local db file.
-
-        :param defer_decryption:
-            Whether to defer decryption of documents, or do it inline while
-            syncing.
-        :type defer_decryption: bool
 
         :return: A deferred lock that will run the actual sync process when
                  the lock is acquired, and which will fire with with the local
@@ -718,18 +687,12 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         d = self.sync_lock.run(
-            self._sync,
-            defer_decryption)
+            self._sync)
         return d
 
-    def _sync(self, defer_decryption):
+    def _sync(self):
         """
         Synchronize documents with the server replica.
-
-        :param defer_decryption:
-            Whether to defer decryption of documents, or do it inline while
-            syncing.
-        :type defer_decryption: bool
 
         :return: A deferred whose callback will be invoked with the local
             generation before the synchronization was performed.
@@ -740,8 +703,7 @@ class Soledad(object):
             return
         d = self._dbsyncer.sync(
             sync_url,
-            creds=self._creds,
-            defer_decryption=defer_decryption)
+            creds=self._creds)
 
         def _sync_callback(local_gen):
             self._last_received_docs = docs = self._dbsyncer.received_docs
@@ -836,50 +798,6 @@ class Soledad(object):
         return self._creds['token']['token']
 
     token = property(_get_token, _set_token, doc='The authentication Token.')
-
-    def _initialize_sync_db(self, opts):
-        """
-        Initialize the Symmetrically-Encrypted document to be synced database,
-        and the queue to communicate with subprocess workers.
-
-        :param opts:
-        :type opts: SQLCipherOptions
-        """
-        soledad_assert(opts.sync_db_key is not None)
-        sync_db_path = None
-        if opts.path != ":memory:":
-            sync_db_path = "%s-sync" % opts.path
-        else:
-            sync_db_path = ":memory:"
-
-        # we copy incoming options because the opts object might be used
-        # somewhere else
-        sync_opts = sqlcipher.SQLCipherOptions.copy(
-            opts, path=sync_db_path, create=True)
-        self._sync_db = sqlcipher.getConnectionPool(
-            sync_opts, extra_queries=self._sync_db_extra_init)
-        if self._defer_encryption:
-            # initialize syncing queue encryption pool
-            self._sync_enc_pool = encdecpool.SyncEncrypterPool(
-                self._crypto, self._sync_db)
-            self._sync_enc_pool.start()
-
-    @property
-    def _sync_db_extra_init(self):
-        """
-        Queries for creating tables for the local sync documents db if needed.
-        They are passed as extra initialization to initialize_sqlciphjer_db
-
-        :rtype: tuple of strings
-        """
-        maybe_create = "CREATE TABLE IF NOT EXISTS %s (%s)"
-        encr = encdecpool.SyncEncrypterPool
-        decr = encdecpool.SyncDecrypterPool
-        sql_encr_table_query = (maybe_create % (
-            encr.TABLE_NAME, encr.FIELD_NAMES))
-        sql_decr_table_query = (maybe_create % (
-            decr.TABLE_NAME, decr.FIELD_NAMES))
-        return (sql_encr_table_query, sql_decr_table_query)
 
     #
     # ISecretsStorage
@@ -1016,6 +934,7 @@ def create_path_if_not_exists(path):
 # ----------------------------------------------------------------------------
 # Monkey patching u1db to be able to provide a custom SSL cert
 # ----------------------------------------------------------------------------
+
 
 # We need a more reasonable timeout (in seconds)
 SOLEDAD_TIMEOUT = 120
