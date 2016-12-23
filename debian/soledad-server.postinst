@@ -18,6 +18,9 @@ if [ ! $RET -eq 0 ]; then
   adduser --system soledad --no-create-home --home /srv/leap/ --ingroup soledad
 fi
 
+# allow soledad user to read ssl certificates
+usermod -aG ssl-cert soledad
+
 # create soledad-admin user
 id soledad-admin > /dev/null 2>&1
 RET=$?
