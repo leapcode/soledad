@@ -4,7 +4,7 @@
 #DH_VERBOSE=1
 
 %:
-	dh $@ --with python2 --namespace=leap.soledad
+	dh $@ --with systemd --with python2 --namespace=leap.soledad
 
 override_dh_auto_clean:
 	cd client && python setup.py clean -a 

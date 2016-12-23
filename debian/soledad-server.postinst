@@ -26,5 +26,6 @@ if [ ! $RET -eq 0 ]; then
   adduser --system soledad-admin --no-create-home --home /srv/leap/ --ingroup soledad
 fi
 
-
-invoke-rc.d soledad-server start
+# update systemd and start service
+systemctl --system daemon-reload >/dev/null || true
+deb-systemd-invoke start soledad-server.service >/dev/null || true
