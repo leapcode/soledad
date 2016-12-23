@@ -13,6 +13,7 @@ EnvironmentFile=-/etc/default/soledad
 
 ExecStart=/usr/bin/twistd \
   --nodaemon \
+  --pidfile= \
   --syslog \
   --prefix=soledad-server \
   web \
