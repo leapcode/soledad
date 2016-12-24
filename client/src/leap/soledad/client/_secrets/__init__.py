@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import scrypt
 
 from collections import namedtuple
 
@@ -34,10 +35,12 @@ SecretLength = namedtuple('SecretLength', 'name length')
 
 class Secrets(object):
 
+    # remote secret is used
+
     lengths = {
-        'remote': 512,
-        'salt': 64,
-        'local': 448,
+        'remote_secret': 512,  # remote_secret is used to encrypt remote data.
+        'local_salt': 64,      # local_salt is used in conjunction with
+        'local_secret': 448,   # local_secret to derive a local_key for storage
     }
 
     def __init__(self, uuid, passphrase, url, local_path, creds, userid,
@@ -119,14 +122,29 @@ class Secrets(object):
         self.storage.save_local(encrypted)
         self.storage.save_remote(encrypted)
 
-    @property
-    def remote(self):
-        return self._secrets.get('remote')
+    #
+    # secrets
+    #
 
     @property
-    def salt(self):
-        return self._secrets.get('salt')
+    def remote_secret(self):
+        return self._secrets.get('remote_secret')
 
     @property
-    def local(self):
-        return self._secrets.get('local')
+    def local_salt(self):
+        return self._secrets.get('local_salt')
+
+    @property
+    def local_secret(self):
+        return self._secrets.get('local_secret')
+
+    @property
+    def local_key(self):
+        # local storage key is scrypt-derived from `local_secret` and
+        # `local_salt` above
+        secret = scrypt.hash(
+            password=self.local_secret,
+            salt=self.local_salt,
+            buflen=32,  # we need a key with 256 bits (32 bytes)
+        )
+        return secret

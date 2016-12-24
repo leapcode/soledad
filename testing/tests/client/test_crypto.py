@@ -189,47 +189,51 @@ class BlobTestCase(unittest.TestCase):
 
 class SecretsCryptoTestCase(unittest.TestCase):
 
-    SECRETS = {'remote': 'a' * 512, 'salt': 'b' * 64, 'local': 'c' * 448}
+    SECRETS = {
+        'remote_secret': 'a' * 512,
+        'local_salt': 'b' * 64,
+        'local_secret': 'c' * 448
+    }
     ENCRYPTED_V2 = {
         'cipher': 'aes_256_gcm',
-        'length': 1417,
-        'kdf_salt': '3DCkfecls0GcX2RadA04FAC2cqkI+vpGwwCLwffdRI6vpO5SPxaw/eM0/'
-                    'z3GUADm3If3YCQBldKXNdqHQLsU1Q==\n',
-        'iv': 'rRwCDw5Rbp5+J3QwjQ46Hw==',
-        'secrets': 'lxf6yrGDcBr8XFWNDgsCoO2XPGfDJndviL9Y2GmHcSEBWnO2dm2sieuPoq'
-                   'PwSHRSJSrzM4Ezgdaan7X8+ErnuRLUVqbPAqPl8xx8FdCjnid4vFyFYNFI'
-                   '/dmo8SQAf8O9vdlVEPZ5Nk2DuWIrh+oPlrSUOmR6XzI0YVdoJDmGWowygU'
-                   'MR0R9Bi9xFGlG135NVcNP8KGdnQDkI0V+U/3qm3tctbo4LRCxxJ60wdi0M'
-                   'DA6iYFI/IMshxI/ZXFHp5/YPk0k2m0i6z71kMVksgjIMMgT5Kmz7WR54na'
-                   'IkWbvNkbYRFR/Hbg9p6Bs7NjJlOLTjnwGJNYPbdyfJXKd1R/S8Mg7ZqsyQ'
-                   'VbBqXHwEN7gYlMZ66D8wu8LOK70mN7LLiSz5J8tXO3rDT1mIIf3IvNhv/j'
-                   'rEZHf1fTFPRp+ZVEt/hJKyPv71ua4p2lgdgNlCs2IsACk9ku/LQwXP6uZr'
-                   'hMJsTvniTQoCVXFYVN/jKo7Pz/+uT5wOXOXtL7smpBE/2r3uoERNM+Zw11'
-                   'SA8UzzMZQMxJQKVNwLmKtwvztN5dxVXhxCUyeLmeQc84VzV7NK0WMUOdfA'
-                   '18I0HS6rHLKcdsvrPAdzvGim7tiE8TBdp8ITNQ8yMFNiGNyOVliTSTwQFf'
-                   'sCj6m5nYcjvprNQ8RkeitvicrtI1Ylc8CfFK50xPV77XVmlgvNsfm54msN'
-                   'tV0K5+XwaNgimlh/1m2bVEYj55gO0twVASwRuZj3sSY2z669iuXRk7EPyT'
-                   'jcE2NnfW+lqOQkJ73N7pv73t6OjiEnrKx7VmH94zYlY8ZReVVn4RTZhare'
-                   'D7rqCmGPhsPaCPaAfotfNBBa0w6p6L9ZlNxpIesnMObtyGob1g4Vcu8O6K'
-                   '2Q1Ldj95+Q53tJDpx2NLP/5tfAUlbehD3whKwKOz/rGKEfhgE+Nx32RR0y'
-                   'YM4aJ7CYI/U3YH82xqGoa1ufIJbSBt965CVIHSVJt/mYfilhMACV/wBlvL'
-                   'ua08iKpHwc7suMc9DuFS4s/bAzc128L8wtfNvNiP6zhAV+UvfgUmyNKjgl'
-                   '0be9Ke2pCNChEQmViNal3zbWNcBrXYQpFpX1lWNkx/OuQalxzSaqmZiOR5'
-                   'eRwqRDZ3R9EpkOFj2ZXS1NlJg1kYXL/ibS8uvjKgJFPrZQzwaKmPNsZyGc'
-                   'CnHupfgC2iRIu97wnvmDxWQ9Cs62NSynr0IYGkTLN5PZU6Z5gd1F7zV6uh'
-                   'oFiHOYidj2EoUj7xnb8GHi5U6PQzaC97nSCR4CFnmcpfv+XcRIWe8nrM8G'
-                   'AVdcUob8pofUlnyGV6GEGlO3mnb7ls5B6lvuZqB/x6UqZiNKwmZvxvS11X'
-                   'AGkhfBGTfFZeqRlLwXvXWnOUOO0KJ8h3gSlc1gFVY+4HCbTOqjUASWw0mV'
-                   'JP+U0anK9wu9B/icLDUZxM/NRdbTQFmcfvABjwdm2GTmwGpQek/H0wN3dO'
-                   'terlTiS7arMUft7A6hkhkmLb0iDfWPWdN50V+XOMpdZtaJSGqwNHokc75p'
-                   '3zYll0/ZpxTgmWXariOkKxr6KHHjml89QNQSBE2TJW/YnQ5SrkaHLHKdcy'
-                   'PqQtcXDz/WxKquQfRF+fsvcwqaeqlAWOxUXHU77cBvDGPU5O3uvEIJnHr1'
-                   'kuabqRQbJIV5Uzo4sEW828r2IWQnUd4Om79y+9yp/aT10DusEmvOgS3oSp'
-                   '3eYkhvlVULeCQEJoI41t4nGLhHiiK4xBG8yFknuV7nF4k2O+EbyCXsJeeD'
-                   'qlGok91zEhQl1MlQA8ZofRK7bDPcn97USiJMss81s5bwIv4yN8s0QL62Ha'
-                   'vrIYG7C26DV6c0GxULu02H1YOnoPf6JsGC/2+zA+b7a+4O0EP0BXU3FYCb'
-                   'iEDbDpB3dFe63ed+ml2HQjqzOLAtKVXzAQq5UNV4m2zY0/y7gV7qSrM='
-                   '\n',
+        'length': 1437,
+        'kdf_salt': 'TSgNLeAGFeITeSgNzmYZHh+mzmkZPOqao7CAV/tx3KZCLwsrT0HmWtVK3'
+                    'TyWHWNgVdeamMZYRuvZavE2sp0DGw==\n',
+        'iv': 'TKZQKIlRgdnXFhJf08qswg==',
+        'secrets': 'ZNZRi72VDtwZqyuU+uf3yzZt23vCtMS3Ki2bnZyeHUOSGVweJeDadF4oqE'
+                   'BW87NN00j9E49BzyzLr9SNgwZjPp0wlUm7kt+s8EUfJUdH8nxaQ+9iqGXM'
+                   'cCHmBM8L8DRN2m3BrPGx7m+QGlN9sbrRpl7fqc46RWcYuTEpm4upjdtI7O'
+                   'jDd0JG3C0rUzIuKJn9w4rEpX3tLEKXVdZfLvRXS5roR0cauazsDO69E13q'
+                   'a01vDuY+UJ+buLQ3FluPnnk8QE7ztPVUmRJJ76yAIhjVX9owiwlp9GnUJY'
+                   'sETRCqdRSTwUcHIkzVR0zAvtxTX7eGTitzf4gCYEC4T9v5N/jHxEfPdx28'
+                   'MM4KShWN2nFxNFQLQUpMN2OrM7UyUw+DQ3ydqBeBPKPHRN5s05kIK7P/Ra'
+                   'aLNcrJWa7DopLbgLlei0Jd7S4sjv1ufaRY7v0qJaVkhh/VaCylTSVw1rv5'
+                   'YzSWcHHcLuC0R8xLadz6T+EpsVYxgPYCS7w5xoE82zwNQzw/EBxLIcyLPl'
+                   'ipKnr2dttrmm3KXUOT1IdbSbI5elF6yQTAusdqiXuypey+MDqHYWEYWkCn'
+                   'e9/uGM9FjklDLE0RtPEDxhq64tw6u2Xu7RzDzyQDI8EIoTdU+4zEMTnelZ'
+                   'fKEwdG58EDxTXfUk6IDcRUupz3YuToSMhIOkqgXnbWl/nrK0O9v4JMhQjI'
+                   'r+oPICYfFr14kvJXBsfntILTJCxzbqTQcNba3jc8rGqCZ6gM0u4PndwTG2'
+                   'UiCqPU2HMnWvVGQOXeLdQY+EqqXQiRDi0DrDmkVwFf+27dPXxmZ43C48W3'
+                   'lMhTKXl0rdBFnOD5jiMh0X6q/KYXonyEtMZMsjT7dFePcCy4wQRhuut+ac'
+                   '/TJWyrr+/IB45E+LZbhV7xCy1dYsbdb52jTRJFpaQ83sj6Iv6SYdiqqXzL'
+                   'F5JGMyuovTjwAoIIQzpLv36xY2wGGAH1V8c7QmDR2qumXrHD9R68WjBoSY'
+                   '7IFM0TFAGZNun56y/zQ4r8yOMSAId+j4kuRH0fENEi0FJ+SpmSdHfpvBhE'
+                   'MdGh927E9enEYWmUQMmkxXIw6E+O3cmOWt2hsMbUAikDCpQOnVP2BD55HT'
+                   '6FfbW7ITVwPINHYexmy2Xcm8H5zzGFSp+uYIyPBYDKA+VJ+QQI8bud9K+T'
+                   'NBybUv9u6LbB6BsLpwLoxMPJu0WsN2HpmLYgrg2ML1huMF1OtaGRuUr2PL'
+                   'NBaZaL6VOztYrVtQG1+tNyRxn8XQTtx0l6n+EihGVe9Sk5XF6DJA9ZN7uO'
+                   'svTUFJ5qG3Erf4AmbUJWoOR/NvapBtifidM7gPZZ6NqBs6v72rU1pGy+p7'
+                   'o84KrmB2MNf3yJ0BvKxPvFmltF3Dc7LB5TN8ycbmFM6hgrLvvhPxiHEnG/'
+                   '8Qcrg0nUXOipFGNgZEU7t7Mz6RJ189Z2Kx1HVGrkAzEgqwZYqijAPlsgzO'
+                   'bg6DwzwC7stolQWGCDQUtJVlE8FZ/Up8zFYYZKn52WzjmSN4/hHhEvdkck'
+                   'Nez/JVev6fMcVrgdrTZ+uCwxjN/4xPdgog2HV470ea1bvIkSNOOrhm194M'
+                   '40GmvmBhiSSMjdRQCQtM0t9bUuSQLPDzEiCA9QaLyygtlz9uRR/dXgkEg0'
+                   'J4YNpZvhE0wbyp4GHytbPaAmrcd7im9+buTuMwhXpZl0stmfkJxVHJSZ8Y'
+                   'IHakHs3W1fdYyI3wxGpel/9eYO3ISukolwrHXESP65wVNKfBwbqVJzQmts'
+                   'pyDBOI6DcLKZfE1EVg0+uwQ/5PKZbn0TwlXO1YE3NL3mAply3zQR9hyBrY'
+                   '6f1jkHVD3irIlWkSiPJsP8sW+nrK8c/Ha8F+dua6DTZmg594OIaQj8mPiY'
+                   'GcIusiARWocR5/MmSjupGOgFx4HtmckTJtAta3XP4elOx04teH/P9Cgr1x'
+                   'XYf+cEX6gp92L9rTo0FCz3Hw==\n',
         'version': 2,
         'kdf': 'scrypt',
         'kdf_length': 32

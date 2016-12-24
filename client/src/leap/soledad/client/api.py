@@ -196,7 +196,7 @@ class Soledad(object):
 
         self._init_secrets(shared_db=shared_db)
 
-        self._crypto = SoledadCrypto(self._secrets.remote)
+        self._crypto = SoledadCrypto(self._secrets.remote_secret)
 
         try:
             # initialize database access, trap any problems so we can shutdown
@@ -268,7 +268,7 @@ class Soledad(object):
         """
         tohex = binascii.b2a_hex
         # sqlcipher only accepts the hex version
-        key = tohex(self._secrets.local)
+        key = tohex(self._secrets.local_key)
 
         opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,

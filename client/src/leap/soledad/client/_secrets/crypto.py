@@ -92,9 +92,9 @@ class SecretsCrypto(object):
         plaintext = self._decrypt(
             key, iv, ciphertext, encrypted, ENC_METHOD.aes_256_ctr)
         secrets = {
-            'remote': plaintext[0:512],
-            'salt': plaintext[512:576],
-            'local': plaintext[576:1024],
+            'remote_secret': plaintext[0:512],
+            'local_salt': plaintext[512:576],
+            'local_secret': plaintext[576:1024],
         }
         return secrets
 
