@@ -27,14 +27,14 @@ import os
 
 from argparse import ArgumentParser
 
-from leap.soledad.server.config import load_configuration
+from leap.soledad.server import get_config
 
 from migrate_couch_schema import migrate
 
 
 TARGET_VERSION = '0.8.2'
 DEFAULT_COUCH_URL = 'http://127.0.0.1:5984'
-CONF = load_configuration('/etc/soledad/soledad-server.conf')
+CONF = get_config()
 NETRC_PATH = CONF['soledad-server']['admin_netrc']
 
 
