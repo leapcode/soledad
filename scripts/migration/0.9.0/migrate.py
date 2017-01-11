@@ -27,7 +27,7 @@ import os
 
 from argparse import ArgumentParser
 
-from leap.soledad.server import load_configuration
+from leap.soledad.server.config import load_configuration
 
 from migrate_couch_schema import migrate
 
