@@ -27,7 +27,6 @@ from twisted.web.wsgi import WSGIResource
 
 from leap.soledad.server import SoledadApp
 from leap.soledad.server.gzip_middleware import GzipMiddleware
-from leap.soledad.server.config import load_configuration
 from leap.soledad.common.backend import SoledadBackend
 from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.log import getLogger
@@ -36,18 +35,7 @@ from leap.soledad.common.log import getLogger
 __all__ = ['init_couch_state', 'get_sync_resource']
 
 
-_config = None
-
-
-def get_config():
-    global _config
-    if not _config:
-        _config = load_configuration('/etc/soledad/soledad-server.conf')
-    return _config['soledad-server']
-
-
-def _get_couch_state():
-    conf = get_config()
+def _get_couch_state(conf):
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'],
                              check_schema_versions=True)
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
@@ -67,9 +55,9 @@ wsgi_application = GzipMiddleware(_app)
 # work.  Because of that, we delay couch state initialization until the reactor
 # is running.
 
-def init_couch_state(_app):
+def init_couch_state(conf):
     try:
-        _app.state = _get_couch_state()
+        _app.state = _get_couch_state(conf)
     except Exception as e:
         logger = getLogger()
         logger.error(str(e))

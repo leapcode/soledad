@@ -36,7 +36,7 @@ from twisted.web.resource import IResource
 from leap.soledad.common.couch import couch_server
 
 from ._resource import SoledadResource
-from ._wsgi import get_config
+from ._config import get_config
 
 
 @implementer(IRealm)

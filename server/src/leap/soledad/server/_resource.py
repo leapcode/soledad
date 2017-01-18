@@ -17,8 +17,10 @@
 """
 A twisted resource that serves the Soledad Server.
 """
+from twisted.web.error import Error
 from twisted.web.resource import Resource
 
+from ._blobs import blobs_resource
 from ._wsgi import get_sync_resource
 
 
@@ -33,11 +35,21 @@ class SoledadResource(Resource):
 
     def __init__(self, sync_pool=None):
         sync_resource = get_sync_resource(sync_pool)
-        self.children = {'': sync_resource}
+        self.children = {
+            'sync': sync_resource,
+            'blobs': blobs_resource,
+        }
 
     def getChild(self, path, request):
-        # for now, just "rewind" the path and serve the wsgi resource for all
-        # requests. In the future, we might look into the request path to
-        # decide which child resources should serve each request.
+        """
+        Decide which child resource to serve based on the given path.
+        """
+        if path == 'blobs':
+            if not self._blobs_enabled:
+                msg = 'Blobs feature is disabled in this server.'
+                raise Error(403, message=msg)
+            return self.children['blobs']
+
+        # rewind the path and serve the wsgi sync resource
         request.postpath.insert(0, request.prepath.pop())
-        return self.children['']
+        return self.children['sync']

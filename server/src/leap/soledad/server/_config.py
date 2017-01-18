@@ -19,12 +19,16 @@
 import configparser
 
 
+__all__ = ['get_config']
+
+
 CONFIG_DEFAULTS = {
     'soledad-server': {
         'couch_url': 'http://localhost:5984',
         'create_cmd': None,
         'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
-        'batching': True
+        'batching': True,
+        'blobs': False,
     },
     'database-security': {
         'members': ['soledad'],
@@ -35,7 +39,17 @@ CONFIG_DEFAULTS = {
 }
 
 
-def load_configuration(file_path):
+_config = None
+
+
+def get_config():
+    global _config
+    if not _config:
+        _config = _load_config('/etc/soledad/soledad-server.conf')
+    return _config['soledad-server']
+
+
+def _load_config(file_path):
     """
     Load server configuration from file.
 
@@ -45,23 +59,23 @@ def load_configuration(file_path):
     @return: A dictionary with the configuration.
     @rtype: dict
     """
-    defaults = dict(CONFIG_DEFAULTS)
+    conf = dict(CONFIG_DEFAULTS)
     config = configparser.SafeConfigParser()
     config.read(file_path)
-    for section in defaults:
+    for section in conf:
         if not config.has_section(section):
             continue
-        for key, value in defaults[section].items():
+        for key, value in conf[section].items():
             if not config.has_option(section, key):
                 continue
             elif type(value) == bool:
-                defaults[section][key] = config.getboolean(section, key)
+                conf[section][key] = config.getboolean(section, key)
             elif type(value) == list:
                 values = config.get(section, key).split(',')
                 values = [v.strip() for v in values]
-                defaults[section][key] = values
+                conf[section][key] = values
             else:
-                defaults[section][key] = config.get(section, key)
+                conf[section][key] = config.get(section, key)
     # TODO: implement basic parsing/sanitization of options comming from
     # config file.
-    return defaults
+    return conf

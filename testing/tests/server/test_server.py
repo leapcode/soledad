@@ -379,5 +379,6 @@ class ConfigurationParsingTest(unittest.TestCase):
                     'sudo -u soledad-admin /usr/bin/create-user-db',
                     'admin_netrc':
                     '/etc/couchdb/couchdb-soledad-admin.netrc',
-                    'batching': False}
+                    'batching': False,
+                    'blobs': False}
         self.assertDictEqual(expected, config['soledad-server'])

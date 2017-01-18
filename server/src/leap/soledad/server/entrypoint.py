@@ -19,13 +19,13 @@ The entrypoint for Soledad server.
 """
 from twisted.internet import reactor
 
-from .config import load_configuration
+from ._config import get_config
 from ._session import SoledadSession
 from ._wsgi import init_couch_state
 
 
 # load configuration from file
-conf = load_configuration('/etc/soledad/soledad-server.conf')
+conf = get_config
 
 
 class SoledadEntrypoint(SoledadSession):
