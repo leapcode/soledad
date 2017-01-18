@@ -21,6 +21,7 @@ from twisted.web.error import Error
 from twisted.web.resource import Resource
 
 from ._blobs import blobs_resource
+from ._config import get_config
 from ._wsgi import get_sync_resource
 
 
@@ -33,8 +34,11 @@ class SoledadResource(Resource):
     for the Soledad Server.
     """
 
+    _conf = get_config()
+
     def __init__(self, sync_pool=None):
         sync_resource = get_sync_resource(sync_pool)
+        self._blobs_enabled = self._conf['soledad-server']['blobs']
         self.children = {
             'sync': sync_resource,
             'blobs': blobs_resource,
