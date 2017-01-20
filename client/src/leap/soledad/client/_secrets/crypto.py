@@ -59,7 +59,7 @@ class SecretsCrypto(object):
             'kdf': 'scrypt',
             'kdf_salt': binascii.b2a_base64(salt),
             'kdf_length': len(key),
-            'cipher': 'aes_256_gcm',
+            'cipher': ENC_METHOD.aes_256_gcm,
             'length': len(plaintext),
             'iv': str(iv),
             'secrets': binascii.b2a_base64(ciphertext),
@@ -80,17 +80,26 @@ class SecretsCrypto(object):
             raise SecretsError(e)
 
     def _decrypt_v1(self, data):
-        secret_id = data['active_secret']
+        # get encrypted secret from dictionary
+        secret_id = data['storage_secrets'].keys().pop()
         encrypted = data['storage_secrets'][secret_id]
-        soledad_assert(encrypted['cipher'] == 'aes256')
 
+        # assert that we know how to decrypt the secret
+        soledad_assert('cipher' in encrypted)
+        cipher = encrypted['cipher']
+        if cipher == 'aes256':
+            cipher = ENC_METHOD.aes_256_ctr
+        soledad_assert(cipher in ENC_METHOD)
+
+        # decrypt
         salt = binascii.a2b_base64(encrypted['kdf_salt'])
         key = self._get_key(salt)
         separator = ':'
         iv, ciphertext = encrypted['secret'].split(separator, 1)
         ciphertext = binascii.a2b_base64(ciphertext)
-        plaintext = self._decrypt(
-            key, iv, ciphertext, encrypted, ENC_METHOD.aes_256_ctr)
+        plaintext = self._decrypt(key, iv, ciphertext, encrypted, cipher)
+
+        # create secrets dictionary
         secrets = {
             'remote_secret': plaintext[0:512],
             'local_salt': plaintext[512:576],
@@ -99,14 +108,15 @@ class SecretsCrypto(object):
         return secrets
 
     def _decrypt_v2(self, encrypted):
-        soledad_assert(encrypted['cipher'] == 'aes_256_gcm')
+        cipher = encrypted['cipher']
+        soledad_assert(cipher in ENC_METHOD)
 
         salt = binascii.a2b_base64(encrypted['kdf_salt'])
         key = self._get_key(salt)
         iv = encrypted['iv']
         ciphertext = binascii.a2b_base64(encrypted['secrets'])
         plaintext = self._decrypt(
-            key, iv, ciphertext, encrypted, ENC_METHOD.aes_256_gcm)
+            key, iv, ciphertext, encrypted, cipher)
         encoded = json.loads(plaintext)
         secrets = {}
         for name, value in encoded.iteritems():
