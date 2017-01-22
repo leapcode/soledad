@@ -15,11 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-A WSGI application to serve as the root resource of the webserver.
-
-Use it like this:
-
-  twistd web --wsgi=leap.soledad.server.application.wsgi_application
+A WSGI application that serves Soledad synchronization.
 """
 from twisted.internet import reactor
 from twisted.python import threadpool
