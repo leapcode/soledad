@@ -80,7 +80,11 @@ class SecretsCrypto(object):
             raise SecretsError(e)
 
     def _decrypt_v1(self, data):
-        # get encrypted secret from dictionary
+        # get encrypted secret from dictionary: the old format allowed for
+        # storage of more than one secret, but this feature was never used and
+        # soledad has been using only one secret so far. As there is a corner
+        # case where the old 'active_secret' key might not be set, we just
+        # ignore it and pop the only secret found in the 'storage_secrets' key.
         secret_id = data['storage_secrets'].keys().pop()
         encrypted = data['storage_secrets'][secret_id]
 
