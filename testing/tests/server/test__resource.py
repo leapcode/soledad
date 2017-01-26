@@ -25,6 +25,7 @@ from twisted.web.wsgi import WSGIResource
 from leap.soledad.server._resource import SoledadResource
 from leap.soledad.server._server_info import ServerInfo
 from leap.soledad.server._blobs import BlobsResource
+from leap.soledad.server.gzip_middleware import GzipMiddleware
 
 
 conf_blobs_false = {'soledad-server': {'blobs': False}}
@@ -64,3 +65,4 @@ class SoledadResourceTestCase(unittest.TestCase):
         request.prepath = ['user-db']
         child = resource.getChild(path, request)
         self.assertIsInstance(child, WSGIResource)
+        self.assertIsInstance(child._application, GzipMiddleware)
