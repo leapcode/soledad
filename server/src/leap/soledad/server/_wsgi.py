@@ -22,6 +22,8 @@ Use it like this:
   twistd web --wsgi=leap.soledad.server.application.wsgi_application
 """
 from twisted.internet import reactor
+from twisted.python import threadpool
+from twisted.web.wsgi import WSGIResource
 
 from leap.soledad.server import SoledadApp
 from leap.soledad.server.gzip_middleware import GzipMiddleware
@@ -31,7 +33,7 @@ from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.log import getLogger
 
 
-__all__ = ['wsgi_application']
+__all__ = ['init_couch_state', 'sync_resource']
 
 
 _config = None
@@ -65,7 +67,7 @@ wsgi_application = GzipMiddleware(_app)
 # work.  Because of that, we delay couch state initialization until the reactor
 # is running.
 
-def _init_couch_state(_app):
+def init_couch_state(_app):
     try:
         _app.state = _get_couch_state()
     except Exception as e:
@@ -74,4 +76,8 @@ def _init_couch_state(_app):
         reactor.stop()
 
 
-reactor.callWhenRunning(_init_couch_state, _app)
+# setup a wsgi resource with its own threadpool
+pool = threadpool.ThreadPool()
+reactor.callWhenRunning(pool.start)
+reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
+sync_resource = WSGIResource(reactor, pool, wsgi_application)

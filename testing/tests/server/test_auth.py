@@ -31,7 +31,7 @@ from twisted.web.test import test_httpauth
 from leap.soledad.server.auth import SoledadRealm
 from leap.soledad.server.auth import TokenChecker
 from leap.soledad.server.auth import TokenCredentialFactory
-from leap.soledad.server.resource import SoledadResource
+from leap.soledad.server._resource import SoledadResource
 
 
 class SoledadRealmTestCase(unittest.TestCase):

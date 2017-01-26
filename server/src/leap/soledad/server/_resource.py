@@ -18,21 +18,11 @@
 A twisted resource that serves the Soledad Server.
 """
 from twisted.web.resource import Resource
-from twisted.web.wsgi import WSGIResource
-from twisted.internet import reactor
-from twisted.python import threadpool
 
-from leap.soledad.server.application import wsgi_application
+from ._wsgi import sync_resource
 
 
 __all__ = ['SoledadResource']
-
-
-# setup a wsgi resource with its own threadpool
-pool = threadpool.ThreadPool()
-reactor.callWhenRunning(pool.start)
-reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
-wsgi_resource = WSGIResource(reactor, pool, wsgi_application)
 
 
 class SoledadResource(Resource):
@@ -42,7 +32,7 @@ class SoledadResource(Resource):
     """
 
     def __init__(self):
-        self.children = {'': wsgi_resource}
+        self.children = {'': sync_resource}
 
     def getChild(self, path, request):
         # for now, just "rewind" the path and serve the wsgi resource for all

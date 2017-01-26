@@ -34,8 +34,9 @@ from twisted.web.iweb import ICredentialFactory
 from twisted.web.resource import IResource
 
 from leap.soledad.common.couch import couch_server
-from leap.soledad.server.resource import SoledadResource
-from leap.soledad.server.application import get_config
+
+from ._resource import SoledadResource
+from ._wsgi import get_config
 
 
 @implementer(IRealm)
