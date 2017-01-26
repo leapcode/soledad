@@ -42,9 +42,13 @@ from ._wsgi import get_config
 @implementer(IRealm)
 class SoledadRealm(object):
 
+    def __init__(self, sync_pool=None):
+        self._sync_pool = sync_pool
+
     def requestAvatar(self, avatarId, mind, *interfaces):
         if IResource in interfaces:
-            return (IResource, SoledadResource(), lambda: None)
+            resource = SoledadResource(sync_pool=self._sync_pool)
+            return (IResource, resource, lambda: None)
         raise NotImplementedError()
 
 
@@ -127,5 +131,10 @@ class TokenCredentialFactory(object):
             raise error.LoginFailed('Invalid credentials')
 
 
-get_portal = lambda: Portal(SoledadRealm(), [TokenChecker()])
+def get_portal(sync_pool=None):
+    realm = SoledadRealm(sync_pool=sync_pool)
+    checker = TokenChecker()
+    return Portal(realm, [checker])
+
+
 credentialFactory = TokenCredentialFactory()

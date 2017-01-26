@@ -20,7 +20,7 @@ The entrypoint for Soledad server.
 from twisted.internet import reactor
 
 from .config import load_configuration
-from ._resource import SoledadResource
+from ._session import SoledadSession
 from ._wsgi import init_couch_state
 
 
@@ -28,10 +28,13 @@ from ._wsgi import init_couch_state
 conf = load_configuration('/etc/soledad/soledad-server.conf')
 
 
-class SoledadEntrypoint(SoledadResource):
+class SoledadEntrypoint(SoledadSession):
 
-    def __init__(self):
-        SoledadResource.__init__(self, conf)
+    # the purpose of the entrypoint is to avoid trying to load the
+    # configuration file during tests. This class will be more useful when we
+    # add the blobs feature toggle. For now, the whole entrypoint
+
+    pass
 
 
 # see the comments in application.py recarding why couch state has to be

@@ -33,7 +33,7 @@ from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.log import getLogger
 
 
-__all__ = ['init_couch_state', 'sync_resource']
+__all__ = ['init_couch_state', 'get_sync_resource']
 
 
 _config = None
@@ -76,8 +76,9 @@ def init_couch_state(_app):
         reactor.stop()
 
 
-# setup a wsgi resource with its own threadpool
-pool = threadpool.ThreadPool()
-reactor.callWhenRunning(pool.start)
-reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
-sync_resource = WSGIResource(reactor, pool, wsgi_application)
+def get_sync_resource(pool=None):
+    if not pool:
+        pool = threadpool.ThreadPool()
+        reactor.callWhenRunning(pool.start)
+        reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
+    return WSGIResource(reactor, pool, wsgi_application)

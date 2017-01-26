@@ -23,6 +23,7 @@ from contextlib import contextmanager
 
 from twisted.cred.credentials import UsernamePassword
 from twisted.cred.error import UnauthorizedLogin
+from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 from twisted.trial import unittest
 from twisted.web.resource import IResource
@@ -37,7 +38,9 @@ from leap.soledad.server._resource import SoledadResource
 class SoledadRealmTestCase(unittest.TestCase):
 
     def test_returned_resource(self):
-        realm = SoledadRealm()
+        # we have to pass a pool to the realm , otherwise tests will hang
+        pool = reactor.getThreadPool()
+        realm = SoledadRealm(sync_pool=pool)
         iface, avatar, logout = realm.requestAvatar('any', None, IResource)
         self.assertIsInstance(avatar, SoledadResource)
         self.assertIsNone(logout())

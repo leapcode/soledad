@@ -19,7 +19,7 @@ A twisted resource that serves the Soledad Server.
 """
 from twisted.web.resource import Resource
 
-from ._wsgi import sync_resource
+from ._wsgi import get_sync_resource
 
 
 __all__ = ['SoledadResource']
@@ -31,7 +31,8 @@ class SoledadResource(Resource):
     for the Soledad Server.
     """
 
-    def __init__(self):
+    def __init__(self, sync_pool=None):
+        sync_resource = get_sync_resource(sync_pool)
         self.children = {'': sync_resource}
 
     def getChild(self, path, request):
