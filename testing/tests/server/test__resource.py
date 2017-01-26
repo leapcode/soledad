@@ -21,6 +21,7 @@ from twisted.trial import unittest
 from twisted.web.test.test_web import DummyRequest
 from twisted.web.error import Error
 from twisted.web.wsgi import WSGIResource
+from twisted.internet import reactor
 
 from leap.soledad.server._resource import SoledadResource
 from leap.soledad.server._server_info import ServerInfo
@@ -28,14 +29,14 @@ from leap.soledad.server._blobs import BlobsResource
 from leap.soledad.server.gzip_middleware import GzipMiddleware
 
 
-conf_blobs_false = {'soledad-server': {'blobs': False}}
+_pool = reactor.getThreadPool()
 
 
 class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_root(self):
         conf = {'soledad-server': {'blobs': None}}  # doesn't matter
-        resource = SoledadResource(conf)
+        resource = SoledadResource(conf, sync_pool=_pool)
         path = ''
         request = DummyRequest([])
         child = resource.getChild(path, request)
@@ -43,7 +44,7 @@ class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_blobs_enabled(self):
         conf = {'soledad-server': {'blobs': True}}
-        resource = SoledadResource(conf)
+        resource = SoledadResource(conf, sync_pool=_pool)
         path = 'blobs'
         request = DummyRequest([])
         child = resource.getChild(path, request)
@@ -51,7 +52,7 @@ class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_blobs_disabled(self):
         conf = {'soledad-server': {'blobs': False}}
-        resource = SoledadResource(conf)
+        resource = SoledadResource(conf, sync_pool=_pool)
         path = 'blobs'
         request = DummyRequest([])
         with self.assertRaises(Error):
@@ -59,7 +60,7 @@ class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_sync(self):
         conf = {'soledad-server': {'blobs': None}}  # doesn't matter
-        resource = SoledadResource(conf)
+        resource = SoledadResource(conf, sync_pool=_pool)
         path = 'sync'  # if not 'blobs' or '', should be routed to sync
         request = DummyRequest([])
         request.prepath = ['user-db']

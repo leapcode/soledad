@@ -36,10 +36,10 @@ class SoledadResource(Resource):
     """
 
     def __init__(self, sync_pool=None):
-        sync_resource = get_sync_resource(sync_pool)
         conf = get_config()
         self._blobs_enabled = conf['soledad-server']['blobs']
         server_info = ServerInfo(self._blobs_enabled)
+        sync_resource = get_sync_resource(sync_pool)
         self.children = {
             '': server_info,
             'sync': sync_resource,
