@@ -19,8 +19,8 @@ Tests for Soledad server main resource.
 """
 from twisted.trial import unittest
 from twisted.web.test.test_web import DummyRequest
-from twisted.web.error import Error
 from twisted.web.wsgi import WSGIResource
+from twisted.web.resource import getChildForRequest
 from twisted.internet import reactor
 
 from leap.soledad.server._resource import SoledadResource
@@ -37,33 +37,30 @@ class SoledadResourceTestCase(unittest.TestCase):
     def test_get_root(self):
         conf = {'soledad-server': {'blobs': None}}  # doesn't matter
         resource = SoledadResource(conf, sync_pool=_pool)
-        path = ''
-        request = DummyRequest([])
-        child = resource.getChild(path, request)
+        request = DummyRequest([''])
+        child = getChildForRequest(resource, request)
         self.assertIsInstance(child, ServerInfo)
 
     def test_get_blobs_enabled(self):
         conf = {'soledad-server': {'blobs': True}}
         resource = SoledadResource(conf, sync_pool=_pool)
-        path = 'blobs'
-        request = DummyRequest([])
-        child = resource.getChild(path, request)
+        request = DummyRequest(['blobs'])
+        child = getChildForRequest(resource, request)
         self.assertIsInstance(child, BlobsResource)
 
     def test_get_blobs_disabled(self):
         conf = {'soledad-server': {'blobs': False}}
         resource = SoledadResource(conf, sync_pool=_pool)
-        path = 'blobs'
-        request = DummyRequest([])
-        with self.assertRaises(Error):
-            resource.getChild(path, request)
+        request = DummyRequest(['blobs'])
+        child = getChildForRequest(resource, request)
+        # if blobs is disabled, the request should be routed to sync
+        self.assertIsInstance(child, WSGIResource)
+        self.assertIsInstance(child._application, GzipMiddleware)
 
     def test_get_sync(self):
         conf = {'soledad-server': {'blobs': None}}  # doesn't matter
         resource = SoledadResource(conf, sync_pool=_pool)
-        path = 'sync'  # if not 'blobs' or '', should be routed to sync
-        request = DummyRequest([])
-        request.prepath = ['user-db']
-        child = resource.getChild(path, request)
+        request = DummyRequest(['user-db', 'sync-from', 'source-id'])
+        child = getChildForRequest(resource, request)
         self.assertIsInstance(child, WSGIResource)
         self.assertIsInstance(child._application, GzipMiddleware)

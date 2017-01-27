@@ -17,11 +17,9 @@
 """
 A twisted resource that serves the Soledad Server.
 """
-from twisted.web.error import Error
 from twisted.web.resource import Resource
 
 from ._blobs import blobs_resource
-from ._config import get_config
 from ._server_info import ServerInfo
 from ._wsgi import get_sync_resource
 
@@ -35,33 +33,25 @@ class SoledadResource(Resource):
     for the Soledad Server.
     """
 
-    def __init__(self, sync_pool=None):
-        conf = get_config()
-        self._blobs_enabled = conf['soledad-server']['blobs']
-        server_info = ServerInfo(self._blobs_enabled)
-        sync_resource = get_sync_resource(sync_pool)
-        self.children = {
-            '': server_info,
-            'sync': sync_resource,
-            'blobs': blobs_resource,
-            'sync': sync_resource,
-        }
+    def __init__(self, conf, sync_pool=None):
+        Resource.__init__(self)
+
+        blobs_enabled = conf['soledad-server']['blobs']
+
+        # requests to / return server information
+        server_info = ServerInfo(blobs_enabled)
+        self.putChild('', server_info)
+
+        # requests to /blobs will serve blobs if enabled
+        if blobs_enabled:
+            self.putChild('blobs', blobs_resource)
+
+        # other requests are routed to legacy sync resource
+        self._sync_resource = get_sync_resource(sync_pool)
 
     def getChild(self, path, request):
         """
-        Decide which child resource to serve based on the given path.
+        Route requests to legacy WSGI sync resource dynamically.
         """
-        # requests to / return server information
-        if path == '':
-            return self.children['']
-
-        # requests to /blobs will serve blobs if enabled
-        if path == 'blobs':
-            if not self._blobs_enabled:
-                msg = 'Blobs feature is disabled in this server.'
-                raise Error(403, message=msg)
-            return self.children['blobs']
-
-        # other requesta are routed to legacy sync resource
         request.postpath.insert(0, request.prepath.pop())
-        return self.children['sync']
+        return self._sync_resource
