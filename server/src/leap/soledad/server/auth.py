@@ -67,24 +67,20 @@ class TokenChecker(object):
         self._dbs = {}
 
     def _tokens_dbname(self):
-        dbname = self.TOKENS_DB_PREFIX + \
-            str(int(time.time() / self.TOKENS_DB_EXPIRE))
-        return dbname
-
-    def _get_db(self, dbname):
-        if dbname not in self._dbs:
-            self._dbs[dbname] = self._server[dbname]
-        return self._dbs[dbname]
-
-    def _tokens_db(self):
         # the tokens db rotates every 30 days, and the current db name is
         # "tokens_NNN", where NNN is the number of seconds since epoch
         # divide dby the rotate period in seconds. When rotating, old and
         # new tokens db coexist during a certain window of time and valid
         # tokens are replicated from the old db to the new one. See:
         # https://leap.se/code/issues/6785
+        dbname = self.TOKENS_DB_PREFIX + \
+            str(int(time.time() / self.TOKENS_DB_EXPIRE))
+        return dbname
+
+    def _tokens_db(self):
         dbname = self._tokens_dbname()
-        db = self._get_db(dbname)
+        with self._server as server:
+            db = server[dbname]
         return db
 
     def requestAvatarId(self, credentials):

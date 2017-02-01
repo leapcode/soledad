@@ -19,6 +19,8 @@ Tests for auth pieces.
 """
 import collections
 
+from contextlib import contextmanager
+
 from twisted.cred.credentials import UsernamePassword
 from twisted.cred.error import UnauthorizedLogin
 from twisted.internet.defer import inlineCallbacks
@@ -54,13 +56,18 @@ class DummyServer(object):
         return self._token
 
 
+@contextmanager
+def dummy_server(token):
+    yield collections.defaultdict(lambda: DummyServer(token))
+
+
 class TokenCheckerTestCase(unittest.TestCase):
 
     @inlineCallbacks
     def test_good_creds(self):
         # set up a dummy server which always return a *valid* token document
         token = {'user_id': 'user', 'type': 'Token'}
-        server = collections.defaultdict(lambda: DummyServer(token))
+        server = dummy_server(token)
         # setup the checker with the custom server
         checker = TokenChecker(server=server)
         # assert the checker *can* verify the creds
@@ -72,7 +79,7 @@ class TokenCheckerTestCase(unittest.TestCase):
     def test_bad_creds(self):
         # set up a dummy server which always return an *invalid* token document
         token = None
-        server = collections.defaultdict(lambda: DummyServer(token))
+        server = dummy_server(token)
         # setup the checker with the custom server
         checker = TokenChecker(server=server)
         # assert the checker *cannot* verify the creds

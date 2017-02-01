@@ -17,23 +17,19 @@
 """
 Tests for server session entrypoint.
 """
-from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
-from twisted.cred import portal
-from twisted.web.test.test_httpauth import b64encode
-from twisted.web.test.test_httpauth import Realm
-from twisted.web.test.requesthelper import DummyRequest
-from twisted.web.resource import getChildForRequest
-
-from twisted.web.resource import Resource
-
 from twisted.trial import unittest
 
-from leap.soledad.server.session import SoledadSession
-
-from twisted.web.static import Data
-from twisted.web._auth.wrapper import UnauthorizedResource
+from twisted.cred import portal
+from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
 from twisted.cred.credentials import IUsernamePassword
-from twisted.cred.checkers import ANONYMOUS, AllowAnonymousAccess
+from twisted.web.resource import getChildForRequest
+from twisted.web.static import Data
+from twisted.web.test.requesthelper import DummyRequest
+from twisted.web.test.test_httpauth import b64encode
+from twisted.web.test.test_httpauth import Realm
+from twisted.web._auth.wrapper import UnauthorizedResource
+
+from leap.soledad.server.session import SoledadSession
 
 
 class SoledadSessionTestCase(unittest.TestCase):
@@ -168,6 +164,7 @@ class SoledadSessionTestCase(unittest.TestCase):
         child = getChildForRequest(self.wrapper, request)
         request.render(child)
         self.assertEqual(request.responseCode, 500)
+        self.assertEqual(len(self.flushLoggedErrors(UnexpectedException)), 1)
 
     def test_unexpectedLoginError(self):
         class UnexpectedException(Exception):
@@ -184,26 +181,4 @@ class SoledadSessionTestCase(unittest.TestCase):
         child = self._authorizedTokenLogin(request)
         request.render(child)
         self.assertEqual(request.responseCode, 500)
-
-    def test_anonymousAccess(self):
-        """
-        Anonymous requests are allowed if a L{Portal} has an anonymous checker
-        registered.
-        """
-        unprotectedContents = b"contents of the unprotected child resource"
-
-        self.avatars[ANONYMOUS] = Resource()
-        self.avatars[ANONYMOUS].putChild(
-            self.childName, Data(unprotectedContents, 'text/plain'))
-        self.portal.registerChecker(AllowAnonymousAccess())
-
-        request = self.makeRequest([self.childName])
-        child = getChildForRequest(self.wrapper, request)
-        d = request.notifyFinish()
-
-        def cbFinished(ignored):
-            self.assertEqual(request.written, [unprotectedContents])
-
-        d.addCallback(cbFinished)
-        request.render(child)
-        return d
+        self.assertEqual(len(self.flushLoggedErrors(UnexpectedException)), 1)

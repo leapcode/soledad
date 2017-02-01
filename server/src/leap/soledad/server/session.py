@@ -104,6 +104,3 @@ class SoledadSession(HTTPAuthSessionWrapper):
 
         # if all checks pass, try to login with credentials
         return util.DeferredResource(self._login(credentials))
-
-
-soledadSession = SoledadSession()
