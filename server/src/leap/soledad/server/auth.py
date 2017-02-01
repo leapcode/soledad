@@ -29,6 +29,7 @@ from twisted.cred.credentials import IUsernamePassword
 from twisted.cred.credentials import UsernamePassword
 from twisted.cred.portal import IRealm
 from twisted.cred.portal import Portal
+from twisted.internet import defer
 from twisted.web.iweb import ICredentialFactory
 from twisted.web.resource import IResource
 
@@ -57,31 +58,45 @@ class TokenChecker(object):
     TOKENS_TYPE_DEF = "Token"
     TOKENS_USER_ID_KEY = "user_id"
 
-    def __init__(self):
-        config = get_config()
-        self.couch_url = config['couch_url']
+    def __init__(self, server=None):
+        if server is None:
+            config = get_config()
+            couch_url = config['couch_url']
+            server = couch_server(couch_url)
+        self._server = server
+        self._dbs = {}
 
     def _tokens_dbname(self):
         dbname = self.TOKENS_DB_PREFIX + \
             str(int(time.time() / self.TOKENS_DB_EXPIRE))
         return dbname
 
+    def _get_db(self, dbname):
+        if dbname not in self._dbs:
+            self._dbs[dbname] = self._server[dbname]
+        return self._dbs[dbname]
+
+    def _tokens_db(self):
+        # the tokens db rotates every 30 days, and the current db name is
+        # "tokens_NNN", where NNN is the number of seconds since epoch
+        # divide dby the rotate period in seconds. When rotating, old and
+        # new tokens db coexist during a certain window of time and valid
+        # tokens are replicated from the old db to the new one. See:
+        # https://leap.se/code/issues/6785
+        dbname = self._tokens_dbname()
+        db = self._get_db(dbname)
+        return db
+
     def requestAvatarId(self, credentials):
         uuid = credentials.username
         token = credentials.password
-        with couch_server(self.couch_url) as server:
-            # the tokens db rotates every 30 days, and the current db name is
-            # "tokens_NNN", where NNN is the number of seconds since epoch
-            # divide dby the rotate period in seconds. When rotating, old and
-            # new tokens db coexist during a certain window of time and valid
-            # tokens are replicated from the old db to the new one. See:
-            # https://leap.se/code/issues/6785
-            dbname = self._tokens_dbname()
-            db = server[dbname]
+
         # lookup key is a hash of the token to prevent timing attacks.
+        db = self._tokens_db()
         token = db.get(sha512(token).hexdigest())
         if token is None:
-            return False
+            return defer.fail(error.UnauthorizedLogin())
+
         # we compare uuid hashes to avoid possible timing attacks that
         # might exploit python's builtin comparison operator behaviour,
         # which fails immediatelly when non-matching bytes are found.
@@ -89,8 +104,9 @@ class TokenChecker(object):
         req_uuid_hash = sha512(uuid).digest()
         if token[self.TOKENS_TYPE_KEY] != self.TOKENS_TYPE_DEF \
                 or couch_uuid_hash != req_uuid_hash:
-            return False
-        return True
+            return defer.fail(error.UnauthorizedLogin())
+
+        return defer.succeed(uuid)
 
 
 @implementer(ICredentialFactory)
@@ -103,7 +119,7 @@ class TokenCredentialFactory(object):
 
     def decode(self, response, request):
         try:
-            creds = response.decode('base64')
+            creds = binascii.a2b_base64(response + b'===')
         except binascii.Error:
             raise error.LoginFailed('Invalid credentials')
 
@@ -114,5 +130,5 @@ class TokenCredentialFactory(object):
             raise error.LoginFailed('Invalid credentials')
 
 
-portal = Portal(SoledadRealm(), [TokenChecker()])
+get_portal = lambda: Portal(SoledadRealm(), [TokenChecker()])
 credentialFactory = TokenCredentialFactory()

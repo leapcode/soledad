@@ -26,7 +26,7 @@ from twisted.web.guard import HTTPAuthSessionWrapper
 from twisted.web.resource import ErrorPage
 from twisted.web.resource import IResource
 
-from leap.soledad.server.auth import portal
+from leap.soledad.server.auth import get_portal
 from leap.soledad.server.auth import credentialFactory
 from leap.soledad.server.url_mapper import URLMapper
 
@@ -50,7 +50,7 @@ class SoledadSession(HTTPAuthSessionWrapper):
 
     def __init__(self):
         self._mapper = URLMapper()
-        self._portal = portal
+        self._portal = get_portal()
         self._credentialFactory = credentialFactory
 
     def _matchPath(self, request):
