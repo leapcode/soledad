@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # test_auth.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ from twisted.cred.error import UnauthorizedLogin
 from twisted.internet.defer import inlineCallbacks
 from twisted.trial import unittest
 from twisted.web.resource import IResource
+from twisted.web.test import test_httpauth
 
 from leap.soledad.server.auth import SoledadRealm
 from leap.soledad.server.auth import TokenChecker
@@ -78,9 +79,6 @@ class TokenCheckerTestCase(unittest.TestCase):
         creds = UsernamePassword('user', '')
         with self.assertRaises(UnauthorizedLogin):
             yield checker.requestAvatarId(creds)
-
-
-from twisted.web.test import test_httpauth
 
 
 class TokenCredentialFactoryTestcase(

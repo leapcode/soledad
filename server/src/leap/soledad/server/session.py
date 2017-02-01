@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # session.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ from zope.interface import implementer
 from twisted.cred import error
 from twisted.python import log
 from twisted.web import util
+from twisted.web._auth import wrapper
 from twisted.web.guard import HTTPAuthSessionWrapper
 from twisted.web.resource import ErrorPage
 from twisted.web.resource import IResource
@@ -32,8 +33,11 @@ from leap.soledad.server.url_mapper import URLMapper
 
 
 @implementer(IResource)
-class UnauthorizedResource(object):
+class UnauthorizedResource(wrapper.UnauthorizedResource):
     isLeaf = True
+
+    def __init__(self):
+        pass
 
     def render(self, request):
         request.setResponseCode(401)
@@ -48,9 +52,12 @@ class UnauthorizedResource(object):
 @implementer(IResource)
 class SoledadSession(HTTPAuthSessionWrapper):
 
-    def __init__(self):
+    def __init__(self, portal=None):
+        if portal is None:
+            portal = get_portal()
+
         self._mapper = URLMapper()
-        self._portal = get_portal()
+        self._portal = portal
         self._credentialFactory = credentialFactory
 
     def _matchPath(self, request):
@@ -65,18 +72,22 @@ class SoledadSession(HTTPAuthSessionWrapper):
         return None
 
     def _authorizedResource(self, request):
+        # check whether the path of the request exists in the app
         match = self._matchPath(request)
         if not match:
             return UnauthorizedResource()
 
+        # get authorization header or fail
         header = request.getHeader(b'authorization')
         if not header:
             return UnauthorizedResource()
 
+        # parse the authorization header
         auth_data = self._parseHeader(header)
         if not auth_data:
             return UnauthorizedResource()
 
+        # decode the credentials from the parsed header
         try:
             credentials = self._credentialFactory.decode(auth_data, request)
         except error.LoginFailed:
@@ -85,10 +96,13 @@ class SoledadSession(HTTPAuthSessionWrapper):
             log.err(None, "Unexpected failure from credentials factory")
             return ErrorPage(500, None, None)
 
+        # make sure the uuid given in path corresponds to the one given in
+        # the credentials
         request_uuid = match.get('uuid')
         if request_uuid and request_uuid != credentials.username:
             return ErrorPage(500, None, None)
 
+        # if all checks pass, try to login with credentials
         return util.DeferredResource(self._login(credentials))
 
 
