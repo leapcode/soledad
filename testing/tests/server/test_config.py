@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # test_config.py
-# Copyright (C) 2013 LEAP
+# Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
