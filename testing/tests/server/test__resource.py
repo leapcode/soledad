@@ -35,22 +35,22 @@ _pool = reactor.getThreadPool()
 class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_root(self):
-        conf = {'soledad-server': {'blobs': None}}  # doesn't matter
-        resource = SoledadResource(conf, sync_pool=_pool)
+        enable_blobs = None  # doesn't matter
+        resource = SoledadResource(enable_blobs=enable_blobs, sync_pool=_pool)
         request = DummyRequest([''])
         child = getChildForRequest(resource, request)
         self.assertIsInstance(child, ServerInfo)
 
     def test_get_blobs_enabled(self):
-        conf = {'soledad-server': {'blobs': True}}
-        resource = SoledadResource(conf, sync_pool=_pool)
+        enable_blobs = True
+        resource = SoledadResource(enable_blobs=enable_blobs, sync_pool=_pool)
         request = DummyRequest(['blobs'])
         child = getChildForRequest(resource, request)
         self.assertIsInstance(child, BlobsResource)
 
     def test_get_blobs_disabled(self):
-        conf = {'soledad-server': {'blobs': False}}
-        resource = SoledadResource(conf, sync_pool=_pool)
+        enable_blobs = False
+        resource = SoledadResource(enable_blobs=enable_blobs, sync_pool=_pool)
         request = DummyRequest(['blobs'])
         child = getChildForRequest(resource, request)
         # if blobs is disabled, the request should be routed to sync
@@ -58,8 +58,8 @@ class SoledadResourceTestCase(unittest.TestCase):
         self.assertIsInstance(child._application, GzipMiddleware)
 
     def test_get_sync(self):
-        conf = {'soledad-server': {'blobs': None}}  # doesn't matter
-        resource = SoledadResource(conf, sync_pool=_pool)
+        enable_blobs = None  # doesn't matter
+        resource = SoledadResource(enable_blobs=enable_blobs, sync_pool=_pool)
         request = DummyRequest(['user-db', 'sync-from', 'source-id'])
         child = getChildForRequest(resource, request)
         self.assertIsInstance(child, WSGIResource)

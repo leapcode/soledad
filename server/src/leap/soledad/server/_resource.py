@@ -33,17 +33,24 @@ class SoledadResource(Resource):
     for the Soledad Server.
     """
 
-    def __init__(self, conf, sync_pool=None):
+    def __init__(self, enable_blobs=False, sync_pool=None):
+        """
+        Initialize the Soledad resource.
+
+        :param enable_blobs: Whether the blobs feature should be enabled.
+        :type enable_blobs: bool
+
+        :param sync_pool: A pool to pass to the WSGI sync resource.
+        :type sync_pool: twisted.python.threadpool.ThreadPool
+        """
         Resource.__init__(self)
 
-        blobs_enabled = conf['soledad-server']['blobs']
-
         # requests to / return server information
-        server_info = ServerInfo(blobs_enabled)
+        server_info = ServerInfo(enable_blobs)
         self.putChild('', server_info)
 
         # requests to /blobs will serve blobs if enabled
-        if blobs_enabled:
+        if enable_blobs:
             self.putChild('blobs', blobs_resource)
 
         # other requests are routed to legacy sync resource

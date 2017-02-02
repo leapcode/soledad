@@ -42,12 +42,18 @@ from ._config import get_config
 @implementer(IRealm)
 class SoledadRealm(object):
 
-    def __init__(self, sync_pool=None):
+    def __init__(self, conf=None, sync_pool=None):
+        if not conf:
+            conf = get_config()
+        self._conf = conf
         self._sync_pool = sync_pool
 
     def requestAvatar(self, avatarId, mind, *interfaces):
         if IResource in interfaces:
-            resource = SoledadResource(sync_pool=self._sync_pool)
+            enable_blobs = self._conf['soledad-server']['blobs']
+            resource = SoledadResource(
+                enable_blobs=enable_blobs,
+                sync_pool=self._sync_pool)
             return (IResource, resource, lambda: None)
         raise NotImplementedError()
 
