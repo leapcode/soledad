@@ -21,7 +21,6 @@ import binascii
 import os
 import pytest
 
-from pkg_resources import resource_filename
 from urlparse import urljoin
 from uuid import uuid4
 
@@ -40,8 +39,6 @@ from test_soledad.util import (
 
 from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
-from leap.soledad.server.config import load_configuration
-from leap.soledad.server.config import CONFIG_DEFAULTS
 from leap.soledad.server.url_mapper import URLMapper
 
 
@@ -339,46 +336,3 @@ class EncryptedSyncTestCase(
         Test if Soledad can sync many smallfiles.
         """
         return self._test_encrypted_sym_sync(doc_size=2, number_of_docs=100)
-
-
-class ConfigurationParsingTest(unittest.TestCase):
-
-    def setUp(self):
-        self.maxDiff = None
-
-    def test_use_defaults_on_failure(self):
-        config = load_configuration('this file will never exist')
-        expected = CONFIG_DEFAULTS
-        self.assertEquals(expected, config)
-
-    def test_security_values_configuration(self):
-        # given
-        config_path = resource_filename('test_soledad',
-                                        'fixture_soledad.conf')
-        # when
-        config = load_configuration(config_path)
-
-        # then
-        expected = {'members': ['user1', 'user2'],
-                    'members_roles': ['role1', 'role2'],
-                    'admins': ['user3', 'user4'],
-                    'admins_roles': ['role3', 'role3']}
-        self.assertDictEqual(expected, config['database-security'])
-
-    def test_server_values_configuration(self):
-        # given
-        config_path = resource_filename('test_soledad',
-                                        'fixture_soledad.conf')
-        # when
-        config = load_configuration(config_path)
-
-        # then
-        expected = {'couch_url':
-                    'http://soledad:passwd@localhost:5984',
-                    'create_cmd':
-                    'sudo -u soledad-admin /usr/bin/create-user-db',
-                    'admin_netrc':
-                    '/etc/couchdb/couchdb-soledad-admin.netrc',
-                    'batching': False,
-                    'blobs': False}
-        self.assertDictEqual(expected, config['soledad-server'])
