@@ -20,8 +20,8 @@ The entrypoint for Soledad server.
 from twisted.internet import reactor
 
 from ._config import get_config
-from ._session import SoledadSession
 from ._wsgi import init_couch_state
+from .session import SoledadSession
 
 
 # load configuration from file
