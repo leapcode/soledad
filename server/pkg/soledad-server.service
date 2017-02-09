@@ -1,0 +1,31 @@
+[Unit]
+Description=Soledad Server
+
+[Service]
+Environment=PATH=/sbin:/bin:/usr/sbin:/usr/bin
+Environment=CLASS=leap.soledad.server.resource.SoledadResource
+Environment=HTTPS_PORT=2424
+Environment=CERT_PATH=/etc/soledad/soledad-server.pem
+Environment=PRIVKEY_PATH=/etc/soledad/soledad-server.key
+Environment=HOME=/var/lib/soledad/
+Environment=SSL_METHOD=SSLv23_METHOD
+EnvironmentFile=-/etc/default/soledad
+
+ExecStart=/usr/bin/twistd \
+  --nodaemon \
+  --pidfile= \
+  --syslog \
+  --prefix=soledad-server \
+  web \
+  --class=${CLASS} \
+  --port=ssl:${HTTPS_PORT}:privateKey=${PRIVKEY_PATH}:certKey=${CERT_PATH}:sslmethod=${SSL_METHOD}
+
+WorkingDirectory=/var/lib/soledad/
+
+User=soledad
+Group=soledad
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
