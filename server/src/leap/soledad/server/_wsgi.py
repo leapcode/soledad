@@ -27,6 +27,7 @@ from leap.soledad.common.backend import SoledadBackend
 from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.log import getLogger
 
+from ._config import get_config
 
 __all__ = ['init_couch_state', 'get_sync_resource']
 
@@ -66,3 +67,12 @@ def get_sync_resource(pool=None):
         reactor.callWhenRunning(pool.start)
         reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
     return WSGIResource(reactor, pool, wsgi_application)
+
+
+# load configuration from file
+conf = get_config()
+
+# see the comments in application.py recarding why couch state has to be
+# initialized when the reactor is running
+
+reactor.callWhenRunning(init_couch_state, conf)

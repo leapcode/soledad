@@ -17,6 +17,7 @@
 """
 The entrypoint for Soledad server.
 """
+
 from twisted.internet import reactor
 
 from ._config import get_config
@@ -34,6 +35,12 @@ class SoledadEntrypoint(SoledadSession):
         SoledadSession.__init__(self, conf)
 
 
+# XXX FIXME ----------------------------
+# this is not executed from anywhere.
+# what's the plan for this module?
+# use me, or delete me.
+# --------------------------------------
 # see the comments in application.py recarding why couch state has to be
 # initialized when the reactor is running
+
 reactor.callWhenRunning(init_couch_state, conf['soledad-server'])
