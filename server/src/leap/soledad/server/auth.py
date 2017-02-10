@@ -50,7 +50,7 @@ class SoledadRealm(object):
 
     def requestAvatar(self, avatarId, mind, *interfaces):
         if IResource in interfaces:
-            enable_blobs = self._conf['soledad-server']['blobs']
+            enable_blobs = self._conf['blobs']
             resource = SoledadResource(
                 enable_blobs=enable_blobs,
                 sync_pool=self._sync_pool)

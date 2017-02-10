@@ -16,6 +16,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 The entrypoint for Soledad server.
+
+This is the entrypoint for the application that is loaded from the initscript
+or the systemd script.
 """
 
 from twisted.internet import reactor
@@ -26,21 +29,16 @@ from .session import SoledadSession
 
 
 # load configuration from file
-conf = get_config
+conf = get_config()
 
 
 class SoledadEntrypoint(SoledadSession):
 
     def __init__(self):
-        SoledadSession.__init__(self, conf)
+        SoledadSession.__init__(self)
 
 
-# XXX FIXME ----------------------------
-# this is not executed from anywhere.
-# what's the plan for this module?
-# use me, or delete me.
-# --------------------------------------
 # see the comments in application.py recarding why couch state has to be
 # initialized when the reactor is running
 
-reactor.callWhenRunning(init_couch_state, conf['soledad-server'])
+reactor.callWhenRunning(init_couch_state, conf)
