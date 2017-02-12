@@ -69,13 +69,11 @@ class TokenChecker(object):
     TOKENS_TYPE_DEF = "Token"
     TOKENS_USER_ID_KEY = "user_id"
 
-    def __init__(self, server=None):
-        if server is None:
-            config = get_config()
-            couch_url = config['couch_url']
-            server = couch_server(couch_url)
-        self._server = server
-        self._dbs = {}
+    def __init__(self):
+        self._couch_url = get_config().get('couch_url')
+
+    def _get_server(self):
+        return couch_server(self._couch_url)
 
     def _tokens_dbname(self):
         # the tokens db rotates every 30 days, and the current db name is
@@ -90,7 +88,11 @@ class TokenChecker(object):
 
     def _tokens_db(self):
         dbname = self._tokens_dbname()
-        with self._server as server:
+
+        # TODO -- leaking abstraction here: this module shouldn't need
+        # to known anything about the context manager. hide that in the couch
+        # module
+        with self._get_server() as server:
             db = server[dbname]
         return db
 
@@ -99,11 +101,14 @@ class TokenChecker(object):
         token = credentials.password
 
         # lookup key is a hash of the token to prevent timing attacks.
+        # TODO cache the tokens already!
+
         db = self._tokens_db()
         token = db.get(sha512(token).hexdigest())
         if token is None:
             return defer.fail(error.UnauthorizedLogin())
 
+        # TODO -- use cryptography constant time builtin comparison.
         # we compare uuid hashes to avoid possible timing attacks that
         # might exploit python's builtin comparison operator behaviour,
         # which fails immediatelly when non-matching bytes are found.
