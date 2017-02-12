@@ -42,11 +42,11 @@ CONFIG_DEFAULTS = {
 _config = None
 
 
-def get_config():
+def get_config(section='soledad-server'):
     global _config
     if not _config:
         _config = _load_config('/etc/soledad/soledad-server.conf')
-    return _config['soledad-server']
+    return _config[section]
 
 
 def _load_config(file_path):
