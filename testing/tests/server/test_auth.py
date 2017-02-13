@@ -29,6 +29,7 @@ from twisted.trial import unittest
 from twisted.web.resource import IResource
 from twisted.web.test import test_httpauth
 
+import leap.soledad.server.auth as auth_module
 from leap.soledad.server.auth import SoledadRealm
 from leap.soledad.server.auth import TokenChecker
 from leap.soledad.server.auth import TokenCredentialFactory
@@ -73,7 +74,8 @@ class TokenCheckerTestCase(unittest.TestCase):
         token = {'user_id': 'user', 'type': 'Token'}
         server = dummy_server(token)
         # setup the checker with the custom server
-        checker = TokenChecker(server=server)
+        checker = TokenChecker()
+        auth_module.couch_server = lambda url: server
         # assert the checker *can* verify the creds
         creds = UsernamePassword('user', 'pass')
         avatarId = yield checker.requestAvatarId(creds)
@@ -85,7 +87,8 @@ class TokenCheckerTestCase(unittest.TestCase):
         token = None
         server = dummy_server(token)
         # setup the checker with the custom server
-        checker = TokenChecker(server=server)
+        checker = TokenChecker()
+        auth_module.couch_server = lambda url: server
         # assert the checker *cannot* verify the creds
         creds = UsernamePassword('user', '')
         with self.assertRaises(UnauthorizedLogin):
