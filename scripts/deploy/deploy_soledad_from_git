@@ -1,0 +1,51 @@
+#!/bin/bash
+######################################################
+# Deploy soledad-server from a given remote and branch
+# valid remotes are: origin shyba drebs kali
+# DO NOT USE IN PRODUCTION OR I'LL SEND NINJAS TO YOUR
+# HOUSE!!!!
+# (c) LEAP, 2017
+######################################################
+
+REMOTE=$1
+BRANCH=$2
+
+if [ "$#" -lt 2 ]; then
+  echo "USAGE: $0 REMOTE BRANCH"
+  exit 1
+fi
+
+SOLEDADPATH="/usr/lib/python2.7/dist-packages/leap/soledad/server"
+REPO="https://0xacab.org/leap/soledad"
+LOCALREPO="$HOME/soledad"
+SYSTEMDINIT="/lib/systemd/system/soledad-server.service"
+
+apt remove --yes soledad-server
+
+if [ ! -d "$LOCALREPO" ]; then
+  echo "soledad repo not found, cloning..."
+  cd $HOME
+  git clone $REPO
+  cd $LOCALREPO
+  git remote add shyba https://0xacab.org/shyba/soledad.git
+  git remote add drebs https://0xacab.org/drebs/soledad.git
+  git remote add kali  https://0xacab.org/kali/soledad.git
+fi
+
+cd $LOCALREPO && git checkout -- . && git fetch $REMOTE && git checkout $REMOTE/$BRANCH
+rm -rf $SOLEDADPATH
+
+# copy over some stuff that we'll need -- stolen from debian package
+cp -r $LOCALREPO/server/src/leap/soledad/server $SOLEDADPATH
+cp $LOCALREPO/server/pkg/soledad-server.service $SYSTEMDINIT
+cp $LOCALREPO/server/pkg/create-user-db /usr/bin/
+cp $LOCALREPO/server/pkg/soledad-sudoers /etc/sudoers.d/
+
+# Let's append the branch info to the version string! So that nobody is lost
+cd $LOCALREPO &&  echo "__version__ = '"`git describe`"~"`git status | head -n 1 | cut -d' ' -f 4`"'" >> $SOLEDADPATH/__init__.py
+
+# restart the daemon
+systemctl --system daemon-reload >/dev/null || true
+deb-systemd-invoke start soledad-server.service >/dev/null || true
+
+tail -n 20 /var/log/syslog
