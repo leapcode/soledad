@@ -31,8 +31,8 @@ from twisted.cred.credentials import Anonymous
 from twisted.cred.credentials import UsernamePassword
 from twisted.cred.portal import IRealm
 from twisted.cred.portal import Portal
-from twisted.logger import Logger
 from twisted.internet import defer
+from twisted.logger import Logger
 from twisted.web.iweb import ICredentialFactory
 from twisted.web.resource import IResource
 
@@ -65,6 +65,11 @@ class SoledadRealm(object):
             return (IResource, resource, lambda: None)
 
         # Authenticated users
+
+        # XXX review this... we're creating a Resource tree
+        # for each request, for every user.
+        # What are the perf implications of this??
+
         if IResource in interfaces:
             resource = SoledadResource(
                 enable_blobs=enable_blobs,
@@ -113,7 +118,6 @@ class TokenChecker(object):
 
     def requestAvatarId(self, credentials):
         if IAnonymous.providedBy(credentials):
-            log.warn('we are anon')
             return defer.succeed(Anonymous())
 
         uuid = credentials.username
@@ -125,7 +129,6 @@ class TokenChecker(object):
         db = self._tokens_db()
         token = db.get(sha512(token).hexdigest())
         if token is None:
-            log.warn('token is none')
             return defer.fail(error.UnauthorizedLogin())
 
         # TODO -- use cryptography constant time builtin comparison.
