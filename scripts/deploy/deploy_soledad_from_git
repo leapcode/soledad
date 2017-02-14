@@ -47,6 +47,6 @@ cd $LOCALREPO &&  echo "__version__ = '"`git describe`"~"`git status | head -n 1
 
 # restart the daemon
 systemctl --system daemon-reload >/dev/null || true
-deb-systemd-invoke start soledad-server.service >/dev/null || true
+deb-systemd-invoke restart soledad-server.service >/dev/null || true
 
 tail -n 20 /var/log/syslog
