@@ -53,6 +53,7 @@ class URLMapper(object):
             URL path                      | Authorized actions
             --------------------------------------------------
             /                             | GET
+            /robots.txt                   | GET
             /shared-db                    | GET
             /shared-db/docs               | -
             /shared-db/doc/{any_id}       | GET, PUT, DELETE
@@ -64,6 +65,8 @@ class URLMapper(object):
         """
         # auth info for global resource
         self._connect('/', ['GET'])
+        # robots
+        self._connect('/robots.txt', ['GET'])
         # auth info for shared-db database resource
         self._connect('/%s' % SHARED_DB_NAME, ['GET'])
         # auth info for shared-db doc resource

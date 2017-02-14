@@ -19,8 +19,9 @@ Twisted resource containing an authenticated Soledad session.
 """
 from zope.interface import implementer
 
+from twisted.cred.credentials import Anonymous
 from twisted.cred import error
-from twisted.python import log
+from twisted.logger import Logger
 from twisted.web import util
 from twisted.web._auth import wrapper
 from twisted.web.guard import HTTPAuthSessionWrapper
@@ -30,6 +31,9 @@ from twisted.web.resource import IResource
 from leap.soledad.server.auth import get_portal
 from leap.soledad.server.auth import credentialFactory
 from leap.soledad.server.url_mapper import URLMapper
+
+
+log = Logger()
 
 
 @implementer(IResource)
@@ -80,7 +84,7 @@ class SoledadSession(HTTPAuthSessionWrapper):
         # get authorization header or fail
         header = request.getHeader(b'authorization')
         if not header:
-            return UnauthorizedResource()
+            return util.DeferredResource(self._login(Anonymous()))
 
         # parse the authorization header
         auth_data = self._parseHeader(header)

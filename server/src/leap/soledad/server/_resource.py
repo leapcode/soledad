@@ -24,7 +24,24 @@ from ._server_info import ServerInfo
 from ._wsgi import get_sync_resource
 
 
-__all__ = ['SoledadResource']
+__all__ = ['SoledadResource', 'SoledadAnonResource']
+
+
+class Robots(Resource):
+    def render_GET(self, request):
+        return 'robots, go away! please!'
+
+
+class SoledadAnonResource(Resource):
+    """
+    The parts of Soledad Server that unauthenticated users can see
+    """
+
+    def __init__(self, enable_blobs=False):
+        Resource.__init__(self)
+        server_info = ServerInfo(enable_blobs)
+        self.putChild('', server_info)
+        self.putChild('robots.txt', Robots())
 
 
 class SoledadResource(Resource):

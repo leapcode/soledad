@@ -26,17 +26,23 @@ from zope.interface import implementer
 from twisted.cred import error
 from twisted.cred.checkers import ICredentialsChecker
 from twisted.cred.credentials import IUsernamePassword
+from twisted.cred.credentials import IAnonymous
+from twisted.cred.credentials import Anonymous
 from twisted.cred.credentials import UsernamePassword
 from twisted.cred.portal import IRealm
 from twisted.cred.portal import Portal
+from twisted.logger import Logger
 from twisted.internet import defer
 from twisted.web.iweb import ICredentialFactory
 from twisted.web.resource import IResource
 
 from leap.soledad.common.couch import couch_server
 
-from ._resource import SoledadResource
+from ._resource import SoledadResource, SoledadAnonResource
 from ._config import get_config
+
+
+log = Logger()
 
 
 @implementer(IRealm)
@@ -49,8 +55,17 @@ class SoledadRealm(object):
         self._sync_pool = sync_pool
 
     def requestAvatar(self, avatarId, mind, *interfaces):
+        log.warn('avatarId {0}'.format(avatarId))
+        enable_blobs = self._conf['blobs']
+
+        # Anonymous access
+        if IAnonymous.providedBy(avatarId):
+            resource = SoledadAnonResource(
+                enable_blobs=enable_blobs)
+            return (IResource, resource, lambda: None)
+
+        # Authenticated users
         if IResource in interfaces:
-            enable_blobs = self._conf['blobs']
             resource = SoledadResource(
                 enable_blobs=enable_blobs,
                 sync_pool=self._sync_pool)
@@ -61,7 +76,7 @@ class SoledadRealm(object):
 @implementer(ICredentialsChecker)
 class TokenChecker(object):
 
-    credentialInterfaces = [IUsernamePassword]
+    credentialInterfaces = [IUsernamePassword, IAnonymous]
 
     TOKENS_DB_PREFIX = "tokens_"
     TOKENS_DB_EXPIRE = 30 * 24 * 3600  # 30 days in seconds
@@ -97,6 +112,10 @@ class TokenChecker(object):
         return db
 
     def requestAvatarId(self, credentials):
+        if IAnonymous.providedBy(credentials):
+            log.warn('we are anon')
+            return defer.succeed(Anonymous())
+
         uuid = credentials.username
         token = credentials.password
 
@@ -106,6 +125,7 @@ class TokenChecker(object):
         db = self._tokens_db()
         token = db.get(sha512(token).hexdigest())
         if token is None:
+            log.warn('token is none')
             return defer.fail(error.UnauthorizedLogin())
 
         # TODO -- use cryptography constant time builtin comparison.
