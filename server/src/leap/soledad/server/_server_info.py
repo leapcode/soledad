@@ -21,6 +21,8 @@ import json
 
 from twisted.web.resource import Resource
 
+from leap.soledad.server import __version__
+
 
 __all__ = ['ServerInfo']
 
@@ -35,6 +37,7 @@ class ServerInfo(Resource):
     def __init__(self, blobs_enabled):
         self._info = {
             "blobs": blobs_enabled,
+            "version": __version__
         }
 
     def render_GET(self, request):
