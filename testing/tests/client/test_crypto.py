@@ -235,6 +235,37 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
             _crypto.decrypt_sym(cyphertext, wrongkey, iv)
 
 
+class PreambleTestCase(unittest.TestCase):
+    class doc_info:
+        doc_id = 'D-deadbeef'
+        rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
+
+    def setUp(self):
+        inf = BytesIO(snowden1)
+        self.blob = _crypto.BlobEncryptor(
+            self.doc_info, inf,
+            secret='A' * 96)
+
+    def test_preamble_starts_with_magic_signature(self):
+        preamble = self.blob._encode_preamble()
+        assert preamble.startswith(_crypto.BLOB_SIGNATURE_MAGIC)
+
+    def test_preamble_has_cipher_metadata(self):
+        preamble = self.blob._encode_preamble()
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        encryption_scheme, encryption_method = unpacked[1:3]
+        assert encryption_scheme in _crypto.ENC_SCHEME
+        assert encryption_method in _crypto.ENC_METHOD
+        assert unpacked[4] == self.blob.iv
+
+    def test_preamble_has_document_sync_metadata(self):
+        preamble = self.blob._encode_preamble()
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        doc_id, doc_rev = unpacked[5:]
+        assert doc_id == self.doc_info.doc_id
+        assert doc_rev == self.doc_info.rev
+
+
 def _aes_encrypt(key, iv, data):
     backend = default_backend()
     cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=backend)

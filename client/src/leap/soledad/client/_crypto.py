@@ -192,7 +192,7 @@ class BlobEncryptor(object):
 
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         self._aes = AESWriter(sym_key)
-        self._aes.authenticate(self._make_preamble())
+        self._aes.authenticate(self._encode_preamble())
 
     @property
     def iv(self):
@@ -214,7 +214,7 @@ class BlobEncryptor(object):
         d.addCallback(lambda _: self._end_crypto_stream())
         return d
 
-    def _make_preamble(self):
+    def _encode_preamble(self):
         current_time = int(time.time())
 
         return PACMAN.pack(
