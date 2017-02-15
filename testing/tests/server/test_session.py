@@ -156,6 +156,7 @@ class SoledadSessionTestCase(unittest.TestCase):
                 return {}
 
             def decode(self, response, request):
+                print "decode raised"
                 raise UnexpectedException()
 
         self.wrapper._credentialFactory = BadFactory()
@@ -164,7 +165,9 @@ class SoledadSessionTestCase(unittest.TestCase):
         child = getChildForRequest(self.wrapper, request)
         request.render(child)
         self.assertEqual(request.responseCode, 500)
-        self.assertEqual(len(self.flushLoggedErrors(UnexpectedException)), 1)
+        #self.assertEqual(len(self.flushLoggedErrors(UnexpectedException)), 1)
+        errors = self.flushLoggedErrors(UnexpectedException)
+        self.assertEqual(len(errors), 1)
 
     def test_unexpectedLoginError(self):
         class UnexpectedException(Exception):

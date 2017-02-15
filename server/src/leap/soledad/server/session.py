@@ -22,6 +22,7 @@ from zope.interface import implementer
 from twisted.cred.credentials import Anonymous
 from twisted.cred import error
 from twisted.logger import Logger
+from twisted.python import log
 from twisted.web import util
 from twisted.web._auth import wrapper
 from twisted.web.guard import HTTPAuthSessionWrapper
@@ -31,9 +32,6 @@ from twisted.web.resource import IResource
 from leap.soledad.server.auth import get_portal
 from leap.soledad.server.auth import credentialFactory
 from leap.soledad.server.url_mapper import URLMapper
-
-
-log = Logger()
 
 
 @implementer(IResource)
@@ -63,6 +61,8 @@ class SoledadSession(HTTPAuthSessionWrapper):
         self._mapper = URLMapper()
         self._portal = portal
         self._credentialFactory = credentialFactory
+        # expected by the contract of the parent class
+        self._credentialFactories = [credentialFactory]
 
     def _matchPath(self, request):
         match = self._mapper.match(request.path, request.method)
@@ -97,6 +97,8 @@ class SoledadSession(HTTPAuthSessionWrapper):
         except error.LoginFailed:
             return UnauthorizedResource()
         except:
+            # If you port this to the newer log facility, be aware that
+            # the tests rely on the error to be logged.
             log.err(None, "Unexpected failure from credentials factory")
             return ErrorPage(500, None, None)
 

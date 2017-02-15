@@ -35,7 +35,6 @@ conf = get_config()
 class SoledadEntrypoint(SoledadSession):
 
     def __init__(self):
-        self._credentialFactories = []
         SoledadSession.__init__(self)
 
 

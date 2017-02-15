@@ -55,7 +55,6 @@ class SoledadRealm(object):
         self._sync_pool = sync_pool
 
     def requestAvatar(self, avatarId, mind, *interfaces):
-        log.warn('avatarId {0}'.format(avatarId))
         enable_blobs = self._conf['blobs']
 
         # Anonymous access
@@ -66,7 +65,8 @@ class SoledadRealm(object):
 
         # Authenticated users
 
-        # XXX review this... we're creating a Resource tree
+        # TODO review this: #8770 ----------------
+        # we're creating a Resource tree
         # for each request, for every user.
         # What are the perf implications of this??
 

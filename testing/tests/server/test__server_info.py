@@ -31,9 +31,13 @@ class ServerInfoTestCase(unittest.TestCase):
     def test_blobs_enabled(self):
         resource = ServerInfo(True)
         response = resource.render(DummyRequest(['']))
-        self.assertEquals(json.loads(response), {'blobs': True})
+        _info = json.loads(response)
+        self.assertEquals(_info['blobs'], True)
+        self.assertTrue(isinstance(_info['version'], basestring))
 
     def test_blobs_disabled(self):
         resource = ServerInfo(False)
         response = resource.render(DummyRequest(['']))
-        self.assertEquals(json.loads(response), {'blobs': False})
+        _info = json.loads(response)
+        self.assertEquals(_info['blobs'], False)
+        self.assertTrue(isinstance(_info['version'], basestring))
