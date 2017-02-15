@@ -165,7 +165,6 @@ class SoledadSessionTestCase(unittest.TestCase):
         child = getChildForRequest(self.wrapper, request)
         request.render(child)
         self.assertEqual(request.responseCode, 500)
-        #self.assertEqual(len(self.flushLoggedErrors(UnexpectedException)), 1)
         errors = self.flushLoggedErrors(UnexpectedException)
         self.assertEqual(len(errors), 1)
 

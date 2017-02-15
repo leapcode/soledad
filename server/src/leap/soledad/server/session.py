@@ -21,7 +21,6 @@ from zope.interface import implementer
 
 from twisted.cred.credentials import Anonymous
 from twisted.cred import error
-from twisted.logger import Logger
 from twisted.python import log
 from twisted.web import util
 from twisted.web._auth import wrapper
