@@ -49,7 +49,8 @@ SECRET_LENGTH = 64
 
 CRYPTO_BACKEND = MultiBackend([OpenSSLBackend()])
 
-PACMAN = struct.Struct('2sbbQ16s255p255p')
+PACMAN = struct.Struct('2sbbQ16s255p255pQ')
+LEGACY_PACMAN = struct.Struct('2sbbQ16s255p255p')
 BLOB_SIGNATURE_MAGIC = '\x13\x37'
 
 
@@ -188,10 +189,13 @@ class BlobEncryptor(object):
         self.doc_id = doc_info.doc_id
         self.rev = doc_info.rev
         self._content_fd = content_fd
+        content_fd.seek(0, os.SEEK_END)
+        self._content_size = content_fd.tell()
+        content_fd.seek(0)
         self._producer = FileBodyProducer(content_fd, readSize=2**16)
 
-        sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
-        self._aes = AESWriter(sym_key)
+        self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
+        self._aes = AESWriter(self.sym_key)
         self._aes.authenticate(self._encode_preamble())
 
     @property
@@ -224,7 +228,8 @@ class BlobEncryptor(object):
             current_time,
             self.iv,
             str(self.doc_id),
-            str(self.rev))
+            str(self.rev),
+            self._content_size)
 
     def _end_crypto_stream(self):
         preamble, encrypted = self._aes.end()
@@ -271,14 +276,17 @@ class BlobDecryptor(object):
             raise InvalidBlob
         ciphertext_fd.close()
 
-        if len(preamble) != PACMAN.size:
-            raise InvalidBlob
-
         try:
-            unpacked_data = PACMAN.unpack(preamble)
-            magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
-        except struct.error:
-            raise InvalidBlob
+            if len(preamble) == LEGACY_PACMAN.size:
+                unpacked_data = LEGACY_PACMAN.unpack(preamble)
+                magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
+            elif len(preamble) == PACMAN.size:
+                unpacked_data = PACMAN.unpack(preamble)
+                magic, sch, meth, ts, iv, doc_id, rev, doc_size = unpacked_data
+            else:
+                raise InvalidBlob("Unexpected preamble size %d", len(preamble))
+        except struct.error, e:
+            raise InvalidBlob(e)
 
         if magic != BLOB_SIGNATURE_MAGIC:
             raise InvalidBlob

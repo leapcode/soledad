@@ -110,7 +110,7 @@ class BlobTestCase(unittest.TestCase):
 
         assert len(preamble) == _crypto.PACMAN.size
         unpacked_data = _crypto.PACMAN.unpack(preamble)
-        magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
+        magic, sch, meth, ts, iv, doc_id, rev, _ = unpacked_data
         assert magic == _crypto.BLOB_SIGNATURE_MAGIC
         assert sch == 1
         assert meth == _crypto.ENC_METHOD.aes_256_gcm
@@ -241,9 +241,9 @@ class PreambleTestCase(unittest.TestCase):
         rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
 
     def setUp(self):
-        inf = BytesIO(snowden1)
+        self.cleartext = BytesIO(snowden1)
         self.blob = _crypto.BlobEncryptor(
-            self.doc_info, inf,
+            self.doc_info, self.cleartext,
             secret='A' * 96)
 
     def test_preamble_starts_with_magic_signature(self):
@@ -261,15 +261,45 @@ class PreambleTestCase(unittest.TestCase):
     def test_preamble_has_document_sync_metadata(self):
         preamble = self.blob._encode_preamble()
         unpacked = _crypto.PACMAN.unpack(preamble)
-        doc_id, doc_rev = unpacked[5:]
+        doc_id, doc_rev = unpacked[5:7]
         assert doc_id == self.doc_info.doc_id
         assert doc_rev == self.doc_info.rev
 
+    def test_preamble_has_document_size(self):
+        preamble = self.blob._encode_preamble()
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        size = unpacked[7]
+        assert size == len(snowden1)
 
-def _aes_encrypt(key, iv, data):
+    @defer.inlineCallbacks
+    def test_preamble_can_come_without_size(self):
+        # XXX: This test case is here only to test backwards compatibility!
+        preamble = self.blob._encode_preamble()
+        # repack preamble using legacy format, without doc size
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        preamble_without_size = _crypto.LEGACY_PACMAN.pack(*unpacked[0:7])
+        # encrypt it manually for custom tag
+        ciphertext, tag = _aes_encrypt(self.blob.sym_key, self.blob.iv,
+                                       self.cleartext.getvalue(),
+                                       aead=preamble_without_size)
+        ciphertext = ciphertext + tag
+        # encode it
+        ciphertext = base64.urlsafe_b64encode(ciphertext)
+        preamble_without_size = base64.urlsafe_b64encode(preamble_without_size)
+        # decrypt it
+        ciphertext = preamble_without_size + ' ' + ciphertext
+        cleartext = yield _crypto.BlobDecryptor(
+            self.doc_info, BytesIO(ciphertext),
+            secret='A' * 96).decrypt()
+        assert cleartext == self.cleartext.getvalue()
+
+
+def _aes_encrypt(key, iv, data, aead=''):
     backend = default_backend()
     cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=backend)
     encryptor = cipher.encryptor()
+    if aead:
+        encryptor.authenticate_additional_data(aead)
     return encryptor.update(data) + encryptor.finalize(), encryptor.tag
 
 
