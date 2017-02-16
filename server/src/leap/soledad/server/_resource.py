@@ -19,7 +19,7 @@ A twisted resource that serves the Soledad Server.
 """
 from twisted.web.resource import Resource
 
-from ._blobs import blobs_resource
+from ._blobs import BlobsResource
 from ._server_info import ServerInfo
 from ._wsgi import get_sync_resource
 
@@ -74,7 +74,7 @@ class SoledadResource(Resource):
 
         # requests to /blobs will serve blobs if enabled
         if enable_blobs:
-            self.putChild('blobs', blobs_resource)
+            self.putChild('blobs', BlobsResource())
 
         # other requests are routed to legacy sync resource
         self._sync_resource = get_sync_resource(sync_pool)
