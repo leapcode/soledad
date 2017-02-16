@@ -22,6 +22,7 @@ Cryptographic operations for the soledad client
 import binascii
 import base64
 import hashlib
+import warnings
 import hmac
 import os
 import re
@@ -278,6 +279,10 @@ class BlobDecryptor(object):
 
         try:
             if len(preamble) == LEGACY_PACMAN.size:
+                warnings.warn("Decrypting a legacy document without size. " +
+                              "This will be deprecated in 0.12. Doc was: " +
+                              "doc_id: %s rev: %s" % (self.doc_id, self.rev),
+                              Warning)
                 unpacked_data = LEGACY_PACMAN.unpack(preamble)
                 magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
             elif len(preamble) == PACMAN.size:

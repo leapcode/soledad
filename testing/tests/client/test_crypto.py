@@ -292,6 +292,9 @@ class PreambleTestCase(unittest.TestCase):
             self.doc_info, BytesIO(ciphertext),
             secret='A' * 96).decrypt()
         assert cleartext == self.cleartext.getvalue()
+        warnings = self.flushWarnings()
+        assert len(warnings) == 1
+        assert 'legacy document without size' in warnings[0]['message']
 
 
 def _aes_encrypt(key, iv, data, aead=''):
