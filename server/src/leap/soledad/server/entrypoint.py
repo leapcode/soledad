@@ -22,10 +22,12 @@ or the systemd script.
 """
 
 from twisted.internet import reactor
+from twisted.python import threadpool
 
+from .auth import portalFactory
+from .session import SoledadSession
 from ._config import get_config
 from ._wsgi import init_couch_state
-from .session import SoledadSession
 
 
 # load configuration from file
@@ -35,7 +37,11 @@ conf = get_config()
 class SoledadEntrypoint(SoledadSession):
 
     def __init__(self):
-        SoledadSession.__init__(self)
+        pool = threadpool.ThreadPool(name='wsgi')
+        reactor.callWhenRunning(pool.start)
+        reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
+        portal = portalFactory(pool)
+        SoledadSession.__init__(self, portal)
 
 
 # see the comments in application.py recarding why couch state has to be

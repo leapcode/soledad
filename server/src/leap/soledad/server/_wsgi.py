@@ -18,7 +18,6 @@
 A WSGI application that serves Soledad synchronization.
 """
 from twisted.internet import reactor
-from twisted.python import threadpool
 from twisted.web.wsgi import WSGIResource
 
 from leap.soledad.server import SoledadApp
@@ -62,10 +61,5 @@ def init_couch_state(conf):
         reactor.stop()
 
 
-def get_sync_resource(pool=None):
-    if not pool:
-	log.warn("NO POOL PASSED, CREATING----------")
-        pool = threadpool.ThreadPool()
-        reactor.callWhenRunning(pool.start)
-        reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
+def get_sync_resource(pool):
     return WSGIResource(reactor, pool, wsgi_application)

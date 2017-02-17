@@ -48,8 +48,9 @@ log = Logger()
 @implementer(IRealm)
 class SoledadRealm(object):
 
-    def __init__(self, conf=None, sync_pool=None):
-        if not conf:
+    def __init__(self, sync_pool, conf=None):
+        assert sync_pool is not None
+        if conf is None:
             conf = get_config()
         blobs = conf['blobs']
         self.anon_resource = SoledadAnonResource(
@@ -160,7 +161,7 @@ class TokenCredentialFactory(object):
             raise error.LoginFailed('Invalid credentials')
 
 
-def portalFactory(sync_pool=None):
+def portalFactory(sync_pool):
     realm = SoledadRealm(sync_pool=sync_pool)
     checker = TokenChecker()
     return Portal(realm, [checker])
