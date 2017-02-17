@@ -51,30 +51,25 @@ class SoledadRealm(object):
     def __init__(self, conf=None, sync_pool=None):
         if not conf:
             conf = get_config()
-        self._conf = conf
-        self._sync_pool = sync_pool
+        blobs = conf['blobs']
+        self.anon_resource = SoledadAnonResource(
+            enable_blobs=blobs)
+        self.auth_resource = SoledadResource(
+            enable_blobs=blobs,
+            sync_pool=sync_pool)
 
     def requestAvatar(self, avatarId, mind, *interfaces):
-        enable_blobs = self._conf['blobs']
 
         # Anonymous access
         if IAnonymous.providedBy(avatarId):
-            resource = SoledadAnonResource(
-                enable_blobs=enable_blobs)
-            return (IResource, resource, lambda: None)
+            return (IResource, self.anon_resource,
+                    lambda: None)
 
-        # Authenticated users
-
-        # TODO review this: #8770 ----------------
-        # we're creating a Resource tree
-        # for each request, for every user.
-        # What are the perf implications of this??
-
-        if IResource in interfaces:
-            resource = SoledadResource(
-                enable_blobs=enable_blobs,
-                sync_pool=self._sync_pool)
-            return (IResource, resource, lambda: None)
+        # Authenticated access
+        else:
+            if IResource in interfaces:
+                return (IResource, self.auth_resource,
+                        lambda: None)
         raise NotImplementedError()
 
 
@@ -165,7 +160,7 @@ class TokenCredentialFactory(object):
             raise error.LoginFailed('Invalid credentials')
 
 
-def get_portal(sync_pool=None):
+def portalFactory(sync_pool=None):
     realm = SoledadRealm(sync_pool=sync_pool)
     checker = TokenChecker()
     return Portal(realm, [checker])
