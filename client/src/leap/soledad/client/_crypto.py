@@ -356,6 +356,7 @@ class BlobDecryptor(object):
         self.fd = ciphertext_fd
         self.armor = armor
         self._producer = None
+        self.size = None
 
         preamble, iv = self._consume_preamble()
         assert preamble
@@ -395,6 +396,7 @@ class BlobDecryptor(object):
             elif len(preamble) == PACMAN.size:
                 unpacked_data = PACMAN.unpack(preamble)
                 magic, sch, meth, ts, iv, doc_id, rev, doc_size = unpacked_data
+                self.size = doc_size
             else:
                 raise InvalidBlob("Unexpected preamble size %d", len(preamble))
         except struct.error as e:
