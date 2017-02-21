@@ -29,6 +29,7 @@ CONFIG_DEFAULTS = {
         'admin_netrc': '/etc/couchdb/couchdb-admin.netrc',
         'batching': True,
         'blobs': False,
+        'blobs_path': '/srv/leap/soledad/blobs',
     },
     'database-security': {
         'members': ['soledad'],

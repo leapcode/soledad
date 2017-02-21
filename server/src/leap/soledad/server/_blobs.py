@@ -19,13 +19,23 @@ Blobs Server implementation.
 """
 from twisted.web import resource
 
+from ._config import get_config
+
 
 __all__ = ['blobs_resource']
+
+
+_config = get_config()
+DEFAULT_BLOBS_PATH = _config['blobs_path']
 
 
 class BlobsResource(resource.Resource):
 
     isLeaf = True
+
+    def __init__(self, blobs_path=DEFAULT_BLOBS_PATH):
+        resource.Resource.__init__(self)
+        self._blobs_path = blobs_path
 
     def render_GET(self, request):
         return 'blobs is not implemented yet!'
