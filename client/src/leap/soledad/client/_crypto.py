@@ -541,3 +541,14 @@ def _mode_by_method(method):
         return modes.GCM
     else:
         return modes.CTR
+
+
+def _ceiling(size):
+    """
+    Some simplistic ceiling scheme that uses powers of 2.
+    We report everything below 4096 bytes as that minimum threshold.
+    """
+    for i in xrange(12, 31):
+        step = 2**i
+        if size < step:
+            return step
