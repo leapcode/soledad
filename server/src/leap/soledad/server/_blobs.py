@@ -143,6 +143,7 @@ class BlobsResource(resource.Resource):
     # under request.
 
     def render_GET(self, request):
+        print "GETTING", request.path
         user, blob_id = self._split_path(request.path)
         return self._handler.read_blob(user, blob_id, request)
 

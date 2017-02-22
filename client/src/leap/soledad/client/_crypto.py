@@ -206,6 +206,8 @@ def decrypt_sym(data, key, iv, method=ENC_METHOD.aes_256_gcm):
     return plaintext
 
 
+# TODO maybe rename this to Encryptor, since it will be used by blobs an non
+# blobs in soledad.
 class BlobEncryptor(object):
     """
     Produces encrypted data from the cleartext data associated with a given
@@ -218,7 +220,15 @@ class BlobEncryptor(object):
     Both the production input and output are file descriptors, so they can be
     applied to a stream of data.
     """
-    def __init__(self, doc_info, content_fd, secret=None, armor=True):
+    # TODO
+    # This class needs further work to allow for proper streaming.
+    # RIght now we HAVE TO WAIT until the end of the stream before encoding the
+    # result. It should be possible to do that just encoding the chunks and
+    # passing them to a sink, but for that we have to encode the chunks at
+    # proper alignment (3 byes?) with b64 if armor is defined.
+
+    def __init__(self, doc_info, content_fd, secret=None, armor=True,
+                 sink=None):
         if not secret:
             raise EncryptionDecryptionError('no secret given')
 
@@ -227,14 +237,18 @@ class BlobEncryptor(object):
         self.armor = armor
 
         self._content_fd = content_fd
-        content_fd.seek(0, os.SEEK_END)
-        self._content_size = _ceiling(content_fd.tell())
-        content_fd.seek(0)
+        self._content_size = self._get_size(content_fd)
         self._producer = FileBodyProducer(content_fd, readSize=2**16)
 
         self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
-        self._aes = AESWriter(self.sym_key)
+        self._aes = AESWriter(self.sym_key, _buffer=sink)
         self._aes.authenticate(self._encode_preamble())
+
+    def _get_size(self, fd):
+        fd.seek(0, os.SEEK_END)
+        size = _ceiling(fd.tell())
+        fd.seek(0)
+        return size
 
     @property
     def iv(self):
@@ -242,7 +256,6 @@ class BlobEncryptor(object):
 
     @property
     def tag(self):
-        print "TAG?", binascii.b2a_hex(self._aes.tag)
         return self._aes.tag
 
     def encrypt(self):
@@ -250,11 +263,12 @@ class BlobEncryptor(object):
         Starts producing encrypted data from the cleartext data.
 
         :return: A deferred which will be fired when encryption ends and whose
-            callback will be invoked with the resulting ciphertext.
+                 callback will be invoked with the resulting ciphertext.
         :rtype: twisted.internet.defer.Deferred
         """
+        # XXX pass a sink to aes?
         d = self._producer.startProducing(self._aes)
-        d.addCallback(lambda _: self._end_crypto_stream())
+        d.addCallback(lambda _: self._end_crypto_stream_and_encode_result())
         return d
 
     def _encode_preamble(self):
@@ -271,12 +285,13 @@ class BlobEncryptor(object):
             self._content_size)
         return preamble
 
-    def _end_crypto_stream(self):
+    def _end_crypto_stream_and_encode_result(self):
 
         # TODO ---- this needs to be refactored to allow PROPER streaming
         # We should write the preamble as soon as possible,
         # Is it possible to write the AES stream as soon as it is encrypted by
         # chunks?
+        # FIXME also, it needs to be able to encode chunks with base64 if armor
 
         preamble, encrypted = self._aes.end()
         result = BytesIO()
@@ -337,6 +352,8 @@ class CryptoStreamBodyProducer(FileBodyProducer):
             yield None
 
 
+# TODO maybe rename this to just Decryptor, since it will be used by blobs an non
+# blobs in soledad.
 class BlobDecryptor(object):
     """
     Decrypts an encrypted blob associated with a given Document.
@@ -416,7 +433,7 @@ class BlobDecryptor(object):
         if rev != self.rev:
             raise InvalidBlob('invalid revision')
         if doc_id != self.doc_id:
-            raise InvalidBlob('invalid revision')
+            raise InvalidBlob('invalid doc id')
 
         self.fd.seek(0)
         tail = ''.join(parts[1:])
@@ -518,7 +535,8 @@ def is_symmetrically_encrypted(content):
 
     :rtype: bool
     """
-    return content and content[:13] == '{"raw": "EzcB'
+    sym_signature = '{"raw": "EzcB'
+    return content and content.startswith(sym_signature)
 
 
 # utils
@@ -552,6 +570,6 @@ def _ceiling(size):
     See #8759 for research pending for less simplistic/aggresive strategies.
     """
     for i in xrange(12, 31):
-        step = 2**i
+        step = 2 ** i
         if size < step:
             return step
