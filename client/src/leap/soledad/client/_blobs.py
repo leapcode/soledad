@@ -44,6 +44,8 @@ Ideally, the decrypting flow goes like this:
 - Allocate a zeroblob in the sqlcipher sink
 - Mark the blob as unusable (ie, not verified)
 - Decrypt the payload incrementally, and write chunks to sqlcipher
+  ** Is it possible to use a small buffer for the aes writer w/o 
+  ** allocating all the memory in openssl?
 - Finalize the AES decryption
 - If preamble + payload verifies correctly, mark the blob as usable
 

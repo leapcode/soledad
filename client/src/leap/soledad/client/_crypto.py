@@ -210,9 +210,11 @@ class BlobEncryptor(object):
     """
     Produces encrypted data from the cleartext data associated with a given
     SoledadDocument using AES-256 cipher in GCM mode.
+
     The production happens using a Twisted's FileBodyProducer, which uses a
     Cooperator to schedule calls and can be paused/resumed. Each call takes at
     most 65536 bytes from the input.
+
     Both the production input and output are file descriptors, so they can be
     applied to a stream of data.
     """
@@ -226,7 +228,7 @@ class BlobEncryptor(object):
 
         self._content_fd = content_fd
         content_fd.seek(0, os.SEEK_END)
-        self._content_size = content_fd.tell()
+        self._content_size = _ceiling(content_fd.tell())
         content_fd.seek(0)
         self._producer = FileBodyProducer(content_fd, readSize=2**16)
 
@@ -547,6 +549,7 @@ def _ceiling(size):
     """
     Some simplistic ceiling scheme that uses powers of 2.
     We report everything below 4096 bytes as that minimum threshold.
+    See #8759 for research pending for less simplistic/aggresive strategies.
     """
     for i in xrange(12, 31):
         step = 2**i
