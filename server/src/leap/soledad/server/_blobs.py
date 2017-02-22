@@ -24,7 +24,7 @@ Clients should be able to opt-in util the feature is complete.
 A more performant BlobsBackend can (and should) be implemented for production
 environments.
 """
-
+import commands
 import os
 
 from twisted.web import static
@@ -42,7 +42,6 @@ __all__ = ['BlobsResource', 'blobs_resource']
 # TODO some error handling needed
 # [ ] make path configurable
 # [ ] sanitize path
-# [ ] implement basic quota (and raise a QuotaExceeded if limit reached!)
 
 # for the future:
 # [ ] isolate user avatar in a safer way
@@ -90,19 +89,28 @@ class IBlobsBackend(Interface):
 class FilesystemBlobsBackend(object):
 
     path = '/tmp/blobs/'
+    quota = 200 * 1024  # in KB
 
     def read_blob(self, user, blob_id, request):
         print "USER", user
         print "BLOB_ID", blob_id
-        path = self.get_path(user, blob_id)
+        path = self._get_path(user, blob_id)
         print "READ FROM", path
         _file = static.File(path, defaultType='application/octet-stream')
         return _file.render_GET(request)
 
     def write_blob(self, user, blob_id, request):
-        path = self.get_path(user, blob_id)
+        path = self._get_path(user, blob_id)
         if os.path.isfile(path):
+            # XXX return some 5xx code
             raise BlobAlreadyExists()
+        used = self.get_total_storage(user)
+        if used > self.quota:
+            print "Error 507: Quota exceeded for user:", user
+            request.setResponseCode(507)
+            request.write('Quota Exceeded!')
+            request.finish()
+            return NOT_DONE_YET
         try:
             os.makedirs(os.path.split(path)[0])
         except:
@@ -113,7 +121,22 @@ class FilesystemBlobsBackend(object):
         d.addCallback(lambda _: request.finish())
         return NOT_DONE_YET
 
-    def get_path(self, user, blob_id):
+    def get_total_storage(self, user):
+        return self._get_disk_usage(os.path.join(self.path, user))
+
+    def delete_blob(user, blob_id):
+        raise NotImplementedError
+
+    def get_blob_size(user, blob_id):
+        raise NotImplementedError
+
+    def _get_disk_usage(self, start_path):
+        assert os.path.isdir(start_path)
+        cmd = 'du -c %s | tail -n 1' % start_path
+        size = commands.getoutput(cmd).split()[0]
+        return int(size)
+
+    def _get_path(self, user, blob_id):
         parts = [user]
         parts += [blob_id[0], blob_id[0:3], blob_id[0:6]]
         parts += [blob_id]
