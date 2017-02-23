@@ -27,15 +27,50 @@ from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
 logger = Logger()
 
 
-class _ConnectionPool(adbapi.ConnectionPool):
+class ConnectionPool(adbapi.ConnectionPool):
 
-    def blob(self, table, column, key, value):
-        conn = self.connectionFactory(self)
-        # XXX FIXME what are these values???
-        # shouldn't I pass the doc_id key?? Why is it asking for an integer???
-        blob = conn.blob(table, column, 1, 1)
-        print "GOT BLOB", blob
-        return blob
+    def insertAndGetLastRowid(self, *args, **kwargs):
+        """
+        Execute an SQL query and return the last rowid.
+
+        See: https://sqlite.org/c3ref/last_insert_rowid.html
+        """
+        return self.runInteraction(
+            self._insertAndGetLastRowid, *args, **kwargs)
+
+    def _insertAndGetLastRowid(self, trans, *args, **kw):
+        trans.execute(*args, **kw)
+        return trans.lastrowid
+
+    def blob(self, table, column, irow, flags):
+        """
+        Open a BLOB for incremental I/O.
+
+        Return a handle to the BLOB that would be selected by:
+
+          SELECT column FROM table WHERE rowid = irow;
+
+        See: https://sqlite.org/c3ref/blob_open.html
+
+        :param table: The table in which to lookup the blob.
+        :type table: str
+        :param column: The column where the BLOB is located.
+        :type column: str
+        :param rowid: The rowid of the BLOB.
+        :type rowid: int
+        :param flags: If zero, BLOB is opened for read-only. If non-zero,
+                      BLOB is opened for RW.
+        :type flags: int
+
+        :return: A BLOB handle.
+        :rtype: pysqlcipher.dbapi.Blob
+        """
+        return self.runInteraction(self._blob, table, column, irow, flags)
+
+    def _blob(self, trans, table, column, irow, flags):
+        # TODO: should not use transaction private variable here
+        handle = trans._connection.blob(table, column, irow, flags)
+        return handle
 
 
 class DecrypterBuffer(object):
@@ -160,15 +195,15 @@ class SQLiteBlobBackend(object):
         pragmafun = partial(pragmas.set_init_pragmas, opts=opts)
         openfun = _sqlcipherInitFactory(pragmafun)
 
-        self.dbpool = _ConnectionPool(
+        self.dbpool = ConnectionPool(
             backend, self.path, check_same_thread=False, timeout=5,
             cp_openfun=openfun, cp_min=1, cp_max=2, cp_name='blob_pool')
 
     @defer.inlineCallbacks
     def put(self, blob_id, blob_fd, size=None):
-        insert = str('INSERT INTO blobs VALUES (?, zeroblob(?))')
-        yield self.dbpool.runQuery(insert, (blob_id, size))
-        dbblob = self.dbpool.blob('blobs', 'payload', 'blob_id', blob_id)
+        insert = 'INSERT INTO blobs (blob_id, payload) VALUES (?, zeroblob(?))'
+        irow = yield self.dbpool.insertAndGetLastRowid(insert, (blob_id, size))
+        handle = yield self.dbpool.blob('blobs', 'payload', irow, 1)
         blob_fd.seek(0)
         # XXX I have to copy the buffer here so that I'm able to
         # return a non-closed file to the caller (blobmanager.get)
@@ -176,7 +211,7 @@ class SQLiteBlobBackend(object):
         # have a look at how treq does cope with closing the handle
         # for uploading a file
         producer = FileBodyProducer(copy(blob_fd))
-        done = yield producer.startProducing(dbblob)
+        done = yield producer.startProducing(handle)
         defer.returnValue(done)
 
     @defer.inlineCallbacks
