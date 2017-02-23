@@ -81,6 +81,8 @@ class Secrets(EmitMixin):
         self._secrets = secrets
 
         if encrypted['version'] < self.crypto.VERSION or force_storage:
+            # TODO: what should we do if it's the first run and remote save
+            #       fails?
             self.storage.save_local(encrypted)
             self.storage.save_remote(encrypted)
 

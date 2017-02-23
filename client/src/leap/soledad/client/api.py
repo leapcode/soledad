@@ -39,7 +39,7 @@ from itertools import chain
 from StringIO import StringIO
 from collections import defaultdict
 
-from twisted.internet.defer import DeferredLock, returnValue, inlineCallbacks
+from twisted.internet import defer
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
@@ -124,7 +124,7 @@ class Soledad(object):
     same database replica. The dictionary indexes are the paths to each local
     db, so we guarantee that only one sync happens for a local db at a time.
     """
-    _sync_lock = defaultdict(DeferredLock)
+    _sync_lock = defaultdict(defer.DeferredLock)
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
@@ -660,6 +660,11 @@ class Soledad(object):
                  generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
+        # bypass sync if there's no token set
+        if not self.token:
+            generation = self._dbsyncer.get_generation()
+            return defer.succeed(generation)
+
         d = self.sync_lock.run(
             self._sync)
         return d
@@ -788,7 +793,7 @@ class Soledad(object):
     # Service authentication
     #
 
-    @inlineCallbacks
+    @defer.inlineCallbacks
     def get_or_create_service_token(self, service):
         """
         Return the stored token for a given service, or generates and stores a
@@ -803,11 +808,11 @@ class Soledad(object):
         docs = yield self._get_token_for_service(service)
         if docs:
             doc = docs[0]
-            returnValue(doc.content['token'])
+            defer.returnValue(doc.content['token'])
         else:
             token = str(uuid.uuid4()).replace('-', '')[-24:]
             yield self._set_token_for_service(service, token)
-            returnValue(token)
+            defer.returnValue(token)
 
     def _get_token_for_service(self, service):
         return self.get_from_index('by-servicetoken', 'servicetoken', service)
