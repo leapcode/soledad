@@ -188,7 +188,7 @@ _path = _config['blobs_path']
 blobs_resource = BlobsResource(_path)
 if __name__ == '__main__':
     # A dummy blob server
-    # curl -X PUT --data-binary @/tmp/book.pdf localhost:9000/user/somerandomstring
+    # curl -X PUT --data-binary @/tmp/book.pdf localhost:9000/user/someid
     # curl -X GET -o /dev/null localhost:9000/user/somerandomstring
 
     from twisted.web.server import Site

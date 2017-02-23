@@ -19,7 +19,10 @@ Clientside BlobBackend Storage.
 """
 
 from copy import copy
+from urlparse import urljoin
+
 import os.path
+import uuid
 
 from io import BytesIO
 from functools import partial
@@ -143,7 +146,7 @@ class BlobManager(object):
         # concurrently. not sure if we'd gain something.
         yield self.local.put(doc.blob_id, fd)
         fd.seek(0)
-        yield self._encrypt_and_upload(doc.blob_id, fd, up)
+        yield self._encrypt_and_upload(doc.blob_id, doc.doc_id, doc.rev, fd)
 
     @defer.inlineCallbacks
     def get(self, blob_id, doc_id, rev):
@@ -152,7 +155,11 @@ class BlobManager(object):
             logger.info("Found blob in local database: %s" % blob_id)
             defer.returnValue(local_blob)
 
-        blob, size = yield self._download_and_decrypt(blob_id, doc_id, rev)
+        result = yield self._download_and_decrypt(blob_id, doc_id, rev)
+
+        if not result:
+            defer.returnValue(None)
+        blob, size = result
 
         if blob:
             logger.info("Got decrypted blob of type: %s" % type(blob))
@@ -169,7 +176,7 @@ class BlobManager(object):
             logger.error('sorry, dunno what happened')
 
     @defer.inlineCallbacks
-    def _encrypt_and_upload(self, blob_id, doc_id, rev, payload):
+    def _encrypt_and_upload(self, blob_id, doc_id, rev, fd):
         # TODO ------------------------------------------
         # this is wrong, is doing 2 stages.
         # the crypto producer can be passed to
@@ -177,12 +184,14 @@ class BlobManager(object):
         # try to rewrite as a tube: pass the fd to aes and let aes writer
         # produce data to the treq request fd.
         # ------------------------------------------------
+        logger.info("Staring upload of blob: %s" % blob_id)
         doc_info = DocInfo(doc_id, rev)
-        uri = self.remote + '/' + self.user + '/' + blob_id
-        crypter = BlobEncryptor(doc_info, payload, secret=self.secret,
+        uri = urljoin(self.remote, self.user + "/" + blob_id)
+        crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=True)
-        result = yield crypter.encrypt()
-        yield treq.put(uri, data=result)
+        fd = yield crypter.encrypt()
+        yield treq.put(uri, data=fd)
+        logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
     def _download_and_decrypt(self, blob_id, doc_id, rev):
@@ -262,21 +271,19 @@ def _sqlcipherInitFactory(fun):
     return _initialize
 
 
-# --------------------8<----------------------------------------------
-# class BlobDoc(object):
-#
-#     # TODO probably not needed, but convenient for testing for now.
-#
-#     def __init__(self, doc_id, rev, content, blob_id=None):
-#
-#         self.doc_id = doc_id
-#         self.rev = rev
-#         self.is_blob = True
-#         self.blob_fd = content
-#         if blob_id is None:
-#             blob_id = uuid4().get_hex()
-#         self.blob_id = blob_id
-# --------------------8<----------------------------------------------
+class BlobDoc(object):
+
+    # TODO probably not needed, but convenient for testing for now.
+
+    def __init__(self, doc_id, rev, content, blob_id=None):
+
+        self.doc_id = doc_id
+        self.rev = rev
+        self.is_blob = True
+        self.blob_fd = content
+        if blob_id is None:
+            blob_id = uuid.uuid4().get_hex()
+        self.blob_id = blob_id
 
 
 #
@@ -293,7 +300,7 @@ def testit(reactor):
     # parse command line arguments
     import argparse
 
-    usage = "\n  cd server/src/leap/soledad/server/ && python _blobs.py" \
+    usage = "\n  mkdir /tmp/blobs/user && cd server/src/leap/soledad/server/ && python _blobs.py" \
             "\n  python _blobs.py upload /path/to/file blob_id" \
             "\n  python _blobs.py download blob_id"
 
@@ -327,47 +334,49 @@ def testit(reactor):
 
     # TODO convert these into proper unittests
 
+    def _manager():
+        manager = BlobManager(
+            '/tmp/blobs', 'http://localhost:9000/',
+            'A' * 32, 'secret', 'user')
+        return manager
+
     @defer.inlineCallbacks
     def _upload(blob_id, payload):
-        logger.info(":: Starting upload only...")
-        doc_info = DocInfo('mydoc', '1')
-        logger.info(str(doc_info))
-        # use BlobEncryptor intead of BlobManager to only upload and not put
-        # blob on local db
-        crypter = BlobEncryptor(
-            doc_info, open(payload, 'r'), 'A' * 32, armor=True)
-        logger.info(":: Uploading with encryptor")
-        result = yield crypter.encrypt()
-        yield treq.put('http://localhost:9000/user/' + blob_id, data=result)
-        logger.info(":: Finished upload only.")
+        logger.info(":: Starting upload only: %s" % str((blob_id, payload)))
+        manager = _manager()
+        with open(payload, 'r') as fd:
+            yield manager._encrypt_and_upload(blob_id, 'mydoc', '1', fd)
+        logger.info(":: Finished upload only: %s" % str((blob_id, payload)))
 
     @defer.inlineCallbacks
     def _download(blob_id):
         logger.info(":: Starting download only: %s" % blob_id)
-        manager = BlobManager(
-            '/tmp/blobs', 'http://localhost:9000/',
-            'A' * 32, 'secret', 'user')
+        manager = _manager()
         result = yield manager._download_and_decrypt(blob_id, 'mydoc', '1')
         logger.info(":: Result of download: %s" % str(result))
-        if not result:
-            logger.info(":: Download failed for: %s" % blob_id)
-        else:
+        if result:
             fd, _ = result
             logger.info(":: Content of blob %s: %s" % (blob_id, fd.getvalue()))
         logger.info(":: Finished download only: %s" % blob_id)
 
+    @defer.inlineCallbacks
     def _put(blob_id, payload):
-        pass
+        logger.info(":: Starting full put: %s" % blob_id)
+        manager = _manager()
+        with open(payload) as fd:
+            doc = BlobDoc('mydoc', '1', fd, blob_id=blob_id)
+            result = yield manager.put(doc)
+        logger.info(":: Result of put: %s" % str(result))
+        logger.info(":: Finished full put: %s" % blob_id)
 
     @defer.inlineCallbacks
     def _get(blob_id):
-        logger.info(":: Starting full get...")
-        manager = BlobManager(
-            '/tmp/blobs', 'http://localhost:9000/',
-            'A' * 32, 'secret', 'user')
-        payload = yield manager.get(blob_id, 'mydoc', '1')
-        logger.info(":: Finished full get.")
-        defer.returnValue(payload)
+        logger.info(":: Starting full get: %s" % blob_id)
+        manager = _manager()
+        fd = yield manager.get(blob_id, 'mydoc', '1')
+        if fd:
+            logger.info(":: Result of get: " + fd.getvalue())
+        logger.info(":: Finished full get: %s" % blob_id)
 
     if args.action == 'upload':
         yield _upload(args.blob_id, args.payload)
@@ -376,8 +385,7 @@ def testit(reactor):
     elif args.action == 'put':
         yield _put(args.blob_id, args.payload)
     elif args.action == 'get':
-        result = yield _get(args.blob_id)
-        logger.info(":: Result of get: " + result.getvalue())
+        yield _get(args.blob_id)
 
 
 if __name__ == '__main__':
