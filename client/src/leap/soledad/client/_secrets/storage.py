@@ -25,13 +25,13 @@ from leap.soledad.common.log import getLogger
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client._secrets.util import emit
+from leap.soledad.client._secrets.util import emit, EmitMixin
 
 
 logger = getLogger(__name__)
 
 
-class SecretsStorage(object):
+class SecretsStorage(EmitMixin):
 
     def __init__(self, uuid, get_pass, url, local_path, creds, userid,
                  shared_db=None):
@@ -42,14 +42,6 @@ class SecretsStorage(object):
 
         self._shared_db = shared_db or self._init_shared_db(url, creds)
         self.__remote_doc = None
-
-    #
-    # properties
-    #
-
-    @property
-    def _user_data(self):
-        return {'uuid': self._uuid, 'userid': self._userid}
 
     #
     # local storage

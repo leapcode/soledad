@@ -23,6 +23,13 @@ class SecretsError(Exception):
     pass
 
 
+class EmitMixin(object):
+
+    @property
+    def _user_data(self):
+        return {'uuid': self._uuid, 'userid': self._userid}
+
+
 def emit(verb):
     def _decorator(method):
         def _decorated(self, *args, **kwargs):

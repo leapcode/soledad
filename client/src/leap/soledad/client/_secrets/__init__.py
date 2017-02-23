@@ -24,7 +24,7 @@ from leap.soledad.common.log import getLogger
 
 from leap.soledad.client._secrets.storage import SecretsStorage
 from leap.soledad.client._secrets.crypto import SecretsCrypto
-from leap.soledad.client._secrets.util import emit
+from leap.soledad.client._secrets.util import emit, EmitMixin
 
 
 logger = getLogger(__name__)
@@ -33,7 +33,7 @@ logger = getLogger(__name__)
 SecretLength = namedtuple('SecretLength', 'name length')
 
 
-class Secrets(object):
+class Secrets(EmitMixin):
 
     # remote secret is used
 
@@ -45,9 +45,10 @@ class Secrets(object):
 
     def __init__(self, uuid, passphrase, url, local_path, creds, userid,
                  shared_db=None):
+        self._uuid = uuid
         self._passphrase = passphrase
+        self._userid = userid
         self._secrets = {}
-        self._user_data = {'uuid': uuid, 'userid': userid}
         self.crypto = SecretsCrypto(self.get_passphrase)
         self.storage = SecretsStorage(
             uuid, self.get_passphrase, url, local_path, creds, userid,
