@@ -191,6 +191,12 @@ class BlobManager(object):
         uri = self.remote + self.user + '/' + blob_id
         buf = DecrypterBuffer(doc_id, rev, self.secret)
         data = yield treq.get(uri)
+
+        if data.code == 404:
+            logger.warn("Blob not found in server: %s" % blob_id)
+            defer.returnValue(None)
+
+        # incrementally collect the body of the response
         yield treq.collect(data, buf.write)
         fd, size = yield buf.close()
         logger.info("Finished download: (%s, %d)" % (blob_id, size))
@@ -337,13 +343,18 @@ def testit(reactor):
 
     @defer.inlineCallbacks
     def _download(blob_id):
-        logger.info(":: Starting download only...")
+        logger.info(":: Starting download only: %s" % blob_id)
         manager = BlobManager(
             '/tmp/blobs', 'http://localhost:9000/',
             'A' * 32, 'secret', 'user')
-        payload = yield manager._download_and_decrypt(blob_id, 'mydoc', '1')
-        defer.returnValue(payload)
-        logger.info(":: Finished download only.")
+        result = yield manager._download_and_decrypt(blob_id, 'mydoc', '1')
+        logger.info(":: Result of download: %s" % str(result))
+        if not result:
+            logger.info(":: Download failed for: %s" % blob_id)
+        else:
+            fd, _ = result
+            logger.info(":: Content of blob %s: %s" % (blob_id, fd.getvalue()))
+        logger.info(":: Finished download only: %s" % blob_id)
 
     def _put(blob_id, payload):
         pass
@@ -361,8 +372,7 @@ def testit(reactor):
     if args.action == 'upload':
         yield _upload(args.blob_id, args.payload)
     elif args.action == 'download':
-        fd, _ = yield _download(args.blob_id)
-        logger.info(":: Result of download: " + fd.getvalue())
+        yield _download(args.blob_id)
     elif args.action == 'put':
         yield _put(args.blob_id, args.payload)
     elif args.action == 'get':
