@@ -33,15 +33,20 @@ logger = getLogger(__name__)
 
 class SecretsStorage(EmitMixin):
 
-    def __init__(self, uuid, get_pass, url, local_path, creds, userid,
+    def __init__(self, uuid, get_pass, url, local_path, get_token, userid,
                  shared_db=None):
         self._uuid = uuid
         self._get_pass = get_pass
         self._local_path = local_path
+        self._get_token = get_token
         self._userid = userid
 
-        self._shared_db = shared_db or self._init_shared_db(url, creds)
+        self._shared_db = shared_db or self._init_shared_db(url, self._creds)
         self.__remote_doc = None
+
+    @property
+    def _creds(self):
+        return {'token': {'uuid': self._uuid, 'token': self._get_token()}}
 
     #
     # local storage

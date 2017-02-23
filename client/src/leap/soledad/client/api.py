@@ -249,10 +249,9 @@ class Soledad(object):
         """
         Initialize Soledad secrets.
         """
-        creds = {'token': {'uuid': self.uuid, 'token': self.token}}
         self._secrets = Secrets(
             self._uuid, self._passphrase, self._server_url, self._secrets_path,
-            creds, self.userid, shared_db=shared_db)
+            self.get_token, self.userid, shared_db=shared_db)
 
     def _init_u1db_sqlcipher_backend(self):
         """

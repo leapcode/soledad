@@ -43,7 +43,7 @@ class Secrets(EmitMixin):
         'local_secret': 448,   # local_secret to derive a local_key for storage
     }
 
-    def __init__(self, uuid, passphrase, url, local_path, creds, userid,
+    def __init__(self, uuid, passphrase, url, local_path, get_token, userid,
                  shared_db=None):
         self._uuid = uuid
         self._passphrase = passphrase
@@ -51,7 +51,7 @@ class Secrets(EmitMixin):
         self._secrets = {}
         self.crypto = SecretsCrypto(self.get_passphrase)
         self.storage = SecretsStorage(
-            uuid, self.get_passphrase, url, local_path, creds, userid,
+            uuid, self.get_passphrase, url, local_path, get_token, userid,
             shared_db=shared_db)
         self._bootstrap()
 
