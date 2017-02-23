@@ -3,17 +3,15 @@ Clientside BlobBackend Storage.
 """
 
 from copy import copy
-from uuid import uuid4
 import os.path
 
 from io import BytesIO
 from functools import partial
 
-from sqlite3 import Binary
 
 from twisted.logger import Logger
 from twisted.enterprise import adbapi
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.web.client import FileBodyProducer
 
 import treq
@@ -129,7 +127,7 @@ class BlobManager(object):
         # concurrently. not sure if we'd gain something.
         yield self.local.put(doc.blob_id, fd)
         fd.seek(0)
-        yield self._encrypt_and_upload(doc.blob_id,  fd, up)
+        yield self._encrypt_and_upload(doc.blob_id, fd, up)
 
     @defer.inlineCallbacks
     def get(self, blob_id, doc_id, rev):
@@ -160,7 +158,7 @@ class BlobManager(object):
     def _encrypt_and_upload(self, blob_id, doc_id, rev, payload):
         # TODO ------------------------------------------
         # this is wrong, is doing 2 stages.
-        # the crypto producer can be passed to 
+        # the crypto producer can be passed to
         # the uploader and react as data is written.
         # try to rewrite as a tube: pass the fd to aes and let aes writer
         # produce data to the treq request fd.
@@ -239,21 +237,23 @@ def _sqlcipherInitFactory(fun):
         _init_blob_table(conn)
     return _initialize
 
+
 # --------------------8<----------------------------------------------
-#class BlobDoc(object):
+# class BlobDoc(object):
 #
-    # TODO probably not needed, but convenient for testing for now.
+#     # TODO probably not needed, but convenient for testing for now.
 #
-    #def __init__(self, doc_id, rev, content, blob_id=None):
+#     def __init__(self, doc_id, rev, content, blob_id=None):
 #
-        #self.doc_id = doc_id
-        #self.rev = rev
-        #self.is_blob = True
-        #self.blob_fd = content
-        #if blob_id is None:
-            #blob_id = uuid4().get_hex()
-        #self.blob_id = blob_id
+#         self.doc_id = doc_id
+#         self.rev = rev
+#         self.is_blob = True
+#         self.blob_fd = content
+#         if blob_id is None:
+#             blob_id = uuid4().get_hex()
+#         self.blob_id = blob_id
 # --------------------8<----------------------------------------------
+
 
 @defer.inlineCallbacks
 def testit(reactor):
