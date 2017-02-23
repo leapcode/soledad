@@ -180,7 +180,6 @@ class MockedSharedDBTest(object):
             put_doc = Mock(side_effect=put_doc_side_effect)
             open = Mock(return_value=None)
             close = Mock(return_value=None)
-            syncable = True
 
             def __call__(self):
                 return self

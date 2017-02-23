@@ -55,10 +55,6 @@ class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
 
-    # If syncable is False, the database will not attempt to sync against
-    # a remote replica. Default is True.
-    syncable = True
-
     #
     # Token auth methods.
     #
@@ -95,7 +91,7 @@ class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
     #
 
     @staticmethod
-    def open_database(url, uuid, creds=None, syncable=True):
+    def open_database(url, uuid, creds=None):
         """
         Open a Soledad shared database.
 
@@ -106,20 +102,11 @@ class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
         :param creds: A tuple containing the authentication method and
             credentials.
         :type creds: tuple
-        :param syncable:
-            If syncable is False, the database will not attempt to sync against
-            a remote replica.
-        :type syncable: bool
 
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
-        # XXX fix below, doesn't work with tests.
-        # if syncable and not url.startswith('https://'):
-        #    raise ImproperlyConfiguredError(
-        #        "Remote soledad server must be an https URI")
         db = SoledadSharedDatabase(url, uuid, creds=creds)
-        db.syncable = syncable
         return db
 
     @staticmethod
