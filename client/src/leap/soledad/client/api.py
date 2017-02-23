@@ -128,7 +128,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None):
+                 auth_token=None, offline=False):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -165,10 +165,11 @@ class Soledad(object):
             Authorization token for accessing remote databases.
         :type auth_token: str
 
-        :param syncable:
-            If set to ``False``, this database will not attempt to synchronize
-            with remote replicas (default is ``True``)
-        :type syncable: bool
+        :param offline:
+            If set to ``True``, this database will not attempt to save/load
+            secrets to/from server or synchronize with remote replicas (default
+            is ``False``)
+        :type offline: bool
 
         :raise BootstrapSequenceError:
             Raised when the secret initialization sequence (i.e. retrieval
@@ -182,6 +183,7 @@ class Soledad(object):
         self._server_url = server_url
         self._secrets_path = None
         self._dbsyncer = None
+        self._offline = offline
 
         # configure SSL certificate
         global SOLEDAD_CERT
@@ -211,6 +213,14 @@ class Soledad(object):
             if hasattr(self, '_dbpool'):
                 self._dbpool.close()
             raise
+
+    def _get_offline(self):
+        return self._offline
+
+    def _set_offline(self, offline):
+        self._offline = offline
+
+    offline = property(_get_offline, _set_offline)
 
     #
     # initialization/destruction methods
@@ -660,8 +670,8 @@ class Soledad(object):
                  generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
-        # bypass sync if there's no token set
-        if not self.token:
+        # maybe bypass sync
+        if self.offline or not self.token:
             generation = self._dbsyncer.get_generation()
             return defer.succeed(generation)
 
