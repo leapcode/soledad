@@ -149,15 +149,13 @@ class BlobManager(object):
     def get(self, blob_id, doc_id, rev):
         local_blob = yield self.local.get(blob_id)
         if local_blob:
-            print "GOT LOCAL BLOB", local_blob
+            logger.info("Found blob in local database: %s" % blob_id)
             defer.returnValue(local_blob)
 
         blob, size = yield self._download_and_decrypt(blob_id, doc_id, rev)
-        print "DOWNLOADED BLOB, SIZE:", size
 
         if blob:
-            print 'GOT DECRYPTED BLOB', type(blob)
-            print 'SAVING BLOB IN LOCAL STORE'
+            logger.info("Got decrypted blob of type: %s" % type(blob))
             blob.seek(0)
             yield self.local.put(blob_id, blob, size=size)
             blob.seek(0)
@@ -188,13 +186,15 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def _download_and_decrypt(self, blob_id, doc_id, rev):
+        logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
         uri = self.remote + self.user + '/' + blob_id
         buf = DecrypterBuffer(doc_id, rev, self.secret)
         data = yield treq.get(uri)
         yield treq.collect(data, buf.write)
-        blob = yield buf.close()
-        defer.returnValue(blob)
+        fd, size = yield buf.close()
+        logger.info("Finished download: (%s, %d)" % (blob_id, size))
+        defer.returnValue((fd, size))
 
 
 class SQLiteBlobBackend(object):
@@ -215,6 +215,7 @@ class SQLiteBlobBackend(object):
 
     @defer.inlineCallbacks
     def put(self, blob_id, blob_fd, size=None):
+        logger.info("Saving blob in local database...")
         insert = 'INSERT INTO blobs (blob_id, payload) VALUES (?, zeroblob(?))'
         irow = yield self.dbpool.insertAndGetLastRowid(insert, (blob_id, size))
         handle = yield self.dbpool.blob('blobs', 'payload', irow, 1)
@@ -226,6 +227,7 @@ class SQLiteBlobBackend(object):
         # for uploading a file
         producer = FileBodyProducer(copy(blob_fd))
         done = yield producer.startProducing(handle)
+        logger.info("Finished saving blob in local database.")
         defer.returnValue(done)
 
     @defer.inlineCallbacks
@@ -271,45 +273,101 @@ def _sqlcipherInitFactory(fun):
 # --------------------8<----------------------------------------------
 
 
+#
+# testing facilities
+#
+
 @defer.inlineCallbacks
 def testit(reactor):
-
-    # TODO convert this into proper unittests
-
+    # configure logging to stdout
+    from twisted.python import log
     import sys
-    try:
-        cmd = sys.argv[1]
-    except:
-        cmd = ''
+    log.startLogging(sys.stdout)
 
-    if cmd == 'upload':
-        src = sys.argv[2]
-        blob_id = sys.argv[3]
+    # parse command line arguments
+    import argparse
 
+    usage = "\n  cd server/src/leap/soledad/server/ && python _blobs.py" \
+            "\n  python _blobs.py upload /path/to/file blob_id" \
+            "\n  python _blobs.py download blob_id"
+
+    parser = argparse.ArgumentParser(usage=usage)
+    subparsers = parser.add_subparsers(help='sub-command help', dest='action')
+
+    # parse upload command
+    parser_upload = subparsers.add_parser(
+        'upload', help='upload blob and bypass local db')
+    parser_upload.add_argument('payload')
+    parser_upload.add_argument('blob_id')
+
+    # parse download command
+    parser_download = subparsers.add_parser(
+        'download', help='download blob and bypass local db')
+    parser_download.add_argument('blob_id')
+
+    # parse put command
+    parser_put = subparsers.add_parser(
+        'put', help='put blob in local db and upload')
+    parser_put.add_argument('payload')
+    parser_put.add_argument('blob_id')
+
+    # parse get command
+    parser_get = subparsers.add_parser(
+        'get', help='get blob from local db, get if needed')
+    parser_get.add_argument('blob_id')
+
+    # parse arguments
+    args = parser.parse_args()
+
+    # TODO convert these into proper unittests
+
+    @defer.inlineCallbacks
+    def _upload(blob_id, payload):
+        logger.info(":: Starting upload only...")
         doc_info = DocInfo('mydoc', '1')
-        print "DOC INFO", doc_info
-
-        # I don't use BlobManager here because I need to avoid
-        # putting the blob on local db on upload
+        logger.info(str(doc_info))
+        # use BlobEncryptor intead of BlobManager to only upload and not put
+        # blob on local db
         crypter = BlobEncryptor(
-            doc_info, open(src, 'r'), 'A' * 32, armor=True)
-        print "UPLOADING WITH ENCRYPTOR"
+            doc_info, open(payload, 'r'), 'A' * 32, armor=True)
+        logger.info(":: Uploading with encryptor")
         result = yield crypter.encrypt()
         yield treq.put('http://localhost:9000/user/' + blob_id, data=result)
+        logger.info(":: Finished upload only.")
 
-    elif cmd == 'download':
-        blob_id = sys.argv[2]
+    @defer.inlineCallbacks
+    def _download(blob_id):
+        logger.info(":: Starting download only...")
         manager = BlobManager(
             '/tmp/blobs', 'http://localhost:9000/',
             'A' * 32, 'secret', 'user')
-        result = yield manager.get(blob_id, 'mydoc', '1')
-        print result.getvalue()
+        payload = yield manager._download_and_decrypt(blob_id, 'mydoc', '1')
+        defer.returnValue(payload)
+        logger.info(":: Finished download only.")
 
-    else:
-        print "Usage:"
-        print "cd server/src/leap/soledad/server/ && python _blobs.py"
-        print "python _blobs.py upload /path/to/file blob_id"
-        print "python _blobs.py download blob_id"
+    def _put(blob_id, payload):
+        pass
+
+    @defer.inlineCallbacks
+    def _get(blob_id):
+        logger.info(":: Starting full get...")
+        manager = BlobManager(
+            '/tmp/blobs', 'http://localhost:9000/',
+            'A' * 32, 'secret', 'user')
+        payload = yield manager.get(blob_id, 'mydoc', '1')
+        logger.info(":: Finished full get.")
+        defer.returnValue(payload)
+
+    if args.action == 'upload':
+        yield _upload(args.blob_id, args.payload)
+    elif args.action == 'download':
+        fd, _ = yield _download(args.blob_id)
+        logger.info(":: Result of download: " + fd.getvalue())
+    elif args.action == 'put':
+        yield _put(args.blob_id, args.payload)
+    elif args.action == 'get':
+        result = yield _get(args.blob_id)
+        logger.info(":: Result of get: " + result.getvalue())
 
 
 if __name__ == '__main__':
