@@ -187,7 +187,7 @@ class Soledad(object):
         global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
 
-        self._set_token(auth_token)
+        self.set_token(auth_token)
 
         self._init_config_with_defaults()
         self._init_working_dirs()
@@ -249,9 +249,10 @@ class Soledad(object):
         """
         Initialize Soledad secrets.
         """
+        creds = {'token': {'uuid': self.uuid, 'token': self.token}}
         self._secrets = Secrets(
             self._uuid, self._passphrase, self._server_url, self._secrets_path,
-            self._creds, self.userid, shared_db=shared_db)
+            creds, self.userid, shared_db=shared_db)
 
     def _init_u1db_sqlcipher_backend(self):
         """
@@ -675,9 +676,8 @@ class Soledad(object):
         sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
         if not self._dbsyncer:
             return
-        d = self._dbsyncer.sync(
-            sync_url,
-            creds=self._creds)
+        creds = {'token': {'uuid': self.uuid, 'token': self.token}}
+        d = self._dbsyncer.sync(sync_url, creds=creds)
 
         def _sync_callback(local_gen):
             self._last_received_docs = docs = self._dbsyncer.received_docs
@@ -734,37 +734,13 @@ class Soledad(object):
         """
         return self.sync_lock.locked
 
-    def _set_token(self, token):
-        """
-        Set the authentication token for remote database access.
+    def set_token(self, token):
+        self._token = token
 
-        Internally, this builds the credentials dictionary with the following
-        format:
+    def get_token(self):
+        return self._token
 
-            {
-                'token': {
-                    'uuid': '<uuid>'
-                    'token': '<token>'
-                }
-            }
-
-        :param token: The authentication token.
-        :type token: str
-        """
-        self._creds = {
-            'token': {
-                'uuid': self.uuid,
-                'token': token,
-            }
-        }
-
-    def _get_token(self):
-        """
-        Return current token from credentials dictionary.
-        """
-        return self._creds['token']['token']
-
-    token = property(_get_token, _set_token, doc='The authentication Token.')
+    token = property(get_token, set_token, doc='The authentication Token.')
 
     #
     # ISecretsStorage
