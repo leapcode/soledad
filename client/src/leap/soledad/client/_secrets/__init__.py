@@ -18,8 +18,6 @@
 import os
 import scrypt
 
-from collections import namedtuple
-
 from leap.soledad.common.log import getLogger
 
 from leap.soledad.client._secrets.storage import SecretsStorage
@@ -30,12 +28,7 @@ from leap.soledad.client._secrets.util import emit, UserDataMixin
 logger = getLogger(__name__)
 
 
-SecretLength = namedtuple('SecretLength', 'name length')
-
-
 class Secrets(UserDataMixin):
-
-    # remote secret is used
 
     lengths = {
         'remote_secret': 512,  # remote_secret is used to encrypt remote data.
