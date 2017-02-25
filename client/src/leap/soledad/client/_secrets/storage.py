@@ -25,13 +25,13 @@ from leap.soledad.common.log import getLogger
 
 from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.shared_db import SoledadSharedDatabase
-from leap.soledad.client._secrets.util import emit, EmitMixin
+from leap.soledad.client._secrets.util import emit, UserDataMixin
 
 
 logger = getLogger(__name__)
 
 
-class SecretsStorage(EmitMixin):
+class SecretsStorage(UserDataMixin):
 
     def __init__(self, soledad):
         self._soledad = soledad

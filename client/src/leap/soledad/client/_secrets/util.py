@@ -23,12 +23,20 @@ class SecretsError(Exception):
     pass
 
 
-class EmitMixin(object):
+class UserDataMixin(object):
+    """
+    When emitting an event, we have to pass a dictionary containing user data.
+    This class only defines a property so we don't have to define it in
+    multiple places.
+    """
 
     @property
     def _user_data(self):
         uuid = self._soledad.uuid
         userid = self._soledad.userid
+        # TODO: seems that uuid and userid hold the same value! We should check
+        # whether we should pass something different or if the events api
+        # really needs two different values.
         return {'uuid': uuid, 'userid': userid}
 
 
