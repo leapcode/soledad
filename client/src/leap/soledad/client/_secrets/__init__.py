@@ -48,29 +48,29 @@ class Secrets(UserDataMixin):
     #
 
     def _bootstrap(self):
+
         # attempt to load secrets from local storage
         encrypted = self.storage.load_local()
-
-        if not encrypted:
-            # we have not found a secret stored locally, so this is a first run
-            # of soledad for this user in this device. It is mandatory that we
-            # check if there's a secret stored in server.
-            encrypted = self.storage.load_remote()
-
         if encrypted:
-            # we found a secret either in local or in remote storage, so we
-            # have to decrypt it.
             self._secrets = self.crypto.decrypt(encrypted)
+            # maybe update the format of storage of local secret.
             if encrypted['version'] < self.crypto.VERSION:
-                # there is a format version for secret storage that is newer
-                # than the one we found (either in local or remote storage), so
-                # we re-encrypt and store with the newest version.
                 self.store_secrets()
-        else:
-            # we have *not* found a secret neither in local nor in remote
-            # storage, so we have to generate a new one, and store it.
-            self._secrets = self._generate()
+            return
+
+        # no secret was found in local storage, so this is a first run of
+        # soledad for this user in this device. It is mandatory that we check
+        # if there's a secret stored in server.
+        encrypted = self.storage.load_remote()
+        if encrypted:
+            self._secrets = self.crypto.decrypt(encrypted)
             self.store_secrets()
+            return
+
+        # we have *not* found a secret neither in local nor in remote storage,
+        # so we have to generate a new one, and then store it.
+        self._secrets = self._generate()
+        self.store_secrets()
 
     #
     # generation
