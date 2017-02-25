@@ -55,33 +55,29 @@ class Secrets(UserDataMixin):
     #
 
     def _bootstrap(self):
-        force_storage = False
-
         # attempt to load secrets from local storage
         encrypted = self.storage.load_local()
 
-        # if not found, attempt to load secrets from remote storage
         if not encrypted:
+            # we have not found a secret stored locally, so this is a first run
+            # of soledad for this user in this device. It is mandatory that we
+            # check if there's a secret stored in server.
             encrypted = self.storage.load_remote()
 
-        if not encrypted:
-            # if not found, generate new secrets
-            secrets = self._generate()
-            encrypted = self.crypto.encrypt(secrets)
-            force_storage = True
+        if encrypted:
+            # we found a secret either in local or in remote storage, so we
+            # have to decrypt it.
+            self._secrets = self.crypto.decrypt(encrypted)
+            if encrypted['version'] < self.crypto.VERSION:
+                # there is a format version for secret storage that is newer
+                # than the one we found (either in local or remote storage), so
+                # we re-encrypt and store with the newest version.
+                self.store_secrets()
         else:
-            # decrypt secrets found either in local or remote storage
-            secrets = self.crypto.decrypt(encrypted)
-
-        self._secrets = secrets
-
-        if encrypted['version'] < self.crypto.VERSION or force_storage:
-            # TODO: what should we do if it's the first run and remote save
-            #       fails?
-            # TODO: we have to actually update the encrypted version before
-            # saving, we are currently not doing it.
-            self.storage.save_local(encrypted)
-            self.storage.save_remote(encrypted)
+            # we have *not* found a secret neither in local nor in remote
+            # storage, so we have to generate a new one, and store it.
+            self._secrets = self._generate()
+            self.store_secrets()
 
     #
     # generation
@@ -101,15 +97,13 @@ class Secrets(UserDataMixin):
     # crypto
     #
 
-    def _encrypt(self):
-        # encrypt secrets
-        secrets = self._secrets
-        encrypted = self.crypto.encrypt(secrets)
-        # create the recovery document
-        data = {'secret': encrypted, 'version': 2}
-        return data
-
     def store_secrets(self):
+        # TODO: we have to improve the logic here, as we want to make sure that
+        # whatever is stored locally should only be used after remote storage
+        # is successful. Otherwise, this soledad could start encrypting with a
+        # secret while another soledad in another device could start encrypting
+        # with another secret, which would lead to decryption failures during
+        # sync.
         encrypted = self.crypto.encrypt(self._secrets)
         self.storage.save_local(encrypted)
         self.storage.save_remote(encrypted)
