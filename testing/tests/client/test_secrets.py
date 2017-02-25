@@ -121,12 +121,10 @@ class SecretsCryptoTestCase(unittest.TestCase):
     }
 
     def setUp(self):
-        def _get_pass():
-            return '123'
-        self._crypto = SecretsCrypto(_get_pass)
-
-    def test__get_pass(self):
-        self.assertEqual(self._crypto._get_pass(), '123')
+        class Soledad(object):
+            passphrase = '123'
+        soledad = Soledad()
+        self._crypto = SecretsCrypto(soledad)
 
     def test__get_key(self):
         salt = 'abc'

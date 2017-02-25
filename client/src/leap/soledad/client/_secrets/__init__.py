@@ -43,16 +43,11 @@ class Secrets(EmitMixin):
         'local_secret': 448,   # local_secret to derive a local_key for storage
     }
 
-    def __init__(self, uuid, passphrase, url, local_path, get_token, userid,
-                 shared_db=None):
-        self._uuid = uuid
-        self._passphrase = passphrase
-        self._userid = userid
+    def __init__(self, soledad):
+        self._soledad = soledad
         self._secrets = {}
-        self.crypto = SecretsCrypto(self.get_passphrase)
-        self.storage = SecretsStorage(
-            uuid, self.get_passphrase, url, local_path, get_token, userid,
-            shared_db=shared_db)
+        self.crypto = SecretsCrypto(soledad)
+        self.storage = SecretsStorage(soledad)
         self._bootstrap()
 
     #
@@ -83,6 +78,8 @@ class Secrets(EmitMixin):
         if encrypted['version'] < self.crypto.VERSION or force_storage:
             # TODO: what should we do if it's the first run and remote save
             #       fails?
+            # TODO: we have to actually update the encrypted version before
+            # saving, we are currently not doing it.
             self.storage.save_local(encrypted)
             self.storage.save_remote(encrypted)
 
@@ -112,15 +109,7 @@ class Secrets(EmitMixin):
         data = {'secret': encrypted, 'version': 2}
         return data
 
-    def get_passphrase(self):
-        return self._passphrase.encode('utf-8')
-
-    @property
-    def passphrase(self):
-        return self.get_passphrase()
-
-    def change_passphrase(self, new_passphrase):
-        self._passphrase = new_passphrase
+    def store_secrets(self):
         encrypted = self.crypto.encrypt(self._secrets)
         self.storage.save_local(encrypted)
         self.storage.save_remote(encrypted)

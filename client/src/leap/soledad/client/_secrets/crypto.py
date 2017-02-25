@@ -34,11 +34,12 @@ class SecretsCrypto(object):
 
     VERSION = 2
 
-    def __init__(self, get_pass):
-        self._get_pass = get_pass
+    def __init__(self, soledad):
+        self._soledad = soledad
 
     def _get_key(self, salt):
-        key = scrypt.hash(self._get_pass(), salt, buflen=32)
+        passphrase = self._soledad.passphrase.encode('utf8')
+        key = scrypt.hash(passphrase, salt, buflen=32)
         return key
 
     #

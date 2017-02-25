@@ -51,7 +51,7 @@ class DeprecatedCryptoTest(SoledadWithCouchServerMixin, TestCaseWithServer):
             self._soledad_instance(user=user, server_url=server_url))
 
         self.make_app()
-        remote = self.request_state._create_database(replica_uid=client._uuid)
+        remote = self.request_state._create_database(replica_uid=client.uuid)
         remote = CouchDatabase.open_database(
             urljoin(self.couch_url, 'user-' + user),
             create=True)

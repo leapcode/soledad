@@ -135,7 +135,7 @@ class EncryptedSyncTestCase(
             user=user,
             prefix='x',
             auth_token='auth-token',
-            secrets_path=sol1._secrets_path,
+            secrets_path=sol1.secrets_path,
             passphrase=passphrase)
 
         # ensure remote db exists before syncing

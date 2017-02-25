@@ -177,27 +177,25 @@ class Soledad(object):
             some reason.
         """
         # store config params
-        self._uuid = uuid
-        self._passphrase = passphrase
+        self.uuid = uuid
+        self.passphrase = passphrase
+        self.secrets_path = secrets_path
         self._local_db_path = local_db_path
-        self._server_url = server_url
-        self._secrets_path = None
+        self.server_url = server_url
+        self.shared_db = shared_db
+        self.token = auth_token
+        self.offline = offline
+
         self._dbsyncer = None
-        self._offline = offline
 
         # configure SSL certificate
         global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
 
-        self.set_token(auth_token)
-
         self._init_config_with_defaults()
         self._init_working_dirs()
 
-        self._secrets_path = secrets_path
-
-        self._init_secrets(shared_db=shared_db)
-
+        self._secrets = Secrets(self)
         self._crypto = SoledadCrypto(self._secrets.remote_secret)
 
         try:
@@ -214,14 +212,6 @@ class Soledad(object):
                 self._dbpool.close()
             raise
 
-    def _get_offline(self):
-        return self._offline
-
-    def _set_offline(self, offline):
-        self._offline = offline
-
-    offline = property(_get_offline, _set_offline)
-
     #
     # initialization/destruction methods
     #
@@ -230,7 +220,7 @@ class Soledad(object):
         """
         Initialize configuration using default values for missing params.
         """
-        soledad_assert_type(self._passphrase, unicode)
+        soledad_assert_type(self.passphrase, unicode)
 
         def initialize(attr, val):
             return ((getattr(self, attr, None) is None) and
@@ -241,7 +231,7 @@ class Soledad(object):
         initialize("_local_db_path", os.path.join(
             self.default_prefix, self.local_db_file_name))
         # initialize server_url
-        soledad_assert(self._server_url is not None,
+        soledad_assert(self.server_url is not None,
                        'Missing URL for Soledad server.')
 
     def _init_working_dirs(self):
@@ -254,14 +244,6 @@ class Soledad(object):
             self._local_db_path, self._secrets_path])
         for path in paths:
             create_path_if_not_exists(path)
-
-    def _init_secrets(self, shared_db=None):
-        """
-        Initialize Soledad secrets.
-        """
-        self._secrets = Secrets(
-            self._uuid, self._passphrase, self._server_url, self._secrets_path,
-            self.get_token, self.userid, shared_db=shared_db)
 
     def _init_u1db_sqlcipher_backend(self):
         """
@@ -647,10 +629,6 @@ class Soledad(object):
         return self._local_db_path
 
     @property
-    def uuid(self):
-        return self._uuid
-
-    @property
     def userid(self):
         return self.uuid
 
@@ -687,7 +665,7 @@ class Soledad(object):
             generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
-        sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
+        sync_url = urlparse.urljoin(self.server_url, 'user-%s' % self.uuid)
         if not self._dbsyncer:
             return
         creds = {'token': {'uuid': self.uuid, 'token': self.token}}
@@ -748,14 +726,6 @@ class Soledad(object):
         """
         return self.sync_lock.locked
 
-    def set_token(self, token):
-        self._token = token
-
-    def get_token(self):
-        return self._token
-
-    token = property(get_token, set_token, doc='The authentication Token.')
-
     #
     # ISecretsStorage
     #
@@ -779,7 +749,8 @@ class Soledad(object):
 
         :raise NoStorageSecret: Raised if there's no storage secret available.
         """
-        self._secrets.change_passphrase(new_passphrase)
+        self.passphrase = new_passphrase
+        self._secrets.store_secrets()
 
     #
     # Raw SQLCIPHER Queries

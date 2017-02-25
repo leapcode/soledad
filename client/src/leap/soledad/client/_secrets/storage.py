@@ -33,29 +33,26 @@ logger = getLogger(__name__)
 
 class SecretsStorage(EmitMixin):
 
-    def __init__(self, uuid, get_pass, url, local_path, get_token, userid,
-                 shared_db=None):
-        self._uuid = uuid
-        self._get_pass = get_pass
-        self._local_path = local_path
-        self._get_token = get_token
-        self._userid = userid
-
-        self._shared_db = shared_db or self._init_shared_db(url, self._creds)
+    def __init__(self, soledad):
+        self._soledad = soledad
+        self._shared_db = self._soledad.shared_db or self._init_shared_db()
         self.__remote_doc = None
 
     @property
     def _creds(self):
-        return {'token': {'uuid': self._uuid, 'token': self._get_token()}}
+        uuid = self._soledad.uuid
+        token = self._soledad.token
+        return {'token': {'uuid': uuid, 'token': token}}
 
     #
     # local storage
     #
 
     def load_local(self):
-        logger.info("trying to load secrets from disk: %s" % self._local_path)
+        path = self._soledad.secrets_path
+        logger.info("trying to load secrets from disk: %s" % path)
         try:
-            with open(self._local_path, 'r') as f:
+            with open(path, 'r') as f:
                 encrypted = json.loads(f.read())
             logger.info("secrets loaded successfully from disk")
             return encrypted
@@ -64,23 +61,26 @@ class SecretsStorage(EmitMixin):
         return None
 
     def save_local(self, encrypted):
+        path = self._soledad.secrets_path
         json_data = json.dumps(encrypted)
-        with open(self._local_path, 'w') as f:
+        with open(path, 'w') as f:
             f.write(json_data)
 
     #
     # remote storage
     #
 
-    def _init_shared_db(self, url, creds):
-        url = urlparse.urljoin(url, SHARED_DB_NAME)
-        db = SoledadSharedDatabase.open_database(
-            url, self._uuid, creds=creds)
-        self._shared_db = db
+    def _init_shared_db(self):
+        url = urlparse.urljoin(self._soledad.server_url, SHARED_DB_NAME)
+        uuid = self._soledad.uuid
+        creds = self._creds
+        db = SoledadSharedDatabase.open_database(url, uuid, creds)
+        return db
 
     def _remote_doc_id(self):
-        passphrase = self._get_pass()
-        text = '%s%s' % (passphrase, self._uuid)
+        passphrase = self._soledad.passphrase.encode('utf8')
+        uuid = self._soledad.uuid
+        text = '%s%s' % (passphrase, uuid)
         digest = sha256(text).hexdigest()
         return digest
 

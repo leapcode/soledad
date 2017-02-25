@@ -27,7 +27,9 @@ class EmitMixin(object):
 
     @property
     def _user_data(self):
-        return {'uuid': self._uuid, 'userid': self._userid}
+        uuid = self._soledad.uuid
+        userid = self._soledad.userid
+        return {'uuid': uuid, 'userid': userid}
 
 
 def emit(verb):
