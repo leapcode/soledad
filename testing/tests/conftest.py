@@ -104,7 +104,7 @@ class SoledadServer(object):
             '--pidfile=%s' % self._pidfile,
             'web',
             '--class=leap.soledad.server.entrypoint.SoledadEntrypoint',
-            '--port=2424'
+            '--port=tcp:2424'
         ])
 
     def _create_conf_file(self):
