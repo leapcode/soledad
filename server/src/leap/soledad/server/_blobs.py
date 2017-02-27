@@ -22,18 +22,14 @@ from twisted.web import resource
 from ._config import get_config
 
 
-__all__ = ['blobs_resource']
-
-
-_config = get_config()
-DEFAULT_BLOBS_PATH = _config['blobs_path']
+__all__ = ['BlobsResource', 'blobs_resource']
 
 
 class BlobsResource(resource.Resource):
 
     isLeaf = True
 
-    def __init__(self, blobs_path=DEFAULT_BLOBS_PATH):
+    def __init__(self, blobs_path):
         resource.Resource.__init__(self)
         self._blobs_path = blobs_path
 
@@ -41,4 +37,8 @@ class BlobsResource(resource.Resource):
         return 'blobs is not implemented yet!'
 
 
-blobs_resource = BlobsResource()
+# provide a configured instance of the resource
+_config = get_config()
+_path = _config['blobs_path']
+
+blobs_resource = BlobsResource(_path)
