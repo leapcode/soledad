@@ -41,7 +41,7 @@ def create_download(downloads, size):
         # ensures we are dealing with properly encrypted docs
 
         def setup():
-            return soledad_client()
+            return soledad_client(force_fresh_db=True)
 
         def sync(clean_client):
             return clean_client.sync()
