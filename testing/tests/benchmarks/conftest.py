@@ -12,11 +12,29 @@ from leap.common.events import server
 server.ensure_server()
 
 
+#
+# pytest customizations
+#
+
 def pytest_addoption(parser):
     parser.addoption(
         "--num-docs", type="int", default=100,
         help="the number of documents to use in performance tests")
 
+
+# mark benchmark tests using their group names (thanks ionelmc! :)
+def pytest_collection_modifyitems(items):
+    for item in items:
+        bench = item.get_marker("benchmark")
+        if bench and bench.kwargs.get('group'):
+            group = bench.kwargs['group']
+            marker = getattr(pytest.mark, 'benchmark_' + group)
+            item.add_marker(marker)
+
+
+#
+# benchmark fixtures
+#
 
 @pytest.fixture()
 def payload():
