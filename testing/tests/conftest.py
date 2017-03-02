@@ -6,7 +6,7 @@ import signal
 import time
 
 from hashlib import sha512
-from subprocess import call
+from subprocess import check_call
 from urlparse import urljoin
 from uuid import uuid4
 
@@ -98,7 +98,7 @@ class SoledadServer(object):
     def start(self):
         self._create_conf_file()
         # start the server
-        call([
+        check_call([
             'twistd',
             '--logfile=%s' % self._logfile,
             '--pidfile=%s' % self._pidfile,
@@ -118,7 +118,7 @@ class SoledadServer(object):
 
     def stop(self):
         pid = get_pid(self._pidfile)
-        os.kill(pid, signal.SIGKILL)
+        os.kill(pid, signal.SIGTERM)
 
 
 @pytest.fixture(scope='module')
