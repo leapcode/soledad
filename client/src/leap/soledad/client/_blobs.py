@@ -300,7 +300,8 @@ def testit(reactor):
     # parse command line arguments
     import argparse
 
-    usage = "\n  mkdir /tmp/blobs/user && cd server/src/leap/soledad/server/ && python _blobs.py" \
+    usage = "\n  mkdir /tmp/blobs/user && cd server/src/leap/soledad/server/" \
+            " && python _blobs.py" \
             "\n  python _blobs.py upload /path/to/file blob_id" \
             "\n  python _blobs.py download blob_id"
 

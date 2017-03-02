@@ -51,18 +51,15 @@ decrypt(PAYLOAD)
 """
 
 
-import binascii
 import base64
 import hashlib
 import warnings
 import hmac
 import os
-import re
 import struct
 import time
 
 from io import BytesIO
-from six.moves import map as imap
 from collections import namedtuple
 
 from twisted.internet import defer
@@ -352,8 +349,8 @@ class CryptoStreamBodyProducer(FileBodyProducer):
             yield None
 
 
-# TODO maybe rename this to just Decryptor, since it will be used by blobs an non
-# blobs in soledad.
+# TODO maybe rename this to just Decryptor, since it will be used by blobs
+# and non blobs in soledad.
 class BlobDecryptor(object):
     """
     Decrypts an encrypted blob associated with a given Document.
@@ -401,7 +398,7 @@ class BlobDecryptor(object):
             encoded_preamble = parts[0]
             preamble = base64.urlsafe_b64decode(encoded_preamble)
 
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             raise InvalidBlob
 
         try:

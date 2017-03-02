@@ -157,8 +157,8 @@ class BlobsResource(resource.Resource):
         factorykls = getattr(self, backend + 'Class')(**opts)
         self._handler = kls()
         """
-	resource.Resource.__init__(self)
-	self._blobs_path = blobs_path
+        resource.Resource.__init__(self)
+        self._blobs_path = blobs_path
         self._handler = self.blobsFactoryClass()
         assert IBlobsBackend.providedBy(self._handler)
 
