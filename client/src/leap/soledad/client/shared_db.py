@@ -91,14 +91,12 @@ class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
     #
 
     @staticmethod
-    def open_database(url, uuid, creds=None):
+    def open_database(url, creds=None):
         """
         Open a Soledad shared database.
 
         :param url: URL of the remote database.
         :type url: str
-        :param uuid: The user's unique id.
-        :type uuid: str
         :param creds: A tuple containing the authentication method and
             credentials.
         :type creds: tuple
@@ -106,7 +104,7 @@ class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
-        db = SoledadSharedDatabase(url, uuid, creds=creds)
+        db = SoledadSharedDatabase(url, creds=creds)
         return db
 
     @staticmethod

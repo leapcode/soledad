@@ -72,9 +72,8 @@ class SecretsStorage(UserDataMixin):
 
     def _init_shared_db(self):
         url = urlparse.urljoin(self._soledad.server_url, SHARED_DB_NAME)
-        uuid = self._soledad.uuid
         creds = self._creds
-        db = SoledadSharedDatabase.open_database(url, uuid, creds)
+        db = SoledadSharedDatabase.open_database(url, creds)
         return db
 
     def _remote_doc_id(self):
