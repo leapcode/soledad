@@ -307,48 +307,6 @@ class BlobEncryptor(object):
         return defer.succeed(result)
 
 
-class CryptoStreamBodyProducer(FileBodyProducer):
-
-    """
-    A BodyProducer that gets the tag from the last 16 bytes before closing the
-    fd.
-    """
-    _tag = None
-
-    @property
-    def tag(self):
-        # XXX this is a bit tricky. If you call this
-        # before the end of the stream, you will ruin everything
-        if not self._tag:
-            self._writeTag()
-        return self._tag
-
-    def _writeTag(self):
-        fd = self._inputFile
-        fd.seek(-16, os.SEEK_END)
-        self._tag = fd.read(16)
-        fd.seek(0)
-
-    def stopProducing(self):
-        self._writeTag()
-        self._inputFile.close()
-        self._task.stop()
-
-    def _writeloop(self, consumer):
-        """
-        Return an iterator which reads one chunk of bytes from the input file
-        and writes them to the consumer for each time it is iterated.
-        """
-        while True:
-            bytes = self._inputFile.read(self._readSize)
-            if not bytes:
-                self._writeTag()
-                self._inputFile.close()
-                break
-            consumer.write(base64.urlsafe_b64decode(bytes))
-            yield None
-
-
 # TODO maybe rename this to just Decryptor, since it will be used by blobs
 # and non blobs in soledad.
 class BlobDecryptor(object):
@@ -381,14 +339,13 @@ class BlobDecryptor(object):
         self.result = result or BytesIO()
         sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
 
-        self._aes = AESWriter(sym_key, iv, self.result, tag=None)
+        self._aes = AESWriter(sym_key, iv, self.result, tag=self.tag)
         self._aes.authenticate(preamble)
         if start_stream:
             self._start_stream()
 
     def _start_stream(self):
-        self._producer = CryptoStreamBodyProducer(self.fd, readSize=2**16)
-        self._producer.armor = self.armor
+        self._producer = FileBodyProducer(self.fd, readSize=2**16)
 
     def _consume_preamble(self):
 
@@ -397,6 +354,8 @@ class BlobDecryptor(object):
             parts = self.fd.getvalue().split()
             encoded_preamble = parts[0]
             preamble = base64.urlsafe_b64decode(encoded_preamble)
+            ciphertext = base64.urlsafe_b64decode(parts[1])
+            self.tag, ciphertext = ciphertext[-16:], ciphertext[:-16]
 
         except (TypeError, ValueError):
             raise InvalidBlob
@@ -433,21 +392,18 @@ class BlobDecryptor(object):
             raise InvalidBlob('invalid doc id')
 
         self.fd.seek(0)
-        tail = ''.join(parts[1:])
-        self.fd.write(tail)
-        self.fd.seek(len(tail))
+        self.fd.write(ciphertext)
+        self.fd.seek(len(ciphertext))
         self.fd.truncate()
         self.fd.seek(0)
         return preamble, iv
 
     def _end_stream(self):
         try:
-            self._aes.end()[1]
+            self._aes.end()
         except InvalidTag:
             raise InvalidBlob('Invalid Tag. Blob authentication failed.')
         fd = self.result
-        fd.seek(-16, os.SEEK_END)
-        fd.truncate()
         fd.seek(0)
         return self.result
 

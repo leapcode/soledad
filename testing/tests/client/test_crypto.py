@@ -105,7 +105,9 @@ class BlobTestCase(unittest.TestCase):
             secret='A' * 96)
 
         encrypted = yield blob.encrypt()
-        preamble, ciphertext = _crypto._split(encrypted.getvalue())
+        preamble, ciphertext = encrypted.getvalue().split()
+        preamble = base64.urlsafe_b64decode(preamble)
+        ciphertext = base64.urlsafe_b64decode(ciphertext)
         ciphertext = ciphertext[:-16]
 
         assert len(preamble) == _crypto.PACMAN.size
@@ -140,7 +142,7 @@ class BlobTestCase(unittest.TestCase):
             self.doc_info, ciphertext,
             secret='A' * 96)
         decrypted = yield decryptor.decrypt()
-        assert decrypted == snowden1
+        assert decrypted.getvalue() == snowden1
 
     @defer.inlineCallbacks
     def test_encrypt_and_decrypt(self):
@@ -157,7 +159,7 @@ class BlobTestCase(unittest.TestCase):
         doc2 = SoledadDocument('id1', '1')
         doc2.set_json(encrypted)
         assert _crypto.is_symmetrically_encrypted(encrypted)
-        decrypted = yield crypto.decrypt_doc(doc2)
+        decrypted = (yield crypto.decrypt_doc(doc2)).getvalue()
         assert len(decrypted) != 0
         assert json.loads(decrypted) == payload
 
@@ -172,7 +174,9 @@ class BlobTestCase(unittest.TestCase):
 
         encrypted = yield crypto.encrypt_doc(doc1)
         encdict = json.loads(encrypted)
-        preamble, raw = _crypto._split(str(encdict['raw']))
+        preamble, raw = str(encdict['raw']).split()
+        preamble = base64.urlsafe_b64decode(preamble)
+        raw = base64.urlsafe_b64decode(raw)
         # mess with tag
         messed = raw[:-16] + '0' * 16
 
@@ -269,7 +273,7 @@ class PreambleTestCase(unittest.TestCase):
         preamble = self.blob._encode_preamble()
         unpacked = _crypto.PACMAN.unpack(preamble)
         size = unpacked[7]
-        assert size == len(snowden1)
+        assert size == _crypto._ceiling(len(snowden1))
 
     @defer.inlineCallbacks
     def test_preamble_can_come_without_size(self):
@@ -291,7 +295,7 @@ class PreambleTestCase(unittest.TestCase):
         cleartext = yield _crypto.BlobDecryptor(
             self.doc_info, BytesIO(ciphertext),
             secret='A' * 96).decrypt()
-        assert cleartext == self.cleartext.getvalue()
+        assert cleartext.getvalue() == self.cleartext.getvalue()
         warnings = self.flushWarnings()
         assert len(warnings) == 1
         assert 'legacy document without size' in warnings[0]['message']
