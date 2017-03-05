@@ -1,4 +1,4 @@
-0.9.3 - 
+0.9.4 - 
 +++++++++++++++++++++++++++++++
 
 Please add lines to this file, they will be moved to the CHANGELOG.rst during
@@ -10,10 +10,6 @@ I've added a new category `Misc` so we can track doc/style/packaging stuff.
 
 Features
 ~~~~~~~~
-- Refactor authentication code to use twisted credential system.
-- `#8764 <https://0xacab.org/leap/soledad/issues/8764>`_: Allow unauthenticated
-  users to retrieve the capabilties banner.
-- `#8758 <https://0xacab.org/leap/soledad/issues/8758>`_: Add blob size to the crypto preamble
 - `#1234 <https://leap.se/code/issues/1234>`_: Description of the new feature corresponding with issue #1234.
 - New feature without related issue number.
 
@@ -24,7 +20,6 @@ Bugfixes
 
 Other
 ~~~~~
-- #8762: Add a systemd service file
 - `#1236 <https://leap.se/code/issues/1236>`_: Description of the new feature corresponding with issue #1236.
 - Some change without issue number.
 

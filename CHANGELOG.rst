@@ -1,3 +1,28 @@
+0.9.3 -  06 March, 2017
++++++++++++++++++++++++++++++++
+
+
+Server
+~~~~~~
+- Refactor authentication code to use twisted credential system.
+- Announce server blobs capabilities
+- `#8764 <https://0xacab.org/leap/soledad/issues/8764>`_: Allow unauthenticated users to retrieve the capabilties banner.
+- `#6178 <https://0xacab.org/leap/soledad/issues/6178>`_: Add robots.txt
+- #8762: Add a systemd service file
+- Add script to deploy from git
+
+Client
+~~~~~~~~
+- `#8758 <https://0xacab.org/leap/soledad/issues/8758>`_: Add blob size to the crypto preamble
+- Improve secrets generation and storage code
+- Add offline status to soledad client api.
+- Remove syncable property
+
+Misc
+~~~~
+- Improvements in performance benchmarks.
+
+
 0.9.2 - 22 December, 2016
 +++++++++++++++++++++++++
 
