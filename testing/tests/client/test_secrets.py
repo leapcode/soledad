@@ -158,8 +158,9 @@ class SecretsCryptoTestCase(unittest.TestCase):
         decrypted = self._crypto.decrypt(encrypted)
         self.assertEqual(decrypted, self.SECRETS)
 
-    def test__decrypt_v1_without_version_field(self):
+    def test__no_version_defaults_to_v1(self):
         encrypted = dict(self.ENCRYPTED_V1)
         del encrypted['version']
         decrypted = self._crypto.decrypt(encrypted)
         self.assertEqual(decrypted, self.SECRETS)
+        self.assertEqual(encrypted['version'], 1)

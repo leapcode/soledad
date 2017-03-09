@@ -72,7 +72,7 @@ class SecretsCrypto(object):
     #
 
     def decrypt(self, data):
-        version = data.get('version', 1)
+        version = data.setdefault('version', 1)
         method = getattr(self, '_decrypt_v%d' % version)
         try:
             return method(data)
