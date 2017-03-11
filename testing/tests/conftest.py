@@ -6,7 +6,7 @@ import signal
 import time
 
 from hashlib import sha512
-from subprocess import call
+from subprocess import check_call
 from urlparse import urljoin
 from uuid import uuid4
 
@@ -98,13 +98,13 @@ class SoledadServer(object):
     def start(self):
         self._create_conf_file()
         # start the server
-        call([
+        check_call([
             'twistd',
             '--logfile=%s' % self._logfile,
             '--pidfile=%s' % self._pidfile,
             'web',
-            '--wsgi=leap.soledad.server.application.wsgi_application',
-            '--port=2424'
+            '--class=leap.soledad.server.entrypoint.SoledadEntrypoint',
+            '--port=tcp:2424'
         ])
 
     def _create_conf_file(self):
@@ -118,7 +118,7 @@ class SoledadServer(object):
 
     def stop(self):
         pid = get_pid(self._pidfile)
-        os.kill(pid, signal.SIGKILL)
+        os.kill(pid, signal.SIGTERM)
 
 
 @pytest.fixture(scope='module')
@@ -191,9 +191,19 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
     soledad_dbs(default_uuid)
 
     # get a soledad instance
-    def create():
-        secrets_path = os.path.join(tmpdir.strpath, '%s.secret' % default_uuid)
-        local_db_path = os.path.join(tmpdir.strpath, '%s.db' % default_uuid)
+    def create(force_fresh_db=False):
+        secrets_file = '%s.secret' % default_uuid
+        secrets_path = os.path.join(tmpdir.strpath, secrets_file)
+
+        # in some tests we might want to use the same user and remote database
+        # but with a clean/empty local database (i.e. download benchmarks), so
+        # here we provide a way to do that.
+        db_file = '%s.db' % default_uuid
+        if force_fresh_db:
+            prefix = uuid4().hex
+            db_file = prefix + '-' + db_file
+        local_db_path = os.path.join(tmpdir.strpath, db_file)
+
         soledad_client = Soledad(
             default_uuid,
             unicode(passphrase),

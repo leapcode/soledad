@@ -63,7 +63,8 @@ class TestSoledadParseReceivedDocResponse(unittest.TestCase):
     """
 
     def parse(self, stream):
-        parser = DocStreamReceiver(None, None, lambda *_: defer.succeed(42))
+        parser = DocStreamReceiver(None, defer.Deferred(),
+                                   lambda *_: defer.succeed(42))
         parser.dataReceived(stream)
         parser.finish()
 
@@ -838,7 +839,7 @@ class TestSoledadDbSync(
         # already created on some setUp method.
         import binascii
         tohex = binascii.b2a_hex
-        key = tohex(self._soledad.secrets.get_local_storage_key())
+        key = tohex(self._soledad.secrets.local_key)
         dbpath = self._soledad._local_db_path
 
         self.opts = SQLCipherOptions(

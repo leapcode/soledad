@@ -88,15 +88,17 @@ import sys
 from leap.soledad.common.l2db.remote import http_app, utils
 from leap.soledad.common import SHARED_DB_NAME
 
-from leap.soledad.server.sync import SyncResource
-from leap.soledad.server.sync import MAX_REQUEST_SIZE
-from leap.soledad.server.sync import MAX_ENTRY_SIZE
+from .sync import SyncResource
+from .sync import MAX_REQUEST_SIZE
+from .sync import MAX_ENTRY_SIZE
 
 from ._version import get_versions
+from ._config import get_config
 
 
 __all__ = [
     'SoledadApp',
+    'get_config',
     '__version__',
 ]
 

@@ -17,7 +17,7 @@
 """
 A shared database for storing/retrieving encrypted key material.
 """
-from leap.soledad.common.l2db.remote import http_database
+from leap.soledad.common.l2db.remote.http_database import HTTPDatabase
 
 from leap.soledad.client.auth import TokenBasedAuth
 
@@ -47,17 +47,13 @@ class ImproperlyConfiguredError(Exception):
     """
 
 
-class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
+class SoledadSharedDatabase(HTTPDatabase, TokenBasedAuth):
     """
     This is a shared recovery database that enables users to store their
     encryption secrets in the server and retrieve them afterwards.
     """
     # TODO: prevent client from messing with the shared DB.
     # TODO: define and document API.
-
-    # If syncable is False, the database will not attempt to sync against
-    # a remote replica. Default is True.
-    syncable = True
 
     #
     # Token auth methods.
@@ -95,31 +91,20 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
     #
 
     @staticmethod
-    def open_database(url, uuid, creds=None, syncable=True):
+    def open_database(url, creds=None):
         """
         Open a Soledad shared database.
 
         :param url: URL of the remote database.
         :type url: str
-        :param uuid: The user's unique id.
-        :type uuid: str
         :param creds: A tuple containing the authentication method and
             credentials.
         :type creds: tuple
-        :param syncable:
-            If syncable is False, the database will not attempt to sync against
-            a remote replica.
-        :type syncable: bool
 
         :return: The shared database in the given url.
         :rtype: SoledadSharedDatabase
         """
-        # XXX fix below, doesn't work with tests.
-        # if syncable and not url.startswith('https://'):
-        #    raise ImproperlyConfiguredError(
-        #        "Remote soledad server must be an https URI")
-        db = SoledadSharedDatabase(url, uuid, creds=creds)
-        db.syncable = syncable
+        db = SoledadSharedDatabase(url, creds=creds)
         return db
 
     @staticmethod
@@ -134,20 +119,16 @@ class SoledadSharedDatabase(http_database.HTTPDatabase, TokenBasedAuth):
         """
         raise Unauthorized("Can't delete shared database.")
 
-    def __init__(self, url, uuid, document_factory=None, creds=None):
+    def __init__(self, url, document_factory=None, creds=None):
         """
         Initialize database with auth token and encryption powers.
 
         :param url: URL of the remote database.
         :type url: str
-        :param uuid: The user's unique id.
-        :type uuid: str
         :param document_factory: A factory for U1BD documents.
         :type document_factory: u1db.Document
         :param creds: A tuple containing the authentication method and
             credentials.
         :type creds: tuple
         """
-        http_database.HTTPDatabase.__init__(self, url, document_factory,
-                                            creds)
-        self._uuid = uuid
+        HTTPDatabase.__init__(self, url, document_factory, creds)

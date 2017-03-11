@@ -24,10 +24,11 @@ after receiving.
 
 import os
 
-from leap.soledad.common.log import getLogger
-from leap.common.certs import get_compatible_ssl_context_factory
 from twisted.web.client import Agent
 from twisted.internet import reactor
+
+from leap.common.certs import get_compatible_ssl_context_factory
+from leap.soledad.common.log import getLogger
 from leap.soledad.client.http_target.send import HTTPDocSender
 from leap.soledad.client.http_target.api import SyncTargetAPI
 from leap.soledad.client.http_target.fetch import HTTPDocFetcher
@@ -86,8 +87,8 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self._insert_doc_cb = None
 
         # Twisted default Agent with our own ssl context factory
-        self._http = Agent(reactor,
-                           get_compatible_ssl_context_factory(cert_file))
+        factory = get_compatible_ssl_context_factory(cert_file)
+        self._http = Agent(reactor, factory)
 
         if DO_STATS:
             self.sync_exchange_phase = [0]

@@ -39,13 +39,12 @@ from itertools import chain
 from StringIO import StringIO
 from collections import defaultdict
 
-from twisted.internet.defer import DeferredLock, returnValue, inlineCallbacks
+from twisted.internet import defer
 from zope.interface import implements
 
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
 
-from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
 from leap.soledad.common.log import getLogger
@@ -57,8 +56,7 @@ from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
 from leap.soledad.client import interfaces as soledad_interfaces
 from leap.soledad.client import sqlcipher
-from leap.soledad.client.secrets import SoledadSecrets
-from leap.soledad.client.shared_db import SoledadSharedDatabase
+from leap.soledad.client._secrets import Secrets
 from leap.soledad.client._crypto import SoledadCrypto
 
 logger = getLogger(__name__)
@@ -126,11 +124,11 @@ class Soledad(object):
     same database replica. The dictionary indexes are the paths to each local
     db, so we guarantee that only one sync happens for a local db at a time.
     """
-    _sync_lock = defaultdict(DeferredLock)
+    _sync_lock = defaultdict(defer.DeferredLock)
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, syncable=True):
+                 auth_token=None, offline=False):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -167,10 +165,11 @@ class Soledad(object):
             Authorization token for accessing remote databases.
         :type auth_token: str
 
-        :param syncable:
-            If set to ``False``, this database will not attempt to synchronize
-            with remote replicas (default is ``True``)
-        :type syncable: bool
+        :param offline:
+            If set to ``True``, this database will not attempt to save/load
+            secrets to/from server or synchronize with remote replicas (default
+            is ``False``)
+        :type offline: bool
 
         :raise BootstrapSequenceError:
             Raised when the secret initialization sequence (i.e. retrieval
@@ -178,41 +177,32 @@ class Soledad(object):
             some reason.
         """
         # store config params
-        self._uuid = uuid
-        self._passphrase = passphrase
+        self.uuid = uuid
+        self.passphrase = passphrase
+        self.secrets_path = secrets_path
         self._local_db_path = local_db_path
-        self._server_url = server_url
-        self._secrets_path = None
-        self._dbsyncer = None
-
+        self.server_url = server_url
         self.shared_db = shared_db
+        self.token = auth_token
+        self.offline = offline
+
+        self._dbsyncer = None
 
         # configure SSL certificate
         global SOLEDAD_CERT
         SOLEDAD_CERT = cert_file
 
-        self._set_token(auth_token)
-
         self._init_config_with_defaults()
         self._init_working_dirs()
 
-        self._secrets_path = secrets_path
-
-        # Initialize shared recovery database
-        self.init_shared_db(server_url, uuid, self._creds, syncable=syncable)
-
-        # The following can raise BootstrapSequenceError, that will be
-        # propagated upwards.
-        self._init_secrets()
-
-        self._crypto = SoledadCrypto(self._secrets.remote_storage_secret)
+        self._secrets = Secrets(self)
+        self._crypto = SoledadCrypto(self._secrets.remote_secret)
 
         try:
             # initialize database access, trap any problems so we can shutdown
             # smoothly.
             self._init_u1db_sqlcipher_backend()
-            if syncable:
-                self._init_u1db_syncer()
+            self._init_u1db_syncer()
         except DatabaseAccessError:
             # oops! something went wrong with backend initialization. We
             # have to close any thread-related stuff we have already opened
@@ -230,7 +220,7 @@ class Soledad(object):
         """
         Initialize configuration using default values for missing params.
         """
-        soledad_assert_type(self._passphrase, unicode)
+        soledad_assert_type(self.passphrase, unicode)
 
         def initialize(attr, val):
             return ((getattr(self, attr, None) is None) and
@@ -241,7 +231,7 @@ class Soledad(object):
         initialize("_local_db_path", os.path.join(
             self.default_prefix, self.local_db_file_name))
         # initialize server_url
-        soledad_assert(self._server_url is not None,
+        soledad_assert(self.server_url is not None,
                        'Missing URL for Soledad server.')
 
     def _init_working_dirs(self):
@@ -254,15 +244,6 @@ class Soledad(object):
             self._local_db_path, self._secrets_path])
         for path in paths:
             create_path_if_not_exists(path)
-
-    def _init_secrets(self):
-        """
-        Initialize Soledad secrets.
-        """
-        self._secrets = SoledadSecrets(
-            self.uuid, self._passphrase, self._secrets_path,
-            self.shared_db, userid=self.userid)
-        self._secrets.bootstrap()
 
     def _init_u1db_sqlcipher_backend(self):
         """
@@ -279,7 +260,7 @@ class Soledad(object):
         """
         tohex = binascii.b2a_hex
         # sqlcipher only accepts the hex version
-        key = tohex(self._secrets.get_local_storage_key())
+        key = tohex(self._secrets.local_key)
 
         opts = sqlcipher.SQLCipherOptions(
             self._local_db_path, key,
@@ -648,31 +629,12 @@ class Soledad(object):
         return self._local_db_path
 
     @property
-    def uuid(self):
-        return self._uuid
-
-    @property
     def userid(self):
         return self.uuid
 
     #
     # ISyncableStorage
     #
-
-    def set_syncable(self, syncable):
-        """
-        Toggle the syncable state for this database.
-
-        This can be used to start a database with offline state and switch it
-        online afterwards. Or the opposite: stop syncs when connection is lost.
-
-        :param syncable: new status for syncable.
-        :type syncable: bool
-        """
-        # TODO should check that we've got a token!
-        self.shared_db.syncable = syncable
-        if syncable and not self._dbsyncer:
-            self._init_u1db_syncer()
 
     def sync(self):
         """
@@ -686,6 +648,11 @@ class Soledad(object):
                  generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
+        # maybe bypass sync
+        if self.offline or not self.token:
+            generation = self._dbsyncer.get_generation()
+            return defer.succeed(generation)
+
         d = self.sync_lock.run(
             self._sync)
         return d
@@ -698,12 +665,11 @@ class Soledad(object):
             generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
-        sync_url = urlparse.urljoin(self._server_url, 'user-%s' % self.uuid)
+        sync_url = urlparse.urljoin(self.server_url, 'user-%s' % self.uuid)
         if not self._dbsyncer:
             return
-        d = self._dbsyncer.sync(
-            sync_url,
-            creds=self._creds)
+        creds = {'token': {'uuid': self.uuid, 'token': self.token}}
+        d = self._dbsyncer.sync(sync_url, creds=creds)
 
         def _sync_callback(local_gen):
             self._last_received_docs = docs = self._dbsyncer.received_docs
@@ -760,93 +726,9 @@ class Soledad(object):
         """
         return self.sync_lock.locked
 
-    @property
-    def syncable(self):
-        if self.shared_db:
-            return self.shared_db.syncable
-        else:
-            return False
-
-    def _set_token(self, token):
-        """
-        Set the authentication token for remote database access.
-
-        Internally, this builds the credentials dictionary with the following
-        format:
-
-            {
-                'token': {
-                    'uuid': '<uuid>'
-                    'token': '<token>'
-                }
-            }
-
-        :param token: The authentication token.
-        :type token: str
-        """
-        self._creds = {
-            'token': {
-                'uuid': self.uuid,
-                'token': token,
-            }
-        }
-
-    def _get_token(self):
-        """
-        Return current token from credentials dictionary.
-        """
-        return self._creds['token']['token']
-
-    token = property(_get_token, _set_token, doc='The authentication Token.')
-
     #
     # ISecretsStorage
     #
-
-    def init_shared_db(self, server_url, uuid, creds, syncable=True):
-        """
-        Initialize the shared database.
-
-        :param server_url: URL of the remote database.
-        :type server_url: str
-        :param uuid: The user's unique id.
-        :type uuid: str
-        :param creds: A tuple containing the authentication method and
-            credentials.
-        :type creds: tuple
-        :param syncable:
-            If syncable is False, the database will not attempt to sync against
-            a remote replica.
-        :type syncable: bool
-        """
-        # only case this is False is for testing purposes
-        if self.shared_db is None:
-            shared_db_url = urlparse.urljoin(server_url, SHARED_DB_NAME)
-            self.shared_db = SoledadSharedDatabase.open_database(
-                shared_db_url,
-                uuid,
-                creds=creds,
-                syncable=syncable)
-
-    @property
-    def storage_secret(self):
-        """
-        Return the secret used for local storage encryption.
-
-        :return: The secret used for local storage encryption.
-        :rtype: str
-        """
-        return self._secrets.storage_secret
-
-    @property
-    def remote_storage_secret(self):
-        """
-        Return the secret used for encryption of remotely stored data.
-
-        :return: The secret used for remote storage  encryption.
-        :rtype: str
-        """
-        return self._secrets.remote_storage_secret
 
     @property
     def secrets(self):
@@ -854,7 +736,7 @@ class Soledad(object):
         Return the secrets object.
 
         :return: The secrets object.
-        :rtype: SoledadSecrets
+        :rtype: Secrets
         """
         return self._secrets
 
@@ -867,7 +749,8 @@ class Soledad(object):
 
         :raise NoStorageSecret: Raised if there's no storage secret available.
         """
-        self._secrets.change_passphrase(new_passphrase)
+        self.passphrase = new_passphrase
+        self._secrets.store_secrets()
 
     #
     # Raw SQLCIPHER Queries
@@ -891,7 +774,7 @@ class Soledad(object):
     # Service authentication
     #
 
-    @inlineCallbacks
+    @defer.inlineCallbacks
     def get_or_create_service_token(self, service):
         """
         Return the stored token for a given service, or generates and stores a
@@ -906,11 +789,11 @@ class Soledad(object):
         docs = yield self._get_token_for_service(service)
         if docs:
             doc = docs[0]
-            returnValue(doc.content['token'])
+            defer.returnValue(doc.content['token'])
         else:
             token = str(uuid.uuid4()).replace('-', '')[-24:]
             yield self._set_token_for_service(service, token)
-            returnValue(token)
+            defer.returnValue(token)
 
     def _get_token_for_service(self, service):
         return self.get_from_index('by-servicetoken', 'servicetoken', service)

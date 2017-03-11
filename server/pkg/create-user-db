@@ -22,7 +22,7 @@ import argparse
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import is_db_name_valid
 from leap.soledad.common.couch import list_users_dbs
-from leap.soledad.server.config import load_configuration
+from leap.soledad.server._config import get_config
 
 
 BYPASS_AUTH = os.environ.get('SOLEDAD_BYPASS_AUTH', False)
@@ -38,8 +38,9 @@ parser.add_argument('dbname', metavar='user-d34db33f', type=str,
                     help='database name on the format user-{uuid4}')
 parser.add_argument('--migrate-all', action='store_true',
                     help="recreate all design docs for all existing account")
-CONF = load_configuration('/etc/soledad/soledad-server.conf')
-NETRC_PATH = CONF['soledad-server']['admin_netrc']
+CONF = get_config()
+DBCONF = get_config(section='database-security')
+NETRC_PATH = CONF['admin_netrc']
 
 
 def url_for_db(dbname):
@@ -78,7 +79,7 @@ def ensure_database(dbname):
         print ("Invalid name! %s" % dbname)
         sys.exit(1)
     url = url_for_db(dbname)
-    db_security = CONF['database-security']
+    db_security = DBCONF
     db = CouchDatabase.open_database(url=url, create=True,
                                      replica_uid=None,
                                      database_security=db_security)

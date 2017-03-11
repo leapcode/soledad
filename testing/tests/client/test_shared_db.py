@@ -2,7 +2,6 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.shared_db import SoledadSharedDatabase
 
 from test_soledad.util import BaseSoledadTest
-from test_soledad.util import ADDRESS
 
 
 class SoledadSharedDBTestCase(BaseSoledadTest):
@@ -14,37 +13,28 @@ class SoledadSharedDBTestCase(BaseSoledadTest):
     def setUp(self):
         BaseSoledadTest.setUp(self)
         self._shared_db = SoledadSharedDatabase(
-            'https://provider/', ADDRESS, document_factory=SoledadDocument,
+            'https://provider/', document_factory=SoledadDocument,
             creds=None)
 
     def tearDown(self):
         BaseSoledadTest.tearDown(self)
 
-    def test__get_secrets_from_shared_db(self):
+    def test__get_remote_doc(self):
         """
         Ensure the shared db is queried with the correct doc_id.
         """
-        doc_id = self._soledad.secrets._shared_db_doc_id()
-        self._soledad.secrets._get_secrets_from_shared_db()
-        self.assertTrue(
-            self._soledad.shared_db.get_doc.assert_called_with(
-                doc_id) is None,
-            'Wrong doc_id when fetching recovery document.')
+        doc_id = self._soledad.secrets.storage._remote_doc_id()
+        self._soledad.secrets.storage._get_remote_doc()
+        self._soledad.secrets.storage._shared_db.get_doc.assert_called_with(
+            doc_id)
 
-    def test__put_secrets_in_shared_db(self):
+    def test_save_remote(self):
         """
         Ensure recovery document is put into shared recover db.
         """
-        doc_id = self._soledad.secrets._shared_db_doc_id()
-        self._soledad.secrets._put_secrets_in_shared_db()
-        self.assertTrue(
-            self._soledad.shared_db.get_doc.assert_called_with(
-                doc_id) is None,
-            'Wrong doc_id when fetching recovery document.')
-        self.assertTrue(
-            self._soledad.shared_db.put_doc.assert_called_with(
-                self._doc_put) is None,
-            'Wrong document when putting recovery document.')
-        self.assertTrue(
-            self._doc_put.doc_id == doc_id,
-            'Wrong doc_id when putting recovery document.')
+        doc_id = self._soledad.secrets.storage._remote_doc_id()
+        storage = self._soledad.secrets.storage
+        storage.save_remote({'content': 'blah'})
+        storage._shared_db.get_doc.assert_called_with(doc_id)
+        storage._shared_db.put_doc.assert_called_with(self._doc_put)
+        self.assertTrue(self._doc_put.doc_id == doc_id)

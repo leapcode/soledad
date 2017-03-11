@@ -19,12 +19,11 @@ Tests for general Soledad functionality.
 """
 import os
 
-from twisted.internet import defer
+from pytest import inlineCallbacks
 
 from leap.soledad.client import Soledad
 from leap.soledad.client.adbapi import U1DBConnectionPool
-from leap.soledad.client.secrets import PassphraseTooShort
-from leap.soledad.client.secrets import SecretsException
+from leap.soledad.client._secrets.util import SecretsError
 
 from test_soledad.util import BaseSoledadTest
 
@@ -34,7 +33,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
     def test__init_dirs(self):
         sol = self._soledad_instance(prefix='_init_dirs')
         local_db_dir = os.path.dirname(sol.local_db_path)
-        secrets_path = os.path.dirname(sol.secrets.secrets_path)
+        secrets_path = os.path.dirname(sol.secrets_path)
         self.assertTrue(os.path.isdir(local_db_dir))
         self.assertTrue(os.path.isdir(secrets_path))
 
@@ -64,8 +63,8 @@ class AuxMethodsTestCase(BaseSoledadTest):
         # instantiate without initializing so we just test
         # _init_config_with_defaults()
         sol = SoledadMock()
-        sol._passphrase = u''
-        sol._server_url = ''
+        sol.passphrase = u''
+        sol.server_url = ''
         sol._init_config_with_defaults()
         # assert value of local_db_path
         self.assertEquals(
@@ -85,14 +84,14 @@ class AuxMethodsTestCase(BaseSoledadTest):
             cert_file=None)
         self.assertEqual(
             os.path.join(self.tempdir, 'value_3'),
-            sol.secrets.secrets_path)
+            sol.secrets_path)
         self.assertEqual(
             os.path.join(self.tempdir, 'value_2'),
             sol.local_db_path)
-        self.assertEqual('value_1', sol._server_url)
+        self.assertEqual('value_1', sol.server_url)
         sol.close()
 
-    @defer.inlineCallbacks
+    @inlineCallbacks
     def test_change_passphrase(self):
         """
         Test if passphrase can be changed.
@@ -108,7 +107,7 @@ class AuxMethodsTestCase(BaseSoledadTest):
         sol.change_passphrase(u'654321')
         sol.close()
 
-        with self.assertRaises(SecretsException):
+        with self.assertRaises(SecretsError):
             self._soledad_instance(
                 'leap@leap.se',
                 passphrase=u'123',
@@ -124,24 +123,10 @@ class AuxMethodsTestCase(BaseSoledadTest):
 
         sol2.close()
 
-    def test_change_passphrase_with_short_passphrase_raises(self):
-        """
-        Test if attempt to change passphrase passing a short passphrase
-        raises.
-        """
-        sol = self._soledad_instance(
-            'leap@leap.se',
-            passphrase=u'123')
-        # check that soledad complains about new passphrase length
-        self.assertRaises(
-            PassphraseTooShort,
-            sol.change_passphrase, u'54321')
-        sol.close()
-
     def test_get_passphrase(self):
         """
         Assert passphrase getter works fine.
         """
         sol = self._soledad_instance()
-        self.assertEqual('123', sol._passphrase)
+        self.assertEqual('123', sol.passphrase)
         sol.close()

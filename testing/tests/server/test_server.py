@@ -18,17 +18,13 @@
 Tests for server-related functionality.
 """
 import binascii
-import mock
 import os
 import pytest
 
-from hashlib import sha512
-from pkg_resources import resource_filename
 from urlparse import urljoin
 from uuid import uuid4
 
 from twisted.internet import defer
-from twisted.trial import unittest
 
 from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.couch import CouchDatabase
@@ -38,253 +34,10 @@ from test_soledad.util import (
     make_token_soledad_app,
     make_soledad_document_for_test,
     soledad_sync_target,
-    BaseSoledadTest,
 )
 
 from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
-from leap.soledad.server.config import load_configuration
-from leap.soledad.server.config import CONFIG_DEFAULTS
-from leap.soledad.server.auth import URLToAuthorization
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
-
-
-class ServerAuthenticationMiddlewareTestCase(CouchDBTestCase):
-
-    def setUp(self):
-        super(ServerAuthenticationMiddlewareTestCase, self).setUp()
-        app = mock.Mock()
-        self._state = CouchServerState(self.couch_url)
-        app.state = self._state
-        self.auth_middleware = SoledadTokenAuthMiddleware(app)
-        self._authorize('valid-uuid', 'valid-token')
-
-    def _authorize(self, uuid, token):
-        token_doc = {}
-        token_doc['_id'] = sha512(token).hexdigest()
-        token_doc[self._state.TOKENS_USER_ID_KEY] = uuid
-        token_doc[self._state.TOKENS_TYPE_KEY] = \
-            self._state.TOKENS_TYPE_DEF
-        dbname = self._state._tokens_dbname()
-        db = self.couch_server.create(dbname)
-        db.save(token_doc)
-        self.addCleanup(self.delete_db, db.name)
-
-    def test_authorized_user(self):
-        is_authorized = self.auth_middleware._verify_authentication_data
-        self.assertTrue(is_authorized('valid-uuid', 'valid-token'))
-        self.assertFalse(is_authorized('valid-uuid', 'invalid-token'))
-        self.assertFalse(is_authorized('invalid-uuid', 'valid-token'))
-        self.assertFalse(is_authorized('eve', 'invalid-token'))
-
-
-class ServerAuthorizationTestCase(BaseSoledadTest):
-
-    """
-    Tests related to Soledad server authorization.
-    """
-
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def _make_environ(self, path_info, request_method):
-        return {
-            'PATH_INFO': path_info,
-            'REQUEST_METHOD': request_method,
-        }
-
-    def test_verify_action_with_correct_dbnames(self):
-        """
-        Test encrypting and decrypting documents.
-
-        The following table lists the authorized actions among all possible
-        u1db remote actions:
-
-            URL path                      | Authorized actions
-            --------------------------------------------------
-            /                             | GET
-            /shared-db                    | GET
-            /shared-db/docs               | -
-            /shared-db/doc/{id}           | GET, PUT, DELETE
-            /shared-db/sync-from/{source} | -
-            /user-db                      | GET, PUT, DELETE
-            /user-db/docs                 | -
-            /user-db/doc/{id}             | -
-            /user-db/sync-from/{source}   | GET, PUT, POST
-        """
-        uuid = uuid4().hex
-        authmap = URLToAuthorization(uuid,)
-        dbname = authmap._user_db_name
-        # test global auth
-        self.assertTrue(
-            authmap.is_authorized(self._make_environ('/', 'GET')))
-        # test shared-db database resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared', 'POST')))
-        # test shared-db docs resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/docs', 'POST')))
-        # test shared-db doc resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'GET')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'PUT')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/doc/x', 'POST')))
-        # test shared-db sync resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/shared/sync-from/x', 'POST')))
-        # test user-db database resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'GET')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'PUT')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'POST')))
-        # test user-db docs resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'POST')))
-        # test user-db doc resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'POST')))
-        # test user-db sync resource auth
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'GET')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'DELETE')))
-        self.assertTrue(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
-
-    def test_verify_action_with_wrong_dbnames(self):
-        """
-        Test if authorization fails for a wrong dbname.
-        """
-        uuid = uuid4().hex
-        authmap = URLToAuthorization(uuid)
-        dbname = 'somedb'
-        # test wrong-db database resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s' % dbname, 'POST')))
-        # test wrong-db docs resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/docs' % dbname, 'POST')))
-        # test wrong-db doc resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/doc/x' % dbname, 'POST')))
-        # test wrong-db sync resource auth
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'GET')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'PUT')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'DELETE')))
-        self.assertFalse(
-            authmap.is_authorized(
-                self._make_environ('/%s/sync-from/x' % dbname, 'POST')))
 
 
 @pytest.mark.usefixtures("method_tmpdir")
@@ -382,7 +135,7 @@ class EncryptedSyncTestCase(
             user=user,
             prefix='x',
             auth_token='auth-token',
-            secrets_path=sol1._secrets_path,
+            secrets_path=sol1.secrets_path,
             passphrase=passphrase)
 
         # ensure remote db exists before syncing
@@ -474,45 +227,3 @@ class EncryptedSyncTestCase(
         Test if Soledad can sync many smallfiles.
         """
         return self._test_encrypted_sym_sync(doc_size=2, number_of_docs=100)
-
-
-class ConfigurationParsingTest(unittest.TestCase):
-
-    def setUp(self):
-        self.maxDiff = None
-
-    def test_use_defaults_on_failure(self):
-        config = load_configuration('this file will never exist')
-        expected = CONFIG_DEFAULTS
-        self.assertEquals(expected, config)
-
-    def test_security_values_configuration(self):
-        # given
-        config_path = resource_filename('test_soledad',
-                                        'fixture_soledad.conf')
-        # when
-        config = load_configuration(config_path)
-
-        # then
-        expected = {'members': ['user1', 'user2'],
-                    'members_roles': ['role1', 'role2'],
-                    'admins': ['user3', 'user4'],
-                    'admins_roles': ['role3', 'role3']}
-        self.assertDictEqual(expected, config['database-security'])
-
-    def test_server_values_configuration(self):
-        # given
-        config_path = resource_filename('test_soledad',
-                                        'fixture_soledad.conf')
-        # when
-        config = load_configuration(config_path)
-
-        # then
-        expected = {'couch_url':
-                    'http://soledad:passwd@localhost:5984',
-                    'create_cmd':
-                    'sudo -u soledad-admin /usr/bin/create-user-db',
-                    'admin_netrc':
-                    '/etc/couchdb/couchdb-soledad-admin.netrc',
-                    'batching': False}
-        self.assertDictEqual(expected, config['soledad-server'])

@@ -3,7 +3,7 @@ Description=Soledad Server
 
 [Service]
 Environment=PATH=/sbin:/bin:/usr/sbin:/usr/bin
-Environment=CLASS=leap.soledad.server.resource.SoledadResource
+Environment=CLASS=leap.soledad.server.entrypoint.SoledadEntrypoint
 Environment=HTTPS_PORT=2424
 Environment=CERT_PATH=/etc/soledad/soledad-server.pem
 Environment=PRIVKEY_PATH=/etc/soledad/soledad-server.key

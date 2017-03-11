@@ -20,7 +20,7 @@ class SoledadSignalingTestCase(BaseSoledadTest):
     def setUp(self):
         # mock signaling
         soledad.client.signal = Mock()
-        soledad.client.secrets.events.emit_async = Mock()
+        soledad.client._secrets.util.events.emit_async = Mock()
         # run parent's setUp
         BaseSoledadTest.setUp(self)
 
@@ -42,55 +42,36 @@ class SoledadSignalingTestCase(BaseSoledadTest):
           - downloading keys / done downloading keys.
           - uploading keys / done uploading keys.
         """
-        soledad.client.secrets.events.emit_async.reset_mock()
+        soledad.client._secrets.util.events.emit_async.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         sol = self._soledad_instance(
             secrets_path='alternative_stage3.json',
             local_db_path='alternative_stage3.u1db')
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.secrets.events.emit_async.mock_calls.reverse()
-        soledad.client.secrets.events.emit_async.call_args = \
-            soledad.client.secrets.events.emit_async.call_args_list[0]
-        soledad.client.secrets.events.emit_async.call_args_list.reverse()
+        soledad.client._secrets.util.events.emit_async.mock_calls.reverse()
+        soledad.client._secrets.util.events.emit_async.call_args = \
+            soledad.client._secrets.util.events.emit_async.call_args_list[0]
+        soledad.client._secrets.util.events.emit_async.call_args_list.reverse()
 
         user_data = {'userid': ADDRESS, 'uuid': ADDRESS}
 
-        # downloading keys signals
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DOWNLOADING_KEYS, user_data
-        )
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data
-        )
-        # creating keys signals
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_CREATING_KEYS, user_data
-        )
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_CREATING_KEYS, user_data
-        )
-        # downloading once more (inside _put_keys_in_shared_db)
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DOWNLOADING_KEYS, user_data
-        )
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data
-        )
-        # uploading keys signals
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_UPLOADING_KEYS, user_data
-        )
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_UPLOADING_KEYS, user_data
-        )
+        def _assert(*args, **kwargs):
+            mocked = soledad.client._secrets.util.events.emit_async
+            mocked.assert_called_with(*args)
+            pop = kwargs.get('pop')
+            if pop or pop is None:
+                self._pop_mock_call(mocked)
+
+        _assert(catalog.SOLEDAD_DOWNLOADING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_CREATING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_DONE_CREATING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_UPLOADING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_DOWNLOADING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_DONE_UPLOADING_KEYS, user_data, pop=False)
+
         sol.close()
 
     def test_stage2_bootstrap_signals(self):
@@ -101,11 +82,11 @@ class SoledadSignalingTestCase(BaseSoledadTest):
         # get existing instance so we have access to keys
         sol = self._soledad_instance()
         # create a document with secrets
-        doc = SoledadDocument(doc_id=sol.secrets._shared_db_doc_id())
-        doc.content = sol.secrets._export_recovery_document()
+        doc = SoledadDocument(doc_id=sol.secrets.storage._remote_doc_id())
+        doc.content = sol.secrets.crypto.encrypt(sol.secrets._secrets)
         sol.close()
         # reset mock
-        soledad.client.secrets.events.emit_async.reset_mock()
+        soledad.client._secrets.util.events.emit_async.reset_mock()
         # get a fresh instance so it emits all bootstrap signals
         shared_db = self.get_default_shared_mock(get_doc_return_value=doc)
         sol = self._soledad_instance(
@@ -114,20 +95,23 @@ class SoledadSignalingTestCase(BaseSoledadTest):
             shared_db_class=shared_db)
         # reverse call order so we can verify in the order the signals were
         # expected
-        soledad.client.secrets.events.emit_async.mock_calls.reverse()
-        soledad.client.secrets.events.emit_async.call_args = \
-            soledad.client.secrets.events.emit_async.call_args_list[0]
-        soledad.client.secrets.events.emit_async.call_args_list.reverse()
+        mocked = soledad.client._secrets.util.events.emit_async
+        mocked.mock_calls.reverse()
+        mocked.call_args = mocked.call_args_list[0]
+        mocked.call_args_list.reverse()
+
+        def _assert(*args, **kwargs):
+            mocked = soledad.client._secrets.util.events.emit_async
+            mocked.assert_called_with(*args)
+            pop = kwargs.get('pop')
+            if pop or pop is None:
+                self._pop_mock_call(mocked)
+
         # assert download keys signals
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DOWNLOADING_KEYS,
-            {'userid': ADDRESS, 'uuid': ADDRESS}
-        )
-        self._pop_mock_call(soledad.client.secrets.events.emit_async)
-        soledad.client.secrets.events.emit_async.assert_called_with(
-            catalog.SOLEDAD_DONE_DOWNLOADING_KEYS,
-            {'userid': ADDRESS, 'uuid': ADDRESS},
-        )
+        user_data = {'userid': ADDRESS, 'uuid': ADDRESS}
+        _assert(catalog.SOLEDAD_DOWNLOADING_KEYS, user_data)
+        _assert(catalog.SOLEDAD_DONE_DOWNLOADING_KEYS, user_data, pop=False)
+
         sol.close()
 
     def test_stage1_bootstrap_signals(self):

@@ -52,7 +52,6 @@ from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client._crypto import is_symmetrically_encrypted
 
 from leap.soledad.server import SoledadApp
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 
 
 PASSWORD = '123456'
@@ -108,7 +107,7 @@ def make_soledad_app(state):
 
 
 def make_token_soledad_app(state):
-    app = SoledadApp(state)
+    application = SoledadApp(state)
 
     def _verify_authentication_data(uuid, auth_data):
         if uuid.startswith('user-') and auth_data == 'auth-token':
@@ -119,7 +118,6 @@ def make_token_soledad_app(state):
     def _verify_authorization(uuid, environ):
         return True
 
-    application = SoledadTokenAuthMiddleware(app)
     application._verify_authentication_data = _verify_authentication_data
     application._verify_authorization = _verify_authorization
     return application
@@ -182,7 +180,6 @@ class MockedSharedDBTest(object):
             put_doc = Mock(side_effect=put_doc_side_effect)
             open = Mock(return_value=None)
             close = Mock(return_value=None)
-            syncable = True
 
             def __call__(self):
                 return self

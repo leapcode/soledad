@@ -19,7 +19,6 @@ Tests for cryptographic related stuff.
 """
 import binascii
 import base64
-import hashlib
 import json
 import os
 
@@ -111,7 +110,7 @@ class BlobTestCase(unittest.TestCase):
 
         assert len(preamble) == _crypto.PACMAN.size
         unpacked_data = _crypto.PACMAN.unpack(preamble)
-        magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
+        magic, sch, meth, ts, iv, doc_id, rev, _ = unpacked_data
         assert magic == _crypto.BLOB_SIGNATURE_MAGIC
         assert sch == 1
         assert meth == _crypto.ENC_METHOD.aes_256_gcm
@@ -186,99 +185,13 @@ class BlobTestCase(unittest.TestCase):
             yield crypto.decrypt_doc(doc2)
 
 
-class RecoveryDocumentTestCase(BaseSoledadTest):
-
-    def test_export_recovery_document_raw(self):
-        rd = self._soledad.secrets._export_recovery_document()
-        secret_id = rd[self._soledad.secrets.STORAGE_SECRETS_KEY].items()[0][0]
-        # assert exported secret is the same
-        secret = self._soledad.secrets._decrypt_storage_secret_version_1(
-            rd[self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id])
-        self.assertEqual(secret_id, self._soledad.secrets._secret_id)
-        self.assertEqual(secret, self._soledad.secrets._secrets[secret_id])
-        # assert recovery document structure
-        encrypted_secret = rd[
-            self._soledad.secrets.STORAGE_SECRETS_KEY][secret_id]
-        self.assertTrue(self._soledad.secrets.CIPHER_KEY in encrypted_secret)
-        self.assertEquals(
-            _crypto.ENC_METHOD.aes_256_gcm,
-            encrypted_secret[self._soledad.secrets.CIPHER_KEY])
-        self.assertTrue(self._soledad.secrets.LENGTH_KEY in encrypted_secret)
-        self.assertTrue(self._soledad.secrets.SECRET_KEY in encrypted_secret)
-
-    def test_import_recovery_document(self, cipher='aes256'):
-        rd = self._soledad.secrets._export_recovery_document(cipher)
-        s = self._soledad_instance()
-        s.secrets._import_recovery_document(rd)
-        s.secrets.set_secret_id(self._soledad.secrets._secret_id)
-        self.assertEqual(self._soledad.storage_secret,
-                         s.storage_secret,
-                         'Failed settinng secret for symmetric encryption.')
-        s.close()
-
-    def test_import_GCM_recovery_document(self):
-        cipher = self._soledad.secrets.CIPHER_AES256_GCM
-        self.test_import_recovery_document(cipher)
-
-    def test_import_legacy_CTR_recovery_document(self):
-        cipher = self._soledad.secrets.CIPHER_AES256
-        self.test_import_recovery_document(cipher)
-
-
 class SoledadSecretsTestCase(BaseSoledadTest):
 
-    def test_new_soledad_instance_generates_one_secret(self):
-        self.assertTrue(
-            self._soledad.storage_secret is not None,
-            "Expected secret to be something different than None")
-        number_of_secrets = len(self._soledad.secrets._secrets)
-        self.assertTrue(
-            number_of_secrets == 1,
-            "Expected exactly 1 secret, got %d instead." % number_of_secrets)
-
-    def test_generated_secret_is_of_correct_type(self):
-        expected_type = str
-        self.assertIsInstance(
-            self._soledad.storage_secret, expected_type,
-            "Expected secret to be of type %s" % expected_type)
-
-    def test_generated_secret_has_correct_lengt(self):
-        expected_length = self._soledad.secrets.GEN_SECRET_LENGTH
-        actual_length = len(self._soledad.storage_secret)
-        self.assertTrue(
-            expected_length == actual_length,
-            "Expected secret with length %d, got %d instead."
-            % (expected_length, actual_length))
-
-    def test_generated_secret_id_is_sha256_hash_of_secret(self):
-        generated = self._soledad.secrets.secret_id
-        expected = hashlib.sha256(self._soledad.storage_secret).hexdigest()
-        self.assertTrue(
-            generated == expected,
-            "Expeceted generated secret id to be sha256 hash, got something "
-            "else instead.")
-
-    def test_generate_new_secret_generates_different_secret_id(self):
-        # generate new secret
-        secret_id_1 = self._soledad.secrets.secret_id
-        secret_id_2 = self._soledad.secrets._gen_secret()
-        self.assertTrue(
-            len(self._soledad.secrets._secrets) == 2,
-            "Expected exactly 2 secrets.")
-        self.assertTrue(
-            secret_id_1 != secret_id_2,
-            "Expected IDs of secrets to be distinct.")
-        self.assertTrue(
-            secret_id_1 in self._soledad.secrets._secrets,
-            "Expected to find ID of first secret in Soledad Secrets.")
-        self.assertTrue(
-            secret_id_2 in self._soledad.secrets._secrets,
-            "Expected to find ID of second secret in Soledad Secrets.")
-
-    def test__has_secret(self):
-        self.assertTrue(
-            self._soledad._secrets._has_secret(),
-            "Should have a secret at this point")
+    def test_generated_secrets_have_correct_length(self):
+        expected = self._soledad.secrets.lengths
+        for name, length in expected.iteritems():
+            secret = getattr(self._soledad.secrets, name)
+            self.assertEqual(length, len(secret))
 
 
 class SoledadCryptoAESTestCase(BaseSoledadTest):
@@ -322,10 +235,74 @@ class SoledadCryptoAESTestCase(BaseSoledadTest):
             _crypto.decrypt_sym(cyphertext, wrongkey, iv)
 
 
-def _aes_encrypt(key, iv, data):
+class PreambleTestCase(unittest.TestCase):
+    class doc_info:
+        doc_id = 'D-deadbeef'
+        rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
+
+    def setUp(self):
+        self.cleartext = BytesIO(snowden1)
+        self.blob = _crypto.BlobEncryptor(
+            self.doc_info, self.cleartext,
+            secret='A' * 96)
+
+    def test_preamble_starts_with_magic_signature(self):
+        preamble = self.blob._encode_preamble()
+        assert preamble.startswith(_crypto.BLOB_SIGNATURE_MAGIC)
+
+    def test_preamble_has_cipher_metadata(self):
+        preamble = self.blob._encode_preamble()
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        encryption_scheme, encryption_method = unpacked[1:3]
+        assert encryption_scheme in _crypto.ENC_SCHEME
+        assert encryption_method in _crypto.ENC_METHOD
+        assert unpacked[4] == self.blob.iv
+
+    def test_preamble_has_document_sync_metadata(self):
+        preamble = self.blob._encode_preamble()
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        doc_id, doc_rev = unpacked[5:7]
+        assert doc_id == self.doc_info.doc_id
+        assert doc_rev == self.doc_info.rev
+
+    def test_preamble_has_document_size(self):
+        preamble = self.blob._encode_preamble()
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        size = unpacked[7]
+        assert size == len(snowden1)
+
+    @defer.inlineCallbacks
+    def test_preamble_can_come_without_size(self):
+        # XXX: This test case is here only to test backwards compatibility!
+        preamble = self.blob._encode_preamble()
+        # repack preamble using legacy format, without doc size
+        unpacked = _crypto.PACMAN.unpack(preamble)
+        preamble_without_size = _crypto.LEGACY_PACMAN.pack(*unpacked[0:7])
+        # encrypt it manually for custom tag
+        ciphertext, tag = _aes_encrypt(self.blob.sym_key, self.blob.iv,
+                                       self.cleartext.getvalue(),
+                                       aead=preamble_without_size)
+        ciphertext = ciphertext + tag
+        # encode it
+        ciphertext = base64.urlsafe_b64encode(ciphertext)
+        preamble_without_size = base64.urlsafe_b64encode(preamble_without_size)
+        # decrypt it
+        ciphertext = preamble_without_size + ' ' + ciphertext
+        cleartext = yield _crypto.BlobDecryptor(
+            self.doc_info, BytesIO(ciphertext),
+            secret='A' * 96).decrypt()
+        assert cleartext == self.cleartext.getvalue()
+        warnings = self.flushWarnings()
+        assert len(warnings) == 1
+        assert 'legacy document without size' in warnings[0]['message']
+
+
+def _aes_encrypt(key, iv, data, aead=''):
     backend = default_backend()
     cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=backend)
     encryptor = cipher.encryptor()
+    if aead:
+        encryptor.authenticate_additional_data(aead)
     return encryptor.update(data) + encryptor.finalize(), encryptor.tag
 
 

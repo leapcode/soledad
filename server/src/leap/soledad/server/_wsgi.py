@@ -15,40 +15,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-A WSGI application to serve as the root resource of the webserver.
-
-Use it like this:
-
-  twistd web --wsgi=leap.soledad.server.application.wsgi_application
+A WSGI application that serves Soledad synchronization.
 """
 from twisted.internet import reactor
+from twisted.web.wsgi import WSGIResource
 
 from leap.soledad.server import SoledadApp
-from leap.soledad.server.auth import SoledadTokenAuthMiddleware
 from leap.soledad.server.gzip_middleware import GzipMiddleware
-from leap.soledad.server.config import load_configuration
 from leap.soledad.common.backend import SoledadBackend
 from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.log import getLogger
 
+from twisted.logger import Logger
+log = Logger()
 
-__all__ = ['wsgi_application']
-
-
-def _load_config():
-    conf = load_configuration('/etc/soledad/soledad-server.conf')
-    return conf['soledad-server']
+__all__ = ['init_couch_state', 'get_sync_resource']
 
 
-def _get_couch_state():
-    conf = _load_config()
+def _get_couch_state(conf):
     state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'],
                              check_schema_versions=True)
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
     return state
 
 
-_app = SoledadTokenAuthMiddleware(SoledadApp(None))  # delay state init
+_app = SoledadApp(None)  # delay state init
 wsgi_application = GzipMiddleware(_app)
 
 
@@ -61,13 +52,14 @@ wsgi_application = GzipMiddleware(_app)
 # work.  Because of that, we delay couch state initialization until the reactor
 # is running.
 
-def _init_couch_state(_app):
+def init_couch_state(conf):
     try:
-        _app.state = _get_couch_state()
+        _app.state = _get_couch_state(conf)
     except Exception as e:
         logger = getLogger()
         logger.error(str(e))
         reactor.stop()
 
 
-reactor.callWhenRunning(_init_couch_state, _app)
+def get_sync_resource(pool):
+    return WSGIResource(reactor, pool, wsgi_application)

@@ -351,27 +351,11 @@ class ISecretsStorage(Interface):
     secrets_file_name = Attribute(
         "The name of the file where the storage secrets will be stored")
 
-    storage_secret = Attribute("")
-    remote_storage_secret = Attribute("")
-    shared_db = Attribute("The shared db object")
-
     # XXX this used internally from secrets, so it might be good to preserve
     # as a public boundary with other components.
 
     # We should also probably document its interface.
     secrets = Attribute("A SoledadSecrets object containing access to secrets")
-
-    def init_shared_db(self, server_url, uuid, creds):
-        """
-        Initialize the shared recovery database.
-
-        :param server_url:
-        :type server_url:
-        :param uuid:
-        :type uuid:
-        :param creds:
-        :type creds:
-        """
 
     def change_passphrase(self, new_passphrase):
         """
@@ -382,7 +366,3 @@ class ISecretsStorage(Interface):
 
         :raise NoStorageSecret: Raised if there's no storage secret available.
         """
-
-    # XXX not in use. Uncomment if we ever decide to allow
-    # multiple secrets.
-    # secret_id = Attribute("The id of the storage secret to be used")

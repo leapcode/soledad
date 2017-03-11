@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# __init__.py
-# Copyright (C) 2013 LEAP
+# _server_info.py
+# Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,34 +14,31 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-from leap.common.check import leap_assert as soledad_assert
-from leap.common.check import leap_assert_type as soledad_assert_type
-
-from ._version import get_versions
-
 """
-Soledad routines common to client and server.
+Resource that announces information about the server.
 """
+import json
+
+from twisted.web.resource import Resource
+
+from leap.soledad.server import __version__
 
 
-#
-# Global constants
-#
-
-SHARED_DB_NAME = 'shared'
+__all__ = ['ServerInfo']
 
 
-#
-# Global functions
-#
+class ServerInfo(Resource):
+    """
+    Return information about the server.
+    """
 
-__version__ = get_versions()['version']
-del get_versions
+    isLeaf = True
 
+    def __init__(self, blobs_enabled):
+        self._info = {
+            "blobs": blobs_enabled,
+            "version": __version__
+        }
 
-__all__ = [
-    "soledad_assert",
-    "soledad_assert_type",
-    "__version__",
-]
+    def render_GET(self, request):
+        return json.dumps(self._info)

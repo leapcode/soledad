@@ -397,7 +397,6 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
     ENCRYPT_LOOP_PERIOD = 1
 
     def __init__(self, opts, soledad_crypto, replica_uid, cert_file):
-
         self._opts = opts
         self._path = opts.path
         self._crypto = soledad_crypto

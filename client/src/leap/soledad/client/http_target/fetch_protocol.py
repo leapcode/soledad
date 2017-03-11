@@ -63,6 +63,8 @@ class DocStreamReceiver(ReadBodyProtocol):
         Deliver the accumulated response bytes to the waiting L{Deferred}, if
         the response body has been completely received without error.
         """
+        if self.deferred.called:
+            return
         try:
             if reason.check(ResponseDone):
                 self.dataBuffer = self.metadata
@@ -125,11 +127,7 @@ class DocStreamReceiver(ReadBodyProtocol):
         else:
             d = self._doc_reader(
                 self.current_doc, line.strip() or None, self.total)
-            d.addErrback(self._error)
-
-    def _error(self, reason):
-        logger.error(reason)
-        self.transport.loseConnection()
+            d.addErrback(self.deferred.errback)
 
     def finish(self):
         """

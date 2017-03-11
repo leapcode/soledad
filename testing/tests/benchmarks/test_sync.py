@@ -11,6 +11,12 @@ def load_up(client, amount, payload):
     yield gatherResults(deferreds)
 
 
+# Each test created with this function will:
+#
+#  - get a fresh client.
+#  - iterate:
+#    - setup: create N docs of a certain size
+#    - benchmark: sync() -- uploads N docs.
 def create_upload(uploads, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_upload")
@@ -29,6 +35,14 @@ test_upload_100_100k = create_upload(100, 100 * 1000)
 test_upload_1000_10k = create_upload(1000, 10 * 1000)
 
 
+# Each test created with this function will:
+#
+#  - get a fresh client.
+#  - create N docs of a certain size
+#  - sync (uploads those docs)
+#  - iterate:
+#    - setup: get a fresh client with empty local db
+#    - benchmark: sync() -- downloads N docs.
 def create_download(downloads, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_download")
@@ -41,7 +55,7 @@ def create_download(downloads, size):
         # ensures we are dealing with properly encrypted docs
 
         def setup():
-            return soledad_client()
+            return soledad_client(force_fresh_db=True)
 
         def sync(clean_client):
             return clean_client.sync()
