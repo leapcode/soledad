@@ -24,6 +24,7 @@ cache:
     #- sleep 3600
   artifacts:
     expire_in: 1w
+    when: always
     paths:
     - '*_*.xz'
     - '*_*.dsc'
