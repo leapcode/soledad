@@ -1,4 +1,8 @@
+# - Fail again on linitan errors once current ones are fixed
+# - Package after testing, not before
+#
 stages:
+  - package
   - code-check
   - tests
 
@@ -7,9 +11,28 @@ cache:
   paths:
   - testing/.tox/
 
+.job_template: &job_definition
+  stage: package
+  image: "0xacab.org:4567/leap/gitlab-buildpackage:build_${DIST}_${ARCH}"
+  script:
+    - "pwd; git describe"
+    - build-build-package
+    # Test the package with lintian
+    - build-test-lintian
+    - upload-package
+    # sleep 1h to allow debugging of running container
+    #- sleep 3600
+  artifacts:
+    expire_in: 1w
+    paths:
+    - '*_*.xz'
+    - '*_*.dsc'
+    - '*_amd64.changes'
+    - '*.deb'
+    - 'results/*'
+
 code-check:
   stage: code-check
-  image: leapcode/soledad:latest
   script:
     - cd testing
     - tox -e code-check
@@ -22,3 +45,11 @@ tests:
   script:
     - cd testing
     - tox -- --couch-url http://couchdb:5984
+
+package:amd64_jessie:
+  variables:
+    ARCH: "amd64"
+    DIST: "jessie"
+    # Don't try to freeze the python version
+    PRE_COMMIT_CMD: "/bin/true"
+  <<: *job_definition
