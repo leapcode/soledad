@@ -1,4 +1,4 @@
-# - Fail again on linitan errors once current ones are fixed
+# - Freeze python version
 # - Package after testing, not before
 #
 stages:
@@ -52,5 +52,5 @@ package:amd64_jessie:
     ARCH: "amd64"
     DIST: "jessie"
     # Don't try to freeze the python version
-    PRE_COMMIT_CMD: "/bin/true"
+    #PRE_COMMIT_CMD: "/bin/true"
   <<: *job_definition
