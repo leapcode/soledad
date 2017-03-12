@@ -5,18 +5,14 @@ set -e
 export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 # create soledad group
-getent group soledad > /dev/null
-RET=$?
-
-if [ ! $RET -eq 0 ]; then
+if ! getent group soledad > /dev/null
+then
     addgroup --system soledad
 fi
 
 # create soledad user
-id soledad > /dev/null 2>&1
-RET=$?
-
-if [ ! $RET -eq 0 ]; then
+if ! getent passwd soledad > /dev/null
+then
   adduser --system soledad --no-create-home --home /srv/leap/ --ingroup soledad
 fi
 
@@ -24,10 +20,8 @@ fi
 usermod -aG ssl-cert soledad
 
 # create soledad-admin user
-id soledad-admin > /dev/null 2>&1
-RET=$?
-
-if [ ! $RET -eq 0 ]; then
+if ! getent passwd soledad-admin > /dev/null
+then
   adduser --system soledad-admin --no-create-home --home /srv/leap/ --ingroup soledad
 fi
 
