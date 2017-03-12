@@ -82,8 +82,8 @@ class SoledadSynchronizer(Synchronizer):
              target_my_gen, target_my_trans_id) = yield \
                 sync_target.get_sync_info(self.source._replica_uid)
         except (errors.DatabaseDoesNotExist, BackendNotReadyError) as e:
-            logger.debug("Database isn't ready on server. Will be created.")
-            logger.debug("Reason: %s" % e.__class__)
+            logger.warn("Database isn't ready on server. Will be created.")
+            logger.warn("Reason: %s" % e.__class__)
             self.target_replica_uid = None
             target_gen, target_trans_id = 0, ''
             target_my_gen, target_my_trans_id = 0, ''
