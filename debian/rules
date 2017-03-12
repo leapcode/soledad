@@ -6,7 +6,7 @@
 %:
 	dh $@ --with systemd --with python2 --namespace=leap.soledad
 
-override_dh_auto_install: 
+override_dh_auto_install:
 	cd client && python setup.py install --root=../debian/soledad-client
 	cd common && python setup.py install --root=../debian/soledad-common
 	cd server && LEAP_SKIP_INIT=1 python setup.py install --root=../debian/soledad-server
@@ -17,7 +17,10 @@ override_dh_install:
 	    cp common/src/leap/__init__.py debian/soledad-common/usr/local/lib/python$$pv/*-packages/leap/; \
 	    cp common/src/leap/__init__.py debian/soledad-common/usr/local/lib/python$$pv/*-packages/leap/soledad/; \
 	done
-	dh_install
+
+override_dh_installinit:
+	dh_systemd_enable -p${NAME} --name=${NAME} ${NAME}.service
+	dh_installinit -p${NAME} --no-start --noscripts
 
 override_dh_auto_clean:
 	cd client && python setup.py clean -a
