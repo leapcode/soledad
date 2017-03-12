@@ -128,7 +128,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None, offline=False):
+                 auth_token=None):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -165,12 +165,6 @@ class Soledad(object):
             Authorization token for accessing remote databases.
         :type auth_token: str
 
-        :param offline:
-            If set to ``True``, this database will not attempt to save/load
-            secrets to/from server or synchronize with remote replicas (default
-            is ``False``)
-        :type offline: bool
-
         :raise BootstrapSequenceError:
             Raised when the secret initialization sequence (i.e. retrieval
             from server or generation and storage on server) has failed for
@@ -184,7 +178,6 @@ class Soledad(object):
         self.server_url = server_url
         self.shared_db = shared_db
         self.token = auth_token
-        self.offline = offline
 
         self._dbsyncer = None
 
@@ -649,7 +642,7 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         # maybe bypass sync
-        if self.offline or not self.token:
+        if not self.token:
             generation = self._dbsyncer.get_generation()
             return defer.succeed(generation)
 
