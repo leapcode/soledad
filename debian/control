@@ -9,7 +9,7 @@ Standards-Version: 3.9.8
 
 Package: soledad-server
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, python-configparser, python-couchdb,
+Depends: ${misc:Depends}, ${python:Depends}, adduser, python-configparser, python-couchdb,
  python-simplejson, python-oauth, python-u1db, python-routes, python-openssl,
  soledad-common (>= 0.9.0), python-six, python-twisted-web (>= 16.2.0-1~bpo8+1),
  sudo, python-beaker
