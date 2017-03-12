@@ -2,9 +2,10 @@ Source: soledad
 Section: python
 Priority: optional
 Maintainer: Micah Anderson <micah@debian.org>
+Uploaders: LEAP automated build <sysdev@leap.se>
 Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 9),
   dh-python, dh-systemd (>= 1.5)
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 
 Package: soledad-server
 Architecture: all
