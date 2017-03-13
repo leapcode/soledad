@@ -47,10 +47,20 @@ Compatibility
 Tests
 -----
 
+System dependencies::
+
+  python3-venv
+
+Install local dependencies::
+
+  $ cd testing
+  $ pyvenv test-env
+  $ source test-env/bin/activate
+  $ pip3 install -U -r requirements-testing.pip
+
 Soledad tests use tox, and they live in the testing folder::
 
-  cd testing
-  tox
+  $ tox
 
 Note that to run CouchDB tests, be sure you have `CouchDB`_ installed on your
 system.

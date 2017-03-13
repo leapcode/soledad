@@ -21,3 +21,4 @@ scripts/profiling/sync/profiles
 
 testing/htmlcov
 testing/.coverage
+testing/test-env
