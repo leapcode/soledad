@@ -21,7 +21,7 @@ import os
 import pytest
 import threading
 
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 from twisted.internet import defer
 from uuid import uuid4
 

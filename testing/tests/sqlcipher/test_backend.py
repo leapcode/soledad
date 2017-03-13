@@ -21,8 +21,11 @@ import os
 import pytest
 import time
 import threading
-
-from pysqlcipher import dbapi2
+import sys
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 from testscenarios import TestWithScenarios
 
 # l2db stuff.
@@ -148,7 +151,7 @@ class TestSQLCipherDatabase(tests.TestCase):
             def run(self):
                 try:
                     db2 = SQLCipherDatabaseTesting(dbname, 2)
-                except Exception, e:
+                except Exception as e:
                     SecondTry.outcome2.append(e)
                 else:
                     SecondTry.outcome2.append(db2)

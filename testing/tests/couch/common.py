@@ -1,5 +1,5 @@
 from uuid import uuid4
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 from couchdb.client import Server
 
 from leap.soledad.common import couch

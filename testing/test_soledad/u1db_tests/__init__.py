@@ -23,11 +23,16 @@ import socket
 import tempfile
 import threading
 import json
+import sys
 
+from six import StringIO
 from wsgiref import simple_server
 
-from pysqlcipher import dbapi2
-from StringIO import StringIO
+
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 
 import testscenarios
 from twisted.trial import unittest

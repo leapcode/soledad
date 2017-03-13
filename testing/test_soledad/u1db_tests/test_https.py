@@ -84,7 +84,7 @@ class TestHttpSyncTargetHttpsSupport(tests.TestCaseWithServer):
         remote_target = self.getSyncTarget('localhost', 'test')
         try:
             remote_target.record_sync_info('other-id', 2, 'T-id')
-        except ssl.SSLError, e:
+        except ssl.SSLError as e:
             self.assertIn("certificate verify failed", str(e))
         else:
             self.fail("certificate verification should have failed.")

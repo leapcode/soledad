@@ -10,9 +10,9 @@ from test_soledad.util import CouchDBTestCase
 from test_soledad.util import make_local_db_and_target
 from test_soledad.u1db_tests import DatabaseBaseTests
 
-from common import simple_doc
-from common import nested_doc
-from common import COUCH_SCENARIOS
+from .common import simple_doc
+from .common import nested_doc
+from .common import COUCH_SCENARIOS
 
 
 target_scenarios = [

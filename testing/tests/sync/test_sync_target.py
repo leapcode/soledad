@@ -17,13 +17,14 @@
 """
 Test Leap backend bits: sync target
 """
-import cStringIO
 import os
 import time
 import json
 import random
 import string
 import shutil
+
+from six import StringIO as cStringIO
 from uuid import uuid4
 
 from testscenarios import TestWithScenarios

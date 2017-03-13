@@ -24,12 +24,17 @@ import random
 import string
 import couchdb
 import pytest
+import sys
 
+from six.moves.urllib.parse import urljoin
+from six import StringIO
 from uuid import uuid4
 from mock import Mock
-from urlparse import urljoin
-from StringIO import StringIO
-from pysqlcipher import dbapi2
+
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 
 from twisted.trial import unittest
 

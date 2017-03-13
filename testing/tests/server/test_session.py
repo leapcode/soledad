@@ -156,7 +156,7 @@ class SoledadSessionTestCase(unittest.TestCase):
                 return {}
 
             def decode(self, response, request):
-                print "decode raised"
+                print("decode raised")
                 raise UnexpectedException()
 
         self.wrapper._credentialFactory = BadFactory()

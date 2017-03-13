@@ -21,7 +21,7 @@ import binascii
 import os
 import pytest
 
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 from uuid import uuid4
 
 from twisted.internet import defer

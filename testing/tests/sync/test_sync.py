@@ -18,7 +18,7 @@ import json
 import threading
 import time
 
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 from mock import Mock
 from twisted.internet import defer
 

@@ -7,7 +7,7 @@ import time
 
 from hashlib import sha512
 from subprocess import check_call
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 from uuid import uuid4
 
 from leap.soledad.common.couch import CouchDatabase

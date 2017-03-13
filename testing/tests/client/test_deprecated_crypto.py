@@ -1,9 +1,8 @@
 import json
 
 from pytest import inlineCallbacks
-
+from six.moves.urllib.parse import urljoin
 from uuid import uuid4
-from urlparse import urljoin
 
 from leap.soledad.client import crypto as old_crypto
 from leap.soledad.common.couch import CouchDatabase

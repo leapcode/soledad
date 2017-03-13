@@ -19,7 +19,7 @@ Test ObjectStore and Couch backend bits.
 """
 
 from uuid import uuid4
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 from testscenarios import TestWithScenarios
 from twisted.trial import unittest
 
@@ -28,7 +28,7 @@ from leap.soledad.common import couch
 from test_soledad.util import CouchDBTestCase
 from test_soledad.u1db_tests import test_backends
 
-from common import COUCH_SCENARIOS
+from .common import COUCH_SCENARIOS
 
 
 # -----------------------------------------------------------------------------

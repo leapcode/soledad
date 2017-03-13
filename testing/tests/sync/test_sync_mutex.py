@@ -25,7 +25,7 @@ be two concurrent synchronization processes at the same time.
 import time
 import uuid
 
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 
 from twisted.internet import defer
 
