@@ -21,13 +21,13 @@ import base64
 from StringIO import StringIO
 from uuid import uuid4
 
-from twisted.web.error import Error
 from twisted.internet import defer
 from twisted.web.http_headers import Headers
 from twisted.web.client import FileBodyProducer
 
 from leap.soledad.client.http_target.support import readBody
 from leap.soledad.common.errors import InvalidAuthTokenError
+from leap.soledad.common.l2db.errors import HTTPError
 from leap.soledad.common.l2db import SyncTarget
 
 
@@ -242,7 +242,7 @@ def _unauth_to_invalid_token_error(failure):
     :return: Either the original failure or an invalid auth token error.
     :rtype: twisted.python.failure.Failure
     """
-    failure.trap(Error)
-    if failure.getErrorMessage() == "401 Unauthorized":
+    failure.trap(HTTPError)
+    if failure.value.status == 401:
         raise InvalidAuthTokenError
     return failure
