@@ -642,6 +642,9 @@ class Soledad(object):
         :rtype: twisted.internet.defer.Deferred
         """
         # maybe bypass sync
+        # TODO: That's because bitmask may not provide us a token, but
+        # this should be handled on the caller side. Here, calling us without
+        # a token is a real error.
         if not self.token:
             generation = self._dbsyncer.get_generation()
             return defer.succeed(generation)
