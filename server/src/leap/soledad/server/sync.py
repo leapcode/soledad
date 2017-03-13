@@ -18,7 +18,7 @@
 Server side synchronization infrastructure.
 """
 import time
-from itertools import izip
+from six.moves import zip as izip
 
 from leap.soledad.common.l2db import sync
 from leap.soledad.common.l2db.remote import http_app

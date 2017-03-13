@@ -323,7 +323,7 @@ class Parser(object):
             else:
                 try:
                     inner = arg_type(arg)
-                except ValueError, e:
+                except ValueError as e:
                     raise errors.IndexDefinitionParseError(
                         "Invalid value %r for argument type %r "
                         "(%r)." % (arg, arg_type, e))

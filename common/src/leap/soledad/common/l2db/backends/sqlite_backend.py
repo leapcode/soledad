@@ -58,7 +58,7 @@ class SQLiteDatabase(CommonBackend):
         try:
             c.execute("SELECT value FROM u1db_config"
                       " WHERE name = 'index_storage'")
-        except dbapi2.OperationalError, e:
+        except dbapi2.OperationalError as e:
             # The table does not exist yet
             return None, e
         else:
@@ -668,7 +668,7 @@ class SQLiteDatabase(CommonBackend):
         c = self._db_handle.cursor()
         try:
             c.execute(statement, tuple(args))
-        except dbapi2.OperationalError, e:
+        except dbapi2.OperationalError as e:
             raise dbapi2.OperationalError(
                 str(e) +
                 '\nstatement: %s\nargs: %s\n' % (statement, args))
@@ -768,7 +768,7 @@ class SQLiteDatabase(CommonBackend):
         c = self._db_handle.cursor()
         try:
             c.execute(statement, tuple(args))
-        except dbapi2.OperationalError, e:
+        except dbapi2.OperationalError as e:
             raise dbapi2.OperationalError(
                 str(e) +
                 '\nstatement: %s\nargs: %s\n' % (statement, args))
@@ -798,7 +798,7 @@ class SQLiteDatabase(CommonBackend):
                 value_fields))
         try:
             c.execute(statement, tuple(definition))
-        except dbapi2.OperationalError, e:
+        except dbapi2.OperationalError as e:
             raise dbapi2.OperationalError(
                 str(e) +
                 '\nstatement: %s\nargs: %s\n' % (statement, tuple(definition)))
@@ -893,7 +893,10 @@ class SQLitePartialExpandDatabase(SQLiteDatabase):
                 stored_def = self._get_index_definition(index_name)
                 if stored_def == [x[-1] for x in definition]:
                     return
-                raise errors.IndexNameTakenError, e, sys.exc_info()[2]
+                raise errors.IndexNameTakenError(
+                    str(e) +
+                    str(sys.exc_info()[2])
+                )
             new_fields = set(
                 [f for f in index_expressions if f not in cur_fields])
             if new_fields:

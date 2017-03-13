@@ -25,9 +25,8 @@ import re
 import uuid
 import binascii
 
-
-from StringIO import StringIO
-from urlparse import urljoin
+from six import StringIO
+from six.moves.urllib.parse import urljoin
 from contextlib import contextmanager
 
 

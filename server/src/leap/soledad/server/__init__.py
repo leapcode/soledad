@@ -82,7 +82,7 @@ documents on the shared database is handled by `leap.soledad.server.auth`
 module.
 """
 
-import urlparse
+import six.moves.urllib.parse as urlparse
 import sys
 
 from leap.soledad.common.l2db.remote import http_app, utils

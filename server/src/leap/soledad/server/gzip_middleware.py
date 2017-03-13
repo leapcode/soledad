@@ -17,7 +17,7 @@
 """
 Gzip middleware for WSGI apps.
 """
-import StringIO
+from six import StringIO
 from gzip import GzipFile
 
 

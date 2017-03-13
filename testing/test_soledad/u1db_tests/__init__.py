@@ -28,12 +28,6 @@ import sys
 from six import StringIO
 from wsgiref import simple_server
 
-
-if sys.version_info[0] < 3:
-    from pysqlcipher import dbapi2
-else:
-    from pysqlcipher3 import dbapi2
-
 import testscenarios
 from twisted.trial import unittest
 from twisted.web.server import Site
@@ -47,6 +41,11 @@ from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.l2db.remote import server_state
 from leap.soledad.common.l2db.remote import http_app
 from leap.soledad.common.l2db.remote import http_target
+
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 
 
 class TestCase(unittest.TestCase):

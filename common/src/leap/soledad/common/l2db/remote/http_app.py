@@ -21,11 +21,11 @@ HTTP Application exposing U1DB.
 # TODO -- deprecate, use twisted/txaio.
 
 import functools
-import httplib
+import six.moves.http_client as httplib
 import inspect
 import json
 import sys
-import urlparse
+import six.moves.urllib.parse as urlparse
 
 import routes.mapper
 
@@ -610,7 +610,7 @@ class HTTPApp(object):
         try:
             resource = self._lookup_resource(environ, responder)
             HTTPInvocationByMethodWithBody(resource, environ, self)()
-        except errors.U1DBError, e:
+        except errors.U1DBError as e:
             self.request_u1db_error(environ, e)
             status = http_errors.wire_description_to_status.get(
                 e.wire_description, 500)

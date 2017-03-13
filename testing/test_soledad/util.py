@@ -31,11 +31,6 @@ from six import StringIO
 from uuid import uuid4
 from mock import Mock
 
-if sys.version_info[0] < 3:
-    from pysqlcipher import dbapi2
-else:
-    from pysqlcipher3 import dbapi2
-
 from twisted.trial import unittest
 
 from leap.common.testing.basetest import BaseLeapTest
@@ -48,7 +43,6 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import CouchServerState
 
-
 from leap.soledad.client import Soledad
 from leap.soledad.client import http_target
 from leap.soledad.client import auth
@@ -57,6 +51,11 @@ from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client._crypto import is_symmetrically_encrypted
 
 from leap.soledad.server import SoledadApp
+
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 
 
 PASSWORD = '123456'

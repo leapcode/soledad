@@ -19,7 +19,8 @@ Server state using CouchDatabase as backend.
 """
 import couchdb
 import re
-from urlparse import urljoin
+
+from six.moves.urllib.parse import urljoin
 
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.couch import CouchDatabase

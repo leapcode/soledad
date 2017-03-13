@@ -30,7 +30,7 @@ import struct
 import time
 
 from io import BytesIO
-from itertools import imap
+from six.moves import map as imap
 from collections import namedtuple
 
 from twisted.internet import defer
@@ -43,7 +43,7 @@ from cryptography.hazmat.backends.multibackend import MultiBackend
 from cryptography.hazmat.backends.openssl.backend \
     import Backend as OpenSSLBackend
 
-from zope.interface import implements
+from zope.interface import implementer
 
 
 SECRET_LENGTH = 64
@@ -290,7 +290,7 @@ class BlobDecryptor(object):
                 magic, sch, meth, ts, iv, doc_id, rev, doc_size = unpacked_data
             else:
                 raise InvalidBlob("Unexpected preamble size %d", len(preamble))
-        except struct.error, e:
+        except struct.error as e:
             raise InvalidBlob(e)
 
         if magic != BLOB_SIGNATURE_MAGIC:
@@ -325,12 +325,12 @@ class BlobDecryptor(object):
         return d
 
 
+@implementer(interfaces.IConsumer)
 class AESWriter(object):
     """
     A Twisted's Consumer implementation that takes an input file descriptor and
     applies AES-256 cipher in GCM mode.
     """
-    implements(interfaces.IConsumer)
 
     def __init__(self, key, iv=None, _buffer=None, tag=None, mode=modes.GCM):
         if len(key) != 32:

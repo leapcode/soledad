@@ -15,7 +15,7 @@
 # along with u1db.  If not, see <http://www.gnu.org/licenses/>.
 
 """The synchronization utilities for U1DB."""
-from itertools import izip
+from six.moves import zip as izip
 
 from leap.soledad.common import l2db
 from leap.soledad.common.l2db import errors

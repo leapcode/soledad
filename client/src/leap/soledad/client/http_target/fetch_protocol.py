@@ -16,7 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 from functools import partial
-from cStringIO import StringIO
+from six import StringIO
 from twisted.web._newclient import ResponseDone
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.remote import utils
@@ -70,7 +70,7 @@ class DocStreamReceiver(ReadBodyProtocol):
                 self.dataBuffer = self.metadata
             else:
                 self.dataBuffer = self.finish()
-        except errors.BrokenSyncStream, e:
+        except errors.BrokenSyncStream as e:
             return self.deferred.errback(e)
         return ReadBodyProtocol.connectionLost(self, reason)
 

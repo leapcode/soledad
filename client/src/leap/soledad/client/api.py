@@ -27,20 +27,19 @@ remote storage in the server side.
 """
 import binascii
 import errno
-import httplib
 import os
 import socket
 import ssl
 import uuid
-import urlparse
 
 from itertools import chain
-
-from StringIO import StringIO
+import six.moves.http_client as httplib
+import six.moves.urllib.parse as urlparse
+from six import StringIO
 from collections import defaultdict
 
 from twisted.internet import defer
-from zope.interface import implements
+from zope.interface import implementer
 
 from leap.common.config import get_path_prefix
 from leap.common.plugins import collect_plugins
@@ -79,6 +78,9 @@ Soledad client and server.
 SOLEDAD_CERT = None
 
 
+@implementer(soledad_interfaces.ILocalStorage,
+             soledad_interfaces.ISyncableStorage,
+             soledad_interfaces.ISecretsStorage)
 class Soledad(object):
     """
     Soledad provides encrypted data storage and sync.
@@ -111,9 +113,6 @@ class Soledad(object):
           there's indeed new data to be synchronized between local database
           replica and server's replica. --- not used right now.
     """
-    implements(soledad_interfaces.ILocalStorage,
-               soledad_interfaces.ISyncableStorage,
-               soledad_interfaces.ISecretsStorage)
 
     local_db_file_name = 'soledad.u1db'
     secrets_file_name = "soledad.json"

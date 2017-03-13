@@ -45,7 +45,7 @@ def exec_validated_cmd(cmd, argument, validator=None):
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-    except OSError, e:
+    except OSError as e:
         return 1, e
     (out, err) = process.communicate()
     code = process.wait()

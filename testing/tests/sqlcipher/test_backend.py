@@ -22,11 +22,6 @@ import pytest
 import time
 import threading
 import sys
-if sys.version_info[0] < 3:
-    from pysqlcipher import dbapi2
-else:
-    from pysqlcipher3 import dbapi2
-from testscenarios import TestWithScenarios
 
 # l2db stuff.
 from leap.soledad.common.l2db import errors
@@ -47,6 +42,13 @@ from test_soledad.u1db_tests import test_open
 from test_soledad.util import SQLCIPHER_SCENARIOS
 from test_soledad.util import PASSWORD
 from test_soledad.util import BaseSoledadTest
+
+from testscenarios import TestWithScenarios
+
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 
 
 def sqlcipher_open(path, passphrase, create=True, document_factory=None):

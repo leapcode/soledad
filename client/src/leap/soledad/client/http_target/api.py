@@ -18,7 +18,7 @@ import os
 import json
 import base64
 
-from StringIO import StringIO
+from six import StringIO
 from uuid import uuid4
 
 from twisted.internet import defer

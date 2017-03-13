@@ -14,19 +14,18 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from zope.interface import implements
+from zope.interface import implementer
 from twisted.internet import defer
 from twisted.internet import reactor
 from twisted.web.iweb import IBodyProducer
 from twisted.web.iweb import UNKNOWN_LENGTH
 
 
+@implementer(IBodyProducer)
 class DocStreamProducer(object):
     """
     A producer that writes the body of a request to a consumer.
     """
-
-    implements(IBodyProducer)
 
     def __init__(self, producer):
         """

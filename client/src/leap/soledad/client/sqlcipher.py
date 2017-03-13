@@ -42,10 +42,9 @@ SQLCipher 1.1 databases, we do not implement them as all SQLCipher databases
 handled by Soledad should be created by SQLCipher >= 2.0.
 """
 import os
+import sys
 
 from functools import partial
-
-from pysqlcipher import dbapi2 as sqlcipher_dbapi2
 
 from twisted.internet import reactor
 from twisted.internet import defer
@@ -62,6 +61,10 @@ from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client import pragmas
 
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2 as sqlcipher_dbapi2
+else:
+    from pysqlcipher3 import dbapi2 as sqlcipher_dbapi2
 
 logger = getLogger(__name__)
 
@@ -306,7 +309,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
             ))
         try:
             c.execute(statement, tuple(args))
-        except sqlcipher_dbapi2.OperationalError, e:
+        except sqlcipher_dbapi2.OperationalError as e:
             raise sqlcipher_dbapi2.OperationalError(
                 str(e) + '\nstatement: %s\nargs: %s\n' % (statement, args))
         res = c.fetchall()

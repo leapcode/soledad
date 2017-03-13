@@ -16,14 +16,13 @@
 
 """Base class to make requests to a remote HTTP server."""
 
-import httplib
 import json
 import socket
 import ssl
 import sys
-import urlparse
 import urllib
-
+import six.moves.urllib.parse as urlparse
+import six.moves.http_client as httplib
 from time import sleep
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db.remote import http_errors
@@ -168,7 +167,7 @@ class HTTPClientBase(object):
             try:
                 self._conn.request(method, url_query, body, headers)
                 return self._response()
-            except errors.Unavailable, e:
+            except errors.Unavailable as e:
                 sleep(delay)
         raise e
 

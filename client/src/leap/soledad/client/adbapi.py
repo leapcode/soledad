@@ -26,13 +26,16 @@ from functools import partial
 from twisted.enterprise import adbapi
 from twisted.internet.defer import DeferredSemaphore
 from zope.proxy import ProxyBase, setProxiedObject
-from pysqlcipher import dbapi2
 
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.errors import DatabaseAccessError
-
 from leap.soledad.client import sqlcipher as soledad_sqlcipher
 from leap.soledad.client.pragmas import set_init_pragmas
+
+if sys.version_info[0] < 3:
+    from pysqlcipher import dbapi2
+else:
+    from pysqlcipher3 import dbapi2
 
 
 logger = getLogger(__name__)
@@ -276,7 +279,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
                 conn.rollback()
             except:
                 logger.error(None, "Rollback failed")
-            raise excType, excValue, excTraceback
+            raise excType(excValue, excTraceback)
 
     def finalClose(self):
         """
