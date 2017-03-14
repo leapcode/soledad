@@ -33,7 +33,7 @@ from twisted.web.client import FileBodyProducer
 from twisted.web.server import NOT_DONE_YET
 
 from zope.interface import Interface, implementer
-from ._config import get_config
+from leap.soledad.server._config import get_config
 
 
 __all__ = ['BlobsResource', 'blobs_resource']
@@ -195,7 +195,7 @@ if __name__ == '__main__':
     from twisted.internet import reactor
 
     # XXX pass the path here
-    root = BlobsResource()
+    root = BlobsResource('/tmp/blobs/user')
     # I picture somethink like
     # BlobsResource(backend="filesystem", backend_opts={'path': '/tmp/blobs'})
 
