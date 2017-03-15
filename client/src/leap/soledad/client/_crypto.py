@@ -328,15 +328,16 @@ class BlobDecryptor(object):
         self.armor = armor
         self._producer = None
         self.result = result or BytesIO()
-        self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
+        sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         self.size = None
-        self.tag = tag
+        self.tag = None
+
         preamble, iv = self._consume_preamble()
         assert preamble
         assert iv
-        self._aes = AESWriter(self.sym_key, iv, self.result, tag=self.tag)
-        self._aes.authenticate(preamble)
 
+        self._aes = AESWriter(sym_key, iv, self.result, tag=tag or self.tag)
+        self._aes.authenticate(preamble)
         if start_stream:
             self._start_stream()
 
@@ -346,12 +347,18 @@ class BlobDecryptor(object):
     def _consume_preamble(self):
         self.fd.seek(0)
         try:
-            preamble, ciphertext = self.fd.getvalue().split(SEPARATOR, 1)
-            preamble = base64.urlsafe_b64decode(preamble)
-            if self.armor:
-                ciphertext = base64.urlsafe_b64decode(ciphertext)
-            tag, ciphertext = ciphertext[-16:], ciphertext[:-16]
-            self.tag = self.tag or tag
+            parts = self.fd.getvalue().split(SEPARATOR, 1)
+            preamble = base64.urlsafe_b64decode(parts[0])
+            if len(parts) == 2:
+                ciphertext = parts[1]
+                if self.armor:
+                    ciphertext = base64.urlsafe_b64decode(ciphertext)
+                self.tag, ciphertext = ciphertext[-16:], ciphertext[:-16]
+                self.fd.seek(0)
+                self.fd.write(ciphertext)
+                self.fd.seek(len(ciphertext))
+                self.fd.truncate()
+                self.fd.seek(0)
 
         except (TypeError, ValueError):
             raise InvalidBlob
@@ -387,11 +394,6 @@ class BlobDecryptor(object):
         if doc_id != self.doc_id:
             raise InvalidBlob('invalid doc id')
 
-        self.fd.seek(0)
-        self.fd.write(ciphertext)
-        self.fd.seek(len(ciphertext))
-        self.fd.truncate()
-        self.fd.seek(0)
         return preamble, iv
 
     def _end_stream(self):

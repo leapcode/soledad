@@ -143,6 +143,35 @@ class BlobTestCase(unittest.TestCase):
         assert str(decrypted) == snowden1
 
     @defer.inlineCallbacks
+    def test_init_with_preamble_alone(self):
+        ciphertext = yield self.blob.encrypt()
+        preamble = ciphertext.getvalue().split()[0]
+        decryptor = _crypto.BlobDecryptor(
+            self.doc_info, BytesIO(preamble),
+            start_stream=False,
+            secret='A' * 96)
+        assert decryptor._consume_preamble()
+
+    @defer.inlineCallbacks
+    def test_incremental_blob_decryptor(self):
+        ciphertext = yield self.blob.encrypt()
+        preamble, ciphertext = ciphertext.getvalue().split()
+        ciphertext = base64.urlsafe_b64decode(ciphertext)
+
+        decryptor = _crypto.BlobDecryptor(
+            self.doc_info, BytesIO(preamble),
+            start_stream=False,
+            secret='A' * 96,
+            tag=ciphertext[-16:])
+        ciphertext = BytesIO(ciphertext[:-16])
+        chunk = ciphertext.read(10)
+        while chunk:
+            decryptor.write(chunk)
+            chunk = ciphertext.read(10)
+        decrypted = decryptor._end_stream()
+        assert decrypted.getvalue() == snowden1
+
+    @defer.inlineCallbacks
     def test_blob_decryptor(self):
         ciphertext = yield self.blob.encrypt()
 
