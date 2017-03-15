@@ -300,8 +300,7 @@ class BlobEncryptor(object):
             result.write(
                 base64.urlsafe_b64encode(encrypted + self.tag))
         else:
-            result.write(encrypted)
-            result.write(self.tag)
+            result.write(encrypted + self.tag)
 
         result.seek(0)
         return defer.succeed(result)
@@ -319,28 +318,25 @@ class BlobDecryptor(object):
     # TODO enable the ascii armor = False
 
     def __init__(self, doc_info, ciphertext_fd, result=None,
-                 secret=None, armor=True, start_stream=True):
+                 secret=None, armor=True, start_stream=True, tag=None):
         if not secret:
             raise EncryptionDecryptionError('no secret given')
-        if armor is False:
-            raise NotImplementedError
 
         self.doc_id = doc_info.doc_id
         self.rev = doc_info.rev
         self.fd = ciphertext_fd
         self.armor = armor
         self._producer = None
+        self.result = result or BytesIO()
+        self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         self.size = None
-
+        self.tag = tag
         preamble, iv = self._consume_preamble()
         assert preamble
         assert iv
-
-        self.result = result or BytesIO()
-        sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
-
-        self._aes = AESWriter(sym_key, iv, self.result, tag=self.tag)
+        self._aes = AESWriter(self.sym_key, iv, self.result, tag=self.tag)
         self._aes.authenticate(preamble)
+
         if start_stream:
             self._start_stream()
 
@@ -348,14 +344,14 @@ class BlobDecryptor(object):
         self._producer = FileBodyProducer(self.fd, readSize=2**16)
 
     def _consume_preamble(self):
-
         self.fd.seek(0)
         try:
-            parts = self.fd.getvalue().split()
-            encoded_preamble = parts[0]
-            preamble = base64.urlsafe_b64decode(encoded_preamble)
-            ciphertext = base64.urlsafe_b64decode(parts[1])
-            self.tag, ciphertext = ciphertext[-16:], ciphertext[:-16]
+            preamble, ciphertext = self.fd.getvalue().split(SEPARATOR, 1)
+            preamble = base64.urlsafe_b64decode(preamble)
+            if self.armor:
+                ciphertext = base64.urlsafe_b64decode(ciphertext)
+            tag, ciphertext = ciphertext[-16:], ciphertext[:-16]
+            self.tag = self.tag or tag
 
         except (TypeError, ValueError):
             raise InvalidBlob

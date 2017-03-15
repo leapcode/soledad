@@ -95,16 +95,30 @@ class BlobTestCase(unittest.TestCase):
         doc_id = 'D-deadbeef'
         rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
 
-    @defer.inlineCallbacks
-    def test_blob_encryptor(self):
-
-        inf = BytesIO(snowden1)
-
-        blob = _crypto.BlobEncryptor(
-            self.doc_info, inf,
+    def setUp(self):
+        self.inf = BytesIO(snowden1)
+        self.blob = _crypto.BlobEncryptor(
+            self.doc_info, self.inf,
+            armor=True,
             secret='A' * 96)
 
-        encrypted = yield blob.encrypt()
+    @defer.inlineCallbacks
+    def test_unarmored_blob_encrypt(self):
+        self.blob.armor = False
+        encrypted = yield self.blob.encrypt()
+        decode = base64.urlsafe_b64decode
+        with pytest.raises(TypeError):
+            assert map(decode, encrypted.getvalue().split())
+
+    @defer.inlineCallbacks
+    def test_default_armored_blob_encrypt(self):
+        encrypted = yield self.blob.encrypt()
+        decode = base64.urlsafe_b64decode
+        assert map(decode, encrypted.getvalue().split())
+
+    @defer.inlineCallbacks
+    def test_blob_encryptor(self):
+        encrypted = yield self.blob.encrypt()
         preamble, ciphertext = encrypted.getvalue().split()
         preamble = base64.urlsafe_b64decode(preamble)
         ciphertext = base64.urlsafe_b64decode(ciphertext)
@@ -116,30 +130,36 @@ class BlobTestCase(unittest.TestCase):
         assert magic == _crypto.BLOB_SIGNATURE_MAGIC
         assert sch == 1
         assert meth == _crypto.ENC_METHOD.aes_256_gcm
-        assert iv == blob.iv
+        assert iv == self.blob.iv
         assert doc_id == 'D-deadbeef'
         assert rev == self.doc_info.rev
 
         aes_key = _crypto._get_sym_key_for_doc(
             self.doc_info.doc_id, 'A' * 96)
-        assert ciphertext == _aes_encrypt(aes_key, blob.iv, snowden1)[0]
+        assert ciphertext == _aes_encrypt(aes_key, self.blob.iv, snowden1)[0]
 
-        decrypted = _aes_decrypt(aes_key, blob.iv, blob.tag, ciphertext,
-                                 preamble)
+        decrypted = _aes_decrypt(aes_key, self.blob.iv, self.blob.tag,
+                                 ciphertext, preamble)
         assert str(decrypted) == snowden1
 
     @defer.inlineCallbacks
     def test_blob_decryptor(self):
-
-        inf = BytesIO(snowden1)
-
-        blob = _crypto.BlobEncryptor(
-            self.doc_info, inf,
-            secret='A' * 96)
-        ciphertext = yield blob.encrypt()
+        ciphertext = yield self.blob.encrypt()
 
         decryptor = _crypto.BlobDecryptor(
             self.doc_info, ciphertext,
+            secret='A' * 96)
+        decrypted = yield decryptor.decrypt()
+        assert decrypted.getvalue() == snowden1
+
+    @defer.inlineCallbacks
+    def test_unarmored_blob_decryptor(self):
+        self.blob.armor = False
+        ciphertext = yield self.blob.encrypt()
+
+        decryptor = _crypto.BlobDecryptor(
+            self.doc_info, ciphertext,
+            armor=False,
             secret='A' * 96)
         decrypted = yield decryptor.decrypt()
         assert decrypted.getvalue() == snowden1
