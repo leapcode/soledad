@@ -17,6 +17,7 @@ override_dh_install:
 	    cp common/src/leap/__init__.py debian/soledad-common/usr/local/lib/python$$pv/*-packages/leap/; \
 	    cp common/src/leap/__init__.py debian/soledad-common/usr/local/lib/python$$pv/*-packages/leap/soledad/; \
 	done
+	dh_install
 
 override_dh_installinit:
 	dh_systemd_enable -p${NAME} --name=${NAME} ${NAME}.service
