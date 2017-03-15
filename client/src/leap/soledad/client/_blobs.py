@@ -23,6 +23,7 @@ from urlparse import urljoin
 
 import os.path
 import uuid
+import base64
 
 from io import BytesIO
 from functools import partial
@@ -92,29 +93,45 @@ class ConnectionPool(adbapi.ConnectionPool):
 
 class DecrypterBuffer(object):
 
-    def __init__(self, doc_id, rev, secret):
+    def __init__(self, doc_id, rev, secret, tag):
         self.decrypter = None
         self.buffer = BytesIO()
         self.doc_info = DocInfo(doc_id, rev)
         self.secret = secret
+        self.tag = tag
         self.d = None
 
     def write(self, data):
         if not self.decrypter:
+            return self.prepare_decrypter(data)
+
+        self.buffer.write(data)
+        if self.buffer.tell() > 16:
+            overflow_size = self.buffer.tell() - 16
+            self.buffer.seek(0)
+            self.decrypter.write(self.buffer.read(overflow_size))
+            remaining = self.buffer.read()
+            self.buffer.seek(0)
+            self.buffer.write(remaining)
+            self.buffer.truncate()
+
+    def prepare_decrypter(self, data):
+        if ' ' not in data:
             self.buffer.write(data)
-            self.decrypter = BlobDecryptor(
-                self.doc_info, self.buffer,
-                secret=self.secret,
-                armor=True,
-                start_stream=False)
-            self.d = self.decrypter.decrypt()
-        else:
-            self.decrypter.write(data)
+            return
+        preamble_chunk, remaining = data.split(' ', 1)
+        self.buffer.write(preamble_chunk)
+        self.decrypter = BlobDecryptor(
+            self.doc_info, BytesIO(self.buffer.getvalue()),
+            secret=self.secret,
+            armor=False,
+            start_stream=False,
+            tag=self.tag)
+        self.buffer = BytesIO()
+        self.write(remaining)
 
     def close(self):
-        if self.d:
-            self.d.addCallback(lambda result: (result, self.decrypter.size))
-        return self.d
+        return self.decrypter._end_stream(), self.decrypter.size
 
 
 class BlobManager(object):
@@ -188,7 +205,7 @@ class BlobManager(object):
         doc_info = DocInfo(doc_id, rev)
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
-                                armor=True)
+                                armor=False)
         fd = yield crypter.encrypt()
         yield treq.put(uri, data=fd)
         logger.info("Finished upload: %s" % (blob_id,))
@@ -212,7 +229,7 @@ class BlobManager(object):
 
         # incrementally collect the body of the response
         yield treq.collect(data, buf.write)
-        fd, size = yield buf.close()
+        fd, size = buf.close()
         logger.info("Finished download: (%s, %d)" % (blob_id, size))
         defer.returnValue((fd, size))
 
