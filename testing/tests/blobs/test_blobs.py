@@ -19,6 +19,7 @@ Tests for cryptographic related stuff.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
+from leap.soledad.client import _blobs
 from leap.soledad.client._blobs import DecrypterBuffer
 from leap.soledad.client import _crypto
 from io import BytesIO
@@ -47,3 +48,20 @@ class BlobTestCase(unittest.TestCase):
         buf.write(encrypted)
         fd, size = buf.close()
         assert fd.getvalue() == 'rosa de foc'
+
+    def test_blob_manager_encrypted_upload(self):
+
+        @defer.inlineCallbacks
+        def _check_result(uri, data):
+            decryptor = _crypto.BlobDecryptor(
+                self.doc_info, data,
+                armor=False,
+                secret=self.secret)
+            decrypted = yield decryptor.decrypt()
+            assert decrypted.getvalue() == 'up and up'
+
+        manager = _blobs.BlobManager('', '', self.secret, self.secret, 'user')
+        doc_id, rev = self.doc_info.doc_id, self.doc_info.rev
+        fd = BytesIO('up and up')
+        _blobs.treq.put = _check_result
+        return manager._encrypt_and_upload('blob_id', doc_id, rev, fd)

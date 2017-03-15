@@ -151,7 +151,8 @@ class BlobManager(object):
     """
 
     def __init__(self, local_path, remote, key, secret, user):
-        self.local = SQLiteBlobBackend(local_path, key)
+        if local_path:
+            self.local = SQLiteBlobBackend(local_path, key)
         self.remote = remote
         self.secret = secret
         self.user = user
