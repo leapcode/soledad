@@ -26,6 +26,7 @@ environments.
 """
 import commands
 import os
+import base64
 
 from twisted.web import static
 from twisted.web import resource
@@ -66,6 +67,14 @@ class IBlobsBackend(Interface):
         :returns: a deferred that fires upon finishing.
         """
 
+    def tag_header(user, blob_id, request):
+        """
+        Adds a header 'Tag' with the last 20 bytes of the encoded file,
+        which contains the tag.
+
+        :returns: a deferred that fires upon finishing.
+        """
+
     def write_blob(user, blob_id, request):
         """
         Write blob to the storage, reading it from the passed request.
@@ -90,6 +99,12 @@ class FilesystemBlobsBackend(object):
 
     path = '/tmp/blobs/'
     quota = 200 * 1024  # in KB
+
+    def tag_header(self, user, blob_id, request):
+        with open(self._get_path(user, blob_id)) as doc_file:
+                doc_file.seek(-16, 2)
+                tag = base64.urlsafe_b64encode(doc_file.read())
+                request.responseHeaders.setRawHeaders('Tag', [tag])
 
     def read_blob(self, user, blob_id, request):
         print "USER", user
@@ -168,6 +183,7 @@ class BlobsResource(resource.Resource):
     def render_GET(self, request):
         print "GETTING", request.path
         user, blob_id = self._split_path(request.path)
+        self._handler.tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
 
     def render_PUT(self, request):

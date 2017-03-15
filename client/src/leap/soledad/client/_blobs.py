@@ -198,12 +198,17 @@ class BlobManager(object):
         logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
         uri = self.remote + self.user + '/' + blob_id
-        buf = DecrypterBuffer(doc_id, rev, self.secret)
         data = yield treq.get(uri)
 
         if data.code == 404:
             logger.warn("Blob not found in server: %s" % blob_id)
             defer.returnValue(None)
+        elif not data.headers.hasHeader('Tag'):
+            logger.error("Server didn't send a tag header for: %s" % blob_id)
+            defer.returnValue(None)
+        tag = data.headers.getRawHeaders('Tag')[0]
+        tag = base64.urlsafe_b64decode(tag)
+        buf = DecrypterBuffer(doc_id, rev, self.secret, tag)
 
         # incrementally collect the body of the response
         yield treq.collect(data, buf.write)
