@@ -55,6 +55,7 @@ from leap.soledad.client import adbapi
 from leap.soledad.client import events as soledad_events
 from leap.soledad.client import interfaces as soledad_interfaces
 from leap.soledad.client import sqlcipher
+from leap.soledad.client._recovery_code import RecoveryCode
 from leap.soledad.client._secrets import Secrets
 from leap.soledad.client._crypto import SoledadCrypto
 
@@ -187,6 +188,7 @@ class Soledad(object):
         self._init_config_with_defaults()
         self._init_working_dirs()
 
+        self._recovery_code = RecoveryCode()
         self._secrets = Secrets(self)
         self._crypto = SoledadCrypto(self._secrets.remote_secret)
 
@@ -796,6 +798,9 @@ class Soledad(object):
     def _set_token_for_service(self, service, token):
         doc = {'type': 'servicetoken', 'service': service, 'token': token}
         return self.create_doc(doc)
+
+    def create_recovery_code(self):
+        return self._recovery_code.generate()
 
 
 def create_path_if_not_exists(path):
