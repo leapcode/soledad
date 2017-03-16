@@ -151,7 +151,8 @@ class FilesystemBlobsBackend(object):
         raise NotImplementedError
 
     def _get_disk_usage(self, start_path):
-        assert os.path.isdir(start_path)
+        if not os.path.isdir(start_path):
+            return 0
         cmd = 'du -c %s | tail -n 1' % start_path
         size = commands.getoutput(cmd).split()[0]
         return int(size)
