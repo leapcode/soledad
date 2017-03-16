@@ -210,11 +210,21 @@ if __name__ == '__main__':
     from twisted.web.server import Site
     from twisted.internet import reactor
 
-    # XXX pass the path here
-    root = BlobsResource('/tmp/blobs/user')
+    # parse command line arguments
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', default=9000)
+    parser.add_argument('--path', default='/tmp/blobs/user')
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.path):
+        os.makedirs(args.path)
+
+    root = BlobsResource(args.path)
     # I picture somethink like
     # BlobsResource(backend="filesystem", backend_opts={'path': '/tmp/blobs'})
 
     factory = Site(root)
-    reactor.listenTCP(9000, factory)
+    reactor.listenTCP(args.port, factory)
     reactor.run()

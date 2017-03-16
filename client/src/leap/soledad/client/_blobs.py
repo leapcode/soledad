@@ -21,7 +21,7 @@ Clientside BlobBackend Storage.
 from copy import copy
 from urlparse import urljoin
 
-import os.path
+import os
 import uuid
 import base64
 
@@ -323,12 +323,10 @@ def testit(reactor):
     # parse command line arguments
     import argparse
 
-    usage = "\n  mkdir /tmp/blobs/user && cd server/src/leap/soledad/server/" \
-            " && python _blobs.py" \
-            "\n  python _blobs.py upload /path/to/file blob_id" \
-            "\n  python _blobs.py download blob_id"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--url', default='http://localhost:9000/')
+    parser.add_argument('--path', default='/tmp/blobs')
 
-    parser = argparse.ArgumentParser(usage=usage)
     subparsers = parser.add_subparsers(help='sub-command help', dest='action')
 
     # parse upload command
@@ -341,6 +339,7 @@ def testit(reactor):
     parser_download = subparsers.add_parser(
         'download', help='download blob and bypass local db')
     parser_download.add_argument('blob_id')
+    parser_download.add_argument('--output-file', default='/tmp/incoming-file')
 
     # parse put command
     parser_put = subparsers.add_parser(
@@ -359,8 +358,10 @@ def testit(reactor):
     # TODO convert these into proper unittests
 
     def _manager():
+        if not os.path.isdir(args.path):
+            os.makedirs(args.path)
         manager = BlobManager(
-            '/tmp/blobs', 'http://localhost:9000/',
+            args.path, args.url,
             'A' * 32, 'secret', 'user')
         return manager
 
@@ -380,7 +381,9 @@ def testit(reactor):
         logger.info(":: Result of download: %s" % str(result))
         if result:
             fd, _ = result
-            logger.info(":: Content of blob %s: %s" % (blob_id, fd.getvalue()))
+            with open(args.output_file, 'w') as f:
+                logger.info(":: Writing data to %s" % args.output_file)
+                f.write(fd.read())
         logger.info(":: Finished download only: %s" % blob_id)
 
     @defer.inlineCallbacks
