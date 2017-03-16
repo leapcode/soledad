@@ -28,6 +28,7 @@ import commands
 import os
 import base64
 
+from twisted.logger import Logger
 from twisted.web import static
 from twisted.web import resource
 from twisted.web.client import FileBodyProducer
@@ -38,6 +39,9 @@ from leap.soledad.server._config import get_config
 
 
 __all__ = ['BlobsResource', 'blobs_resource']
+
+
+logger = Logger()
 
 
 # TODO some error handling needed
@@ -107,21 +111,21 @@ class FilesystemBlobsBackend(object):
                 request.responseHeaders.setRawHeaders('Tag', [tag])
 
     def read_blob(self, user, blob_id, request):
-        print "USER", user
-        print "BLOB_ID", blob_id
+        logger.info('reading blob: %s - %s' % (user, blob_id))
         path = self._get_path(user, blob_id)
-        print "READ FROM", path
+        logger.debug('blob path: %s' % path)
         _file = static.File(path, defaultType='application/octet-stream')
         return _file.render_GET(request)
 
     def write_blob(self, user, blob_id, request):
         path = self._get_path(user, blob_id)
+        logger.info('writing blob: %s - %s' % (user, blob_id))
         if os.path.isfile(path):
             # XXX return some 5xx code
             raise BlobAlreadyExists()
         used = self.get_total_storage(user)
         if used > self.quota:
-            print "Error 507: Quota exceeded for user:", user
+            logger.error("Error 507: Quota exceeded for user: %s" % user)
             request.setResponseCode(507)
             request.write('Quota Exceeded!')
             request.finish()
@@ -130,7 +134,7 @@ class FilesystemBlobsBackend(object):
             os.makedirs(os.path.split(path)[0])
         except:
             pass
-        print "WRITE TO", path
+        logger.debug("writing blob: %s" % path)
         fbp = FileBodyProducer(request.content)
         d = fbp.startProducing(open(path, 'wb'))
         d.addCallback(lambda _: request.finish())
@@ -173,20 +177,20 @@ class BlobsResource(resource.Resource):
         self._handler = kls()
         """
         resource.Resource.__init__(self)
-        self._blobs_path = blobs_path
-        self._handler = self.blobsFactoryClass()
+        self._handler = self.blobsFactoryClass(blobs_path)
         assert IBlobsBackend.providedBy(self._handler)
 
     # TODO double check credentials, we can have then
     # under request.
 
     def render_GET(self, request):
-        print "GETTING", request.path
+        logger.info("http get: %s" % request.path)
         user, blob_id = self._split_path(request.path)
         self._handler.tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
 
     def render_PUT(self, request):
+        logger.info("http put: %s" % request.path)
         user, blob_id = self._split_path(request.path)
         return self._handler.write_blob(user, blob_id, request)
 
@@ -206,6 +210,9 @@ if __name__ == '__main__':
     # A dummy blob server
     # curl -X PUT --data-binary @/tmp/book.pdf localhost:9000/user/someid
     # curl -X GET -o /dev/null localhost:9000/user/somerandomstring
+    from twisted.python import log
+    import sys
+    log.startLogging(sys.stdout)
 
     from twisted.web.server import Site
     from twisted.internet import reactor
