@@ -9,6 +9,7 @@ cache:
 
 code-check:
   stage: code-check
+  image: leapcode/soledad:latest
   script:
     - cd testing
     - tox -e code-check
@@ -21,5 +22,3 @@ tests:
   script:
     - cd testing
     - tox -- --couch-url http://couchdb:5984
-  tags:
-    - couchdb
