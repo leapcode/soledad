@@ -4,3 +4,4 @@ twisted
 cryptography
 pysqlcipher;python_version=="2.7"
 pysqlcipher3;python_version=="3.4"
+treq
