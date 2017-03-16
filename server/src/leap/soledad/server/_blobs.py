@@ -50,7 +50,7 @@ logger = Logger()
 # for the future:
 # [ ] isolate user avatar in a safer way
 # [ ] catch timeout in the server (and delete incomplete upload)
-# p [ chunking (should we do it on the client or on the server?)
+# [ ] chunking (should we do it on the client or on the server?)
 
 
 class BlobAlreadyExists(Exception):
