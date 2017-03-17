@@ -12,6 +12,10 @@ Client
 - Add default version when decrypting secrets
 - Secrets version defaults to v1
 
+Misc
+~~~~
+- First steps porting soledad to python3
+
 0.9.3 -  06 March, 2017
 +++++++++++++++++++++++++++++++
 
