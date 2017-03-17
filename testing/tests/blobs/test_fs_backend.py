@@ -21,6 +21,8 @@ from twisted.trial import unittest
 from leap.soledad.server import _blobs
 from io import BytesIO
 from mock import Mock
+import mock
+import os
 import base64
 import pytest
 
@@ -50,9 +52,26 @@ class FilesystemBackendTestCase(unittest.TestCase):
         _blobs.static.File.assert_called_once_with('path', defaultType=ctype)
         render_mock.render_GET.assert_called_once_with(request)
 
-    def test_cannot_overwrite(self):
-        _blobs.os.path.isfile = lambda path: True
+    @mock.patch.object(os.path, 'isfile')
+    def test_cannot_overwrite(self, isfile):
+        isfile.return_value = True
         backend = _blobs.FilesystemBlobsBackend()
         backend._get_path = Mock(return_value='path')
         with pytest.raises(_blobs.BlobAlreadyExists):
             backend.write_blob('user', 'blob_id', 'request')
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @mock.patch.object(os.path, 'isfile')
+    def test_write_cannot_exceed_quota(self, isfile):
+        isfile.return_value = False
+        backend = _blobs.FilesystemBlobsBackend()
+        backend._get_path = Mock(return_value=self.tempdir)
+        request = Mock()
+
+        backend.get_total_storage = lambda x: 100
+        backend.quota = 90
+        backend.write_blob('user', 'blob_id', request)
+
+        request.setResponseCode.assert_called_once_with(507)
+        request.write.assert_called_once_with('Quota Exceeded!')
+        request.finish.assert_called_once()
