@@ -35,3 +35,16 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend.tag_header('user', 'blob_id', request)
 
         expected_method.assert_called_once_with('Tag', [expected_tag])
+
+    def test_read_blob(self):
+        render_mock = Mock()
+        _blobs.static.File = Mock(return_value=render_mock)
+        backend = _blobs.FilesystemBlobsBackend()
+        request = object()
+        backend._get_path = Mock(return_value='path')
+        backend.read_blob('user', 'blob_id', request)
+
+        backend._get_path.assert_called_once_with('user', 'blob_id')
+        ctype = 'application/octet-stream'
+        _blobs.static.File.assert_called_once_with('path', defaultType=ctype)
+        render_mock.render_GET.assert_called_once_with(request)
