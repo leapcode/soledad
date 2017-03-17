@@ -75,3 +75,9 @@ class FilesystemBackendTestCase(unittest.TestCase):
         request.setResponseCode.assert_called_once_with(507)
         request.write.assert_called_once_with('Quota Exceeded!')
         request.finish.assert_called_once()
+
+    def test_get_path_partitioning(self):
+        backend = _blobs.FilesystemBlobsBackend()
+        backend.path = '/somewhere/'
+        path = backend._get_path('user', 'blob_id')
+        assert path == '/somewhere/user/b/blo/blob_i/blob_id'
