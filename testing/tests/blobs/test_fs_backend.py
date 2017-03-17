@@ -22,6 +22,7 @@ from leap.soledad.server import _blobs
 from io import BytesIO
 from mock import Mock
 import base64
+import pytest
 
 
 class FilesystemBackendTestCase(unittest.TestCase):
@@ -48,3 +49,10 @@ class FilesystemBackendTestCase(unittest.TestCase):
         ctype = 'application/octet-stream'
         _blobs.static.File.assert_called_once_with('path', defaultType=ctype)
         render_mock.render_GET.assert_called_once_with(request)
+
+    def test_cannot_overwrite(self):
+        _blobs.os.path.isfile = lambda path: True
+        backend = _blobs.FilesystemBlobsBackend()
+        backend._get_path = Mock(return_value='path')
+        with pytest.raises(_blobs.BlobAlreadyExists):
+            backend.write_blob('user', 'blob_id', 'request')
