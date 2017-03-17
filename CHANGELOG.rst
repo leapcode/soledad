@@ -1,6 +1,19 @@
-0.9.3 -  06 March, 2017
+0.9.4 -  17 March, 2017
 +++++++++++++++++++++++++++++++
 
+Server
+~~~~~~
+- Make database creation appear in logs
+
+Client
+~~~~~~
+- `#8721 <https://0xacab.org/leap/soledad/issues/8721>`_: Remove offline flag
+- Fix raising of invalid auth token error
+- Add default version when decrypting secrets
+- Secrets version defaults to v1
+
+0.9.3 -  06 March, 2017
++++++++++++++++++++++++++++++++
 
 Server
 ~~~~~~
