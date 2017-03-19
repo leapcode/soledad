@@ -39,6 +39,7 @@ from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client import pragmas
 
 from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
+from _http import HTTPClient
 
 
 logger = Logger()
@@ -149,20 +150,15 @@ class BlobManager(object):
 
     """
 
-    def __init__(self, local_path, remote, key, secret, user, token):
+    def __init__(
+            self, local_path, remote, key, secret, user, token=None,
+            cert_file=None):
         if local_path:
             self.local = SQLiteBlobBackend(local_path, key)
         self.remote = remote
         self.secret = secret
         self.user = user
-        self.token = token
-
-    def _auth_header(self):
-        if not self.token:
-            return {}
-        auth = '%s:%s' % (self.user, self.token)
-        b64_token = base64.b64encode(auth)
-        return {'Authorization': ['Token %s' % b64_token]}
+        self._client = HTTPClient(user, token, cert_file)
 
     @defer.inlineCallbacks
     def put(self, doc):
@@ -215,15 +211,15 @@ class BlobManager(object):
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=False)
         fd = yield crypter.encrypt()
-        yield treq.put(uri, data=fd, headers=self._auth_header())
+        yield self._client.put(uri, data=fd)
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
     def _download_and_decrypt(self, blob_id, doc_id, rev):
         logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
-        uri = self.remote + self.user + '/' + blob_id
-        data = yield treq.get(uri, headers=self._auth_header())
+        uri = urljoin(self.remote, self.user + '/' + blob_id)
+        data = yield self._client.get(uri)
 
         if data.code == 404:
             logger.warn("Blob not found in server: %s" % blob_id)
@@ -320,12 +316,6 @@ class BlobDoc(object):
 # testing facilities
 #
 
-def auth_header(args):
-    if args.uuid and args.token:
-        return
-    return
-
-
 @defer.inlineCallbacks
 def testit(reactor):
     # configure logging to stdout
@@ -342,6 +332,7 @@ def testit(reactor):
     parser.add_argument('--secret', default='secret')
     parser.add_argument('--uuid', default='user')
     parser.add_argument('--token', default=None)
+    parser.add_argument('--cert-file', default='')
 
     subparsers = parser.add_subparsers(help='sub-command help', dest='action')
 
@@ -379,7 +370,7 @@ def testit(reactor):
         manager = BlobManager(
             args.path, args.url,
             'A' * 32, args.secret,
-            args.uuid, args.token)
+            args.uuid, args.token, args.cert_file)
         return manager
 
     @defer.inlineCallbacks
