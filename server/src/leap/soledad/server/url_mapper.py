@@ -50,18 +50,14 @@ class URLMapper(object):
 
         This method sets up the following authorization rules:
 
-            URL path                      | Authorized actions
-            --------------------------------------------------
-            /                             | GET
-            /robots.txt                   | GET
-            /shared-db                    | GET
-            /shared-db/docs               | -
-            /shared-db/doc/{any_id}       | GET, PUT, DELETE
-            /shared-db/sync-from/{source} | -
-            /user-db                      | -
-            /user-db/docs                 | -
-            /user-db/doc/{id}             | -
-            /user-db/sync-from/{source}   | GET, PUT, POST
+            URL path                        | Authorized actions
+            ----------------------------------------------------
+            /                               | GET
+            /robots.txt                     | GET
+            /shared-db                      | GET
+            /shared-db/doc/{any_id}         | GET, PUT, DELETE
+            /user-{uuid}/sync-from/{source} | GET, PUT, POST
+            /blobs/{uuid}/{blob_id}         | GET, PUT, POST
         """
         # auth info for global resource
         self._connect('/', ['GET'])
@@ -75,3 +71,5 @@ class URLMapper(object):
         # auth info for user-db sync resource
         self._connect('/user-{uuid}/sync-from/{source_replica_uid}',
                       ['GET', 'PUT', 'POST'])
+        # auth info for blobs resource
+        self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT'])
