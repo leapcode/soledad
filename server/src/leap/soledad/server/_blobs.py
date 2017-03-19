@@ -189,20 +189,14 @@ class BlobsResource(resource.Resource):
 
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
-        user, blob_id = self._split_path(request.path)
+        user, blob_id = request.postpath
         self._handler.tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
 
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)
-        user, blob_id = self._split_path(request.path)
+        user, blob_id = request.postpath
         return self._handler.write_blob(user, blob_id, request)
-
-    def _split_path(self, blob_id):
-        # FIXME catch errors here
-        parts = blob_id.split('/')
-        _, user, blobname = parts
-        return user, blobname
 
 
 # provide a configured instance of the resource
