@@ -35,10 +35,9 @@ from twisted.web.client import FileBodyProducer
 from twisted.web.server import NOT_DONE_YET
 
 from zope.interface import Interface, implementer
-from leap.soledad.server._config import get_config
 
 
-__all__ = ['BlobsResource', 'blobs_resource']
+__all__ = ['BlobsResource']
 
 
 logger = Logger()
@@ -199,12 +198,6 @@ class BlobsResource(resource.Resource):
         return self._handler.write_blob(user, blob_id, request)
 
 
-# provide a configured instance of the resource
-_config = get_config()
-_path = _config['blobs_path']
-blobs_resource = BlobsResource(_path)
-
-
 if __name__ == '__main__':
     # A dummy blob server
     # curl -X PUT --data-binary @/tmp/book.pdf localhost:9000/user/someid
@@ -220,7 +213,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', default=9000)
+    parser.add_argument('--port', default=9000, type=int)
     parser.add_argument('--path', default='/tmp/blobs/user')
     args = parser.parse_args()
 

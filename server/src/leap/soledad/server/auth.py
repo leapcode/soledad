@@ -39,6 +39,7 @@ from twisted.web.resource import IResource
 from leap.soledad.common.couch import couch_server
 
 from ._resource import SoledadResource, SoledadAnonResource
+from ._blobs import BlobsResource
 from ._config import get_config
 
 
@@ -53,10 +54,11 @@ class SoledadRealm(object):
         if conf is None:
             conf = get_config()
         blobs = conf['blobs']
+        blobs_resource = BlobsResource(conf['blobs_path']) if blobs else None
         self.anon_resource = SoledadAnonResource(
             enable_blobs=blobs)
         self.auth_resource = SoledadResource(
-            enable_blobs=blobs,
+            blobs_resource=blobs_resource,
             sync_pool=sync_pool)
 
     def requestAvatar(self, avatarId, mind, *interfaces):
