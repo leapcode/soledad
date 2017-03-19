@@ -28,7 +28,6 @@ import base64
 from io import BytesIO
 from functools import partial
 
-
 from twisted.logger import Logger
 from twisted.enterprise import adbapi
 from twisted.internet import defer
@@ -150,12 +149,20 @@ class BlobManager(object):
 
     """
 
-    def __init__(self, local_path, remote, key, secret, user):
+    def __init__(self, local_path, remote, key, secret, user, token):
         if local_path:
             self.local = SQLiteBlobBackend(local_path, key)
         self.remote = remote
         self.secret = secret
         self.user = user
+        self.token = token
+
+    def _auth_header(self):
+        if not self.token:
+            return {}
+        auth = '%s:%s' % (self.user, self.token)
+        b64_token = base64.b64encode(auth)
+        return {'Authorization': ['Token %s' % b64_token]}
 
     @defer.inlineCallbacks
     def put(self, doc):
@@ -208,7 +215,7 @@ class BlobManager(object):
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=False)
         fd = yield crypter.encrypt()
-        yield treq.put(uri, data=fd)
+        yield treq.put(uri, data=fd, headers=self._auth_header())
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
@@ -216,7 +223,7 @@ class BlobManager(object):
         logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
         uri = self.remote + self.user + '/' + blob_id
-        data = yield treq.get(uri)
+        data = yield treq.get(uri, headers=self._auth_header())
 
         if data.code == 404:
             logger.warn("Blob not found in server: %s" % blob_id)
@@ -313,6 +320,12 @@ class BlobDoc(object):
 # testing facilities
 #
 
+def auth_header(args):
+    if args.uuid and args.token:
+        return
+    return
+
+
 @defer.inlineCallbacks
 def testit(reactor):
     # configure logging to stdout
@@ -326,6 +339,9 @@ def testit(reactor):
     parser = argparse.ArgumentParser()
     parser.add_argument('--url', default='http://localhost:9000/')
     parser.add_argument('--path', default='/tmp/blobs')
+    parser.add_argument('--secret', default='secret')
+    parser.add_argument('--uuid', default='user')
+    parser.add_argument('--token', default=None)
 
     subparsers = parser.add_subparsers(help='sub-command help', dest='action')
 
@@ -362,7 +378,8 @@ def testit(reactor):
             os.makedirs(args.path)
         manager = BlobManager(
             args.path, args.url,
-            'A' * 32, 'secret', 'user')
+            'A' * 32, args.secret,
+            args.uuid, args.token)
         return manager
 
     @defer.inlineCallbacks
