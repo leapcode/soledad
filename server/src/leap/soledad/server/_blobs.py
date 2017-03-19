@@ -103,6 +103,8 @@ class FilesystemBlobsBackend(object):
     quota = 200 * 1024  # in KB
 
     def __init__(self, blobs_path):
+        if not os.path.isdir(blobs_path):
+            os.makedirs(blobs_path)
         self.path = blobs_path
 
     def tag_header(self, user, blob_id, request):
@@ -206,8 +208,9 @@ class BlobsResource(resource.Resource):
 # provide a configured instance of the resource
 _config = get_config()
 _path = _config['blobs_path']
-
 blobs_resource = BlobsResource(_path)
+
+
 if __name__ == '__main__':
     # A dummy blob server
     # curl -X PUT --data-binary @/tmp/book.pdf localhost:9000/user/someid
@@ -226,9 +229,6 @@ if __name__ == '__main__':
     parser.add_argument('--port', default=9000)
     parser.add_argument('--path', default='/tmp/blobs/user')
     args = parser.parse_args()
-
-    if not os.path.isdir(args.path):
-        os.makedirs(args.path)
 
     root = BlobsResource(args.path)
     # I picture somethink like
