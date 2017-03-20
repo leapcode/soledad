@@ -60,8 +60,9 @@ class BlobTestCase(unittest.TestCase):
             decrypted = yield decryptor.decrypt()
             assert decrypted.getvalue() == 'up and up'
 
-        manager = _blobs.BlobManager('', '', self.secret, self.secret, 'user')
+        manager = _blobs.BlobManager(
+            '', 'http://127.0.0.1/', self.secret, self.secret, 'user')
         doc_id, rev = self.doc_info.doc_id, self.doc_info.rev
         fd = BytesIO('up and up')
-        _blobs.treq.put = _check_result
+        manager._client.put = _check_result
         return manager._encrypt_and_upload('blob_id', doc_id, rev, fd)
