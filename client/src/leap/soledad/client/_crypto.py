@@ -386,13 +386,16 @@ class BlobDecryptor(object):
         # we can refuse to process something that is in the future or
         # too far in the past (1984 would be nice, hehe)
         if sch != ENC_SCHEME.symkey:
-            raise InvalidBlob('invalid scheme')
+            raise InvalidBlob('Invalid scheme: %s' % sch)
         if meth != ENC_METHOD.aes_256_gcm:
-            raise InvalidBlob('invalid encryption scheme')
+            raise InvalidBlob('Invalid encryption scheme: %s' % meth)
         if rev != self.rev:
-            raise InvalidBlob('invalid revision')
+            msg = 'Invalid revision. Expected: %s, was: %s' % (self.rev, rev)
+            raise InvalidBlob(msg)
         if doc_id != self.doc_id:
-            raise InvalidBlob('invalid doc id')
+            msg = 'Invalid doc_id. '
+            + 'Expected: %s, was: %s' % (self.doc_id, doc_id)
+            raise InvalidBlob(msg)
 
         return preamble, iv
 
