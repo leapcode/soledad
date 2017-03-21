@@ -120,7 +120,10 @@ class FilesystemBlobsBackend(object):
 
     def write_blob(self, user, blob_id, request):
         path = self._get_path(user, blob_id)
-        logger.info('writing blob: %s - %s' % (user, blob_id))
+        try:
+            os.makedirs(os.path.split(path)[0])
+        except:
+            pass
         if os.path.isfile(path):
             # XXX return some 5xx code
             raise BlobAlreadyExists()
@@ -131,11 +134,7 @@ class FilesystemBlobsBackend(object):
             request.write('Quota Exceeded!')
             request.finish()
             return NOT_DONE_YET
-        try:
-            os.makedirs(os.path.split(path)[0])
-        except:
-            pass
-        logger.debug("writing blob: %s" % path)
+        logger.info('writing blob: %s - %s' % (user, blob_id))
         fbp = FileBodyProducer(request.content)
         d = fbp.startProducing(open(path, 'wb'))
         d.addCallback(lambda _: request.finish())
