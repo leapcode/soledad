@@ -178,6 +178,7 @@ class BlobsResource(resource.Resource):
         self._handler = kls()
         """
         resource.Resource.__init__(self)
+        self._blobs_path = blobs_path
         self._handler = self.blobsFactoryClass(blobs_path)
         assert IBlobsBackend.providedBy(self._handler)
 
