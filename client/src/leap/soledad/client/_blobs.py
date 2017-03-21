@@ -211,7 +211,8 @@ class BlobManager(object):
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=False)
         fd = yield crypter.encrypt()
-        yield self._client.put(uri, data=fd)
+        response = yield self._client.put(uri, data=fd)
+        assert response.code == 200
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
