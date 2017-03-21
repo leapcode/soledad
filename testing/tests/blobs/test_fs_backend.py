@@ -29,8 +29,9 @@ import pytest
 
 class FilesystemBackendTestCase(unittest.TestCase):
 
-    def test_tag_header(self):
-        _blobs.open = lambda x: BytesIO('A' * 40 + 'B' * 16)
+    @mock.patch.object(_blobs, 'open')
+    def test_tag_header(self, open_mock):
+        open_mock.return_value = BytesIO('A' * 40 + 'B' * 16)
         expected_tag = base64.urlsafe_b64encode('B' * 16)
         expected_method = Mock()
         backend = _blobs.FilesystemBlobsBackend()
@@ -39,9 +40,10 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
         expected_method.assert_called_once_with('Tag', [expected_tag])
 
-    def test_read_blob(self):
+    @mock.patch.object(_blobs.static, 'File')
+    def test_read_blob(self, file_mock):
         render_mock = Mock()
-        _blobs.static.File = Mock(return_value=render_mock)
+        file_mock.return_value = render_mock
         backend = _blobs.FilesystemBlobsBackend()
         request = object()
         backend._get_path = Mock(return_value='path')
