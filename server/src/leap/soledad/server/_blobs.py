@@ -99,9 +99,8 @@ class IBlobsBackend(Interface):
 @implementer(IBlobsBackend)
 class FilesystemBlobsBackend(object):
 
-    quota = 200 * 1024  # in KB
-
-    def __init__(self, blobs_path):
+    def __init__(self, blobs_path='/tmp/blobs/', quota=200 * 1024):
+        self.quota = quota
         if not os.path.isdir(blobs_path):
             os.makedirs(blobs_path)
         self.path = blobs_path
