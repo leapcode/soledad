@@ -36,6 +36,7 @@ import treq
 
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client import pragmas
+from leap.soledad.client._pipes import TruncatedTailPipe
 from leap.soledad.common.errors import SoledadError
 
 from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
@@ -106,7 +107,7 @@ class DecrypterBuffer(object):
 
     def __init__(self, doc_id, rev, secret, tag):
         self.decrypter = None
-        self.buffer = BytesIO()
+        self.preamble = BytesIO()
         self.doc_info = DocInfo(doc_id, rev)
         self.secret = secret
         self.tag = tag
@@ -116,30 +117,22 @@ class DecrypterBuffer(object):
         if not self.decrypter:
             return self.prepare_decrypter(data)
 
-        self.buffer.write(data)
-        if self.buffer.tell() > 16:
-            overflow_size = self.buffer.tell() - 16
-            self.buffer.seek(0)
-            self.decrypter.write(self.buffer.read(overflow_size))
-            remaining = self.buffer.read()
-            self.buffer.seek(0)
-            self.buffer.write(remaining)
-            self.buffer.truncate()
+        self.output.write(data)
 
     def prepare_decrypter(self, data):
         if ' ' not in data:
-            self.buffer.write(data)
+            self.preamble.write(data)
             return
         preamble_chunk, remaining = data.split(' ', 1)
-        self.buffer.write(preamble_chunk)
+        self.preamble.write(preamble_chunk)
         self.decrypter = BlobDecryptor(
-            self.doc_info, BytesIO(self.buffer.getvalue()),
+            self.doc_info, BytesIO(self.preamble.getvalue()),
             secret=self.secret,
             armor=False,
             start_stream=False,
             tag=self.tag)
-        self.buffer = BytesIO()
-        self.write(remaining)
+        self.output = TruncatedTailPipe(self.decrypter, tail_size=16)
+        self.output.write(remaining)
 
     def close(self):
         return self.decrypter._end_stream(), self.decrypter.size
