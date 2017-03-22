@@ -3,10 +3,13 @@ stages:
   - tests
   - benchmark
 
-# Cache tox envs between builds
+# Cache a folder between builds.
+# Tox sets it to be our pip cache.
 cache:
+  untracked: true
+  key: soledad-shared-pip-cache
   paths:
-  - testing/.tox/
+  - testing/.cache/
 
 before_script:
   - echo "Running on ${HOST_HOSTNAME:=$(hostname)}"
