@@ -1,11 +1,15 @@
 stages:
   - code-check
   - tests
+  - benchmark
 
 # Cache tox envs between builds
 cache:
   paths:
   - testing/.tox/
+
+before_script:
+  - echo "Running on ${HOST_HOSTNAME:=$(hostname)}"
 
 code-check:
   stage: code-check
@@ -22,3 +26,25 @@ tests:
   script:
     - cd testing
     - tox -- --couch-url http://couchdb:5984
+
+benchmark:
+  stage: benchmark
+  image: leapcode/soledad:latest
+  tags:
+    - benchmark
+  services:
+    - couchdb
+  allow_failure: true
+  script:
+    - cd testing
+    - curl -s couchdb:5984
+    # You can provide a $NETRC variable containing the creds for your
+    # elasticsearch instance so it's protected from being leaked in the
+    # CI console
+    # We can't get it working inside docker for unknown reasons.
+    #- echo "$NETRC" > /root/.netrc && chmod 600 /root/.netrc
+    #
+    # Add $PYTEST_OPTS to pytest.ini to allow posting benchmark tests
+    # to an elasticsearch instance
+    - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
+    - tox --recreate -e benchmark -- --couch-url http://couchdb:5984
