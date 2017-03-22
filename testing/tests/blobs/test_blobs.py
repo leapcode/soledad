@@ -23,7 +23,6 @@ from leap.soledad.client._blobs import DecrypterBuffer, BlobManager
 from leap.soledad.client import _crypto
 from io import BytesIO
 from mock import Mock
-import mock
 
 
 class BlobTestCase(unittest.TestCase):
@@ -66,6 +65,5 @@ class BlobTestCase(unittest.TestCase):
         manager = BlobManager('', '', self.secret, self.secret, 'user')
         doc_id, rev = self.doc_info.doc_id, self.doc_info.rev
         fd = BytesIO('up and up')
-        with mock.patch('leap.soledad.client._blobs.treq.put') as mock_treq:
-            mock_treq.side_effect = _check_result
-            yield manager._encrypt_and_upload('blob_id', doc_id, rev, fd)
+        manager._client.put = _check_result
+        yield manager._encrypt_and_upload('blob_id', doc_id, rev, fd)
