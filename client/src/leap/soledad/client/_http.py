@@ -67,8 +67,7 @@ class PinnedTokenAgent(Agent):
 
     def request(self, method, uri, headers=None, bodyProducer=None):
         # authenticate the request
-        if not headers:
-            headers = Headers()
+        headers = headers or Headers()
         headers.addRawHeader('Authorization', self._creds)
         # perform the authenticated request
         return Agent.request(

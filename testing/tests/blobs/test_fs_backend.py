@@ -18,6 +18,7 @@
 Tests for blobs backend on server side.
 """
 from twisted.trial import unittest
+from twisted.web.test.test_web import DummyRequest
 from leap.soledad.server import _blobs
 from io import BytesIO
 from mock import Mock
@@ -45,7 +46,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         render_mock = Mock()
         file_mock.return_value = render_mock
         backend = _blobs.FilesystemBlobsBackend()
-        request = object()
+        request = DummyRequest([''])
         backend._get_path = Mock(return_value='path')
         backend.read_blob('user', 'blob_id', request)
 
@@ -59,8 +60,10 @@ class FilesystemBackendTestCase(unittest.TestCase):
         isfile.return_value = True
         backend = _blobs.FilesystemBlobsBackend()
         backend._get_path = Mock(return_value='path')
-        with pytest.raises(_blobs.BlobAlreadyExists):
-            backend.write_blob('user', 'blob_id', 'request')
+        request = DummyRequest([''])
+        result = backend.write_blob('user', 'blob_id', request)
+        assert result == "Blob already exists: blob_id"
+        assert request.responseCode == 409
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')

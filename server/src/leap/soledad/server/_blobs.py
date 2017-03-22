@@ -52,10 +52,6 @@ logger = Logger()
 # [ ] chunking (should we do it on the client or on the server?)
 
 
-class BlobAlreadyExists(Exception):
-    pass
-
-
 class IBlobsBackend(Interface):
 
     """
@@ -125,8 +121,9 @@ class FilesystemBlobsBackend(object):
         except:
             pass
         if os.path.isfile(path):
-            # XXX return some 5xx code
-            raise BlobAlreadyExists()
+            # 409 - Conflict
+            request.setResponseCode(409)
+            return "Blob already exists: %s" % blob_id
         used = self.get_total_storage(user)
         if used > self.quota:
             logger.error("Error 507: Quota exceeded for user: %s" % user)

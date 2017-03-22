@@ -24,7 +24,7 @@ from twisted.web.server import Site
 from twisted.internet import reactor
 from twisted.internet import defer
 from leap.soledad.server import _blobs as server_blobs
-from leap.soledad.client._blobs import BlobManager
+from leap.soledad.client._blobs import BlobManager, BlobAlreadyExistsError
 
 
 class BlobServerTestCase(unittest.TestCase):
@@ -42,7 +42,7 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_upload(self):
+    def test_upload_download(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
         fd = BytesIO("save me")
@@ -50,3 +50,14 @@ class BlobServerTestCase(unittest.TestCase):
         blob, size = yield manager._download_and_decrypt('blob_id',
                                                          'mydoc', '1')
         assert blob.getvalue() == "save me"
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_upload_deny_duplicates(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        fd = BytesIO("save me")
+        yield manager._encrypt_and_upload('blob_id', 'mydoc', '1', fd)
+        fd = BytesIO("save me")
+        with pytest.raises(BlobAlreadyExistsError):
+            yield manager._encrypt_and_upload('blob_id', 'mydoc', '1', fd)

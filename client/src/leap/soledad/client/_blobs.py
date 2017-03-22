@@ -36,12 +36,17 @@ import treq
 
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client import pragmas
+from leap.soledad.common.errors import SoledadError
 
 from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
 from _http import HTTPClient
 
 
 logger = Logger()
+
+
+class BlobAlreadyExistsError(SoledadError):
+    pass
 
 
 class ConnectionPool(adbapi.ConnectionPool):
@@ -88,6 +93,13 @@ class ConnectionPool(adbapi.ConnectionPool):
         # TODO: should not use transaction private variable here
         handle = trans._connection.blob(table, column, irow, flags)
         return handle
+
+
+def check_http_status(code):
+    if code == 409:
+        raise BlobAlreadyExistsError()
+    elif code != 200:
+        raise SoledadError("Server Error")
 
 
 class DecrypterBuffer(object):
@@ -217,7 +229,7 @@ class BlobManager(object):
                                 armor=False)
         fd = yield crypter.encrypt()
         response = yield self._client.put(uri, data=fd)
-        assert response.code == 200
+        check_http_status(response.code)
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
