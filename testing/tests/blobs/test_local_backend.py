@@ -19,10 +19,11 @@ Tests for sqlcipher backend on blobs client.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from leap.soledad.client._blobs import BlobManager
+from leap.soledad.client._blobs import BlobManager, BlobDoc
 from io import BytesIO
 from mock import Mock
 import pytest
+import os
 
 
 class SQLCipherBlobsClientTestCase(unittest.TestCase):
@@ -48,3 +49,44 @@ class SQLCipherBlobsClientTestCase(unittest.TestCase):
         result = yield self.manager.get(*args)
         assert result is None
         self.manager._download_and_decrypt.assert_called_once_with(*args)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_from_existing_value(self):
+        self.manager._download_and_decrypt = Mock(return_value=None)
+        msg = "It's me, M4r10!"
+        yield self.manager.local.put('myblob_id', BytesIO(msg),
+                                     size=len(msg))
+        args = ('myblob_id', 'mydoc_id', 'cool_rev')
+        result = yield self.manager.get(*args)
+        assert result.getvalue() == msg
+        assert not self.manager._download_and_decrypt.called
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_put_stores_on_local_db(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        msg = "Hey Joe"
+        doc = BlobDoc('mydoc_id', 'mydoc_rev', BytesIO(msg),
+                      blob_id='myblob_id')
+        yield self.manager.put(doc, size=len(msg))
+        result = yield self.manager.local.get('myblob_id')
+        assert result.getvalue() == msg
+        assert self.manager._encrypt_and_upload.called
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_put_then_get_using_real_file_descriptor(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager._download_and_decrypt = Mock(return_value=None)
+        msg = "Fuuuuull cycleee! \o/"
+        tmpfile = os.tmpfile()
+        tmpfile.write(msg)
+        tmpfile.seek(0)
+        doc = BlobDoc('mydoc_id', 'mydoc_rev', tmpfile,
+                      blob_id='myblob_id')
+        yield self.manager.put(doc, size=len(msg))
+        result = yield self.manager.get(doc.blob_id, doc.doc_id, doc.rev)
+        assert result.getvalue() == msg
+        assert self.manager._encrypt_and_upload.called
+        assert not self.manager._download_and_decrypt.called
