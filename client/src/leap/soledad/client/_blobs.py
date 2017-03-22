@@ -18,7 +18,6 @@
 Clientside BlobBackend Storage.
 """
 
-from copy import copy
 from urlparse import urljoin
 
 import os
@@ -169,8 +168,10 @@ class BlobManager(object):
         fd = doc.blob_fd
         # TODO this is a tee really, but ok... could do db and upload
         # concurrently. not sure if we'd gain something.
-        yield self.local.put(doc.blob_id, fd)
-        fd.seek(0)
+        yield self.local.put(doc.blob_id, fd, size=size)
+        # In fact, some kind of pipe is needed here, where each write on db
+        # handle gets forwarded into a write on the connection handle
+        fd = yield self.local.get(doc.blob_id)
         yield self._encrypt_and_upload(doc.blob_id, doc.doc_id, doc.rev, fd)
 
     @defer.inlineCallbacks
@@ -274,7 +275,7 @@ class SQLiteBlobBackend(object):
         # FIXME should remove this duplication!
         # have a look at how treq does cope with closing the handle
         # for uploading a file
-        producer = FileBodyProducer(copy(blob_fd))
+        producer = FileBodyProducer(blob_fd)
         done = yield producer.startProducing(handle)
         logger.info("Finished saving blob in local database.")
         defer.returnValue(done)
