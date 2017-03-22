@@ -347,6 +347,7 @@ class Soledad(object):
         :return: A deferred.
         :rtype: twisted.internet.defer.Deferred
         """
+        soledad_assert(doc is not None, "delete_doc doesn't accept None.")
         return self._defer("delete_doc", doc)
 
     def get_doc(self, doc_id, include_deleted=False):
