@@ -9,6 +9,7 @@ MANIFEST
 *.swp
 *.swo
 *.pyc
+*.pyo
 *.log
 *.*~
 *.csv
