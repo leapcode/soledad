@@ -164,7 +164,7 @@ class BlobManager(object):
             return self.local.close()
 
     @defer.inlineCallbacks
-    def put(self, doc):
+    def put(self, doc, size):
         fd = doc.blob_fd
         # TODO this is a tee really, but ok... could do db and upload
         # concurrently. not sure if we'd gain something.
@@ -407,9 +407,10 @@ def testit(reactor):
     def _put(blob_id, payload):
         logger.info(":: Starting full put: %s" % blob_id)
         manager = _manager()
+        size = os.path.getsize(payload)
         with open(payload) as fd:
             doc = BlobDoc('mydoc', '1', fd, blob_id=blob_id)
-            result = yield manager.put(doc)
+            result = yield manager.put(doc, size=size)
         logger.info(":: Result of put: %s" % str(result))
         logger.info(":: Finished full put: %s" % blob_id)
 
