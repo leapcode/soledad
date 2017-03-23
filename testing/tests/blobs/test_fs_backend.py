@@ -25,6 +25,7 @@ from mock import Mock
 import mock
 import os
 import base64
+import json
 import pytest
 
 
@@ -86,3 +87,11 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend.path = '/somewhere/'
         path = backend._get_path('user', 'blob_id')
         assert path == '/somewhere/user/b/blo/blob_i/blob_id'
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @mock.patch('leap.soledad.server._blobs.os.walk')
+    def test_list_blobs(self, walk_mock):
+        backend, _ = _blobs.FilesystemBlobsBackend(self.tempdir), None
+        walk_mock.return_value = [(_, _, ['blob_0']), (_, _, ['blob_1'])]
+        result = json.loads(backend.list_blobs('user', DummyRequest([''])))
+        assert result == ['blob_0', 'blob_1']

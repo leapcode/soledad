@@ -27,6 +27,7 @@ environments.
 import commands
 import os
 import base64
+import json
 
 from twisted.logger import Logger
 from twisted.web import static
@@ -61,6 +62,13 @@ class IBlobsBackend(Interface):
     def read_blob(user, blob_id, request):
         """
         Read blob with a given blob_id, and write it to the passed request.
+
+        :returns: a deferred that fires upon finishing.
+        """
+
+    def list_blobs(user, request):
+        """
+        Returns a json-encoded list of ids from user's blob.
 
         :returns: a deferred that fires upon finishing.
         """
@@ -100,6 +108,13 @@ class FilesystemBlobsBackend(object):
         if not os.path.isdir(blobs_path):
             os.makedirs(blobs_path)
         self.path = blobs_path
+
+    def list_blobs(self, user, request):
+        blob_ids = []
+        base_path = os.path.join(self.path, user)
+        for _, _, filenames in os.walk(base_path):
+            blob_ids += filenames
+        return json.dumps(blob_ids)
 
     def tag_header(self, user, blob_id, request):
         with open(self._get_path(user, blob_id)) as doc_file:
@@ -185,6 +200,8 @@ class BlobsResource(resource.Resource):
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
         user, blob_id = request.postpath
+        if not blob_id:
+            return self._handler.list_blobs(user, request)
         self._handler.tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
 

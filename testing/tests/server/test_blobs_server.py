@@ -53,6 +53,17 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_upload_list(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        yield manager._encrypt_and_upload('blob_id1', '1', '1', BytesIO("1"))
+        yield manager._encrypt_and_upload('blob_id2', '2', '2', BytesIO("2"))
+        blobs_list = yield manager.list()
+        assert len(blobs_list) == 2
+        assert 'blob_id1' in blobs_list and 'blob_id2' in blobs_list
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_deny_duplicates(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')

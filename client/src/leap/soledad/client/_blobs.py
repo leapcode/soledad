@@ -158,6 +158,12 @@ class BlobManager(object):
             return self.local.close()
 
     @defer.inlineCallbacks
+    def list(self):
+        uri = urljoin(self.remote, self.user + '/')
+        data = yield self._client.get(uri)
+        defer.returnValue((yield data.json()))
+
+    @defer.inlineCallbacks
     def put(self, doc, size):
         fd = doc.blob_fd
         # TODO this is a tee really, but ok... could do db and upload
