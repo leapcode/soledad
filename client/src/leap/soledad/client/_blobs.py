@@ -36,7 +36,7 @@ import treq
 
 from leap.soledad.client.sqlcipher import SQLCipherOptions
 from leap.soledad.client import pragmas
-from leap.soledad.client._pipes import TruncatedTailPipe
+from leap.soledad.client._pipes import TruncatedTailPipe, PreamblePipe
 from leap.soledad.common.errors import SoledadError
 
 from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
@@ -106,33 +106,22 @@ def check_http_status(code):
 class DecrypterBuffer(object):
 
     def __init__(self, doc_id, rev, secret, tag):
-        self.decrypter = None
-        self.preamble = BytesIO()
         self.doc_info = DocInfo(doc_id, rev)
         self.secret = secret
         self.tag = tag
-        self.d = None
+        self.preamble_pipe = PreamblePipe(self._make_decryptor)
 
-    def write(self, data):
-        if not self.decrypter:
-            return self.prepare_decrypter(data)
-
-        self.output.write(data)
-
-    def prepare_decrypter(self, data):
-        if ' ' not in data:
-            self.preamble.write(data)
-            return
-        preamble_chunk, remaining = data.split(' ', 1)
-        self.preamble.write(preamble_chunk)
+    def _make_decryptor(self, preamble):
         self.decrypter = BlobDecryptor(
-            self.doc_info, BytesIO(self.preamble.getvalue()),
+            self.doc_info, preamble,
             secret=self.secret,
             armor=False,
             start_stream=False,
             tag=self.tag)
-        self.output = TruncatedTailPipe(self.decrypter, tail_size=16)
-        self.output.write(remaining)
+        return TruncatedTailPipe(self.decrypter, tail_size=len(self.tag))
+
+    def write(self, data):
+        self.preamble_pipe.write(data)
 
     def close(self):
         return self.decrypter._end_stream(), self.decrypter.size

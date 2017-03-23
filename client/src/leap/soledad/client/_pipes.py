@@ -20,7 +20,7 @@ Components for piping data on streams.
 from io import BytesIO
 
 
-__all__ = ['TruncatedTailPipe']
+__all__ = ['TruncatedTailPipe', 'PreamblePipe']
 
 
 class TruncatedTailPipe(object):
@@ -49,3 +49,30 @@ class TruncatedTailPipe(object):
 
     def close(self):
         return self.output
+
+
+class PreamblePipe(object):
+    """
+    Consumes data until a space is found, then calls a callback with it and
+    starts forwarding data to consumer returned by this callback.
+    """
+
+    def __init__(self, callback):
+        self.callback = callback
+        self.preamble = BytesIO()
+        self.output = None
+
+    def write(self, data):
+        if not self.output:
+            self._write_preamble(data)
+        else:
+            self.output.write(data)
+
+    def _write_preamble(self, data):
+        if ' ' not in data:
+            self.preamble.write(data)
+            return
+        preamble_chunk, remaining = data.split(' ', 1)
+        self.preamble.write(preamble_chunk)
+        self.output = self.callback(self.preamble)
+        self.output.write(remaining)

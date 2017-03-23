@@ -19,9 +19,11 @@ Tests for streaming components.
 """
 from twisted.trial import unittest
 from leap.soledad.client._pipes import TruncatedTailPipe
+from leap.soledad.client._pipes import PreamblePipe
+from io import BytesIO
 
 
-class TruncatedTailTestCase(unittest.TestCase):
+class TruncatedTailPipeTestCase(unittest.TestCase):
 
     def test_tail_truncating_pipe(self):
         pipe = TruncatedTailPipe(tail_size=20)
@@ -30,3 +32,20 @@ class TruncatedTailTestCase(unittest.TestCase):
             pipe.write(data)
         result = pipe.close()
         assert result.getvalue() == 'A' * 100
+
+
+class PreamblePipeTestCase(unittest.TestCase):
+
+    def test_preamble_pipe(self):
+        remaining = BytesIO()
+        preamble = BytesIO()
+
+        def callback(dataBuffer):
+            preamble.write(dataBuffer.getvalue())
+            return remaining
+        pipe = PreamblePipe(callback)
+        payload = 'A' * 100 + ' ' + 'B' * 20
+        for data in payload:
+            pipe.write(data)
+        assert remaining.getvalue() == 'B' * 20
+        assert preamble.getvalue() == 'A' * 100
