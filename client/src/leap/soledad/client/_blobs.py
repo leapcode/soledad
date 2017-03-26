@@ -378,6 +378,10 @@ def testit(reactor):
         'get', help='get blob from local db, get if needed')
     parser_get.add_argument('blob_id')
 
+    # parse list command
+    parser_get = subparsers.add_parser(
+        'list', help='list local and remote blob ids')
+
     # parse arguments
     args = parser.parse_args()
 
@@ -433,6 +437,16 @@ def testit(reactor):
             logger.info(":: Result of get: " + fd.getvalue())
         logger.info(":: Finished full get: %s" % blob_id)
 
+    @defer.inlineCallbacks
+    def _list():
+        logger.info(":: Listing local blobs")
+        manager = _manager()
+        local_list = yield manager.local_list()
+        logger.info(":: Local list: %s" % local_list)
+        logger.info(":: Listing remote blobs")
+        remote_list = yield manager.remote_list()
+        logger.info(":: Remote list: %s" % remote_list)
+
     if args.action == 'upload':
         yield _upload(args.blob_id, args.payload)
     elif args.action == 'download':
@@ -441,6 +455,8 @@ def testit(reactor):
         yield _put(args.blob_id, args.payload)
     elif args.action == 'get':
         yield _get(args.blob_id)
+    elif args.action == 'list':
+        yield _list()
 
 
 if __name__ == '__main__':
