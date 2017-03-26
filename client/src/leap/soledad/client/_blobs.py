@@ -163,6 +163,9 @@ class BlobManager(object):
         data = yield self._client.get(uri)
         defer.returnValue((yield data.json()))
 
+    def local_list(self):
+        return self.local.list()
+
     @defer.inlineCallbacks
     def put(self, doc, size):
         fd = doc.blob_fd
@@ -288,6 +291,13 @@ class SQLiteBlobBackend(object):
         result = yield self.dbpool.runQuery(select, (blob_id,))
         if result:
             defer.returnValue(BytesIO(str(result[0][0])))
+
+    @defer.inlineCallbacks
+    def list(self):
+        query = 'select blob_id from blobs'
+        result = yield self.dbpool.runQuery(query)
+        if result:
+            defer.returnValue([b_id[0] for b_id in result])
 
 
 def _init_blob_table(conn):

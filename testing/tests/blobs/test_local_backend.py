@@ -90,3 +90,18 @@ class SQLCipherBlobsClientTestCase(unittest.TestCase):
         assert result.getvalue() == msg
         assert self.manager._encrypt_and_upload.called
         assert not self.manager._download_and_decrypt.called
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_local_list_blobs(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        msg = "1337"
+        doc = BlobDoc('mydoc_id', 'mydoc_rev', BytesIO(msg),
+                      blob_id='myblob_id')
+        yield self.manager.put(doc, size=len(msg))
+        doc2 = BlobDoc('mydoc_id2', 'mydoc_rev2', BytesIO(msg),
+                       blob_id='myblob_id2')
+        yield self.manager.put(doc2, size=len(msg))
+        blobs_list = yield self.manager.local_list()
+
+        assert 'myblob_id' in blobs_list and 'myblob_id2' in blobs_list
