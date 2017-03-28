@@ -70,3 +70,16 @@ class BlobServerTestCase(unittest.TestCase):
         fd = BytesIO("save me")
         with pytest.raises(BlobAlreadyExistsError):
             yield manager._encrypt_and_upload('blob_id', fd)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_send_missing(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, 'user')
+        self.addCleanup(manager.close)
+        blob_id = 'local_only_blob_id'
+        yield manager.local.put(blob_id, BytesIO("X"), size=1)
+        yield manager.send_missing()
+        result = yield manager._download_and_decrypt(blob_id)
+        assert result is not None
+        assert result[0].getvalue() == "X"

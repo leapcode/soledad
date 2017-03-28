@@ -168,6 +168,18 @@ class BlobManager(object):
         return self.local.list()
 
     @defer.inlineCallbacks
+    def send_missing(self):
+        our_blobs = yield self.local_list()
+        server_blobs = yield self.remote_list()
+        missing = [b_id for b_id in our_blobs if b_id not in server_blobs]
+        logger.info("Amount of documents missing on server: %s" % len(missing))
+        # TODO: Send concurrently when we are able to stream directly from db
+        for blob_id in missing:
+            fd = yield self.local.get(blob_id)
+            logger.info("Upload local blob: %s" % blob_id)
+            yield self._encrypt_and_upload(blob_id, fd)
+
+    @defer.inlineCallbacks
     def put(self, doc, size):
         fd = doc.blob_fd
         # TODO this is a tee really, but ok... could do db and upload

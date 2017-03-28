@@ -100,3 +100,15 @@ class BlobManagerTestCase(unittest.TestCase):
         blobs_list = yield self.manager.local_list()
 
         self.assertEquals(set(['myblob_id', 'myblob_id2']), set(blobs_list))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_send_missing(self):
+        fd = BytesIO('test')
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager.remote_list = Mock(return_value=[])
+        self.manager.local_list = Mock(return_value=['missing_id'])
+        self.manager.local = Mock(get=Mock(return_value=fd))
+        yield self.manager.send_missing()
+
+        self.manager._encrypt_and_upload.assert_called_with('missing_id', fd)
