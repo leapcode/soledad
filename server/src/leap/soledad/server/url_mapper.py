@@ -58,6 +58,7 @@ class URLMapper(object):
             /shared-db/doc/{any_id}         | GET, PUT, DELETE
             /user-{uuid}/sync-from/{source} | GET, PUT, POST
             /blobs/{uuid}/{blob_id}         | GET, PUT, POST
+            /blobs/{uuid}                   | GET
         """
         # auth info for global resource
         self._connect('/', ['GET'])
@@ -73,3 +74,4 @@ class URLMapper(object):
                       ['GET', 'PUT', 'POST'])
         # auth info for blobs resource
         self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT'])
+        self._connect('/blobs/{uuid}', ['GET'])
