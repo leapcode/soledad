@@ -19,7 +19,7 @@ Tests for sqlcipher backend on blobs client.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from leap.soledad.client._blobs import BlobManager, BlobDoc
+from leap.soledad.client._blobs import BlobManager, BlobDoc, FIXED_REV
 from io import BytesIO
 from mock import Mock
 import pytest
@@ -30,7 +30,7 @@ class BlobManagerTestCase(unittest.TestCase):
 
     class doc_info:
         doc_id = 'D-deadbeef'
-        rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
+        rev = FIXED_REV
 
     def setUp(self):
         self.cleartext = BytesIO('rosa de foc')
@@ -45,10 +45,10 @@ class BlobManagerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_inexistent(self):
         self.manager._download_and_decrypt = Mock(return_value=None)
-        args = ('inexistent_blob_id', 'inexistent_doc_id', 'inexistent_rev')
-        result = yield self.manager.get(*args)
+        bad_blob_id = 'inexsistent_id'
+        result = yield self.manager.get(bad_blob_id)
         self.assertIsNone(result)
-        self.manager._download_and_decrypt.assert_called_once_with(*args)
+        self.manager._download_and_decrypt.assert_called_once_with(bad_blob_id)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -57,8 +57,7 @@ class BlobManagerTestCase(unittest.TestCase):
         msg = "It's me, M4r10!"
         yield self.manager.local.put('myblob_id', BytesIO(msg),
                                      size=len(msg))
-        args = ('myblob_id', 'mydoc_id', 'cool_rev')
-        result = yield self.manager.get(*args)
+        result = yield self.manager.get('myblob_id')
         self.assertEquals(result.getvalue(), msg)
         self.assertNot(self.manager._download_and_decrypt.called)
 
@@ -67,8 +66,7 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_put_stores_on_local_db(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         msg = "Hey Joe"
-        doc = BlobDoc('mydoc_id', 'mydoc_rev', BytesIO(msg),
-                      blob_id='myblob_id')
+        doc = BlobDoc(BytesIO(msg), blob_id='myblob_id')
         yield self.manager.put(doc, size=len(msg))
         result = yield self.manager.local.get('myblob_id')
         self.assertEquals(result.getvalue(), msg)
@@ -83,10 +81,9 @@ class BlobManagerTestCase(unittest.TestCase):
         tmpfile = os.tmpfile()
         tmpfile.write(msg)
         tmpfile.seek(0)
-        doc = BlobDoc('mydoc_id', 'mydoc_rev', tmpfile,
-                      blob_id='myblob_id')
+        doc = BlobDoc(tmpfile, 'myblob_id')
         yield self.manager.put(doc, size=len(msg))
-        result = yield self.manager.get(doc.blob_id, doc.doc_id, doc.rev)
+        result = yield self.manager.get(doc.blob_id)
         self.assertEquals(result.getvalue(), msg)
         self.assertTrue(self.manager._encrypt_and_upload.called)
         self.assertFalse(self.manager._download_and_decrypt.called)
@@ -96,11 +93,9 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_local_list_blobs(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         msg = "1337"
-        doc = BlobDoc('mydoc_id', 'mydoc_rev', BytesIO(msg),
-                      blob_id='myblob_id')
+        doc = BlobDoc(BytesIO(msg), 'myblob_id')
         yield self.manager.put(doc, size=len(msg))
-        doc2 = BlobDoc('mydoc_id2', 'mydoc_rev2', BytesIO(msg),
-                       blob_id='myblob_id2')
+        doc2 = BlobDoc(BytesIO(msg), 'myblob_id2')
         yield self.manager.put(doc2, size=len(msg))
         blobs_list = yield self.manager.local_list()
 

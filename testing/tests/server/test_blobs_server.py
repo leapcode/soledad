@@ -46,9 +46,8 @@ class BlobServerTestCase(unittest.TestCase):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
         fd = BytesIO("save me")
-        yield manager._encrypt_and_upload('blob_id', 'mydoc', '1', fd)
-        blob, size = yield manager._download_and_decrypt('blob_id',
-                                                         'mydoc', '1')
+        yield manager._encrypt_and_upload('blob_id', fd)
+        blob, size = yield manager._download_and_decrypt('blob_id')
         self.assertEquals(blob.getvalue(), "save me")
 
     @defer.inlineCallbacks
@@ -56,8 +55,8 @@ class BlobServerTestCase(unittest.TestCase):
     def test_upload_changes_remote_list(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
-        yield manager._encrypt_and_upload('blob_id1', '1', '1', BytesIO("1"))
-        yield manager._encrypt_and_upload('blob_id2', '2', '2', BytesIO("2"))
+        yield manager._encrypt_and_upload('blob_id1', BytesIO("1"))
+        yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         blobs_list = yield manager.remote_list()
         self.assertEquals(set(['blob_id1', 'blob_id2']), set(blobs_list))
 
@@ -67,7 +66,7 @@ class BlobServerTestCase(unittest.TestCase):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
         fd = BytesIO("save me")
-        yield manager._encrypt_and_upload('blob_id', 'mydoc', '1', fd)
+        yield manager._encrypt_and_upload('blob_id', fd)
         fd = BytesIO("save me")
         with pytest.raises(BlobAlreadyExistsError):
-            yield manager._encrypt_and_upload('blob_id', 'mydoc', '1', fd)
+            yield manager._encrypt_and_upload('blob_id', fd)

@@ -44,6 +44,7 @@ from _http import HTTPClient
 
 
 logger = Logger()
+FIXED_REV = 'ImmutableRevision'  # Blob content is immutable
 
 
 class BlobAlreadyExistsError(SoledadError):
@@ -105,8 +106,8 @@ def check_http_status(code):
 
 class DecrypterBuffer(object):
 
-    def __init__(self, doc_id, rev, secret, tag):
-        self.doc_info = DocInfo(doc_id, rev)
+    def __init__(self, blob_id, secret, tag):
+        self.doc_info = DocInfo(blob_id, FIXED_REV)
         self.secret = secret
         self.tag = tag
         self.preamble_pipe = PreamblePipe(self._make_decryptor)
@@ -175,16 +176,16 @@ class BlobManager(object):
         # In fact, some kind of pipe is needed here, where each write on db
         # handle gets forwarded into a write on the connection handle
         fd = yield self.local.get(doc.blob_id)
-        yield self._encrypt_and_upload(doc.blob_id, doc.doc_id, doc.rev, fd)
+        yield self._encrypt_and_upload(doc.blob_id, fd)
 
     @defer.inlineCallbacks
-    def get(self, blob_id, doc_id, rev):
+    def get(self, blob_id):
         local_blob = yield self.local.get(blob_id)
         if local_blob:
             logger.info("Found blob in local database: %s" % blob_id)
             defer.returnValue(local_blob)
 
-        result = yield self._download_and_decrypt(blob_id, doc_id, rev)
+        result = yield self._download_and_decrypt(blob_id)
 
         if not result:
             defer.returnValue(None)
@@ -205,7 +206,7 @@ class BlobManager(object):
             logger.error('sorry, dunno what happened')
 
     @defer.inlineCallbacks
-    def _encrypt_and_upload(self, blob_id, doc_id, rev, fd):
+    def _encrypt_and_upload(self, blob_id, fd):
         # TODO ------------------------------------------
         # this is wrong, is doing 2 stages.
         # the crypto producer can be passed to
@@ -214,7 +215,7 @@ class BlobManager(object):
         # produce data to the treq request fd.
         # ------------------------------------------------
         logger.info("Staring upload of blob: %s" % blob_id)
-        doc_info = DocInfo(doc_id, rev)
+        doc_info = DocInfo(blob_id, FIXED_REV)
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=False)
@@ -224,7 +225,7 @@ class BlobManager(object):
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
-    def _download_and_decrypt(self, blob_id, doc_id, rev):
+    def _download_and_decrypt(self, blob_id):
         logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
@@ -238,7 +239,7 @@ class BlobManager(object):
             defer.returnValue(None)
         tag = data.headers.getRawHeaders('Tag')[0]
         tag = base64.urlsafe_b64decode(tag)
-        buf = DecrypterBuffer(doc_id, rev, self.secret, tag)
+        buf = DecrypterBuffer(blob_id, self.secret, tag)
 
         # incrementally collect the body of the response
         yield treq.collect(data, buf.write)
@@ -320,10 +321,9 @@ class BlobDoc(object):
 
     # TODO probably not needed, but convenient for testing for now.
 
-    def __init__(self, doc_id, rev, content, blob_id=None):
+    def __init__(self, content, blob_id):
 
-        self.doc_id = doc_id
-        self.rev = rev
+        self.blob_id = blob_id
         self.is_blob = True
         self.blob_fd = content
         if blob_id is None:
@@ -401,14 +401,14 @@ def testit(reactor):
         logger.info(":: Starting upload only: %s" % str((blob_id, payload)))
         manager = _manager()
         with open(payload, 'r') as fd:
-            yield manager._encrypt_and_upload(blob_id, 'mydoc', '1', fd)
+            yield manager._encrypt_and_upload(blob_id, fd)
         logger.info(":: Finished upload only: %s" % str((blob_id, payload)))
 
     @defer.inlineCallbacks
     def _download(blob_id):
         logger.info(":: Starting download only: %s" % blob_id)
         manager = _manager()
-        result = yield manager._download_and_decrypt(blob_id, 'mydoc', '1')
+        result = yield manager._download_and_decrypt(blob_id)
         logger.info(":: Result of download: %s" % str(result))
         if result:
             fd, _ = result
@@ -423,7 +423,7 @@ def testit(reactor):
         manager = _manager()
         size = os.path.getsize(payload)
         with open(payload) as fd:
-            doc = BlobDoc('mydoc', '1', fd, blob_id=blob_id)
+            doc = BlobDoc(fd, blob_id)
             result = yield manager.put(doc, size=size)
         logger.info(":: Result of put: %s" % str(result))
         logger.info(":: Finished full put: %s" % blob_id)
@@ -432,7 +432,7 @@ def testit(reactor):
     def _get(blob_id):
         logger.info(":: Starting full get: %s" % blob_id)
         manager = _manager()
-        fd = yield manager.get(blob_id, 'mydoc', '1')
+        fd = yield manager.get(blob_id)
         if fd:
             logger.info(":: Result of get: " + fd.getvalue())
         logger.info(":: Finished full get: %s" % blob_id)

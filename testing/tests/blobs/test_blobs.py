@@ -19,7 +19,7 @@ Tests for blobs handling.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from leap.soledad.client._blobs import DecrypterBuffer, BlobManager
+from leap.soledad.client._blobs import DecrypterBuffer, BlobManager, FIXED_REV
 from leap.soledad.client import _crypto
 from io import BytesIO
 from mock import Mock
@@ -28,8 +28,8 @@ from mock import Mock
 class BlobTestCase(unittest.TestCase):
 
     class doc_info:
-        doc_id = 'D-deadbeef'
-        rev = '397932e0c77f45fcb7c3732930e7e9b2:1'
+        doc_id = 'D-BLOB-ID'
+        rev = FIXED_REV
 
     def setUp(self):
         self.cleartext = BytesIO('rosa de foc')
@@ -42,9 +42,8 @@ class BlobTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_decrypt_buffer(self):
         encrypted = (yield self.blob.encrypt()).getvalue()
-        doc_id, rev = self.doc_info.doc_id, self.doc_info.rev
         tag = encrypted[-16:]
-        buf = DecrypterBuffer(doc_id, rev, self.secret, tag)
+        buf = DecrypterBuffer(self.doc_info.doc_id, self.secret, tag)
         buf.write(encrypted)
         fd, size = buf.close()
         self.assertEquals(fd.getvalue(), 'rosa de foc')
@@ -63,7 +62,6 @@ class BlobTestCase(unittest.TestCase):
             defer.returnValue(Mock(code=200))
 
         manager = BlobManager('', '', self.secret, self.secret, 'user')
-        doc_id, rev = self.doc_info.doc_id, self.doc_info.rev
         fd = BytesIO('up and up')
         manager._client.put = _check_result
-        yield manager._encrypt_and_upload('blob_id', doc_id, rev, fd)
+        yield manager._encrypt_and_upload(self.doc_info.doc_id, fd)
