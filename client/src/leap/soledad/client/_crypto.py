@@ -82,6 +82,7 @@ from twisted.internet import defer
 from twisted.internet import interfaces
 from twisted.web.client import FileBodyProducer
 
+from leap.soledad.common import soledad_assert
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends.multibackend import MultiBackend
@@ -347,8 +348,8 @@ class BlobDecryptor(object):
         self.tag = None
 
         preamble, iv = self._consume_preamble()
-        assert preamble
-        assert iv
+        soledad_assert(preamble)
+        soledad_assert(iv)
 
         self._aes = AESWriter(sym_key, iv, self.result, tag=tag or self.tag)
         self._aes.authenticate(preamble)
