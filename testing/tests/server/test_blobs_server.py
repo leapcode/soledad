@@ -83,3 +83,16 @@ class BlobServerTestCase(unittest.TestCase):
         result = yield manager._download_and_decrypt(blob_id)
         self.assertIsNotNone(result)
         self.assertEquals(result[0].getvalue(), "X")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_fetch_missing(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, 'user')
+        self.addCleanup(manager.close)
+        blob_id = 'remote_only_blob_id'
+        yield manager._encrypt_and_upload(blob_id, BytesIO("X"))
+        yield manager.fetch_missing()
+        result = yield manager.local.get(blob_id)
+        assert result is not None
+        assert result.getvalue() == "X"

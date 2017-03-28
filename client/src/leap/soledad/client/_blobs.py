@@ -180,6 +180,18 @@ class BlobManager(object):
             yield self._encrypt_and_upload(blob_id, fd)
 
     @defer.inlineCallbacks
+    def fetch_missing(self):
+        # TODO: Use something to prioritize user requests over general new docs
+        our_blobs = yield self.local_list()
+        server_blobs = yield self.remote_list()
+        docs_we_want = [b_id for b_id in server_blobs if b_id not in our_blobs]
+        logger.info("Fetching new docs from server: %s" % len(docs_we_want))
+        # TODO: Fetch concurrently when we are able to stream directly into db
+        for blob_id in docs_we_want:
+            logger.info("Fetching new doc: %s" % blob_id)
+            yield self.get(blob_id)
+
+    @defer.inlineCallbacks
     def put(self, doc, size):
         fd = doc.blob_fd
         # TODO this is a tee really, but ok... could do db and upload
@@ -398,6 +410,10 @@ def testit(reactor):
     parser_get = subparsers.add_parser(
         'send_missing', help='send all pending upload blobs')
 
+    # parse send_missing command
+    parser_get = subparsers.add_parser(
+        'fetch_missing', help='fetch all new server blobs')
+
     # parse arguments
     args = parser.parse_args()
 
@@ -470,6 +486,13 @@ def testit(reactor):
         yield manager.send_missing()
         logger.info(":: Finished sending missing docs")
 
+    @defer.inlineCallbacks
+    def _fetch_missing():
+        logger.info(":: Fetching remote new docs")
+        manager = _manager()
+        yield manager.fetch_missing()
+        logger.info(":: Finished fetching new docs")
+
     if args.action == 'upload':
         yield _upload(args.blob_id, args.payload)
     elif args.action == 'download':
@@ -482,6 +505,8 @@ def testit(reactor):
         yield _list()
     elif args.action == 'send_missing':
         yield _send_missing()
+    elif args.action == 'fetch_missing':
+        yield _fetch_missing()
 
 
 if __name__ == '__main__':
