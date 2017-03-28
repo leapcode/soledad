@@ -75,7 +75,7 @@ class IBlobsBackend(Interface):
 
     def tag_header(user, blob_id, request):
         """
-        Adds a header 'Tag' with the last 20 bytes of the encoded file,
+        Adds a header 'Tag' with the last 16 bytes of the encoded file,
         which contains the tag.
 
         :returns: a deferred that fires upon finishing.
@@ -183,12 +183,7 @@ class BlobsResource(resource.Resource):
     blobsFactoryClass = FilesystemBlobsBackend
 
     def __init__(self, blobs_path):
-        # TODO pass the backend as configurable option
-        """
-        __init__(self, backend, opts={})
-        factorykls = getattr(self, backend + 'Class')(**opts)
-        self._handler = kls()
-        """
+        # TODO pass the backend as configurable option #8804
         resource.Resource.__init__(self)
         self._blobs_path = blobs_path
         self._handler = self.blobsFactoryClass(blobs_path)

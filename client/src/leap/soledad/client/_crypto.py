@@ -22,32 +22,48 @@ This module implements streaming crypto operations.
 It replaces the old client.crypto module, that will be deprecated in soledad
 0.12.
 
-The algorithm for encryptig and decrypting is as follow:
+The algorithm for encrypting and decrypting is as follow:
 
 The KEY is a 32 bytes value.
-The PREAMBLE is a packed_structure with encryption metadata.
+The IV is a random 16 bytes value.
+The PREAMBLE is a packed_structure with encryption metadata, such as IV.
 The SEPARATOR is a space.
 
 Encryption
 ----------
 
-ciphertext = b64_encode(packed_preamble)
-             + SEPARATOR
-             + b64(AES_GCM(ciphertext) + tag)
+IV = os.urandom(16)
+PREAMBLE = BLOB_SIGNATURE_MAGIC, ENC_SCHEME, ENC_METHOD, time, IV, doc_id, rev,
+and size.
 
+PREAMBLE = base64_encoded(PREAMBLE)
+CIPHERTEXT = base64_encoded(AES_GCM(KEY, cleartext) + resulting_tag) if armor
+
+CIPHERTEXT = AES_GCM(KEY, cleartext) + resulting_tag if not armor
+# "resulting_tag" came from AES-GCM encryption. It will be the last 16 bytes of
+# our ciphertext.
+
+encrypted_payload = PREAMBLE + SEPARATOR + CIPHERTEXT
 
 Decryption
 ----------
 
-PREAMBLE + SEPARATOR + PAYLOAD
+Ciphertext and Tag CAN come encoded in base64 (with armor=True) or raw (with
+armor=False). Preamble will always come encoded in base64.
 
-Ciphertext and Tag CAN be encoded in b64 (armor=True) or raw (False)
+PREAMBLE, CIPHERTEXT = PAYLOAD.SPLIT(' ', 1)
 
-check_preamble(b64_decode(ciphertext.split(SEPARATOR)[0])
+PREAMBLE = base64_decode(PREAMBLE)
+CIPHERTEXT = base64_decode(CIPHERTEXT) if armor else CIPHERTEXT
 
-PAYLOAD = ciphertext + tag
+CIPHERTEXT, TAG = CIPHERTEXT[:-16], CIPHERTEXT[-16:]
+CLEARTEXT = aes_gcm_decrypt(KEY, IV, CIPHERTEXT, TAG, associated_data=PREAMBLE)
 
-decrypt(PAYLOAD)
+AES-GCM will check preamble authenticity as well, since we are using
+Authenticated Encryption with Associated Data (AEAD). Ciphertext and associated
+data (PREAMBLE) authenticity will both be checked together during decryption.
+PREAMBLE consistency (if it matches the desired document, for instance) is
+checked during PREAMBLE reading.
 """
 
 
@@ -76,7 +92,7 @@ from zope.interface import implementer
 
 
 SECRET_LENGTH = 64
-SEPARATOR = ' '
+SEPARATOR = ' '  # Anything that doesn't belong to base64 encoding
 
 CRYPTO_BACKEND = MultiBackend([OpenSSLBackend()])
 
@@ -219,10 +235,10 @@ class BlobEncryptor(object):
     """
     # TODO
     # This class needs further work to allow for proper streaming.
-    # RIght now we HAVE TO WAIT until the end of the stream before encoding the
+    # Right now we HAVE TO WAIT until the end of the stream before encoding the
     # result. It should be possible to do that just encoding the chunks and
     # passing them to a sink, but for that we have to encode the chunks at
-    # proper alignment (3 byes?) with b64 if armor is defined.
+    # proper alignment (3 bytes?) with b64 if armor is defined.
 
     def __init__(self, doc_info, content_fd, secret=None, armor=True,
                  sink=None):
@@ -234,14 +250,14 @@ class BlobEncryptor(object):
         self.armor = armor
 
         self._content_fd = content_fd
-        self._content_size = self._get_size(content_fd)
+        self._content_size = self._get_rounded_size(content_fd)
         self._producer = FileBodyProducer(content_fd, readSize=2**16)
 
         self.sym_key = _get_sym_key_for_doc(doc_info.doc_id, secret)
         self._aes = AESWriter(self.sym_key, _buffer=sink)
         self._aes.authenticate(self._encode_preamble())
 
-    def _get_size(self, fd):
+    def _get_rounded_size(self, fd):
         fd.seek(0, os.SEEK_END)
         size = _ceiling(fd.tell())
         fd.seek(0)
@@ -315,8 +331,6 @@ class BlobDecryptor(object):
     Will raise an exception if the blob doesn't have the expected structure, or
     if the GCM tag doesn't verify.
     """
-    # TODO enable the ascii armor = False
-
     def __init__(self, doc_info, ciphertext_fd, result=None,
                  secret=None, armor=True, start_stream=True, tag=None):
         if not secret:
@@ -345,6 +359,11 @@ class BlobDecryptor(object):
         self._producer = FileBodyProducer(self.fd, readSize=2**16)
 
     def _consume_preamble(self):
+        """
+        Consume the preamble and write remaining bytes as ciphertext. This
+        function is called during a stream and can be holding both, so we need
+        to consume only preamble and store the remaining.
+        """
         self.fd.seek(0)
         try:
             parts = self.fd.getvalue().split(SEPARATOR, 1)
@@ -444,8 +463,8 @@ class AESWriter(object):
 
     It is used both for encryption and decryption of a stream, depending of the
     value of the tag parameter. If you pass a tag, it will operate in
-    decryption mode, authenticating the preamble. If no tag is passed,
-    encryption mode is assumed.
+    decryption mode, verifying the authenticity of the preamble and ciphertext.
+    If no tag is passed, encryption mode is assumed, which will generate a tag.
     """
 
     def __init__(self, key, iv=None, _buffer=None, tag=None, mode=modes.GCM):
