@@ -220,8 +220,7 @@ class BlobManager(object):
             logger.info("Got decrypted blob of type: %s" % type(blob))
             blob.seek(0)
             yield self.local.put(blob_id, blob, size=size)
-            blob.seek(0)
-            defer.returnValue(blob)
+            defer.returnValue((yield self.local.get(blob_id)))
         else:
             # XXX we shouldn't get here, but we will...
             # lots of ugly error handling possible:
