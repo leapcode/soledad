@@ -39,13 +39,13 @@ class TruncatedTailPipe(object):
             self._truncate_tail()
 
     def _truncate_tail(self):
-            overflow_size = self.buffer.tell() - self.tail_size
-            self.buffer.seek(0)
-            self.output.write(self.buffer.read(overflow_size))
-            remaining = self.buffer.read()
-            self.buffer.seek(0)
-            self.buffer.write(remaining)
-            self.buffer.truncate()
+        overflow_size = self.buffer.tell() - self.tail_size
+        self.buffer.seek(0)
+        self.output.write(self.buffer.read(overflow_size))
+        remaining = self.buffer.read()
+        self.buffer.seek(0)
+        self.buffer.write(remaining)
+        self.buffer.truncate()
 
     def close(self):
         return self.output

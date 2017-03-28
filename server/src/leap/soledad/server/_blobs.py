@@ -118,9 +118,9 @@ class FilesystemBlobsBackend(object):
 
     def tag_header(self, user, blob_id, request):
         with open(self._get_path(user, blob_id)) as doc_file:
-                doc_file.seek(-16, 2)
-                tag = base64.urlsafe_b64encode(doc_file.read())
-                request.responseHeaders.setRawHeaders('Tag', [tag])
+            doc_file.seek(-16, 2)
+            tag = base64.urlsafe_b64encode(doc_file.read())
+            request.responseHeaders.setRawHeaders('Tag', [tag])
 
     def read_blob(self, user, blob_id, request):
         logger.info('reading blob: %s - %s' % (user, blob_id))
