@@ -394,6 +394,10 @@ def testit(reactor):
     parser_get = subparsers.add_parser(
         'list', help='list local and remote blob ids')
 
+    # parse send_missing command
+    parser_get = subparsers.add_parser(
+        'send_missing', help='send all pending upload blobs')
+
     # parse arguments
     args = parser.parse_args()
 
@@ -459,6 +463,13 @@ def testit(reactor):
         remote_list = yield manager.remote_list()
         logger.info(":: Remote list: %s" % remote_list)
 
+    @defer.inlineCallbacks
+    def _send_missing():
+        logger.info(":: Sending local pending upload docs")
+        manager = _manager()
+        yield manager.send_missing()
+        logger.info(":: Finished sending missing docs")
+
     if args.action == 'upload':
         yield _upload(args.blob_id, args.payload)
     elif args.action == 'download':
@@ -469,6 +480,8 @@ def testit(reactor):
         yield _get(args.blob_id)
     elif args.action == 'list':
         yield _list()
+    elif args.action == 'send_missing':
+        yield _send_missing()
 
 
 if __name__ == '__main__':
