@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# test_crypto.py
+# test_blobs_server.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -53,7 +53,7 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_upload_list(self):
+    def test_upload_changes_remote_list(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
         yield manager._encrypt_and_upload('blob_id1', '1', '1', BytesIO("1"))

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# test_crypto.py
+# test_local_backend.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@ import pytest
 import os
 
 
-class SQLCipherBlobsClientTestCase(unittest.TestCase):
+class BlobManagerTestCase(unittest.TestCase):
 
     class doc_info:
         doc_id = 'D-deadbeef'
