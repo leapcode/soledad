@@ -323,6 +323,8 @@ class SQLiteBlobBackend(object):
         result = yield self.dbpool.runQuery(query)
         if result:
             defer.returnValue([b_id[0] for b_id in result])
+        else:
+            defer.returnValue([])
 
 
 def _init_blob_table(conn):
