@@ -125,7 +125,8 @@ class DecrypterBuffer(object):
         self.preamble_pipe.write(data)
 
     def close(self):
-        return self.decrypter._end_stream(), self.decrypter.size
+        real_size = self.decrypter.decrypted_content_size
+        return self.decrypter._end_stream(), real_size
 
 
 class BlobManager(object):

@@ -360,6 +360,10 @@ class BlobDecryptor(object):
         if start_stream:
             self._start_stream()
 
+    @property
+    def decrypted_content_size(self):
+        return self._aes.written
+
     def _start_stream(self):
         self._producer = FileBodyProducer(self.fd, readSize=2**16)
 
@@ -485,6 +489,7 @@ class AESWriter(object):
         cipher = _get_aes_cipher(key, self.iv, tag, mode)
         cipher = cipher.decryptor() if tag else cipher.encryptor()
         self.cipher, self.aead = cipher, ''
+        self.written = 0
 
     def authenticate(self, data):
         self.aead += data
@@ -495,6 +500,7 @@ class AESWriter(object):
         return getattr(self.cipher, 'tag', None)
 
     def write(self, data):
+        self.written += len(data)
         self.buffer.write(self.cipher.update(data))
 
     def end(self):
