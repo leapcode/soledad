@@ -30,7 +30,7 @@ MEMORY               ?= 512m
 all: soledad-image couchdb-image
 
 soledad-image:
-	docker build -t $(IMAGE_NAME) .
+	docker build ${DOCKER_BUILD_OPTS} -t $(IMAGE_NAME) .
 
 couchdb-image:
 	(cd couchdb/ && make)
