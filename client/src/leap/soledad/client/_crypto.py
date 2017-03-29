@@ -259,6 +259,10 @@ class BlobEncryptor(object):
         self._aes.authenticate(self._encode_preamble())
 
     def _get_rounded_size(self, fd):
+        """
+        Returns a rounded value in order to minimize information leaks due to
+        the original size being exposed.
+        """
         fd.seek(0, os.SEEK_END)
         size = _ceiling(fd.tell())
         fd.seek(0)
