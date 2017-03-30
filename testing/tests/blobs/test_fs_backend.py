@@ -63,8 +63,8 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend._get_path = Mock(return_value='path')
         request = DummyRequest([''])
         result = backend.write_blob('user', 'blob_id', request)
-        assert result == "Blob already exists: blob_id"
-        assert request.responseCode == 409
+        self.assertEquals(result, "Blob already exists: blob_id")
+        self.assertEquals(request.responseCode, 409)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
@@ -86,7 +86,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend = _blobs.FilesystemBlobsBackend()
         backend.path = '/somewhere/'
         path = backend._get_path('user', 'blob_id')
-        assert path == '/somewhere/user/b/blo/blob_i/blob_id'
+        self.assertEquals(path, '/somewhere/user/b/blo/blob_i/blob_id')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.walk')
@@ -94,4 +94,4 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend, _ = _blobs.FilesystemBlobsBackend(self.tempdir), None
         walk_mock.return_value = [(_, _, ['blob_0']), (_, _, ['blob_1'])]
         result = json.loads(backend.list_blobs('user', DummyRequest([''])))
-        assert result == ['blob_0', 'blob_1']
+        self.assertEquals(result, ['blob_0', 'blob_1'])

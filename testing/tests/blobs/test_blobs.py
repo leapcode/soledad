@@ -47,7 +47,7 @@ class BlobTestCase(unittest.TestCase):
         buf = DecrypterBuffer(doc_id, rev, self.secret, tag)
         buf.write(encrypted)
         fd, size = buf.close()
-        assert fd.getvalue() == 'rosa de foc'
+        self.assertEquals(fd.getvalue(), 'rosa de foc')
 
     @defer.inlineCallbacks
     def test_blob_manager_encrypted_upload(self):
@@ -59,7 +59,7 @@ class BlobTestCase(unittest.TestCase):
                 armor=False,
                 secret=self.secret)
             decrypted = yield decryptor.decrypt()
-            assert decrypted.getvalue() == 'up and up'
+            self.assertEquals(decrypted.getvalue(), 'up and up')
             defer.returnValue(Mock(code=200))
 
         manager = BlobManager('', '', self.secret, self.secret, 'user')

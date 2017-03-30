@@ -47,7 +47,7 @@ class BlobManagerTestCase(unittest.TestCase):
         self.manager._download_and_decrypt = Mock(return_value=None)
         args = ('inexistent_blob_id', 'inexistent_doc_id', 'inexistent_rev')
         result = yield self.manager.get(*args)
-        assert result is None
+        self.assertIsNone(result)
         self.manager._download_and_decrypt.assert_called_once_with(*args)
 
     @defer.inlineCallbacks
@@ -59,8 +59,8 @@ class BlobManagerTestCase(unittest.TestCase):
                                      size=len(msg))
         args = ('myblob_id', 'mydoc_id', 'cool_rev')
         result = yield self.manager.get(*args)
-        assert result.getvalue() == msg
-        assert not self.manager._download_and_decrypt.called
+        self.assertEquals(result.getvalue(), msg)
+        self.assertNot(self.manager._download_and_decrypt.called)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -71,8 +71,8 @@ class BlobManagerTestCase(unittest.TestCase):
                       blob_id='myblob_id')
         yield self.manager.put(doc, size=len(msg))
         result = yield self.manager.local.get('myblob_id')
-        assert result.getvalue() == msg
-        assert self.manager._encrypt_and_upload.called
+        self.assertEquals(result.getvalue(), msg)
+        self.assertTrue(self.manager._encrypt_and_upload.called)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -87,9 +87,9 @@ class BlobManagerTestCase(unittest.TestCase):
                       blob_id='myblob_id')
         yield self.manager.put(doc, size=len(msg))
         result = yield self.manager.get(doc.blob_id, doc.doc_id, doc.rev)
-        assert result.getvalue() == msg
-        assert self.manager._encrypt_and_upload.called
-        assert not self.manager._download_and_decrypt.called
+        self.assertEquals(result.getvalue(), msg)
+        self.assertTrue(self.manager._encrypt_and_upload.called)
+        self.assertFalse(self.manager._download_and_decrypt.called)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -104,4 +104,4 @@ class BlobManagerTestCase(unittest.TestCase):
         yield self.manager.put(doc2, size=len(msg))
         blobs_list = yield self.manager.local_list()
 
-        assert 'myblob_id' in blobs_list and 'myblob_id2' in blobs_list
+        self.assertEquals(set(['myblob_id', 'myblob_id2']), set(blobs_list))

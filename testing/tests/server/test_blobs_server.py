@@ -49,7 +49,7 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._encrypt_and_upload('blob_id', 'mydoc', '1', fd)
         blob, size = yield manager._download_and_decrypt('blob_id',
                                                          'mydoc', '1')
-        assert blob.getvalue() == "save me"
+        self.assertEquals(blob.getvalue(), "save me")
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -59,8 +59,7 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._encrypt_and_upload('blob_id1', '1', '1', BytesIO("1"))
         yield manager._encrypt_and_upload('blob_id2', '2', '2', BytesIO("2"))
         blobs_list = yield manager.remote_list()
-        assert len(blobs_list) == 2
-        assert 'blob_id1' in blobs_list and 'blob_id2' in blobs_list
+        self.assertEquals(set(['blob_id1', 'blob_id2']), set(blobs_list))
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
