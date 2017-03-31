@@ -18,13 +18,11 @@
 setup file for leap.soledad.client
 """
 import re
+import sys
 from setuptools import setup
 from setuptools import find_packages
 from setuptools import Command
 import versioneer
-
-from pkg import utils
-
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -110,21 +108,16 @@ cmdclass["freeze_debianver"] = freeze_debianver
 
 # XXX add ref to docs
 
-requirements = utils.parse_requirements()
+install_requires = [
+    'twisted', 'scrypt', 'zope.proxy', 'cryptography',
+    'leap.common', 'leap.soledad.common', 'treq']
 
-if utils.is_develop_mode():
-    print
-    print("[WARNING] Skipping leap-specific dependencies "
-          "because development mode is detected.")
-    print("[WARNING] You can install "
-          "the latest published versions with "
-          "'pip install -r pkg/requirements-leap.pip'")
-    print("[WARNING] Or you can instead do 'python setup.py develop' "
-          "from the parent folder of each one of them.")
-    print
+# needed until kali merges the py3 fork back into the main pysqlcipher repo
+if sys.version_info >= (3, 0):
+    install_requires += ['pysqlcipher3']
 else:
-    requirements += utils.parse_requirements(
-        reqfiles=["pkg/requirements-leap.pip"])
+    install_requires += ['pysqlcipher']
+
 
 setup(
     name='leap.soledad.client',
@@ -148,6 +141,6 @@ setup(
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    install_requires=requirements,
+    install_requires=install_requires,
     extras_require={'signaling': ['leap.common>=0.3.0']},
 )
