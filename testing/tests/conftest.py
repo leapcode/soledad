@@ -3,6 +3,8 @@ import os
 import pytest
 import requests
 import signal
+import socket
+import sys
 import time
 
 from hashlib import sha512
@@ -215,3 +217,21 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
         request.addfinalizer(soledad_client.close)
         return soledad_client
     return create
+
+
+#
+# pytest-benchmark customizations
+#
+
+# avoid hooking if this is not a benchmarking environment
+if 'pytest_benchmark' in sys.modules:
+
+    def pytest_benchmark_update_machine_info(config, machine_info):
+        """
+        Add the host's hostname information to machine_info.
+
+        Get the value from the HOST_HOSTNAME environment variable if it is set,
+        or from the actual system's hostname otherwise.
+        """
+        hostname = os.environ.get('HOST_HOSTNAME', socket.gethostname())
+        machine_info['host'] = hostname

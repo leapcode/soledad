@@ -1,6 +1,6 @@
+import base64
 import pytest
 import random
-import base64
 
 from twisted.internet import threads, reactor
 
