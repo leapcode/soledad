@@ -12,6 +12,9 @@
 #
 #   - Error handling. This script is dump and will run forever.
 
+set -e
+
+
 #rm -rf testing/.tox
 
 while /bin/true
@@ -32,6 +35,7 @@ do
   # Option 2: Run couchdb + tox in docker container using gitlab-runner
   git checkout origin/benchmark-all-commits .gitlab-ci.yml
   gitlab-runner exec docker benchmark --env PYTEST_OPTS="$PYTEST_OPTS" --env HOST_HOSTNAME="$(hostname)"
-
+  git reset HEAD .gitlab-ci.yml
+  git checkout   .gitlab-ci.yml
   git checkout HEAD^
 done
