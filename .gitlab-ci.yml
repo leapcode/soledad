@@ -68,6 +68,9 @@ benchmark:
     - couchdb
   allow_failure: true
   script:
+    # We need some files on order to post the right benchmarking data to elasticsearch
+    - git checkout origin/master testing/tox.ini testing/tests/benchmarks/conftest.py testing/tests/conftest.py
+    - git status
     - cd testing
     - curl -s couchdb:5984
     # You can provide a $NETRC variable containing the creds for your
