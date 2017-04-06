@@ -19,9 +19,13 @@ set -e
 
 while /bin/true
 do
+
+  commit_id=$(git rev-parse HEAD)
   echo -e '\n\n\n\n\n'
-
-
+  echo -e "\e[34m$(date): Starting benchmarking of commit ${commit_id:0:8}, which is $(git rev-list --count ${commit_id}..origin/master) commits back from master:\e[0m"
+  echo
+  git show | head -6
+  echo
 
   # Option 1: Run couchdb + tox localy - dirty!
   # curl -s localhost:5984 || exit 1
@@ -34,7 +38,13 @@ do
 
   # Option 2: Run couchdb + tox in docker container using gitlab-runner
   git checkout origin/benchmark-all-commits .gitlab-ci.yml
-  gitlab-runner exec docker benchmark --env PYTEST_OPTS="$PYTEST_OPTS" --env HOST_HOSTNAME="$(hostname)"
+  time gitlab-runner exec docker benchmark --env PYTEST_OPTS="$PYTEST_OPTS" --env HOST_HOSTNAME="$(hostname)"
+  echo
+  echo -e "\e[34m$(date): Finished benchmarking of commit ${commit_id:0:8}, which is $(git rev-list --count ${commit_id}..origin/master) commits back from master:\e[0m"
+  echo
+  git show | head -6
+  echo
+
   git reset HEAD .gitlab-ci.yml
   git checkout   .gitlab-ci.yml
   git checkout HEAD^
