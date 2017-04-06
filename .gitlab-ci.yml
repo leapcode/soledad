@@ -20,6 +20,13 @@ cache:
 
 before_script:
   - echo "Running on ${HOST_HOSTNAME:=$(hostname)}"
+  # By default, gitlab-runner will checkout in a detached HEAD
+  # (see https://gitlab.com/gitlab-org/gitlab-ce/issues/19421)
+  # We want pytest-benchmark to report the proper branch name,
+  # so we make sure we stay at the current branch
+  - git checkout -B "$CI_BUILD_REF_NAME" "$CI_BUILD_REF"
+  - git status
+  - git show -s --pretty=fuller
 
 .job_template: &job_definition
   stage: package
@@ -70,6 +77,7 @@ benchmark:
   script:
     # We need some files on order to post the right benchmarking data to elasticsearch
     - git checkout origin/master testing/tox.ini testing/tests/benchmarks/conftest.py testing/tests/conftest.py
+    - sed -i 's/drebs\/pytest-benchmark.git@use-netrc-file/varac\/pytest-benchmark.git@unmerged_prs/' testing/tox.ini
     - git status
     - cd testing
     - curl -s couchdb:5984
