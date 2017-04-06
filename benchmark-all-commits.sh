@@ -45,7 +45,5 @@ do
   git show | head -6
   echo
 
-  git reset HEAD .gitlab-ci.yml
-  git checkout   .gitlab-ci.yml
-  git checkout HEAD^
+  git reset --hard HEAD^
 done
