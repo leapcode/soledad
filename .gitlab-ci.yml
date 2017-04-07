@@ -78,6 +78,7 @@ benchmark:
     # We need some files on order to post the right benchmarking data to elasticsearch
     - git checkout origin/master testing/tox.ini testing/tests/benchmarks/conftest.py testing/tests/conftest.py
     - sed -i 's/drebs\/pytest-benchmark.git@use-netrc-file/varac\/pytest-benchmark.git@unmerged_prs/' testing/tox.ini
+    - grep -A 9 'testenv:benchmark' testing/tox.ini
     - git status
     - cd testing
     - curl -s couchdb:5984
