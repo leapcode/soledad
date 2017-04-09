@@ -12,7 +12,10 @@
 #
 #   - Error handling. This script is dump and will run forever.
 
-set -e
+# Too many commits just fail for different reasons,
+# so we just benchmark thoses that succeed.
+#set -e
+
 
 
 #rm -rf testing/.tox
