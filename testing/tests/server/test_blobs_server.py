@@ -81,5 +81,5 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager.local.put(blob_id, BytesIO("X"), size=1)
         yield manager.send_missing()
         result = yield manager._download_and_decrypt(blob_id)
-        assert result is not None
-        assert result[0].getvalue() == "X"
+        self.assertIsNotNone(result)
+        self.assertEquals(result[0].getvalue(), "X")
