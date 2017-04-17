@@ -107,8 +107,11 @@ class BlobManagerTestCase(unittest.TestCase):
         fd = BytesIO('test')
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager.remote_list = Mock(return_value=[])
-        self.manager.local_list = Mock(return_value=['missing_id'])
-        self.manager.local = Mock(get=Mock(return_value=fd))
+        yield self.manager.local.put('missing_id', fd, 4)
         yield self.manager.send_missing()
 
-        self.manager._encrypt_and_upload.assert_called_with('missing_id', fd)
+        call_list = self.manager._encrypt_and_upload.call_args_list
+        self.assertEquals(1, len(call_list))
+        call_blob_id, call_fd = call_list[0][0]
+        self.assertEquals('missing_id', call_blob_id)
+        self.assertEquals('test', call_fd.getvalue())
