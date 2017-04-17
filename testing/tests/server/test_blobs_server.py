@@ -23,6 +23,7 @@ from twisted.trial import unittest
 from twisted.web.server import Site
 from twisted.internet import reactor
 from twisted.internet import defer
+from treq._utils import set_global_pool
 from leap.soledad.server import _blobs as server_blobs
 from leap.soledad.client._blobs import BlobManager, BlobAlreadyExistsError
 
@@ -36,6 +37,7 @@ class BlobServerTestCase(unittest.TestCase):
         self.host = self.port.getHost()
         self.uri = 'http://%s:%s/' % (self.host.host, self.host.port)
         self.secret = 'A' * 96
+        set_global_pool(None)
 
     def tearDown(self):
         self.port.stopListening()
