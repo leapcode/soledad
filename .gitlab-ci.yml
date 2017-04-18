@@ -3,6 +3,8 @@ stages:
   - tests
   - benchmark
 
+image: "0xacab.org:4567/leap/gitlab-buildpackage:soledad"
+
 # Cache a folder between builds.
 # Tox sets it to be our pip cache.
 cache:
@@ -16,14 +18,12 @@ before_script:
 
 code-check:
   stage: code-check
-  image: leapcode/soledad:latest
   script:
     - cd testing
     - tox -e code-check
 
 tests:
   stage: tests
-  image: leapcode/soledad:latest
   services:
     - couchdb
   script:
@@ -32,7 +32,6 @@ tests:
 
 benchmark:
   stage: benchmark
-  image: leapcode/soledad:latest
   tags:
     - benchmark
   services:
@@ -50,4 +49,4 @@ benchmark:
     # Add $PYTEST_OPTS to pytest.ini to allow posting benchmark tests
     # to an elasticsearch instance
     - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
-    - tox --recreate -e benchmark -- --couch-url http://couchdb:5984
+    - /usr/bin/unbuffer tox --recreate -e benchmark -- --couch-url http://couchdb:5984 -m 'not synchronous' | /usr/bin/ts -s
