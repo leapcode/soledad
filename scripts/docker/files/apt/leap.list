@@ -1,4 +1,0 @@
-# This file is meant to be copied into the `/etc/apt/sources.list.d` directory
-# inside a docker image to provide a source for leap-specific packages.
-
-deb http://deb.leap.se/0.8 jessie main
