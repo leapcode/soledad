@@ -45,12 +45,12 @@ logger = getLogger(__name__)
 How long the SQLCipher connection should wait for the lock to go away until
 raising an exception.
 """
-SQLCIPHER_CONNECTION_TIMEOUT = 5
+SQLCIPHER_CONNECTION_TIMEOUT = 10
 
 """
 How many times a SQLCipher query should be retried in case of timeout.
 """
-SQLCIPHER_MAX_RETRIES = 10
+SQLCIPHER_MAX_RETRIES = 20
 
 
 def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
