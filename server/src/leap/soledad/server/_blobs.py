@@ -24,7 +24,6 @@ Clients should be able to opt-in util the feature is complete.
 A more performant BlobsBackend can (and should) be implemented for production
 environments.
 """
-import commands
 import os
 import base64
 import json
@@ -34,6 +33,7 @@ from twisted.web import static
 from twisted.web import resource
 from twisted.web.client import FileBodyProducer
 from twisted.web.server import NOT_DONE_YET
+from twisted.internet import utils, defer
 
 from zope.interface import Interface, implementer
 
@@ -129,6 +129,7 @@ class FilesystemBlobsBackend(object):
         _file = static.File(path, defaultType='application/octet-stream')
         return _file.render_GET(request)
 
+    @defer.inlineCallbacks
     def write_blob(self, user, blob_id, request):
         path = self._get_path(user, blob_id)
         try:
@@ -138,19 +139,17 @@ class FilesystemBlobsBackend(object):
         if os.path.isfile(path):
             # 409 - Conflict
             request.setResponseCode(409)
-            return "Blob already exists: %s" % blob_id
-        used = self.get_total_storage(user)
+            request.write("Blob already exists: %s" % blob_id)
+            defer.returnValue(None)
+        used = yield self.get_total_storage(user)
         if used > self.quota:
             logger.error("Error 507: Quota exceeded for user: %s" % user)
             request.setResponseCode(507)
             request.write('Quota Exceeded!')
-            request.finish()
-            return NOT_DONE_YET
+            defer.returnValue(None)
         logger.info('writing blob: %s - %s' % (user, blob_id))
         fbp = FileBodyProducer(request.content)
-        d = fbp.startProducing(open(path, 'wb'))
-        d.addCallback(lambda _: request.finish())
-        return NOT_DONE_YET
+        yield fbp.startProducing(open(path, 'wb'))
 
     def get_total_storage(self, user):
         return self._get_disk_usage(os.path.join(self.path, user))
@@ -161,12 +160,14 @@ class FilesystemBlobsBackend(object):
     def get_blob_size(user, blob_id):
         raise NotImplementedError
 
+    @defer.inlineCallbacks
     def _get_disk_usage(self, start_path):
         if not os.path.isdir(start_path):
-            return 0
-        cmd = 'du -c %s | tail -n 1' % start_path
-        size = commands.getoutput(cmd).split()[0]
-        return int(size)
+            defer.returnValue(0)
+        cmd = ['/usr/bin/du', '-s', '-c', start_path]
+        output = yield utils.getProcessOutput(cmd[0], cmd[1:])
+        size = output.split()[0]
+        defer.returnValue(int(size))
 
     def _get_path(self, user, blob_id):
         parts = [user]
@@ -203,7 +204,15 @@ class BlobsResource(resource.Resource):
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)
         user, blob_id = request.postpath
-        return self._handler.write_blob(user, blob_id, request)
+        d = self._handler.write_blob(user, blob_id, request)
+        d.addCallback(lambda _: request.finish())
+        d.addErrback(self._error, request)
+        return NOT_DONE_YET
+
+    def _error(self, e, request):
+        logger.error(e)
+        request.setResponseCode(500)
+        request.finish()
 
 
 if __name__ == '__main__':

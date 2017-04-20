@@ -62,7 +62,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend = _blobs.FilesystemBlobsBackend()
         backend._get_path = Mock(return_value='path')
         request = DummyRequest([''])
-        result = backend.write_blob('user', 'blob_id', request)
+        result = yield backend.write_blob('user', 'blob_id', request)
         self.assertEquals(result, "Blob already exists: blob_id")
         self.assertEquals(request.responseCode, 409)
 
@@ -76,11 +76,10 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
         backend.get_total_storage = lambda x: 100
         backend.quota = 90
-        backend.write_blob('user', 'blob_id', request)
+        yield backend.write_blob('user', 'blob_id', request)
 
         request.setResponseCode.assert_called_once_with(507)
         request.write.assert_called_once_with('Quota Exceeded!')
-        request.finish.assert_called_once()
 
     def test_get_path_partitioning(self):
         backend = _blobs.FilesystemBlobsBackend()
