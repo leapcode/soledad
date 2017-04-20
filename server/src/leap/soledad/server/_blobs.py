@@ -27,6 +27,7 @@ environments.
 import os
 import base64
 import json
+import re
 
 from twisted.logger import Logger
 from twisted.web import static
@@ -195,7 +196,7 @@ class BlobsResource(resource.Resource):
 
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
-        user, blob_id = request.postpath
+        user, blob_id = self._validate(request)
         if not blob_id:
             return self._handler.list_blobs(user, request)
         self._handler.tag_header(user, blob_id, request)
@@ -203,7 +204,7 @@ class BlobsResource(resource.Resource):
 
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)
-        user, blob_id = request.postpath
+        user, blob_id = self._validate(request)
         d = self._handler.write_blob(user, blob_id, request)
         d.addCallback(lambda _: request.finish())
         d.addErrback(self._error, request)
@@ -213,6 +214,12 @@ class BlobsResource(resource.Resource):
         logger.error(e)
         request.setResponseCode(500)
         request.finish()
+
+    def _validate(self, request):
+        for arg in request.postpath:
+            if arg and not re.match('^[a-zA-Z0-9_-]+$', arg):
+                raise Exception('Invalid blob resource argument: %s' % arg)
+        return request.postpath
 
 
 if __name__ == '__main__':
