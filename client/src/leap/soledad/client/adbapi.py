@@ -25,6 +25,7 @@ from functools import partial
 
 from twisted.enterprise import adbapi
 from twisted.internet.defer import DeferredSemaphore
+from twisted.python import compat
 from zope.proxy import ProxyBase, setProxiedObject
 
 from leap.soledad.common.log import getLogger
@@ -279,7 +280,7 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
                 conn.rollback()
             except:
                 logger.error(None, "Rollback failed")
-            raise excType(excValue, excTraceback)
+            compat.reraise(excValue, excTraceback)
 
     def finalClose(self):
         """
