@@ -211,7 +211,7 @@ class BlobsResource(resource.Resource):
         return NOT_DONE_YET
 
     def _error(self, e, request):
-        logger.error(e)
+        logger.error('Error processing request: %s' % e.getErrorMessage())
         request.setResponseCode(500)
         request.finish()
 
