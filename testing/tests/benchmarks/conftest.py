@@ -1,4 +1,6 @@
 import base64
+import os
+import psutil
 import pytest
 import random
 
@@ -73,3 +75,24 @@ def txbenchmark_with_setup(benchmark):
                                       rounds=4, warmup_rounds=1)
         return threads.deferToThread(bench)
     return blockOnThreadWithSetup
+
+
+#
+# resource monitoring
+#
+
+@pytest.fixture
+def monitored_benchmark(benchmark, request):
+
+    def _monitored_benchmark(fun, *args, **kwargs):
+        process = psutil.Process(os.getpid())
+        process.cpu_percent()
+        benchmark.pedantic(
+            fun, args=args, kwargs=kwargs,
+            rounds=1, iterations=1, warmup_rounds=0)
+        percent = process.cpu_percent()
+        # store value in benchmark session, so json output can be updated
+        bs = request.config._benchmarksession
+        bs.benchmarks[0].stats.cpu_percent = percent
+
+    return _monitored_benchmark
