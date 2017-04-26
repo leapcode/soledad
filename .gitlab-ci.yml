@@ -79,6 +79,8 @@ benchmark:
     - git remote add leap https://leap.se/git/soledad
     - git fetch leap
     - git checkout leap/master testing/tox.ini testing/tests/benchmarks/conftest.py testing/tests/conftest.py
+    # ensure larger timeout and more retries for async/concurrent sqlcipher access
+    - git cherry-pick a052c150ae1276f643e3b6e049e45571fe1a7b70
     - git status
     - git show -s --pretty=fuller
     - cd testing
