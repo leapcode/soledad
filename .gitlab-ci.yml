@@ -81,7 +81,7 @@ benchmark:
     - git checkout leap/master testing/tox.ini testing/tests/benchmarks/conftest.py testing/tests/conftest.py
     - git checkout leap/benchmark-all-commits tune-adbapi-parameters.sh
     # ensure larger timeout and more retries for async/concurrent sqlcipher access
-    - ./tune-adbpi-parameters.sh
+    - ./tune-adbapi-parameters.sh
     - git status
     - git show -s --pretty=fuller
     - cd testing
