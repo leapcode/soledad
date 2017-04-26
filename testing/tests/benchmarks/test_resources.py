@@ -1,4 +1,3 @@
-import pytest
 import random
 import time
 
@@ -23,14 +22,26 @@ def bellardBig(n):
     return pi
 
 
-def test_long_operation(monitored_benchmark):
+def test_cpu_intensive(monitored_benchmark):
 
-    def _long_operation():
+    def _cpu_intensive():
         sleep = [random.uniform(0.5, 1.5) for _ in xrange(3)]
         while sleep:
             t = sleep.pop()
             time.sleep(t)
             bellardBig(int((10 ** 3) * t))
 
-    results = monitored_benchmark(_long_operation)
-    print results
+    monitored_benchmark(_cpu_intensive)
+
+
+def test_memory_intensive(monitored_benchmark):
+
+    def _memory_intensive():
+        sleep = [random.uniform(0.5, 1.5) for _ in xrange(3)]
+        bigdata = ""
+        while sleep:
+            t = sleep.pop()
+            bigdata += "b" * 10 * int(10E6)
+            time.sleep(t)
+
+    monitored_benchmark(_memory_intensive)

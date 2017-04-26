@@ -1,8 +1,11 @@
 import base64
+import numpy
 import os
 import psutil
 import pytest
 import random
+import threading
+import time
 
 from twisted.internet import threads, reactor
 
@@ -81,18 +84,52 @@ def txbenchmark_with_setup(benchmark):
 # resource monitoring
 #
 
+class MemoryWatcher(threading.Thread):
+
+    def __init__(self, process, interval):
+        threading.Thread.__init__(self)
+        self.process = process
+        self.interval = interval
+        self.samples = []
+        self.running = False
+
+    def run(self):
+        self.running = True
+        while self.running:
+            memory = self.process.memory_percent(memtype='rss')
+            self.samples.append(memory)
+            time.sleep(self.interval)
+
+    def stop(self):
+        self.running = False
+        self.join()
+
+    def info(self):
+        info = {
+            'interval': self.interval,
+            'samples': self.samples,
+            'stats': {},
+        }
+        for stat in 'max', 'min', 'mean', 'std':
+            fun = getattr(numpy, stat)
+            info['stats'][stat] = fun(self.samples)
+        return info
+
+
 @pytest.fixture
 def monitored_benchmark(benchmark, request):
 
     def _monitored_benchmark(fun, *args, **kwargs):
         process = psutil.Process(os.getpid())
+        memwatch = MemoryWatcher(process, 1)
+        memwatch.start()
         process.cpu_percent()
         benchmark.pedantic(
             fun, args=args, kwargs=kwargs,
             rounds=1, iterations=1, warmup_rounds=0)
-        percent = process.cpu_percent()
-        # store value in benchmark session, so json output can be updated
-        bs = request.config._benchmarksession
-        bs.benchmarks[0].stats.cpu_percent = percent
+        memwatch.stop()
+        # store results
+        benchmark.extra_info['cpu_percent'] = process.cpu_percent()
+        benchmark.extra_info['memory_percent'] = memwatch.info()
 
     return _monitored_benchmark

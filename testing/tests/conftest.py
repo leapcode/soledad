@@ -235,12 +235,3 @@ if 'pytest_benchmark' in sys.modules:
         """
         hostname = os.environ.get('HOST_HOSTNAME', socket.gethostname())
         machine_info['host'] = hostname
-
-    def pytest_benchmark_update_json(config, benchmarks, output_json):
-        json_benchmarks = output_json['benchmarks']
-        for benchmark in benchmarks:
-            # find the json output that corresponds to this benchmark
-            name = benchmark['name']
-            output = filter(lambda d: d['name'] == name, json_benchmarks).pop()
-            # update output stats with previously saved values
-            output['stats']['cpu_percent'] = benchmark.stats.cpu_percent
