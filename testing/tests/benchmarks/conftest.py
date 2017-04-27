@@ -1,4 +1,5 @@
 import base64
+import functools
 import numpy
 import os
 import psutil
@@ -52,16 +53,16 @@ def payload():
 
 
 @pytest.fixture()
-def txbenchmark(benchmark):
+def txbenchmark(monitored_benchmark):
     def blockOnThread(*args, **kwargs):
         return threads.deferToThread(
-            benchmark, threads.blockingCallFromThread,
+            monitored_benchmark, threads.blockingCallFromThread,
             reactor, *args, **kwargs)
     return blockOnThread
 
 
 @pytest.fixture()
-def txbenchmark_with_setup(benchmark):
+def txbenchmark_with_setup(monitored_benchmark_with_setup):
     def blockOnThreadWithSetup(setup, f):
         def blocking_runner(*args, **kwargs):
             return threads.blockingCallFromThread(reactor, f, *args, **kwargs)
@@ -74,8 +75,9 @@ def txbenchmark_with_setup(benchmark):
                     return ((args,), {}) if args else None
 
         def bench():
-            return benchmark.pedantic(blocking_runner, setup=blocking_setup,
-                                      rounds=4, warmup_rounds=1)
+            return monitored_benchmark_with_setup(
+                blocking_runner, setup=blocking_setup,
+                rounds=4, warmup_rounds=1)
         return threads.deferToThread(bench)
     return blockOnThreadWithSetup
 
@@ -84,52 +86,65 @@ def txbenchmark_with_setup(benchmark):
 # resource monitoring
 #
 
-class MemoryWatcher(threading.Thread):
+class ResourceWatcher(threading.Thread):
 
-    def __init__(self, process, interval):
+    sampling_interval = 1
+
+    def __init__(self):
         threading.Thread.__init__(self)
-        self.process = process
-        self.interval = interval
-        self.samples = []
+        self.process = psutil.Process(os.getpid())
         self.running = False
+        # monitored resources
+        self.cpu_percent = None
+        self.memory_samples = []
+        self.memory_percent = None
 
     def run(self):
         self.running = True
+        self.process.cpu_percent()
         while self.running:
-            memory = self.process.memory_percent(memtype='rss')
-            self.samples.append(memory)
-            time.sleep(self.interval)
+            sample = self.process.memory_percent(memtype='rss')
+            self.memory_samples.append(sample)
+            time.sleep(self.sampling_interval)
 
     def stop(self):
         self.running = False
         self.join()
-
-    def info(self):
-        info = {
-            'interval': self.interval,
-            'samples': self.samples,
+        # save cpu usage info
+        self.cpu_percent = self.process.cpu_percent()
+        # save memory usage info
+        memory_percent = {
+            'sampling_interval': self.sampling_interval,
+            'samples': self.memory_samples,
             'stats': {},
         }
         for stat in 'max', 'min', 'mean', 'std':
             fun = getattr(numpy, stat)
-            info['stats'][stat] = fun(self.samples)
-        return info
+            memory_percent['stats'][stat] = fun(self.memory_samples)
+        self.memory_percent = memory_percent
+
+
+def _monitored_benchmark(benchmark_fixture, benchmark_function,
+                         *args, **kwargs):
+    # setup resource monitoring
+    watcher = ResourceWatcher()
+    watcher.start()
+    # run benchmarking function
+    benchmark_function(*args, **kwargs)
+    # store results
+    watcher.stop()
+    benchmark_fixture.extra_info.update({
+        'cpu_percent': watcher.cpu_percent,
+        'memory_percent': watcher.memory_percent,
+    })
 
 
 @pytest.fixture
-def monitored_benchmark(benchmark, request):
+def monitored_benchmark(benchmark):
+    return functools.partial(_monitored_benchmark, benchmark, benchmark)
 
-    def _monitored_benchmark(fun, *args, **kwargs):
-        process = psutil.Process(os.getpid())
-        memwatch = MemoryWatcher(process, 1)
-        memwatch.start()
-        process.cpu_percent()
-        benchmark.pedantic(
-            fun, args=args, kwargs=kwargs,
-            rounds=1, iterations=1, warmup_rounds=0)
-        memwatch.stop()
-        # store results
-        benchmark.extra_info['cpu_percent'] = process.cpu_percent()
-        benchmark.extra_info['memory_percent'] = memwatch.info()
 
-    return _monitored_benchmark
+@pytest.fixture
+def monitored_benchmark_with_setup(benchmark):
+    return functools.partial(
+        _monitored_benchmark, benchmark, benchmark.pedantic)

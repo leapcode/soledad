@@ -56,18 +56,18 @@ def create_doc_decryption(size):
 
 def create_raw_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_encrypt")
-    def test_raw_encrypt(benchmark, payload):
+    def test_raw_encrypt(monitored_benchmark, payload):
         key = payload(32)
-        benchmark(_crypto.encrypt_sym, payload(size), key)
+        monitored_benchmark(_crypto.encrypt_sym, payload(size), key)
     return test_raw_encrypt
 
 
 def create_raw_decryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_decrypt")
-    def test_raw_decrypt(benchmark, payload):
+    def test_raw_decrypt(monitored_benchmark, payload):
         key = payload(32)
         iv, ciphertext = _crypto.encrypt_sym(payload(size), key)
-        benchmark(_crypto.decrypt_sym, ciphertext, key, iv)
+        monitored_benchmark(_crypto.decrypt_sym, ciphertext, key, iv)
     return test_raw_decrypt
 
 
