@@ -17,12 +17,16 @@
 """
 Tests for blobs handling.
 """
-from twisted.trial import unittest
-from twisted.internet import defer
-from leap.soledad.client._blobs import DecrypterBuffer, BlobManager, FIXED_REV
-from leap.soledad.client import _crypto
 from io import BytesIO
 from mock import Mock
+
+from twisted.trial import unittest
+from twisted.internet import defer
+
+from leap.soledad.client._database.blobs import DecrypterBuffer
+from leap.soledad.client._database.blobs import BlobManager
+from leap.soledad.client._database.blobs import FIXED_REV
+from leap.soledad.client import _crypto
 
 
 class BlobTestCase(unittest.TestCase):

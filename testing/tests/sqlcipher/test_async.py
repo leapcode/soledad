@@ -20,8 +20,8 @@ import hashlib
 from twisted.internet import defer
 
 from test_soledad.util import BaseSoledadTest
-from leap.soledad.client import adbapi
-from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client._database import adbapi
+from leap.soledad.client._database import sqlcipher
 
 
 class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
@@ -42,7 +42,7 @@ class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
 
     def _get_dbpool(self):
         tmpdb = os.path.join(self.tempdir, "test.soledad")
-        opts = SQLCipherOptions(tmpdb, "secret", create=True)
+        opts = sqlcipher.SQLCipherOptions(tmpdb, "secret", create=True)
         return adbapi.getConnectionPool(opts)
 
     def _get_sample(self):

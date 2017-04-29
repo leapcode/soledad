@@ -23,10 +23,10 @@ from leap.soledad.client.events import emit_async
 from leap.soledad.client.http_target.support import RequestBody
 from leap.soledad.common.log import getLogger
 from leap.soledad.client._crypto import is_symmetrically_encrypted
-from leap.soledad.common.document import Document
 from leap.soledad.common.l2db import errors
 from leap.soledad.client import crypto as old_crypto
 
+from .._document import Document
 from . import fetch_protocol
 
 logger = getLogger(__name__)

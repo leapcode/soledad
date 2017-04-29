@@ -51,14 +51,14 @@ from leap.soledad.common.l2db.remote import http_client
 from leap.soledad.common.l2db.remote.ssl_match_hostname import match_hostname
 from leap.soledad.common.errors import DatabaseAccessError
 
-from leap.soledad.client import adbapi
-from leap.soledad.client import events as soledad_events
-from leap.soledad.client import interfaces as soledad_interfaces
-from leap.soledad.client import sqlcipher
-from leap.soledad.client._recovery_code import RecoveryCode
-from leap.soledad.client._secrets import Secrets
-from leap.soledad.client._crypto import SoledadCrypto
-from ._blobs import BlobManager
+from . import events as soledad_events
+from . import interfaces as soledad_interfaces
+from ._crypto import SoledadCrypto
+from ._database import adbapi
+from ._database import blobs
+from ._database import sqlcipher
+from ._recovery_code import RecoveryCode
+from ._secrets import Secrets
 
 
 logger = getLogger(__name__)
@@ -268,8 +268,8 @@ class Soledad(object):
         path = os.path.join(os.path.dirname(self._local_db_path), 'blobs')
         url = urlparse.urljoin(self.server_url, 'blobs/%s' % uuid)
         key = self._secrets.local_key
-        self.blobmanager = BlobManager(path, url, key, self.uuid, self.token,
-                                       SOLEDAD_CERT)
+        self.blobmanager = blobs.BlobManager(path, url, key, self.uuid,
+                                             self.token, SOLEDAD_CERT)
 
     #
     # Closing methods

@@ -19,7 +19,7 @@ Tests for sqlcipher backend on blobs client.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from leap.soledad.client._blobs import BlobManager, BlobDoc, FIXED_REV
+from leap.soledad.client._database.blobs import BlobManager, BlobDoc, FIXED_REV
 from io import BytesIO
 from mock import Mock
 import pytest

@@ -22,7 +22,6 @@ from urlparse import urljoin
 
 import errno
 import os
-import uuid
 import base64
 
 from io import BytesIO
@@ -35,13 +34,18 @@ from twisted.web.client import FileBodyProducer
 
 import treq
 
-from leap.soledad.client.sqlcipher import SQLCipherOptions
-from leap.soledad.client import pragmas
-from leap.soledad.client._pipes import TruncatedTailPipe, PreamblePipe
 from leap.soledad.common.errors import SoledadError
 
-from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
-from _http import HTTPClient
+from .._document import BlobDoc
+from .._crypto import DocInfo
+from .._crypto import BlobEncryptor
+from .._crypto import BlobDecryptor
+from .._http import HTTPClient
+from .._pipes import TruncatedTailPipe
+from .._pipes import PreamblePipe
+
+from . import pragmas
+from . import sqlcipher
 
 
 logger = Logger()
@@ -293,7 +297,7 @@ class SQLiteBlobBackend(object):
         if not key:
             raise ValueError('key cannot be None')
         backend = 'pysqlcipher.dbapi2'
-        opts = SQLCipherOptions('/tmp/ignored', key)
+        opts = sqlcipher.SQLCipherOptions('/tmp/ignored', key)
         pragmafun = partial(pragmas.set_init_pragmas, opts=opts)
         openfun = _sqlcipherInitFactory(pragmafun)
 
@@ -358,20 +362,6 @@ def _sqlcipherInitFactory(fun):
         fun(conn)
         _init_blob_table(conn)
     return _initialize
-
-
-class BlobDoc(object):
-
-    # TODO probably not needed, but convenient for testing for now.
-
-    def __init__(self, content, blob_id):
-
-        self.blob_id = blob_id
-        self.is_blob = True
-        self.blob_fd = content
-        if blob_id is None:
-            blob_id = uuid.uuid4().get_hex()
-        self.blob_id = blob_id
 
 
 #
@@ -439,8 +429,7 @@ def testit(reactor):
     # TODO convert these into proper unittests
 
     def _manager():
-        if not os.path.isdir(args.path):
-            mkdir_p(args.path)
+        mkdir_p(os.path.dirname(args.path))
         manager = BlobManager(
             args.path, args.url,
             'A' * 32, args.secret,

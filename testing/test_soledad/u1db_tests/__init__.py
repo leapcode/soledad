@@ -37,10 +37,11 @@ from twisted.internet import reactor
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db import Document
 from leap.soledad.common.l2db.backends import inmemory
-from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.l2db.remote import server_state
 from leap.soledad.common.l2db.remote import http_app
 from leap.soledad.common.l2db.remote import http_target
+
+from leap.soledad.client._database import sqlite
 
 if sys.version_info[0] < 3:
     from pysqlcipher import dbapi2
@@ -140,7 +141,7 @@ def copy_memory_database_for_test(test, db):
 
 
 def make_sqlite_partial_expanded_for_test(test, replica_uid):
-    db = sqlite_backend.SQLitePartialExpandDatabase(':memory:')
+    db = sqlite.SQLitePartialExpandDatabase(':memory:')
     db._set_replica_uid(replica_uid)
     return db
 
@@ -151,7 +152,7 @@ def copy_sqlite_partial_expanded_for_test(test, db):
     # CORRECTLY DETECT IT HAPPENING SO THAT WE CAN RAISE ERRORS RATHER THAN
     # CORRUPT USER DATA. USE SYNC INSTEAD, OR WE WILL SEND NINJA TO YOUR
     # HOUSE.
-    new_db = sqlite_backend.SQLitePartialExpandDatabase(':memory:')
+    new_db = sqlite.SQLitePartialExpandDatabase(':memory:')
     tmpfile = StringIO()
     for line in db._db_handle.iterdump():
         if 'sqlite_sequence' not in line:  # work around bug in iterdump

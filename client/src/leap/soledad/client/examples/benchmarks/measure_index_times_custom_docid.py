@@ -27,7 +27,7 @@ import sys
 from twisted.internet import defer, reactor
 
 from leap.soledad.client import adbapi
-from leap.soledad.client.sqlcipher import SQLCipherOptions
+from leap.soledad.client._database.sqlcipher import SQLCipherOptions
 from leap.soledad.common import l2db
 
 
