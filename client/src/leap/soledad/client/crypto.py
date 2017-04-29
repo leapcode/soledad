@@ -167,7 +167,7 @@ class SoledadCrypto(object):
         Wrapper around encrypt_docstr that accepts the document as argument.
 
         :param doc: the document.
-        :type doc: SoledadDocument
+        :type doc: Document
         """
         key = self.doc_passphrase(doc.doc_id)
 
@@ -179,7 +179,7 @@ class SoledadCrypto(object):
         Wrapper around decrypt_doc_dict that accepts the document as argument.
 
         :param doc: the document.
-        :type doc: SoledadDocument
+        :type doc: Document
 
         :return: json string with the decrypted document
         :rtype: str
@@ -194,7 +194,7 @@ class SoledadCrypto(object):
 
 
 #
-# Crypto utilities for a SoledadDocument.
+# Crypto utilities for a Document.
 #
 
 def mac_doc(doc_id, doc_rev, ciphertext, enc_scheme, enc_method, enc_iv,
@@ -439,7 +439,7 @@ def is_symmetrically_encrypted(doc):
     Return True if the document was symmetrically encrypted.
 
     :param doc: The document to check.
-    :type doc: SoledadDocument
+    :type doc: Document
 
     :rtype: bool
     """

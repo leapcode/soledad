@@ -23,7 +23,7 @@ from leap.soledad.client.events import emit_async
 from leap.soledad.client.http_target.support import RequestBody
 from leap.soledad.common.log import getLogger
 from leap.soledad.client._crypto import is_symmetrically_encrypted
-from leap.soledad.common.document import SoledadDocument
+from leap.soledad.common.document import Document
 from leap.soledad.common.l2db import errors
 from leap.soledad.client import crypto as old_crypto
 
@@ -113,7 +113,7 @@ class HTTPDocFetcher(object):
 
     @defer.inlineCallbacks
     def __atomic_doc_parse(self, doc_info, content, total):
-        doc = SoledadDocument(doc_info['id'], doc_info['rev'], content)
+        doc = Document(doc_info['id'], doc_info['rev'], content)
         if is_symmetrically_encrypted(content):
             content = (yield self._crypto.decrypt_doc(doc)).getvalue()
         elif old_crypto.is_symmetrically_encrypted(doc):

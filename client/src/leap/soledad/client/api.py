@@ -58,6 +58,7 @@ from leap.soledad.client import sqlcipher
 from leap.soledad.client._recovery_code import RecoveryCode
 from leap.soledad.client._secrets import Secrets
 from leap.soledad.client._crypto import SoledadCrypto
+from ._blobs import BlobManager
 
 
 logger = getLogger(__name__)
@@ -171,6 +172,7 @@ class Soledad(object):
         self._recovery_code = RecoveryCode()
         self._secrets = Secrets(self)
         self._crypto = SoledadCrypto(self._secrets.remote_secret)
+        self._init_blobmanager()
 
         try:
             # initialize database access, trap any problems so we can shutdown
@@ -262,6 +264,13 @@ class Soledad(object):
                 sync_exchange_phase = _p
         return sync_phase, sync_exchange_phase
 
+    def _init_blobmanager(self):
+        path = os.path.join(os.path.dirname(self._local_db_path), 'blobs')
+        url = urlparse.urljoin(self.server_url, 'blobs/%s' % uuid)
+        key = self._secrets.local_key
+        self.blobmanager = BlobManager(path, url, key, self.uuid, self.token,
+                                       SOLEDAD_CERT)
+
     #
     # Closing methods
     #
@@ -272,6 +281,7 @@ class Soledad(object):
         """
         logger.debug("closing soledad")
         self._dbpool.close()
+        self.blobmanager.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
 
@@ -306,7 +316,7 @@ class Soledad(object):
         ============================== WARNING ==============================
 
         :param doc: A document with new content.
-        :type doc: leap.soledad.common.document.SoledadDocument
+        :type doc: leap.soledad.common.document.Document
         :return: A deferred whose callback will be invoked with the new
             revision identifier for the document. The document object will
             also be updated.
@@ -323,7 +333,7 @@ class Soledad(object):
         This will also set doc.content to None.
 
         :param doc: A document to be deleted.
-        :type doc: leap.soledad.common.document.SoledadDocument
+        :type doc: leap.soledad.common.document.Document
         :return: A deferred.
         :rtype: twisted.internet.defer.Deferred
         """
@@ -387,6 +397,7 @@ class Soledad(object):
         """
         return self._defer("get_all_docs", include_deleted)
 
+    @defer.inlineCallbacks
     def create_doc(self, content, doc_id=None):
         """
         Create a new document.
@@ -408,8 +419,9 @@ class Soledad(object):
         # create_doc (and probably to put_doc too). There are cases (mail
         # payloads for example) in which we already have the encoding in the
         # headers, so we don't need to guess it.
-        d = self._defer("create_doc", content, doc_id=doc_id)
-        return d
+        doc = yield self._defer("create_doc", content, doc_id=doc_id)
+        doc.set_store(self)
+        defer.returnValue(doc)
 
     def create_doc_from_json(self, json, doc_id=None):
         """
@@ -590,7 +602,7 @@ class Soledad(object):
         the time you GET_DOC_CONFLICTS until the point where you RESOLVE)
 
         :param doc: A Document with the new content to be inserted.
-        :type doc: SoledadDocument
+        :type doc: Document
         :param conflicted_doc_revs: A list of revisions that the new content
             supersedes.
         :type conflicted_doc_revs: list(str)

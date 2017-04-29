@@ -20,6 +20,7 @@ Clientside BlobBackend Storage.
 
 from urlparse import urljoin
 
+import errno
 import os
 import uuid
 import base64
@@ -129,6 +130,16 @@ class DecrypterBuffer(object):
         return self.decrypter._end_stream(), real_size
 
 
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
 class BlobManager(object):
     """
     Ideally, the decrypting flow goes like this:
@@ -149,6 +160,7 @@ class BlobManager(object):
             self, local_path, remote, key, secret, user, token=None,
             cert_file=None):
         if local_path:
+            mkdir_p(os.path.dirname(local_path))
             self.local = SQLiteBlobBackend(local_path, key)
         self.remote = remote
         self.secret = secret
@@ -277,6 +289,7 @@ class SQLiteBlobBackend(object):
     def __init__(self, path, key=None):
         self.path = os.path.abspath(
             os.path.join(path, 'soledad_blob.db'))
+        mkdir_p(os.path.dirname(self.path))
         if not key:
             raise ValueError('key cannot be None')
         backend = 'pysqlcipher.dbapi2'
@@ -289,7 +302,11 @@ class SQLiteBlobBackend(object):
             cp_openfun=openfun, cp_min=1, cp_max=2, cp_name='blob_pool')
 
     def close(self):
-        return self.dbpool.close()
+        from twisted._threads import AlreadyQuit
+        try:
+            self.dbpool.close()
+        except AlreadyQuit:
+            pass
 
     @defer.inlineCallbacks
     def put(self, blob_id, blob_fd, size=None):
@@ -423,7 +440,7 @@ def testit(reactor):
 
     def _manager():
         if not os.path.isdir(args.path):
-            os.makedirs(args.path)
+            mkdir_p(args.path)
         manager = BlobManager(
             args.path, args.url,
             'A' * 32, args.secret,

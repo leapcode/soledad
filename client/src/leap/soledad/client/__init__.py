@@ -17,12 +17,14 @@
 """
 Soledad - Synchronization Of Locally Encrypted Data Among Devices.
 """
-from leap.soledad.client.api import Soledad
 from leap.soledad.common import soledad_assert
 
+from .api import Soledad
+from ._document import Document, AttachmentStates
 from ._version import get_versions
 
 __version__ = get_versions()['version']
 del get_versions
 
-__all__ = ['soledad_assert', 'Soledad', '__version__']
+__all__ = ['soledad_assert', 'Soledad', 'Document', 'AttachmentStates',
+           '__version__']

@@ -50,16 +50,15 @@ from twisted.internet import reactor
 from twisted.internet import defer
 from twisted.enterprise import adbapi
 
-from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import errors as u1db_errors
-from leap.soledad.common.l2db import Document
 from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
 from leap.soledad.client import pragmas
+from leap.soledad.client._document import Document
 
 if sys.version_info[0] < 3:
     from pysqlcipher import dbapi2 as sqlcipher_dbapi2
@@ -232,7 +231,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         # ---------------------------------------------------------
 
         self._ensure_schema()
-        self.set_document_factory(soledad_doc_factory)
+        self.set_document_factory(doc_factory)
         self._prime_replica_uid()
 
     def _prime_replica_uid(self):
@@ -437,7 +436,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                 self._opts, check_same_thread=False)
             self._real_replica_uid = None
             self._ensure_schema()
-            self.set_document_factory(soledad_doc_factory)
+            self.set_document_factory(doc_factory)
         except sqlcipher_dbapi2.DatabaseError as e:
             raise DatabaseAccessError(str(e))
 
@@ -537,7 +536,7 @@ class SoledadSQLCipherWrapper(SQLCipherDatabase):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
-        self.set_document_factory(soledad_doc_factory)
+        self.set_document_factory(doc_factory)
         self._prime_replica_uid()
 
 
@@ -583,14 +582,14 @@ class DatabaseIsNotEncrypted(Exception):
     pass
 
 
-def soledad_doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
-                        syncable=True):
+def doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
+                syncable=True):
     """
     Return a default Soledad Document.
     Used in the initialization for SQLCipherDatabase
     """
-    return SoledadDocument(doc_id=doc_id, rev=rev, json=json,
-                           has_conflicts=has_conflicts, syncable=syncable)
+    return Document(doc_id=doc_id, rev=rev, json=json,
+                    has_conflicts=has_conflicts, syncable=syncable)
 
 
 sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)
