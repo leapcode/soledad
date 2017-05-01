@@ -99,9 +99,24 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(result, ['blob_0', 'blob_1'])
 
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_path_validation_for_subdirectories(self):
+    def test_path_validation_on_read_blob(self):
         blobs_path = self.tempdir
         backend = _blobs.FilesystemBlobsBackend(blobs_path)
-        self.assertFalse(backend._valid_subdir('/'))
-        self.assertFalse(backend._valid_subdir(blobs_path + '../../../../../'))
-        self.assertTrue(backend._valid_subdir(os.path.join(blobs_path, 'x')))
+        with pytest.raises(Exception):
+            backend.read_blob('..', '..', DummyRequest(['']))
+        with pytest.raises(Exception):
+            backend.read_blob('valid', '../../../', DummyRequest(['']))
+        with pytest.raises(Exception):
+            backend.read_blob('../../../', 'valid', DummyRequest(['']))
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @defer.inlineCallbacks
+    def test_path_validation_on_write_blob(self):
+        blobs_path = self.tempdir
+        backend = _blobs.FilesystemBlobsBackend(blobs_path)
+        with pytest.raises(Exception):
+            yield backend.write_blob('..', '..', DummyRequest(['']))
+        with pytest.raises(Exception):
+            yield backend.write_blob('valid', '../../../', DummyRequest(['']))
+        with pytest.raises(Exception):
+            yield backend.write_blob('../../../', 'valid', DummyRequest(['']))
