@@ -194,6 +194,9 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def put(self, doc, size):
+        if (yield self.local.exists(doc.blob_id)):
+            error_message = "Blob already exists: %s" % doc.blob_id
+            raise BlobAlreadyExistsError(error_message)
         fd = doc.blob_fd
         # TODO this is a tee really, but ok... could do db and upload
         # concurrently. not sure if we'd gain something.
@@ -325,6 +328,12 @@ class SQLiteBlobBackend(object):
             defer.returnValue([b_id[0] for b_id in result])
         else:
             defer.returnValue([])
+
+    @defer.inlineCallbacks
+    def exists(self, blob_id):
+        query = 'SELECT blob_id from blobs WHERE blob_id = ?'
+        result = yield self.dbpool.runQuery(query, (blob_id,))
+        defer.returnValue(bool(len(result)))
 
 
 def _init_blob_table(conn):

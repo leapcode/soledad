@@ -20,6 +20,7 @@ Tests for sqlcipher backend on blobs client.
 from twisted.trial import unittest
 from twisted.internet import defer
 from leap.soledad.client._blobs import BlobManager, BlobDoc, FIXED_REV
+from leap.soledad.client._blobs import BlobAlreadyExistsError
 from io import BytesIO
 from mock import Mock
 import pytest
@@ -115,3 +116,17 @@ class BlobManagerTestCase(unittest.TestCase):
         call_blob_id, call_fd = call_list[0][0]
         self.assertEquals('missing_id', call_blob_id)
         self.assertEquals('test', call_fd.getvalue())
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_duplicated_blob_error_on_put(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        content = "Blob content"
+        doc1 = BlobDoc(BytesIO(content), 'existing_id')
+        yield self.manager.put(doc1, len(content))
+        doc2 = BlobDoc(BytesIO(content), 'existing_id')
+        # reset mock, so we can check that upload wasnt called
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        with pytest.raises(BlobAlreadyExistsError):
+            yield self.manager.put(doc2, len(content))
+        self.assertFalse(self.manager._encrypt_and_upload.called)
