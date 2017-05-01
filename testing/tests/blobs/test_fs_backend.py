@@ -97,3 +97,11 @@ class FilesystemBackendTestCase(unittest.TestCase):
         walk_mock.return_value = [(_, _, ['blob_0']), (_, _, ['blob_1'])]
         result = json.loads(backend.list_blobs('user', DummyRequest([''])))
         self.assertEquals(result, ['blob_0', 'blob_1'])
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_path_validation_for_subdirectories(self):
+        blobs_path = self.tempdir
+        backend = _blobs.FilesystemBlobsBackend(blobs_path)
+        self.assertFalse(backend._valid_subdir('/'))
+        self.assertFalse(backend._valid_subdir(blobs_path + '../../../../../'))
+        self.assertTrue(backend._valid_subdir(os.path.join(blobs_path, 'x')))
