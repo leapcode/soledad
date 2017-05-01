@@ -18,6 +18,7 @@
 Tests for blobs backend on server side.
 """
 from twisted.trial import unittest
+from twisted.internet import defer
 from twisted.web.test.test_web import DummyRequest
 from leap.soledad.server import _blobs
 from io import BytesIO
@@ -57,17 +58,19 @@ class FilesystemBackendTestCase(unittest.TestCase):
         render_mock.render_GET.assert_called_once_with(request)
 
     @mock.patch.object(os.path, 'isfile')
+    @defer.inlineCallbacks
     def test_cannot_overwrite(self, isfile):
         isfile.return_value = True
         backend = _blobs.FilesystemBlobsBackend()
         backend._get_path = Mock(return_value='path')
         request = DummyRequest([''])
-        result = yield backend.write_blob('user', 'blob_id', request)
-        self.assertEquals(result, "Blob already exists: blob_id")
+        yield backend.write_blob('user', 'blob_id', request)
+        self.assertEquals(request.written[0], "Blob already exists: blob_id")
         self.assertEquals(request.responseCode, 409)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
+    @defer.inlineCallbacks
     def test_write_cannot_exceed_quota(self, isfile):
         isfile.return_value = False
         backend = _blobs.FilesystemBlobsBackend()
