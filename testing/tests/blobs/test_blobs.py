@@ -15,7 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Tests for blobs handling.
+Tests for blobs decrypter buffer. A component which is used as a decryption
+sink during blob stream download.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -25,7 +26,7 @@ from io import BytesIO
 from mock import Mock
 
 
-class BlobTestCase(unittest.TestCase):
+class DecrypterBufferCase(unittest.TestCase):
 
     class doc_info:
         doc_id = 'D-BLOB-ID'
@@ -49,7 +50,7 @@ class BlobTestCase(unittest.TestCase):
         self.assertEquals(fd.getvalue(), 'rosa de foc')
 
     @defer.inlineCallbacks
-    def test_blob_manager_encrypted_upload(self):
+    def test_decrypt_uploading_encrypted_blob(self):
 
         @defer.inlineCallbacks
         def _check_result(uri, data, *args, **kwargs):
