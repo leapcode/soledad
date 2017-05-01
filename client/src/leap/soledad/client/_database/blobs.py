@@ -20,6 +20,7 @@ Clientside BlobBackend Storage.
 
 from urlparse import urljoin
 
+import binascii
 import errno
 import os
 import base64
@@ -297,7 +298,9 @@ class SQLiteBlobBackend(object):
         if not key:
             raise ValueError('key cannot be None')
         backend = 'pysqlcipher.dbapi2'
-        opts = sqlcipher.SQLCipherOptions('/tmp/ignored', key)
+        opts = sqlcipher.SQLCipherOptions(
+            '/tmp/ignored', binascii.b2a_hex(key),
+            is_raw_key=True, create=True)
         pragmafun = partial(pragmas.set_init_pragmas, opts=opts)
         openfun = _sqlcipherInitFactory(pragmafun)
 
