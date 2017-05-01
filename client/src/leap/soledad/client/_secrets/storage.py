@@ -23,8 +23,8 @@ from hashlib import sha256
 from leap.soledad.common import SHARED_DB_NAME
 from leap.soledad.common.log import getLogger
 
-from leap.soledad.common.document import SoledadDocument
 from leap.soledad.client.shared_db import SoledadSharedDatabase
+from leap.soledad.client._document import Document
 from leap.soledad.client._secrets.util import emit, UserDataMixin
 
 
@@ -111,7 +111,7 @@ class SecretsStorage(UserDataMixin):
     def save_remote(self, encrypted):
         doc = self._remote_doc
         if not doc:
-            doc = SoledadDocument(doc_id=self._remote_doc_id())
+            doc = Document(doc_id=self._remote_doc_id())
         doc.content = encrypted
         db = self._shared_db
         if not db:

@@ -135,7 +135,7 @@ class SoledadCrypto(object):
         and wrapping the result as a simple JSON string with a "raw" key.
 
         :param doc: the document to be encrypted.
-        :type doc: SoledadDocument
+        :type doc: Document
         :return: A deferred whose callback will be invoked with a JSON string
             containing the ciphertext as the value of "raw" key.
         :rtype: twisted.internet.defer.Deferred
@@ -159,7 +159,7 @@ class SoledadCrypto(object):
         the decrypted cleartext content from the encrypted document.
 
         :param doc: the document to be decrypted.
-        :type doc: SoledadDocument
+        :type doc: Document
         :return: The decrypted cleartext content of the document.
         :rtype: str
         """
@@ -225,7 +225,7 @@ def decrypt_sym(data, key, iv, method=ENC_METHOD.aes_256_gcm):
 class BlobEncryptor(object):
     """
     Produces encrypted data from the cleartext data associated with a given
-    SoledadDocument using AES-256 cipher in GCM mode.
+    Document using AES-256 cipher in GCM mode.
 
     The production happens using a Twisted's FileBodyProducer, which uses a
     Cooperator to schedule calls and can be paused/resumed. Each call takes at

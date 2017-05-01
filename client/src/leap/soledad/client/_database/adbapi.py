@@ -30,8 +30,9 @@ from zope.proxy import ProxyBase, setProxiedObject
 
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.errors import DatabaseAccessError
-from leap.soledad.client import sqlcipher as soledad_sqlcipher
-from leap.soledad.client.pragmas import set_init_pragmas
+
+from . import sqlcipher
+from . import pragmas
 
 if sys.version_info[0] < 3:
     from pysqlcipher import dbapi2
@@ -73,7 +74,7 @@ def getConnectionPool(opts, openfun=None, driver="pysqlcipher"):
     :rtype: U1DBConnectionPool
     """
     if openfun is None and driver == "pysqlcipher":
-        openfun = partial(set_init_pragmas, opts=opts)
+        openfun = partial(pragmas.set_init_pragmas, opts=opts)
     return U1DBConnectionPool(
         opts,
         # the following params are relayed "as is" to twisted's
@@ -87,7 +88,7 @@ class U1DBConnection(adbapi.Connection):
     A wrapper for a U1DB connection instance.
     """
 
-    u1db_wrapper = soledad_sqlcipher.SoledadSQLCipherWrapper
+    u1db_wrapper = sqlcipher.SoledadSQLCipherWrapper
     """
     The U1DB wrapper to use.
     """

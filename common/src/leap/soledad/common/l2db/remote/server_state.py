@@ -42,10 +42,9 @@ class ServerState(object):
 
     def open_database(self, path):
         """Open a database at the given location."""
-        from u1db.backends import sqlite_backend
+        from leap.soledad.client._database import sqlite
         full_path = self._relpath(path)
-        return sqlite_backend.SQLiteDatabase.open_database(full_path,
-                                                           create=False)
+        return sqlite.SQLiteDatabase.open_database(full_path, create=False)
 
     def check_database(self, path):
         """Check if the database at the given location exists.
@@ -57,14 +56,13 @@ class ServerState(object):
 
     def ensure_database(self, path):
         """Ensure database at the given location."""
-        from u1db.backends import sqlite_backend
+        from leap.soledad.client._database import sqlite
         full_path = self._relpath(path)
-        db = sqlite_backend.SQLiteDatabase.open_database(full_path,
-                                                         create=True)
+        db = sqlite.SQLiteDatabase.open_database(full_path, create=True)
         return db, db._replica_uid
 
     def delete_database(self, path):
         """Delete database at the given location."""
-        from u1db.backends import sqlite_backend
+        from leap.soledad.client._database import sqlite
         full_path = self._relpath(path)
-        sqlite_backend.SQLiteDatabase.delete_database(full_path)
+        sqlite.SQLiteDatabase.delete_database(full_path)

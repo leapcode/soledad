@@ -26,14 +26,13 @@ import sys
 # l2db stuff.
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db import query_parser
-from leap.soledad.common.l2db.backends.sqlite_backend \
-    import SQLitePartialExpandDatabase
 
 # soledad stuff.
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.client.sqlcipher import SQLCipherDatabase
-from leap.soledad.client.sqlcipher import SQLCipherOptions
-from leap.soledad.client.sqlcipher import DatabaseIsNotEncrypted
+from leap.soledad.client._database.sqlite import SQLitePartialExpandDatabase
+from leap.soledad.client._database.sqlcipher import SQLCipherDatabase
+from leap.soledad.client._database.sqlcipher import SQLCipherOptions
+from leap.soledad.client._database.sqlcipher import DatabaseIsNotEncrypted
 
 # u1db tests stuff.
 from test_soledad import u1db_tests as tests

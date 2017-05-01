@@ -19,7 +19,9 @@ MANIFEST
 _trial_temp
 .DS_Store
 scripts/profiling/sync/profiles
+tags
 
 testing/htmlcov
 testing/.coverage
 testing/test-env
+testing/.benchmarks

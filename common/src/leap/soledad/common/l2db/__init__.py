@@ -37,8 +37,8 @@ def open(path, create, document_factory=None):
         parameters as Document.__init__.
     :return: An instance of Database.
     """
-    from leap.soledad.common.l2db.backends import sqlite_backend
-    return sqlite_backend.SQLiteDatabase.open_database(
+    from leap.soledad.client._database import sqlite
+    return sqlite.SQLiteDatabase.open_database(
         path, create=create, document_factory=document_factory)
 
 

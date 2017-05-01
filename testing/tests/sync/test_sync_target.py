@@ -32,9 +32,9 @@ from twisted.internet import defer
 
 from leap.soledad.client import http_target as target
 from leap.soledad.client.http_target.fetch_protocol import DocStreamReceiver
-from leap.soledad.client.sqlcipher import SQLCipherU1DBSync
-from leap.soledad.client.sqlcipher import SQLCipherOptions
-from leap.soledad.client.sqlcipher import SQLCipherDatabase
+from leap.soledad.client._database.sqlcipher import SQLCipherU1DBSync
+from leap.soledad.client._database.sqlcipher import SQLCipherOptions
+from leap.soledad.client._database.sqlcipher import SQLCipherDatabase
 from leap.soledad.client import _crypto
 
 from leap.soledad.common import l2db

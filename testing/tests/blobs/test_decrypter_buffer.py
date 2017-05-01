@@ -18,12 +18,16 @@
 Tests for blobs decrypter buffer. A component which is used as a decryption
 sink during blob stream download.
 """
-from twisted.trial import unittest
-from twisted.internet import defer
-from leap.soledad.client._blobs import DecrypterBuffer, BlobManager, FIXED_REV
-from leap.soledad.client import _crypto
 from io import BytesIO
 from mock import Mock
+
+from twisted.trial import unittest
+from twisted.internet import defer
+
+from leap.soledad.client._database.blobs import DecrypterBuffer
+from leap.soledad.client._database.blobs import BlobManager
+from leap.soledad.client._database.blobs import FIXED_REV
+from leap.soledad.client import _crypto
 
 
 class DecrypterBufferCase(unittest.TestCase):

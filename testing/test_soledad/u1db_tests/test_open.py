@@ -27,7 +27,8 @@ from test_soledad.u1db_tests.test_backends import TestAlternativeDocument
 
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db import open as u1db_open
-from leap.soledad.common.l2db.backends import sqlite_backend
+
+from leap.soledad.client._database import sqlite
 
 
 @skip("Skiping tests imported from U1DB.")
@@ -47,7 +48,7 @@ class TestU1DBOpen(tests.TestCase):
         db = u1db_open(self.db_path, create=True)
         self.addCleanup(db.close)
         self.assertTrue(os.path.exists(self.db_path))
-        self.assertIsInstance(db, sqlite_backend.SQLiteDatabase)
+        self.assertIsInstance(db, sqlite.SQLiteDatabase)
 
     def test_open_with_factory(self):
         db = u1db_open(self.db_path, create=True,
@@ -56,7 +57,7 @@ class TestU1DBOpen(tests.TestCase):
         self.assertEqual(TestAlternativeDocument, db._factory)
 
     def test_open_existing(self):
-        db = sqlite_backend.SQLitePartialExpandDatabase(self.db_path)
+        db = sqlite.SQLitePartialExpandDatabase(self.db_path)
         self.addCleanup(db.close)
         doc = db.create_doc_from_json(tests.simple_doc)
         # Even though create=True, we shouldn't wipe the db
@@ -66,8 +67,8 @@ class TestU1DBOpen(tests.TestCase):
         self.assertEqual(doc, doc2)
 
     def test_open_existing_no_create(self):
-        db = sqlite_backend.SQLitePartialExpandDatabase(self.db_path)
+        db = sqlite.SQLitePartialExpandDatabase(self.db_path)
         self.addCleanup(db.close)
         db2 = u1db_open(self.db_path, create=False)
         self.addCleanup(db2.close)
-        self.assertIsInstance(db2, sqlite_backend.SQLitePartialExpandDatabase)
+        self.assertIsInstance(db2, sqlite.SQLitePartialExpandDatabase)

@@ -69,7 +69,7 @@ class ILocalStorage(Interface):
         Update a document in the local encrypted database.
 
         :param doc: the document to update
-        :type doc: SoledadDocument
+        :type doc: Document
 
         :return:
             a deferred that will fire with the new revision identifier for
@@ -82,7 +82,7 @@ class ILocalStorage(Interface):
         Delete a document from the local encrypted database.
 
         :param doc: the document to delete
-        :type doc: SoledadDocument
+        :type doc: Document
 
         :return:
             a deferred that will fire with ...
@@ -102,7 +102,7 @@ class ILocalStorage(Interface):
 
         :return:
             A deferred that will fire with the document object, containing a
-            SoledadDocument, or None if it could not be found
+            Document, or None if it could not be found
         :rtype: Deferred
         """
 
@@ -147,7 +147,7 @@ class ILocalStorage(Interface):
         :type doc_id: str
 
         :return:
-            A deferred tht will fire with the new document (SoledadDocument
+            A deferred tht will fire with the new document (Document
             instance).
         :rtype: Deferred
         """
@@ -167,7 +167,7 @@ class ILocalStorage(Interface):
         :param doc_id: An optional identifier specifying the document id.
         :type doc_id:
         :return:
-            A deferred that will fire with the new document (A SoledadDocument
+            A deferred that will fire with the new document (A Document
             instance)
         :rtype: Deferred
         """
@@ -304,7 +304,7 @@ class ILocalStorage(Interface):
         Mark a document as no longer conflicted.
 
         :param doc: a document with the new content to be inserted.
-        :type doc: SoledadDocument
+        :type doc: Document
         :param conflicted_doc_revs:
             A deferred that will fire with a list of revisions that the new
             content supersedes.

@@ -20,8 +20,9 @@ Clientside BlobBackend Storage.
 
 from urlparse import urljoin
 
+import binascii
+import errno
 import os
-import uuid
 import base64
 
 from io import BytesIO
@@ -34,13 +35,18 @@ from twisted.web.client import FileBodyProducer
 
 import treq
 
-from leap.soledad.client.sqlcipher import SQLCipherOptions
-from leap.soledad.client import pragmas
-from leap.soledad.client._pipes import TruncatedTailPipe, PreamblePipe
 from leap.soledad.common.errors import SoledadError
 
-from _crypto import DocInfo, BlobEncryptor, BlobDecryptor
-from _http import HTTPClient
+from .._document import BlobDoc
+from .._crypto import DocInfo
+from .._crypto import BlobEncryptor
+from .._crypto import BlobDecryptor
+from .._http import HTTPClient
+from .._pipes import TruncatedTailPipe
+from .._pipes import PreamblePipe
+
+from . import pragmas
+from . import sqlcipher
 
 
 logger = Logger()
@@ -129,6 +135,16 @@ class DecrypterBuffer(object):
         return self.decrypter._end_stream(), real_size
 
 
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
 class BlobManager(object):
     """
     Ideally, the decrypting flow goes like this:
@@ -149,6 +165,7 @@ class BlobManager(object):
             self, local_path, remote, key, secret, user, token=None,
             cert_file=None):
         if local_path:
+            mkdir_p(os.path.dirname(local_path))
             self.local = SQLiteBlobBackend(local_path, key)
         self.remote = remote
         self.secret = secret
@@ -280,10 +297,13 @@ class SQLiteBlobBackend(object):
     def __init__(self, path, key=None):
         self.path = os.path.abspath(
             os.path.join(path, 'soledad_blob.db'))
+        mkdir_p(os.path.dirname(self.path))
         if not key:
             raise ValueError('key cannot be None')
         backend = 'pysqlcipher.dbapi2'
-        opts = SQLCipherOptions('/tmp/ignored', key)
+        opts = sqlcipher.SQLCipherOptions(
+            '/tmp/ignored', binascii.b2a_hex(key),
+            is_raw_key=True, create=True)
         pragmafun = partial(pragmas.set_init_pragmas, opts=opts)
         openfun = _sqlcipherInitFactory(pragmafun)
 
@@ -292,7 +312,11 @@ class SQLiteBlobBackend(object):
             cp_openfun=openfun, cp_min=1, cp_max=2, cp_name='blob_pool')
 
     def close(self):
-        return self.dbpool.close()
+        from twisted._threads import AlreadyQuit
+        try:
+            self.dbpool.close()
+        except AlreadyQuit:
+            pass
 
     @defer.inlineCallbacks
     def put(self, blob_id, blob_fd, size=None):
@@ -350,20 +374,6 @@ def _sqlcipherInitFactory(fun):
         fun(conn)
         _init_blob_table(conn)
     return _initialize
-
-
-class BlobDoc(object):
-
-    # TODO probably not needed, but convenient for testing for now.
-
-    def __init__(self, content, blob_id):
-
-        self.blob_id = blob_id
-        self.is_blob = True
-        self.blob_fd = content
-        if blob_id is None:
-            blob_id = uuid.uuid4().get_hex()
-        self.blob_id = blob_id
 
 
 #
@@ -431,8 +441,7 @@ def testit(reactor):
     # TODO convert these into proper unittests
 
     def _manager():
-        if not os.path.isdir(args.path):
-            os.makedirs(args.path)
+        mkdir_p(os.path.dirname(args.path))
         manager = BlobManager(
             args.path, args.url,
             'A' * 32, args.secret,

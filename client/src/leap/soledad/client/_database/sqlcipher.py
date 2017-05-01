@@ -50,16 +50,16 @@ from twisted.internet import reactor
 from twisted.internet import defer
 from twisted.enterprise import adbapi
 
-from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.l2db import errors as u1db_errors
-from leap.soledad.common.l2db import Document
-from leap.soledad.common.l2db.backends import sqlite_backend
 from leap.soledad.common.errors import DatabaseAccessError
 
 from leap.soledad.client.http_target import SoledadHTTPSyncTarget
 from leap.soledad.client.sync import SoledadSynchronizer
-from leap.soledad.client import pragmas
+
+from .._document import Document
+from . import sqlite
+from . import pragmas
 
 if sys.version_info[0] < 3:
     from pysqlcipher import dbapi2 as sqlcipher_dbapi2
@@ -69,8 +69,8 @@ else:
 logger = getLogger(__name__)
 
 
-# Monkey-patch u1db.backends.sqlite_backend with pysqlcipher.dbapi2
-sqlite_backend.dbapi2 = sqlcipher_dbapi2
+# Monkey-patch u1db.backends.sqlite with pysqlcipher.dbapi2
+sqlite.dbapi2 = sqlcipher_dbapi2
 
 
 # we may want to collect statistics from the sync process
@@ -193,7 +193,7 @@ class SQLCipherOptions(object):
 # The SQLCipher database
 #
 
-class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
+class SQLCipherDatabase(sqlite.SQLitePartialExpandDatabase):
     """
     A U1DB implementation that uses SQLCipher as its persistence layer.
     """
@@ -232,7 +232,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         # ---------------------------------------------------------
 
         self._ensure_schema()
-        self.set_document_factory(soledad_doc_factory)
+        self.set_document_factory(doc_factory)
         self._prime_replica_uid()
 
     def _prime_replica_uid(self):
@@ -341,7 +341,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :param doc: The new version of the document.
         :type doc: u1db.Document
         """
-        sqlite_backend.SQLitePartialExpandDatabase._put_and_update_indexes(
+        sqlite.SQLitePartialExpandDatabase._put_and_update_indexes(
             self, old_doc, doc)
         c = self._db_handle.cursor()
         c.execute('UPDATE document SET syncable=? WHERE doc_id=?',
@@ -361,7 +361,7 @@ class SQLCipherDatabase(sqlite_backend.SQLitePartialExpandDatabase):
         :return: a Document object.
         :type: u1db.Document
         """
-        doc = sqlite_backend.SQLitePartialExpandDatabase._get_doc(
+        doc = sqlite.SQLitePartialExpandDatabase._get_doc(
             self, doc_id, check_for_conflicts)
         if doc:
             c = self._db_handle.cursor()
@@ -437,7 +437,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
                 self._opts, check_same_thread=False)
             self._real_replica_uid = None
             self._ensure_schema()
-            self.set_document_factory(soledad_doc_factory)
+            self.set_document_factory(doc_factory)
         except sqlcipher_dbapi2.DatabaseError as e:
             raise DatabaseAccessError(str(e))
 
@@ -505,7 +505,7 @@ class SQLCipherU1DBSync(SQLCipherDatabase):
         return self._get_generation()
 
 
-class U1DBSQLiteBackend(sqlite_backend.SQLitePartialExpandDatabase):
+class U1DBSQLiteBackend(sqlite.SQLitePartialExpandDatabase):
     """
     A very simple wrapper for u1db around sqlcipher backend.
 
@@ -537,7 +537,7 @@ class SoledadSQLCipherWrapper(SQLCipherDatabase):
         self._db_handle = conn
         self._real_replica_uid = None
         self._ensure_schema()
-        self.set_document_factory(soledad_doc_factory)
+        self.set_document_factory(doc_factory)
         self._prime_replica_uid()
 
 
@@ -562,7 +562,7 @@ def _assert_db_is_encrypted(opts):
     # If the regular backend succeeds, then we need to stop because
     # the database was not properly initialized.
     try:
-        sqlite_backend.SQLitePartialExpandDatabase(opts.path)
+        sqlite.SQLitePartialExpandDatabase(opts.path)
     except sqlcipher_dbapi2.DatabaseError:
         # assert that we can access it using SQLCipher with the given
         # key
@@ -583,17 +583,17 @@ class DatabaseIsNotEncrypted(Exception):
     pass
 
 
-def soledad_doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
-                        syncable=True):
+def doc_factory(doc_id=None, rev=None, json='{}', has_conflicts=False,
+                syncable=True):
     """
     Return a default Soledad Document.
     Used in the initialization for SQLCipherDatabase
     """
-    return SoledadDocument(doc_id=doc_id, rev=rev, json=json,
-                           has_conflicts=has_conflicts, syncable=syncable)
+    return Document(doc_id=doc_id, rev=rev, json=json,
+                    has_conflicts=has_conflicts, syncable=syncable)
 
 
-sqlite_backend.SQLiteDatabase.register_implementation(SQLCipherDatabase)
+sqlite.SQLiteDatabase.register_implementation(SQLCipherDatabase)
 
 
 #
