@@ -157,8 +157,9 @@ class FilesystemBlobsBackend(object):
     def get_total_storage(self, user):
         return self._get_disk_usage(self._get_path(user))
 
-    def delete_blob(user, blob_id):
-        raise NotImplementedError
+    def delete_blob(self, user, blob_id):
+        blob_path = self._get_path(user, blob_id)
+        os.unlink(blob_path)
 
     def get_blob_size(user, blob_id):
         raise NotImplementedError
@@ -218,6 +219,12 @@ class BlobsResource(resource.Resource):
             return self._handler.list_blobs(user, request)
         self._handler.tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
+
+    def render_DELETE(self, request):
+        logger.info("http put: %s" % request.path)
+        user, blob_id = self._validate(request)
+        self._handler.delete_blob(user, blob_id)
+        return ''
 
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)

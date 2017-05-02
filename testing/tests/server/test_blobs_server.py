@@ -100,3 +100,14 @@ class BlobServerTestCase(unittest.TestCase):
         result = yield manager.local.get(blob_id)
         self.assertIsNotNone(result)
         self.assertEquals(result.getvalue(), "X")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_upload_then_delete_updates_list(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        yield manager._encrypt_and_upload('blob_id1', BytesIO("1"))
+        yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
+        yield manager._delete_from_remote('blob_id1')
+        blobs_list = yield manager.remote_list()
+        self.assertEquals(set(['blob_id2']), set(blobs_list))

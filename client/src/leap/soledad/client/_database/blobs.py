@@ -291,6 +291,18 @@ class BlobManager(object):
         logger.info("Finished download: (%s, %d)" % (blob_id, size))
         defer.returnValue((fd, size))
 
+    @defer.inlineCallbacks
+    def delete(self, blob_id):
+        logger.info("Staring deletion of blob: %s" % blob_id)
+        yield self._delete_from_remote(blob_id)
+        if (yield self.local.exists(blob_id)):
+            yield self.local.delete(blob_id)
+
+    def _delete_from_remote(self, blob_id):
+        # TODO this needs to be connected in a tube
+        uri = urljoin(self.remote, self.user + '/' + blob_id)
+        return self._client.delete(uri)
+
 
 class SQLiteBlobBackend(object):
 
@@ -427,6 +439,11 @@ def testit(reactor):
         'get', help='get blob from local db, get if needed')
     parser_get.add_argument('blob_id')
 
+    # parse delete command
+    parser_get = subparsers.add_parser(
+        'delete', help='delete blob from local and remote db')
+    parser_get.add_argument('blob_id')
+
     # parse list command
     parser_get = subparsers.add_parser(
         'list', help='list local and remote blob ids')
@@ -494,6 +511,13 @@ def testit(reactor):
         logger.info(":: Finished full get: %s" % blob_id)
 
     @defer.inlineCallbacks
+    def _delete(blob_id):
+        logger.info(":: Starting deletion of: %s" % blob_id)
+        manager = _manager()
+        yield manager.delete(blob_id)
+        logger.info(":: Finished deletion of: %s" % blob_id)
+
+    @defer.inlineCallbacks
     def _list():
         logger.info(":: Listing local blobs")
         manager = _manager()
@@ -525,6 +549,8 @@ def testit(reactor):
         yield _put(args.blob_id, args.payload)
     elif args.action == 'get':
         yield _get(args.blob_id)
+    elif args.action == 'delete':
+        yield _delete(args.blob_id)
     elif args.action == 'list':
         yield _list()
     elif args.action == 'send_missing':

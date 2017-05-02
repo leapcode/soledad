@@ -120,3 +120,11 @@ class FilesystemBackendTestCase(unittest.TestCase):
             yield backend.write_blob('valid', '../../../', DummyRequest(['']))
         with pytest.raises(Exception):
             yield backend.write_blob('../../../', 'valid', DummyRequest(['']))
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @mock.patch('leap.soledad.server._blobs.os.unlink')
+    def test_delete_blob(self, unlink_mock):
+        backend = _blobs.FilesystemBlobsBackend(self.tempdir)
+        backend.delete_blob('user', 'blob_id')
+        unlink_mock.assert_called_once_with(backend._get_path('user',
+                                                              'blob_id'))

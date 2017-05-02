@@ -130,3 +130,16 @@ class BlobManagerTestCase(unittest.TestCase):
         with pytest.raises(BlobAlreadyExistsError):
             yield self.manager.put(doc2, len(content))
         self.assertFalse(self.manager._encrypt_and_upload.called)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_delete_from_local_and_remote(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager._delete_from_remote = Mock(return_value=None)
+        content = "Blob content"
+        doc1 = BlobDoc(BytesIO(content), 'blob_id')
+        yield self.manager.put(doc1, len(content))
+        yield self.manager.delete('blob_id')
+        local_list = yield self.manager.local_list()
+        self.assertEquals(0, len(local_list))
+        self.manager._delete_from_remote.assert_called_with('blob_id')
