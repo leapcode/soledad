@@ -51,6 +51,17 @@ class SQLBackendTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_delete(self):
+        blob_id = 'blob_id'
+        content = "x"
+        yield self.local.put(blob_id, BytesIO(content), len(content))
+        yield self.local.put('remains', BytesIO(content), len(content))
+        yield self.local.delete(blob_id)
+        self.assertFalse((yield self.local.exists(blob_id)))
+        self.assertTrue((yield self.local.exists('remains')))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_list(self):
         blob_ids = [('blob_id%s' % i) for i in range(10)]
         content = "x"

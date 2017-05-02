@@ -359,6 +359,10 @@ class SQLiteBlobBackend(object):
         result = yield self.dbpool.runQuery(query, (blob_id,))
         defer.returnValue(bool(len(result)))
 
+    def delete(self, blob_id):
+        query = 'DELETE FROM blobs WHERE blob_id = ?'
+        return self.dbpool.runQuery(query, (blob_id,))
+
 
 def _init_blob_table(conn):
     maybe_create = (
