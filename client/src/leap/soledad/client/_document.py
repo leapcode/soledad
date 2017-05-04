@@ -107,8 +107,9 @@ class IDocumentWithAttachment(Interface):
         Return whether this document's content differs from the contents stored
         in local database.
 
-        :return: Whether this document is dirty or not.
-        :rtype: bool
+        :return: A deferred which fires with True or False, depending on
+                 whether this document is dirty or not.
+        :rtype: Deferred
         """
 
     def upload_attachment(self):
