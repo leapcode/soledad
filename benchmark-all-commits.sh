@@ -41,7 +41,11 @@ do
 
   # Option 2: Run couchdb + tox in docker container using gitlab-runner
   git checkout origin/benchmark-all-commits .gitlab-ci.yml
-  time gitlab-runner exec docker benchmark --env PYTEST_OPTS="$PYTEST_OPTS" --env HOST_HOSTNAME="$(hostname)"
+  time gitlab-runner exec docker \
+    benchmark \
+    --timeout 7200 \
+    --env PYTEST_OPTS="$PYTEST_OPTS" \
+    --env HOST_HOSTNAME="$(hostname)"
 
   code=$?
   echo "$(date -Iseconds) ${commit_id} ${code}" >> results.txt
