@@ -19,12 +19,6 @@ Soledad Common documentation
     :private-members:
     :show-inheritance:
 
-.. automodule:: leap.soledad.common.ddocs
-    :members:
-    :undoc-members:
-    :private-members:
-    :show-inheritance:
-
 .. automodule:: leap.soledad.common.document
     :members:
     :undoc-members:

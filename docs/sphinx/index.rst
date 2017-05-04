@@ -6,21 +6,15 @@
 Soledad documentation
 =====================
 
-Contents:
+Soledad is an acronym for Synchronization of Locally Encrypted Data Among
+Devices. It is LEAP's solution for synchronizing client-encrypted data among
+all user's devices that access a LEAP provider.
 
 .. toctree::
    :maxdepth: 2
 
-   common
    client
    server
-
-.. automodule:: leap.soledad.common
-    :members:
-    :undoc-members:
-    :private-members:
-    :show-inheritance:
-
 
 Indices and tables
 ==================
