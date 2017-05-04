@@ -21,7 +21,6 @@ Clientside BlobBackend Storage.
 from urlparse import urljoin
 
 import binascii
-import errno
 import os
 import base64
 
@@ -36,6 +35,7 @@ from twisted.web.client import FileBodyProducer
 import treq
 
 from leap.soledad.common.errors import SoledadError
+from leap.common.files import mkdir_p
 
 from .._document import BlobDoc
 from .._crypto import DocInfo
@@ -133,16 +133,6 @@ class DecrypterBuffer(object):
     def close(self):
         real_size = self.decrypter.decrypted_content_size
         return self.decrypter._end_stream(), real_size
-
-
-def mkdir_p(path):
-    try:
-        os.makedirs(path)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
 
 
 class BlobManager(object):
