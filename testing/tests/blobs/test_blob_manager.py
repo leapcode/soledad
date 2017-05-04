@@ -125,8 +125,7 @@ class BlobManagerTestCase(unittest.TestCase):
         doc1 = BlobDoc(BytesIO(content), 'existing_id')
         yield self.manager.put(doc1, len(content))
         doc2 = BlobDoc(BytesIO(content), 'existing_id')
-        # reset mock, so we can check that upload wasnt called
-        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager._encrypt_and_upload.reset_mock()
         with pytest.raises(BlobAlreadyExistsError):
             yield self.manager.put(doc2, len(content))
         self.assertFalse(self.manager._encrypt_and_upload.called)

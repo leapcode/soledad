@@ -33,15 +33,15 @@ class SQLBackendTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_get_inexistent(self):
-        bad_blob_id = 'inexsistent_id'
+    def test_get_inexisting(self):
+        bad_blob_id = 'inexsisting_id'
         self.assertFalse((yield self.local.exists(bad_blob_id)))
         result = yield self.local.get(bad_blob_id)
         self.assertIsNone(result)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_get_existent(self):
+    def test_get_existing(self):
         blob_id = 'blob_id'
         content = "x"
         yield self.local.put(blob_id, BytesIO(content), len(content))
