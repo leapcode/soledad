@@ -62,13 +62,13 @@ class AttachmentTests(BaseSoledadTest):
         self.assertEqual('test', fd.read())
 
     @defer.inlineCallbacks
-    def test_attachment_state(self):
+    def test_get_attachment_state(self):
         doc = yield self._soledad.create_doc({})
-        state = yield doc.attachment_state()
+        state = yield doc.get_attachment_state()
         self.assertEqual(AttachmentStates.NONE, state)
         mock_response(doc)
         yield doc.put_attachment(BytesIO('test'))
-        state = yield doc.attachment_state()
+        state = yield doc.get_attachment_state()
         self.assertEqual(AttachmentStates.LOCAL, state)
 
     @defer.inlineCallbacks

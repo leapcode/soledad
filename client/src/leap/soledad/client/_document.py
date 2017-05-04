@@ -15,7 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Everything related to documents.
+Public interfaces for adding extra client features to the generic
+SoledadDocument.
 """
 
 import enum
@@ -89,7 +90,7 @@ class IDocumentWithAttachment(Interface):
         :rtype: Deferred
         """
 
-    def attachment_state(self):
+    def get_attachment_state(self):
         """
         Return the state of the attachment of this document.
 
@@ -103,7 +104,7 @@ class IDocumentWithAttachment(Interface):
 
     def is_dirty(self):
         """
-        Return wether this document's content differs from the contents stored
+        Return whether this document's content differs from the contents stored
         in local database.
 
         :return: Whether this document is dirty or not.
@@ -212,7 +213,7 @@ class Document(SoledadDocument):
         raise NotImplementedError
 
     @defer.inlineCallbacks
-    def attachment_state(self):
+    def get_attachment_state(self):
         state = AttachmentStates.NONE
 
         if not self._blob_id:
@@ -243,11 +244,11 @@ class Document(SoledadDocument):
         fd = yield self._manager.get_blob(self._blob_id)
         # TODO: turn following method into a public one
         yield self._manager._encrypt_and_upload(self._blob_id, fd)
-        defer.returnValue(self.attachment_state())
+        defer.returnValue(self.get_attachment_state())
 
     @defer.inlineCallbacks
     def download_attachment(self):
         if not self._blob_id:
             defer.returnValue(None)
         yield self.get_attachment()
-        defer.returnValue(self.attachment_state())
+        defer.returnValue(self.get_attachment_state())
