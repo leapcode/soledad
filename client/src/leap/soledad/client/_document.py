@@ -19,7 +19,6 @@ Public interfaces for adding extra client features to the generic
 SoledadDocument.
 """
 
-import enum
 import weakref
 import uuid
 
@@ -147,7 +146,7 @@ class BlobDoc(object):
         self.blob_id = blob_id
 
 
-class AttachmentStates(enum.IntEnum):
+class AttachmentStates(object):
     NONE = 0
     LOCAL = 1
     REMOTE = 2
