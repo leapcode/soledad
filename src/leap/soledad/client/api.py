@@ -109,7 +109,7 @@ class Soledad(object):
 
     def __init__(self, uuid, passphrase, secrets_path, local_db_path,
                  server_url, cert_file, shared_db=None,
-                 auth_token=None):
+                 auth_token=None, with_blobs=False):
         """
         Initialize configuration, cryptographic keys and dbs.
 
@@ -146,6 +146,12 @@ class Soledad(object):
             Authorization token for accessing remote databases.
         :type auth_token: str
 
+        :param with_blobs:
+            A boolean that specifies if this soledad instance should enable
+            blobs storage when initialized. This will raise if it's not the
+            first initialization and the passed value is different from when
+            the database was first initialized.
+
         :raise BootstrapSequenceError:
             Raised when the secret initialization sequence (i.e. retrieval
             from server or generation and storage on server) has failed for
@@ -172,7 +178,6 @@ class Soledad(object):
         self._recovery_code = RecoveryCode()
         self._secrets = Secrets(self)
         self._crypto = SoledadCrypto(self._secrets.remote_secret)
-        self._init_blobmanager()
 
         try:
             # initialize database access, trap any problems so we can shutdown
@@ -187,6 +192,11 @@ class Soledad(object):
             if hasattr(self, '_dbpool'):
                 self._dbpool.close()
             raise
+
+        if with_blobs:
+            self._init_blobmanager()
+        else:
+            self.blobmanager = None
 
     #
     # initialization/destruction methods
