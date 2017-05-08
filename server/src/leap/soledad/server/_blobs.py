@@ -36,19 +36,20 @@ from twisted.web.client import FileBodyProducer
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import utils, defer
 
-from zope.interface import Interface, implementer
+from zope.interface import implementer
+
+from leap.common.files import mkdir_p
+from leap.soledad.server import interfaces
 
 
 __all__ = ['BlobsResource']
 
 
 logger = Logger()
+
 # Used for sanitizers, we accept only letters, numbers, '-' and '_'
 VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')
 
-
-# TODO some error handling needed
-# [ ] sanitize path
 
 # for the future:
 # [ ] isolate user avatar in a safer way
@@ -56,54 +57,7 @@ VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')
 # [ ] chunking (should we do it on the client or on the server?)
 
 
-class IBlobsBackend(Interface):
-
-    """
-    An interface for a BlobsBackend.
-    """
-
-    def read_blob(user, blob_id, request):
-        """
-        Read blob with a given blob_id, and write it to the passed request.
-
-        :returns: a deferred that fires upon finishing.
-        """
-
-    def list_blobs(user, request):
-        """
-        Returns a json-encoded list of ids from user's blob.
-
-        :returns: a deferred that fires upon finishing.
-        """
-
-    def tag_header(user, blob_id, request):
-        """
-        Adds a header 'Tag' with the last 16 bytes of the encoded file,
-        which contains the tag.
-
-        :returns: a deferred that fires upon finishing.
-        """
-
-    def write_blob(user, blob_id, request):
-        """
-        Write blob to the storage, reading it from the passed request.
-
-        :returns: a deferred that fires upon finishing.
-        """
-
-    # other stuff for the API
-
-    def delete_blob(user, blob_id):
-        pass
-
-    def get_blob_size(user, blob_id):
-        pass
-
-    def get_total_storage(user):
-        pass
-
-
-@implementer(IBlobsBackend)
+@implementer(interfaces.IBlobsBackend)
 class FilesystemBlobsBackend(object):
 
     def __init__(self, blobs_path='/tmp/blobs/', quota=200 * 1024):
@@ -111,19 +65,6 @@ class FilesystemBlobsBackend(object):
         if not os.path.isdir(blobs_path):
             os.makedirs(blobs_path)
         self.path = blobs_path
-
-    def list_blobs(self, user, request):
-        blob_ids = []
-        base_path = self._get_path(user)
-        for _, _, filenames in os.walk(base_path):
-            blob_ids += filenames
-        return json.dumps(blob_ids)
-
-    def tag_header(self, user, blob_id, request):
-        with open(self._get_path(user, blob_id)) as doc_file:
-            doc_file.seek(-16, 2)
-            tag = base64.urlsafe_b64encode(doc_file.read())
-            request.responseHeaders.setRawHeaders('Tag', [tag])
 
     def read_blob(self, user, blob_id, request):
         logger.info('reading blob: %s - %s' % (user, blob_id))
@@ -136,8 +77,8 @@ class FilesystemBlobsBackend(object):
     def write_blob(self, user, blob_id, request):
         path = self._get_path(user, blob_id)
         try:
-            os.makedirs(os.path.split(path)[0])
-        except:
+            mkdir_p(os.path.split(path)[0])
+        except OSError:
             pass
         if os.path.isfile(path):
             # 409 - Conflict
@@ -154,15 +95,28 @@ class FilesystemBlobsBackend(object):
         fbp = FileBodyProducer(request.content)
         yield fbp.startProducing(open(path, 'wb'))
 
-    def get_total_storage(self, user):
-        return self._get_disk_usage(self._get_path(user))
-
     def delete_blob(self, user, blob_id):
         blob_path = self._get_path(user, blob_id)
         os.unlink(blob_path)
 
     def get_blob_size(user, blob_id):
         raise NotImplementedError
+
+    def list_blobs(self, user, request):
+        blob_ids = []
+        base_path = self._get_path(user)
+        for _, _, filenames in os.walk(base_path):
+            blob_ids += filenames
+        return json.dumps(blob_ids)
+
+    def get_total_storage(self, user):
+        return self._get_disk_usage(self._get_path(user))
+
+    def add_tag_header(self, user, blob_id, request):
+        with open(self._get_path(user, blob_id)) as doc_file:
+            doc_file.seek(-16, 2)
+            tag = base64.urlsafe_b64encode(doc_file.read())
+            request.responseHeaders.setRawHeaders('Tag', [tag])
 
     @defer.inlineCallbacks
     def _get_disk_usage(self, start_path):
@@ -207,7 +161,7 @@ class BlobsResource(resource.Resource):
         resource.Resource.__init__(self)
         self._blobs_path = blobs_path
         self._handler = self.blobsFactoryClass(blobs_path)
-        assert IBlobsBackend.providedBy(self._handler)
+        assert interfaces.IBlobsBackend.providedBy(self._handler)
 
     # TODO double check credentials, we can have then
     # under request.
@@ -217,7 +171,7 @@ class BlobsResource(resource.Resource):
         user, blob_id = self._validate(request)
         if not blob_id:
             return self._handler.list_blobs(user, request)
-        self._handler.tag_header(user, blob_id, request)
+        self._handler.add_tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
 
     def render_DELETE(self, request):

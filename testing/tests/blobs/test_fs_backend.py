@@ -39,7 +39,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         expected_method = Mock()
         backend = _blobs.FilesystemBlobsBackend()
         request = Mock(responseHeaders=Mock(setRawHeaders=expected_method))
-        backend.tag_header('user', 'blob_id', request)
+        backend.add_tag_header('user', 'blob_id', request)
 
         expected_method.assert_called_once_with('Tag', [expected_tag])
 
