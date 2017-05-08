@@ -29,10 +29,10 @@ from leap.soledad.common.l2db import query_parser
 
 # soledad stuff.
 from leap.soledad.common.document import SoledadDocument
-from leap.soledad.client._database.sqlite import SQLitePartialExpandDatabase
-from leap.soledad.client._database.sqlcipher import SQLCipherDatabase
-from leap.soledad.client._database.sqlcipher import SQLCipherOptions
-from leap.soledad.client._database.sqlcipher import DatabaseIsNotEncrypted
+from leap.soledad.client._db.sqlite import SQLitePartialExpandDatabase
+from leap.soledad.client._db.sqlcipher import SQLCipherDatabase
+from leap.soledad.client._db.sqlcipher import SQLCipherOptions
+from leap.soledad.client._db.sqlcipher import DatabaseIsNotEncrypted
 
 # u1db tests stuff.
 from test_soledad import u1db_tests as tests

@@ -47,8 +47,8 @@ from leap.soledad.client import Soledad
 from leap.soledad.client import http_target
 from leap.soledad.client import auth
 from leap.soledad.client._crypto import is_symmetrically_encrypted
-from leap.soledad.client._database.sqlcipher import SQLCipherDatabase
-from leap.soledad.client._database.sqlcipher import SQLCipherOptions
+from leap.soledad.client._db.sqlcipher import SQLCipherDatabase
+from leap.soledad.client._db.sqlcipher import SQLCipherOptions
 
 from leap.soledad.server import SoledadApp
 

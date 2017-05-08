@@ -28,7 +28,7 @@ from twisted.internet import defer, reactor
 
 from leap.soledad.common import l2db
 from leap.soledad.client import adbapi
-from leap.soledad.client._database.sqlcipher import SQLCipherOptions
+from leap.soledad.client._db.sqlcipher import SQLCipherOptions
 
 
 folder = os.environ.get("TMPDIR", "tmp")

@@ -54,9 +54,9 @@ from leap.soledad.common.errors import DatabaseAccessError
 from . import events as soledad_events
 from . import interfaces as soledad_interfaces
 from ._crypto import SoledadCrypto
-from ._database import adbapi
-from ._database import blobs
-from ._database import sqlcipher
+from ._db import adbapi
+from ._db import blobs
+from ._db import sqlcipher
 from ._recovery_code import RecoveryCode
 from ._secrets import Secrets
 

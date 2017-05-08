@@ -37,7 +37,7 @@ def open(path, create, document_factory=None):
         parameters as Document.__init__.
     :return: An instance of Database.
     """
-    from leap.soledad.client._database import sqlite
+    from leap.soledad.client._db import sqlite
     return sqlite.SQLiteDatabase.open_database(
         path, create=create, document_factory=document_factory)
 

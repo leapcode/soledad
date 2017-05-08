@@ -41,7 +41,7 @@ from leap.soledad.common.l2db.remote import server_state
 from leap.soledad.common.l2db.remote import http_app
 from leap.soledad.common.l2db.remote import http_target
 
-from leap.soledad.client._database import sqlite
+from leap.soledad.client._db import sqlite
 
 if sys.version_info[0] < 3:
     from pysqlcipher import dbapi2

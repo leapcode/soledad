@@ -42,7 +42,7 @@ class ServerState(object):
 
     def open_database(self, path):
         """Open a database at the given location."""
-        from leap.soledad.client._database import sqlite
+        from leap.soledad.client._db import sqlite
         full_path = self._relpath(path)
         return sqlite.SQLiteDatabase.open_database(full_path, create=False)
 
@@ -56,13 +56,13 @@ class ServerState(object):
 
     def ensure_database(self, path):
         """Ensure database at the given location."""
-        from leap.soledad.client._database import sqlite
+        from leap.soledad.client._db import sqlite
         full_path = self._relpath(path)
         db = sqlite.SQLiteDatabase.open_database(full_path, create=True)
         return db, db._replica_uid
 
     def delete_database(self, path):
         """Delete database at the given location."""
-        from leap.soledad.client._database import sqlite
+        from leap.soledad.client._db import sqlite
         full_path = self._relpath(path)
         sqlite.SQLiteDatabase.delete_database(full_path)

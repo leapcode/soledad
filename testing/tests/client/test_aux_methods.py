@@ -22,7 +22,7 @@ import os
 from pytest import inlineCallbacks
 
 from leap.soledad.client import Soledad
-from leap.soledad.client._database.adbapi import U1DBConnectionPool
+from leap.soledad.client._db.adbapi import U1DBConnectionPool
 from leap.soledad.client._secrets.util import SecretsError
 
 from test_soledad.util import BaseSoledadTest

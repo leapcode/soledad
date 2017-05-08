@@ -24,9 +24,9 @@ from mock import Mock
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from leap.soledad.client._database.blobs import DecrypterBuffer
-from leap.soledad.client._database.blobs import BlobManager
-from leap.soledad.client._database.blobs import FIXED_REV
+from leap.soledad.client._db.blobs import DecrypterBuffer
+from leap.soledad.client._db.blobs import BlobManager
+from leap.soledad.client._db.blobs import FIXED_REV
 from leap.soledad.client import _crypto
 
 

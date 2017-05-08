@@ -28,7 +28,7 @@ from test_soledad.u1db_tests.test_backends import TestAlternativeDocument
 from leap.soledad.common.l2db import errors
 from leap.soledad.common.l2db import open as u1db_open
 
-from leap.soledad.client._database import sqlite
+from leap.soledad.client._db import sqlite
 
 
 @skip("Skiping tests imported from U1DB.")

@@ -26,8 +26,8 @@ from twisted.internet import defer
 from treq._utils import set_global_pool
 
 from leap.soledad.server import _blobs as server_blobs
-from leap.soledad.client._database.blobs import BlobManager
-from leap.soledad.client._database.blobs import BlobAlreadyExistsError
+from leap.soledad.client._db.blobs import BlobManager
+from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 
 
 class BlobServerTestCase(unittest.TestCase):

@@ -20,8 +20,8 @@ import hashlib
 from twisted.internet import defer
 
 from test_soledad.util import BaseSoledadTest
-from leap.soledad.client._database import adbapi
-from leap.soledad.client._database import sqlcipher
+from leap.soledad.client._db import adbapi
+from leap.soledad.client._db import sqlcipher
 
 
 class ASyncSQLCipherRetryTestCase(BaseSoledadTest):
