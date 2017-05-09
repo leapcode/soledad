@@ -1,9 +1,13 @@
 stages:
   - code-check
+  - build
   - tests
   - benchmark
 
-image: "0xacab.org:4567/leap/gitlab-buildpackage:soledad"
+image: 0xacab.org:4567/leap/soledad:latest
+
+variables:
+  DOCKER_DRIVER: overlay
 
 # Cache a folder between builds.
 # Tox sets it to be our pip cache.
@@ -50,3 +54,24 @@ benchmark:
     # to an elasticsearch instance
     - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
     - /usr/bin/unbuffer tox --recreate -e benchmark -- --couch-url http://couchdb:5984 -m 'not synchronous' | /usr/bin/ts -s
+
+build_docker_image:
+  image: 0xacab.org:4567/leap/soledad:latest
+  stage: build
+  services:
+    - docker:dind
+  tags:
+    - docker-in-docker
+  before_script:
+     - >
+       export LAST_COMMIT=$(curl -s --header "PRIVATE-TOKEN: ${LEAP_CODE_O_MATIC_PRIVATE_TOKEN}" https://0xacab.org/api/v4/projects/519/pipelines |
+       python -c "import sys, json; print json.load(sys.stdin)[1]['sha']")
+  script:
+    - >
+      if git diff $LAST_COMMIT HEAD --name-only|grep testing/docker; then
+        docker --version
+        docker info
+        docker login -u gitlab-ci-token -e sysdev@leap.se -p $CI_JOB_TOKEN $CI_REGISTRY
+        docker build -t ${CI_REGISTRY_IMAGE}:latest testing/docker
+        docker push ${CI_REGISTRY_IMAGE}:latest
+      fi
