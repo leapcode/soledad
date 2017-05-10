@@ -1,6 +1,6 @@
 # start with a fresh debian image
 # we use backports because of libsqlcipher-dev
-FROM 0xacab.org:4567/leap/gitlab-buildpackage:jessie_amd64
+FROM 0xacab.org:4567/leap/docker/debian:jessie_amd64
 
 RUN apt-get update
 RUN apt-get -y dist-upgrade
@@ -20,7 +20,9 @@ RUN apt-get -y install --no-install-recommends libpython2.7-dev \
   # used to show connection to couchdb during CI
   curl \
   # needed to build pysqlcipher module
-  build-essential
+  build-essential \
+  # needed to build docker images
+  docker.io
 
 # We need git from backports because it has
 # the "%cI: committer date, strict ISO 8601 format"
