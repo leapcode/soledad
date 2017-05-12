@@ -23,6 +23,7 @@ from leap.soledad.client._db.blobs import BlobManager, BlobDoc, FIXED_REV
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from io import BytesIO
 from mock import Mock
+from uuid import uuid4
 import pytest
 import os
 
@@ -55,10 +56,10 @@ class BlobManagerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_from_existing_value(self):
         self.manager._download_and_decrypt = Mock(return_value=None)
-        msg = "It's me, M4r10!"
-        yield self.manager.local.put('myblob_id', BytesIO(msg),
+        msg, blob_id = "It's me, M4r10!", uuid4().hex
+        yield self.manager.local.put(blob_id, BytesIO(msg),
                                      size=len(msg))
-        result = yield self.manager.get('myblob_id')
+        result = yield self.manager.get(blob_id)
         self.assertEquals(result.getvalue(), msg)
         self.assertNot(self.manager._download_and_decrypt.called)
 
@@ -66,10 +67,10 @@ class BlobManagerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_put_stores_on_local_db(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
-        msg = "Hey Joe"
-        doc = BlobDoc(BytesIO(msg), blob_id='myblob_id')
+        msg, blob_id = "Hey Joe", uuid4().hex
+        doc = BlobDoc(BytesIO(msg), blob_id=blob_id)
         yield self.manager.put(doc, size=len(msg))
-        result = yield self.manager.local.get('myblob_id')
+        result = yield self.manager.local.get(blob_id)
         self.assertEquals(result.getvalue(), msg)
         self.assertTrue(self.manager._encrypt_and_upload.called)
 
@@ -78,11 +79,11 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_put_then_get_using_real_file_descriptor(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager._download_and_decrypt = Mock(return_value=None)
-        msg = "Fuuuuull cycleee! \o/"
+        msg, blob_id = "Fuuuuull cycleee! \o/", uuid4().hex
         tmpfile = os.tmpfile()
         tmpfile.write(msg)
         tmpfile.seek(0)
-        doc = BlobDoc(tmpfile, 'myblob_id')
+        doc = BlobDoc(tmpfile, blob_id)
         yield self.manager.put(doc, size=len(msg))
         result = yield self.manager.get(doc.blob_id)
         self.assertEquals(result.getvalue(), msg)
@@ -93,14 +94,14 @@ class BlobManagerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_local_list_blobs(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
-        msg = "1337"
-        doc = BlobDoc(BytesIO(msg), 'myblob_id')
+        msg, blob_id1, blob_id2 = "1337", uuid4().hex, uuid4().hex
+        doc = BlobDoc(BytesIO(msg), blob_id1)
         yield self.manager.put(doc, size=len(msg))
-        doc2 = BlobDoc(BytesIO(msg), 'myblob_id2')
+        doc2 = BlobDoc(BytesIO(msg), blob_id2)
         yield self.manager.put(doc2, size=len(msg))
         blobs_list = yield self.manager.local_list()
 
-        self.assertEquals(set(['myblob_id', 'myblob_id2']), set(blobs_list))
+        self.assertEquals(set([blob_id1, blob_id2]), set(blobs_list))
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -135,10 +136,10 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_delete_from_local_and_remote(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager._delete_from_remote = Mock(return_value=None)
-        content = "Blob content"
-        doc1 = BlobDoc(BytesIO(content), 'blob_id')
+        content, blob_id = "Blob content", uuid4().hex
+        doc1 = BlobDoc(BytesIO(content), blob_id)
         yield self.manager.put(doc1, len(content))
-        yield self.manager.delete('blob_id')
+        yield self.manager.delete(blob_id)
         local_list = yield self.manager.local_list()
         self.assertEquals(0, len(local_list))
-        self.manager._delete_from_remote.assert_called_with('blob_id')
+        self.manager._delete_from_remote.assert_called_with(blob_id)
