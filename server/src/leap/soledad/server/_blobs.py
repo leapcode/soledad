@@ -153,14 +153,14 @@ class BlobsResource(resource.Resource):
 
     isLeaf = True
 
-    # Allowed factory classes are defined here
-    blobsFactoryClass = FilesystemBlobsBackend
+    # Allowed backend classes are defined here
+    handlers = {"filesystem": FilesystemBlobsBackend}
 
-    def __init__(self, blobs_path):
-        # TODO pass the backend as configurable option #8804
+    def __init__(self, backend, blobs_path, **backend_args):
         resource.Resource.__init__(self)
         self._blobs_path = blobs_path
-        self._handler = self.blobsFactoryClass(blobs_path)
+        backend_args.update({'blobs_path': blobs_path})
+        self._handler = self.handlers[backend](**backend_args)
         assert interfaces.IBlobsBackend.providedBy(self._handler)
 
     # TODO double check credentials, we can have then
@@ -219,7 +219,7 @@ if __name__ == '__main__':
     parser.add_argument('--path', default='/tmp/blobs/user')
     args = parser.parse_args()
 
-    root = BlobsResource(args.path)
+    root = BlobsResource("filesystem", args.path)
     # I picture somethink like
     # BlobsResource(backend="filesystem", backend_opts={'path': '/tmp/blobs'})
 

@@ -27,7 +27,7 @@ class BlobServerTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
     def setUp(self):
-        self.resource = server_blobs.BlobsResource(self.tempdir)
+        self.resource = server_blobs.BlobsResource("filesystem", self.tempdir)
 
     @pytest.mark.usefixtures("method_tmpdir")
     def test_valid_arguments(self):

@@ -33,7 +33,7 @@ from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 class BlobServerTestCase(unittest.TestCase):
 
     def setUp(self):
-        root = server_blobs.BlobsResource(self.tempdir)
+        root = server_blobs.BlobsResource("filesystem", self.tempdir)
         site = Site(root)
         self.port = reactor.listenTCP(0, site, interface='127.0.0.1')
         self.host = self.port.getHost()

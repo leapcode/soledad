@@ -43,7 +43,7 @@ class SoledadResourceTestCase(unittest.TestCase):
         self.assertIsInstance(child, ServerInfo)
 
     def test_get_blobs_enabled(self):
-        blobs_resource = BlobsResource('/tmp')
+        blobs_resource = BlobsResource("filesystem", '/tmp')
         resource = SoledadResource(
             blobs_resource=blobs_resource, sync_pool=_pool)
         request = DummyRequest(['blobs'])
