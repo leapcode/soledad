@@ -26,6 +26,7 @@ from twisted.internet import reactor
 from leap.soledad.server._resource import SoledadResource
 from leap.soledad.server._server_info import ServerInfo
 from leap.soledad.server._blobs import BlobsResource
+from leap.soledad.server._incoming import IncomingResource
 from leap.soledad.server.gzip_middleware import GzipMiddleware
 
 
@@ -68,3 +69,9 @@ class SoledadResourceTestCase(unittest.TestCase):
         child = getChildForRequest(resource, request)
         self.assertIsInstance(child, WSGIResource)
         self.assertIsInstance(child._application, GzipMiddleware)
+
+    def test_get_incoming(self):
+        resource = SoledadResource(None, sync_pool=_pool)
+        request = DummyRequest(['incoming'])
+        child = getChildForRequest(resource, request)
+        self.assertIsInstance(child, IncomingResource)

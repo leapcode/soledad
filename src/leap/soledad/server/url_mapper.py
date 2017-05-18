@@ -59,6 +59,7 @@ class URLMapper(object):
             /user-{uuid}/sync-from/{source} | GET, PUT, POST
             /blobs/{uuid}/{blob_id}         | GET, PUT, POST
             /blobs/{uuid}                   | GET
+            /incoming/                      | PUT
         """
         # auth info for global resource
         self._connect('/', ['GET'])
@@ -75,3 +76,6 @@ class URLMapper(object):
         # auth info for blobs resource
         self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT'])
         self._connect('/blobs/{uuid}', ['GET'])
+
+        # incoming resource
+        self._connect('/incoming/{uuid}/{incoming_id}', ['PUT'])
