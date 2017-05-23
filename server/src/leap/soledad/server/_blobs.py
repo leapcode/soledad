@@ -149,6 +149,10 @@ class FilesystemBlobsBackend(object):
         return self._validate_path(path, user, blob_id)
 
 
+class ImproperlyConfiguredException(Exception):
+    pass
+
+
 class BlobsResource(resource.Resource):
 
     isLeaf = True
@@ -156,11 +160,13 @@ class BlobsResource(resource.Resource):
     # Allowed backend classes are defined here
     handlers = {"filesystem": FilesystemBlobsBackend}
 
-    def __init__(self, backend, blobs_path, **backend_args):
+    def __init__(self, backend, blobs_path, **backend_kwargs):
         resource.Resource.__init__(self)
         self._blobs_path = blobs_path
-        backend_args.update({'blobs_path': blobs_path})
-        self._handler = self.handlers[backend](**backend_args)
+        backend_kwargs.update({'blobs_path': blobs_path})
+        if backend not in self.handlers:
+            raise ImproperlyConfiguredException("No such backend: %s", backend)
+        self._handler = self.handlers[backend](**backend_kwargs)
         assert interfaces.IBlobsBackend.providedBy(self._handler)
 
     # TODO double check credentials, we can have then
