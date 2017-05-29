@@ -18,11 +18,30 @@
 A twisted resource that saves externally delivered documents into user's db.
 """
 from twisted.web.resource import Resource
+from leap.soledad.common.document import ServerDocument
+from ._config import get_config
+from leap.soledad.common.couch.state import CouchServerState
+import json
 
 
 __all__ = ['IncomingResource']
 
 
+def _default_backend():
+    conf = get_config()
+    return CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
+
+
 class IncomingResource(Resource):
+    isLeaf = True
+
+    def __init__(self, backend_factory=None):
+        self.factory = backend_factory or _default_backend()
+
     def render_PUT(self, request):
+        uuid, doc_id = request.postpath
+        db = self.factory.open_database(uuid)
+        doc = ServerDocument(doc_id)
+        doc.content = json.loads(request.content.read())
+        db.put_doc(doc)
         return ''
