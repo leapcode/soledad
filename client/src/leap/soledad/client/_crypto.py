@@ -85,9 +85,7 @@ from twisted.web.client import FileBodyProducer
 from leap.soledad.common import soledad_assert
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends.multibackend import MultiBackend
-from cryptography.hazmat.backends.openssl.backend \
-    import Backend as OpenSSLBackend
+from cryptography.hazmat.backends import default_backend
 
 from zope.interface import implementer
 
@@ -95,7 +93,7 @@ from zope.interface import implementer
 SECRET_LENGTH = 64
 SEPARATOR = ' '  # Anything that doesn't belong to base64 encoding
 
-CRYPTO_BACKEND = MultiBackend([OpenSSLBackend()])
+CRYPTO_BACKEND = default_backend()
 
 PACMAN = struct.Struct('2sbbQ16s255p255pQ')
 LEGACY_PACMAN = struct.Struct('2sbbQ16s255p255p')

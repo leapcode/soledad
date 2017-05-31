@@ -32,7 +32,6 @@ trove_classifiers = (
     "Environment :: Console",
     "Operating System :: OS Independent",
     "Operating System :: POSIX",
-    "Programming Language :: Python :: 2.6",
     "Programming Language :: Python :: 2.7",
     "Topic :: Database :: Front-Ends",
     "Topic :: Software Development :: Libraries :: Python Modules"
@@ -113,7 +112,7 @@ install_requires = [
     'leap.common', 'leap.soledad.common', 'treq']
 
 # needed until kali merges the py3 fork back into the main pysqlcipher repo
-if sys.version_info >= (3, 0):
+if sys.version_info.major >= 3:
     install_requires += ['pysqlcipher3']
 else:
     install_requires += ['pysqlcipher']

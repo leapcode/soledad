@@ -23,10 +23,8 @@ import hmac
 import hashlib
 import json
 
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends.multibackend import MultiBackend
-from cryptography.hazmat.backends.openssl.backend \
-    import Backend as OpenSSLBackend
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common import soledad_assert_type
@@ -42,7 +40,7 @@ warnings.warn("'soledad.client.crypto' MODULE DEPRECATED",
 
 MAC_KEY_LENGTH = 64
 
-crypto_backend = MultiBackend([OpenSSLBackend()])
+crypto_backend = default_backend()
 
 
 def encrypt_sym(data, key):
