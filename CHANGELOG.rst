@@ -1,4 +1,32 @@
-0.9.4 -  17 March, 2017
+0.9.6 - 31 May, 2017
++++++++++++++++++++++++++++++++
+
+Server
+~~~~~~
+
+- Minimal Filesystem BlobsBackend implementation, disabled by default.
+
+Client
+~~~~~~
+
+- Minimal Blobs manager implementation
+- Blobs API
+- Ability to generate recovery code.
+- Fix deprecated multibackend call (cryptography).
+
+Misc
+~~~~~~
+
+- Post benchmark results to elasticsearch
+- Build docker image and push it to registry every time the dockerfile used for
+  tests is changed
+- Fix flaky tests
+- Cleanup old documentation.
+- Added dependency on treq.
+- Improve cpu/memory profiling.
+
+
+0.9.5 -  17 March, 2017
 +++++++++++++++++++++++++++++++
 
 Server
