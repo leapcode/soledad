@@ -24,6 +24,8 @@ Misc
 - Cleanup old documentation.
 - Added dependency on treq.
 - Improve cpu/memory profiling.
+- Bumped version to upload wheels to pypi, to workaround for dbschema.sql not
+  found after installation in virtualenv.
 
 
 0.9.5 -  17 March, 2017
