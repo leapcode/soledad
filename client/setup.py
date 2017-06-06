@@ -140,6 +140,7 @@ setup(
     namespace_packages=["leap", "leap.soledad"],
     packages=find_packages('src'),
     package_dir={'': 'src'},
+    package_data={'': ["*.sql"]},
     install_requires=install_requires,
     extras_require={'signaling': ['leap.common>=0.3.0']},
 )
