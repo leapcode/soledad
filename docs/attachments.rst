@@ -30,6 +30,8 @@ database. Encryption of data before it's sent to the server is the same used
 for Soledad documents' content during usual synchronization process (AES-256
 GCM mode).
 
+See :ref:`client-side-attachment-api` for reference.
+
 Usage example
 ^^^^^^^^^^^^^
 
@@ -69,17 +71,6 @@ the store that created it, and can put/get/delete an attachment:
         fd = yield doc.get_attachment()
         assert fd.read() == open('hackers.txt').read()
 
-API
-^^^
-
-.. autoclass:: leap.soledad.client._document.AttachmentStates
-   :members:
-   :undoc-members:
-
-.. autointerface:: leap.soledad.client._document.IDocumentWithAttachment
-   :members:
-   :undoc-members:
-
 Server-side
 -----------
 
@@ -93,6 +84,9 @@ has to be added as an HTTP auth header, as in::
 
     Authorization: Token <base64-encoded uuid:token>
 
+Check out the :ref:`server-side-attachments-rest-api` for more information on
+how to interact with the server using HTTP.
+
 The :ref:`IBlobsBackend <i-blobs-backend>` interface is provided, so in the
 future there can be different ways to store attachments in the server side
 (think of a third-party storage, for example). Currently, the
@@ -105,33 +99,3 @@ Some characteristics of the :ref:`FilesystemBlobsBackend
 * Configurable storage path.
 * Quota support.
 * Username, blob_id and user storage directory sanitization.
-
-Usage example
-^^^^^^^^^^^^^
-
-These are the possible ways to interact with the attachments REST API on the
-server side:
-
-===========  ================  ======== ==================
-HTTP Method  URL               Content  Possible responses
-===========  ================  ======== ==================
-GET          /user_id          -        200
-GET          /user_id/blob_id  -        200, 404
-PUT          /user_id/blob_id  The BLOB 200, 409, 507
-DELETE       /user_id/blob_id  -        200
-===========  ================  ======== ==================
-
-API
-^^^
-
-.. _i-blobs-backend:
-
-.. autoclass:: leap.soledad.server.interfaces.IBlobsBackend
-   :members:
-   :undoc-members:
-
-.. _filesystem-blobs-backend:
-
-.. autoclass:: leap.soledad.server._blobs.FilesystemBlobsBackend
-   :members:
-   :undoc-members:

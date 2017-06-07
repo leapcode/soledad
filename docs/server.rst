@@ -1,5 +1,5 @@
-Soledad Server documentation
-============================
+Soledad Server
+==============
 
 A U1DB server that stores data using CouchDB as its persistence layer.
 

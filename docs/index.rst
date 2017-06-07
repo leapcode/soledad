@@ -14,8 +14,8 @@ all user's devices that access a LEAP provider.
    :maxdepth: 2
 
    client
-   attachments
    server
+   attachments
 
 Indices and tables
 ==================
