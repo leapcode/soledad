@@ -16,7 +16,7 @@ all user's devices that access a LEAP provider.
    client
    server
    attachments
-
+   incoming_box
    deprecation
 
 Indices and tables
