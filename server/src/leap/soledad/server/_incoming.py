@@ -21,10 +21,13 @@ from twisted.web.resource import Resource
 from leap.soledad.common.document import ServerDocument
 from ._config import get_config
 from leap.soledad.common.couch.state import CouchServerState
-import json
+from leap.soledad.common.crypto import ENC_JSON_KEY
+from leap.soledad.common.crypto import ENC_SCHEME_KEY
+from leap.soledad.common.crypto import EncryptionSchemes
 
 
 __all__ = ['IncomingResource']
+ACCEPTED_SCHEMES = [EncryptionSchemes.NONE, EncryptionSchemes.PUBKEY]
 
 
 def _default_backend():
@@ -37,11 +40,29 @@ class IncomingResource(Resource):
 
     def __init__(self, backend_factory=None):
         self.factory = backend_factory or _default_backend()
+        self.formatter = IncomingFormatter()
 
     def render_PUT(self, request):
-        uuid, doc_id = request.postpath
+        uuid, doc_id, scheme = request.postpath
+        assert scheme in ACCEPTED_SCHEMES
         db = self.factory.open_database(uuid)
         doc = ServerDocument(doc_id)
-        doc.content = json.loads(request.content.read())
+        doc.content = self.formatter.format(request.content.read(), scheme)
         db.put_doc(doc)
         return ''
+
+
+class IncomingFormatter(object):
+    """
+    Formats an incoming document. Today as it was by leap_mx and as expected by
+    leap_mail, but the general usage should evolve towards a generic way for
+    the user to receive external documents.
+    """
+    INCOMING_KEY = 'incoming'
+    ERROR_DECRYPTING_KEY = 'errdecr'  # TODO: Always false on MX, remove it
+
+    def format(self, raw_content, enc_scheme):
+        return {self.INCOMING_KEY: True,
+                self.ERROR_DECRYPTING_KEY: False,
+                ENC_SCHEME_KEY: EncryptionSchemes.NONE,
+                ENC_JSON_KEY: raw_content}

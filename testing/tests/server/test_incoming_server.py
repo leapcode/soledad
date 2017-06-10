@@ -26,6 +26,8 @@ from twisted.internet import defer
 import treq
 
 from leap.soledad.server._incoming import IncomingResource
+from leap.soledad.server._incoming import IncomingFormatter
+from leap.soledad.common.crypto import EncryptionSchemes
 from test_soledad.util import CouchServerStateForTests
 from test_soledad.util import CouchDBTestCase
 
@@ -49,9 +51,11 @@ class BlobServerTestCase(CouchDBTestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_put_incoming_creates_a_document(self):
         user_id, doc_id = self.user_id, uuid4().hex
-        incoming_endpoint = self.uri + '%s/%s' % (user_id, doc_id)
-        yield treq.put(incoming_endpoint, BytesIO('{}'), persistent=False)
+        content, scheme = 'Hi', EncryptionSchemes.NONE
+        formatter = IncomingFormatter()
+        incoming_endpoint = self.uri + '%s/%s/%s' % (user_id, doc_id, scheme)
+        yield treq.put(incoming_endpoint, BytesIO(content), persistent=False)
         db = self.state.open_database(user_id)
 
         doc = db.get_doc(doc_id)
-        self.assertEquals(doc.content, {})
+        self.assertEquals(doc.content, formatter.format(content, scheme))

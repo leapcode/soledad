@@ -20,6 +20,8 @@ Unit tests for incoming API resource
 from twisted.trial import unittest
 from twisted.web.test.test_web import DummyRequest
 from leap.soledad.server._incoming import IncomingResource
+from leap.soledad.server._incoming import IncomingFormatter
+from leap.soledad.common.crypto import EncryptionSchemes
 from io import BytesIO
 from uuid import uuid4
 from mock import Mock
@@ -35,9 +37,11 @@ class BlobServerTestCase(unittest.TestCase):
         self.user_uuid = uuid4().hex
 
     def test_save_document(self):
-        doc_id = uuid4().hex
-        request = DummyRequest([self.user_uuid, doc_id])
-        request.content = BytesIO('{}')
+        formatter = IncomingFormatter()
+        doc_id, scheme = uuid4().hex, EncryptionSchemes.NONE
+        content = 'Incoming content'
+        request = DummyRequest([self.user_uuid, doc_id, scheme])
+        request.content = BytesIO(content)
         self.resource.render_PUT(request)
 
         open_database = self.backend_factory.open_database
@@ -45,4 +49,4 @@ class BlobServerTestCase(unittest.TestCase):
         self.couchdb.put_doc.assert_called_once()
         doc = self.couchdb.put_doc.call_args[0][0]
         self.assertEquals(doc_id, doc.doc_id)
-        self.assertEquals('{}', doc.get_json())
+        self.assertEquals(formatter.format(content, scheme), doc.content)
