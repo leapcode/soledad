@@ -17,6 +17,8 @@ all user's devices that access a LEAP provider.
    server
    attachments
 
+   deprecation
+
 Indices and tables
 ==================
 
