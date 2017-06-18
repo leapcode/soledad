@@ -15,14 +15,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-setup file for leap.soledad.client
+setup file for leap.soledad
 """
+import os
 import re
 import sys
+import versioneer
+
 from setuptools import setup
 from setuptools import find_packages
 from setuptools import Command
-import versioneer
+from setuptools.command.develop import develop as _cmd_develop
+
+from pkg import utils
+
+
+isset = lambda var: os.environ.get(var, None)
+if isset('VIRTUAL_ENV') or isset('LEAP_SKIP_INIT'):
+    data_files = None
+else:
+    # XXX this should go only for linux/mac
+    data_files = [("/etc/init.d/", ["pkg/soledad-server"])]
+
 
 trove_classifiers = (
     "Development Status :: 3 - Alpha",
@@ -32,6 +46,7 @@ trove_classifiers = (
     "Environment :: Console",
     "Operating System :: OS Independent",
     "Operating System :: POSIX",
+    "Programming Language :: Python :: 2.6",
     "Programming Language :: Python :: 2.7",
     "Topic :: Database :: Front-Ends",
     "Topic :: Software Development :: Libraries :: Python Modules"
@@ -101,15 +116,28 @@ def get_versions():
             f.write(subst_template)
 
 
+class cmd_develop(_cmd_develop):
+    def run(self):
+        # versioneer:
+        versions = versioneer.get_versions(verbose=True)
+        self._versioneer_generated_versions = versions
+        # unless we update this, the command will keep using the old version
+        self.distribution.metadata.version = versions["version"]
+        _cmd_develop.run(self)
+
+
 cmdclass = versioneer.get_cmdclass()
 cmdclass["freeze_debianver"] = freeze_debianver
+cmdclass["develop"] = cmd_develop
 
 
 # XXX add ref to docs
 
-install_requires = [
-    'twisted', 'scrypt', 'zope.proxy', 'cryptography',
-    'leap.common', 'leap.soledad.common', 'treq']
+install_requires = []
+for reqfile in ["pkg/common/requirements.pip",
+                "pkg/client/requirements.pip",
+                "pkg/server/requirements.pip"]:
+    install_requires += utils.parse_requirements([reqfile])
 
 # needed until kali merges the py3 fork back into the main pysqlcipher repo
 if sys.version_info.major >= 3:
@@ -117,16 +145,32 @@ if sys.version_info.major >= 3:
 else:
     install_requires += ['pysqlcipher']
 
+if utils.is_develop_mode():
+    print
+    print("[WARNING] Skipping leap-specific dependencies "
+          "because development mode is detected.")
+    print("[WARNING] You can install "
+          "the latest published versions with "
+          "'pip install -r pkg/{common,client,server}/requirements-leap.pip'")
+    print("[WARNING] Or you can instead do 'python setup.py develop' "
+          "from the parent folder of each one of them.")
+    print
+else:
+    reqfiles = [
+        "pkg/common/requirements-leap.pip",
+        "pkg/client/requirements-leap.pip",
+        "pkg/server/requirements-leap.pip",
+    ]
+    install_requires += utils.parse_requirements(reqfiles=reqfiles)
 
 setup(
-    name='leap.soledad.client',
+    name='leap.soledad',
     version=VERSION,
     cmdclass=cmdclass,
     url='https://leap.se/',
     download_url=DOWNLOAD_URL,
     license='GPLv3+',
-    description='Synchronization of locally encrypted data among devices '
-                '(client components).',
+    description='Synchronization of locally encrypted data among devices.',
     author='The LEAP Encryption Access Project',
     author_email='info@leap.se',
     maintainer='Kali Kaneko',
@@ -137,10 +181,11 @@ setup(
         "LEAP project, an API for data storage and sync."
     ),
     classifiers=trove_classifiers,
-    namespace_packages=["leap", "leap.soledad"],
-    packages=find_packages('src'),
+    namespace_packages=["leap"],
+    packages=find_packages('src', exclude=['*.tests', '*.tests.*']),
     package_dir={'': 'src'},
     package_data={'': ["*.sql"]},
     install_requires=install_requires,
     extras_require={'signaling': ['leap.common>=0.3.0']},
+    data_files=data_files
 )
