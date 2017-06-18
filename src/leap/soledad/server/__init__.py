@@ -31,14 +31,12 @@ from .sync import SyncResource
 from .sync import MAX_REQUEST_SIZE
 from .sync import MAX_ENTRY_SIZE
 
-from ._version import get_versions
 from ._config import get_config
 
 
 __all__ = [
     'SoledadApp',
     'get_config',
-    '__version__',
 ]
 
 
@@ -186,7 +184,3 @@ class HTTPInvocationByMethodWithBody(
 
 # monkey patch server with new http invocation
 http_app.HTTPInvocationByMethodWithBody = HTTPInvocationByMethodWithBody
-
-
-__version__ = get_versions()['version']
-del get_versions

@@ -18,7 +18,6 @@
 from leap.common.check import leap_assert as soledad_assert
 from leap.common.check import leap_assert_type as soledad_assert_type
 
-from ._version import get_versions
 
 """
 Soledad routines common to client and server.
@@ -36,12 +35,7 @@ SHARED_DB_NAME = 'shared'
 # Global functions
 #
 
-__version__ = get_versions()['version']
-del get_versions
-
-
 __all__ = [
     "soledad_assert",
     "soledad_assert_type",
-    "__version__",
 ]

@@ -21,7 +21,7 @@ import json
 
 from twisted.web.resource import Resource
 
-from leap.soledad.server import __version__
+from leap.soledad import __version__
 
 
 __all__ = ['ServerInfo']
