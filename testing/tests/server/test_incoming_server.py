@@ -51,9 +51,9 @@ class IncomingServerTestCase(CouchDBTestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_put_incoming_creates_a_document(self):
         user_id, doc_id = self.user_id, uuid4().hex
-        content, scheme = 'Hi', EncryptionSchemes.NONE
+        content, scheme = 'Hi', EncryptionSchemes.PUBKEY
         formatter = IncomingFormatter()
-        incoming_endpoint = self.uri + '%s/%s/%s' % (user_id, doc_id, scheme)
+        incoming_endpoint = self.uri + '%s/%s' % (user_id, doc_id)
         yield treq.put(incoming_endpoint, BytesIO(content), persistent=False)
         db = self.state.open_database(user_id)
 

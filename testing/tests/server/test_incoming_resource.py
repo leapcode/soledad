@@ -38,9 +38,9 @@ class IncomingResourceTestCase(unittest.TestCase):
 
     def test_save_document(self):
         formatter = IncomingFormatter()
-        doc_id, scheme = uuid4().hex, EncryptionSchemes.NONE
+        doc_id, scheme = uuid4().hex, EncryptionSchemes.PUBKEY
         content = 'Incoming content'
-        request = DummyRequest([self.user_uuid, doc_id, scheme])
+        request = DummyRequest([self.user_uuid, doc_id])
         request.content = BytesIO(content)
         self.resource.render_PUT(request)
 

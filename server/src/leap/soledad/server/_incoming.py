@@ -27,7 +27,6 @@ from leap.soledad.common.crypto import EncryptionSchemes
 
 
 __all__ = ['IncomingResource']
-ACCEPTED_SCHEMES = [EncryptionSchemes.NONE, EncryptionSchemes.PUBKEY]
 
 
 def _default_backend():
@@ -43,8 +42,8 @@ class IncomingResource(Resource):
         self.formatter = IncomingFormatter()
 
     def render_PUT(self, request):
-        uuid, doc_id, scheme = request.postpath
-        assert scheme in ACCEPTED_SCHEMES
+        uuid, doc_id = request.postpath
+        scheme = EncryptionSchemes.PUBKEY
         db = self.factory.open_database(uuid)
         doc = ServerDocument(doc_id)
         doc.content = self.formatter.format(request.content.read(), scheme)
