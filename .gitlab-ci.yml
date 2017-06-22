@@ -107,7 +107,7 @@ package:amd64_jessie:
     ARCH: "amd64"
     DIST: "jessie"
     REPONAMES: "platform"
-    LINTIAN_DEFAULT_OPTS: "(-X filename-length)"
+    LINTIAN_OPTS: "-X filename-length"
   <<: *job_definition
 
 package:amd64_stretch:
@@ -115,5 +115,5 @@ package:amd64_stretch:
     ARCH: "amd64"
     DIST: "stretch"
     REPONAMES: "platform"
-    LINTIAN_DEFAULT_OPTS: "(-X filename-length)"
+    LINTIAN_OPTS: "-X filename-length"
   <<: *job_definition
