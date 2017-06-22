@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# test_blobs_resource_validation.py
+# test_incoming_resource.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ from uuid import uuid4
 from mock import Mock
 
 
-class BlobServerTestCase(unittest.TestCase):
+class IncomingResourceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.couchdb = Mock()

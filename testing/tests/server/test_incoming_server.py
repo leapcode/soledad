@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# test_blobs_server.py
+# test_incoming_server.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@ from test_soledad.util import CouchServerStateForTests
 from test_soledad.util import CouchDBTestCase
 
 
-class BlobServerTestCase(CouchDBTestCase):
+class IncomingServerTestCase(CouchDBTestCase):
 
     def setUp(self):
         self.state = CouchServerStateForTests(self.couch_url)

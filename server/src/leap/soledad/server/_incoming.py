@@ -18,9 +18,9 @@
 A twisted resource that saves externally delivered documents into user's db.
 """
 from twisted.web.resource import Resource
-from leap.soledad.common.document import ServerDocument
 from ._config import get_config
 from leap.soledad.common.couch.state import CouchServerState
+from leap.soledad.common.document import ServerDocument
 from leap.soledad.common.crypto import ENC_JSON_KEY
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.common.crypto import EncryptionSchemes
@@ -49,7 +49,7 @@ class IncomingResource(Resource):
         doc = ServerDocument(doc_id)
         doc.content = self.formatter.format(request.content.read(), scheme)
         db.put_doc(doc)
-        return ''
+        return '{"success": true}'
 
 
 class IncomingFormatter(object):
