@@ -1,3 +1,4 @@
+---
 stages:
   - code-check
   - build
@@ -16,7 +17,7 @@ cache:
   untracked: true
   key: soledad-shared-pip-cache
   paths:
-  - testing/.cache/
+    - testing/.cache/
 
 before_script:
   - echo "Running on ${HOST_HOSTNAME:=$(hostname)}"
@@ -31,15 +32,15 @@ before_script:
     - build-test-lintian
     - upload-package
     # sleep 1h to allow debugging of running container
-    #- sleep 3600
+    # - sleep 3600
   artifacts:
     expire_in: 1w
     paths:
-    - '*_*.xz'
-    - '*_*.dsc'
-    - '*_amd64.changes'
-    - '*.deb'
-    - 'results/*'
+      - '*_*.xz'
+      - '*_*.dsc'
+      - '*_amd64.changes'
+      - '*.deb'
+      - 'results/*'
 
 code-check:
   stage: code-check
@@ -69,12 +70,13 @@ benchmark:
     # elasticsearch instance so it's protected from being leaked in the
     # CI console
     # We can't get it working inside docker for unknown reasons.
-    #- echo "$NETRC" > /root/.netrc && chmod 600 /root/.netrc
+    # - echo "$NETRC" > /root/.netrc && chmod 600 /root/.netrc
     #
     # Add $PYTEST_OPTS to pytest.ini to allow posting benchmark tests
     # to an elasticsearch instance
     - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
-    - /usr/bin/unbuffer tox --recreate -e benchmark -- --couch-url http://couchdb:5984 -m 'not synchronous' | /usr/bin/ts -s
+    - /usr/bin/unbuffer tox --recreate -e benchmark -- \
+        --couch-url http://couchdb:5984 -m 'not synchronous' | /usr/bin/ts -s
 
 build_docker_image:
   image: 0xacab.org:4567/leap/soledad:latest
@@ -84,15 +86,18 @@ build_docker_image:
   tags:
     - docker-in-docker
   before_script:
-     - >
-       export LAST_COMMIT=$(curl -s --header "PRIVATE-TOKEN: ${LEAP_CODE_O_MATIC_PRIVATE_TOKEN}" https://0xacab.org/api/v4/projects/519/pipelines |
-       python -c "import sys, json; print json.load(sys.stdin)[1]['sha']")
+    - >
+      export LAST_COMMIT=$(curl -s \
+        --header "PRIVATE-TOKEN: ${LEAP_CODE_O_MATIC_PRIVATE_TOKEN}" \
+        https://0xacab.org/api/v4/projects/519/pipelines | \
+        python -c "import sys, json; print json.load(sys.stdin)[1]['sha']")
   script:
     - >
       if git diff $LAST_COMMIT HEAD --name-only|grep testing/docker; then
         docker --version
         docker info
-        docker login -u gitlab-ci-token -e sysdev@leap.se -p $CI_JOB_TOKEN $CI_REGISTRY
+        docker login -u gitlab-ci-token -e sysdev@leap.se \
+          -p $CI_JOB_TOKEN $CI_REGISTRY
         docker build -t ${CI_REGISTRY_IMAGE}:latest testing/docker
         docker push ${CI_REGISTRY_IMAGE}:latest
       fi
