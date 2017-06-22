@@ -2,12 +2,13 @@ Source: soledad
 Section: python
 Priority: optional
 Maintainer: Micah Anderson <micah@debian.org>
+Uploaders: LEAP automated build <sysdev@leap.se>
 Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), python-wheel, debhelper (>= 9), dh-python
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 
 Package: soledad-server
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, python-configparser, python-couchdb,
+Depends: ${misc:Depends}, ${python:Depends}, lsb-base (>= 3.0-6), python-configparser, python-couchdb,
  python-simplejson, python-oauth, python-u1db, python-routes, python-openssl,
  soledad-common (>= 0.8.0), python-six, python-twisted-web (>= 13.0.0-1~bpo70+1),
  sudo
@@ -20,8 +21,7 @@ Description: Synchronization of locally encrypted data among devices (server fil
 
 Package: soledad-common
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, python-simplejson, python-oauth, python-u1db,
- python-six
+Depends: ${misc:Depends}, ${python:Depends}, python-simplejson, python-oauth, python-u1db, python-six
 Description: Synchronization of locally encrypted data among devices (common files)
  Soledad is the part of LEAP that allows application data to be securely
  shared among devices. It provides, to other parts of the LEAP client, an
