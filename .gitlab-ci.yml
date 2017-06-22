@@ -2,6 +2,7 @@ stages:
   - code-check
   - build
   - tests
+  - package
   - benchmark
 
 image: 0xacab.org:4567/leap/soledad:latest
@@ -19,6 +20,26 @@ cache:
 
 before_script:
   - echo "Running on ${HOST_HOSTNAME:=$(hostname)}"
+
+.job_template: &job_definition
+  stage: package
+  image: "0xacab.org:4567/leap/gitlab-buildpackage:build_${DIST}_${ARCH}"
+  script:
+    - "pwd; git describe"
+    - build-build-package
+    # Test the package with lintian
+    - build-test-lintian
+    - upload-package
+    # sleep 1h to allow debugging of running container
+    #- sleep 3600
+  artifacts:
+    expire_in: 1w
+    paths:
+    - '*_*.xz'
+    - '*_*.dsc'
+    - '*_amd64.changes'
+    - '*.deb'
+    - 'results/*'
 
 code-check:
   stage: code-check
@@ -75,3 +96,17 @@ build_docker_image:
         docker build -t ${CI_REGISTRY_IMAGE}:latest testing/docker
         docker push ${CI_REGISTRY_IMAGE}:latest
       fi
+
+package:amd64_jessie:
+  variables:
+    ARCH: "amd64"
+    DIST: "jessie"
+    REPONAMES: "platform"
+  <<: *job_definition
+
+package:amd64_stretch:
+  variables:
+    ARCH: "amd64"
+    DIST: "stretch"
+    REPONAMES: "platform"
+  <<: *job_definition
