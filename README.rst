@@ -8,30 +8,27 @@ LEAP project, an API for data storage and sync.
 
 This software is under development.
 
-There are currently three python packages maintained under this
-repository:
+From version ``0.9.7`` on, soledad is a single package, with extra dependencies
+for the client and the server backends.
 
-**leap.soledad.common** common pieces.
+**leap.soledad**
 
 .. image:: https://badge.fury.io/py/leap.soledad.common.svg
     :target: http://badge.fury.io/py/leap.soledad.common
 .. image:: https://img.shields.io/pypi/dm/leap.soledad.common.svg
     :target: http://badge.fury.io/py/leap.soledad.common
 
-**leap.soledad.client** where the soledad client lives.
 
-.. image:: https://badge.fury.io/py/leap.soledad.client.svg
-    :target: http://badge.fury.io/py/leap.soledad.client
-.. image:: https://img.shields.io/pypi/dm/leap.soledad.client.svg
-    :target: http://badge.fury.io/py/leap.soledad.client
+Installing extra dependencies
+-----------------------------
 
-**leap.soledad.server** oh surprise! bits needed for the soledad server.
+The client backend is based on sqlcipher::
 
-.. image:: https://badge.fury.io/py/leap.soledad.server.svg
-    :target: http://badge.fury.io/py/leap.soledad.server
-.. image:: https://img.shields.io/pypi/dm/leap.soledad.server.svg
-    :target: http://badge.fury.io/py/leap.soledad.server
+  pip install ".[client]" 
 
+The server depends on CouchDB::
+
+  pip install ".[server]" 
 
 Compatibility
 -------------
@@ -68,14 +65,15 @@ system.
 .. _`CouchDB`: https://couchdb.apache.org/
 
 Privileges
------
+----------
 In order to prevent privilege escalation, Soledad should not be run as a
 database administrator. This implies the following side effects:
 
 -----------------
 Database creation:
 -----------------
-Can be done via a script located in ``server/pkg/create-user-db``
+
+Can be done via a script located in ``pkg/server/create-user-db``
 It reads a netrc file that should be placed on
 ``/etc/couchdb/couchdb-admin.netrc``.
 That file holds the admin credentials in netrc format and should be accessible
@@ -96,5 +94,6 @@ automatically by the server, following the same logic as u1db server.
 ------------------
 Database deletion:
 ------------------
+
 No code at all handles this and privilege to do so needs to be removed as
 explained before. This can be automated via a simple cron job.
