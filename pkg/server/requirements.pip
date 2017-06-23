@@ -1,6 +1,5 @@
-configparser
 PyOpenSSL
-twisted>=12.3.0
+configparser
 Beaker
 couchdb
 # Upstream needs a patch for py3 compatibility
