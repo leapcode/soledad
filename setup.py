@@ -82,7 +82,8 @@ install_requires = [
     'treq',
     'paste',   # deprecate
     'routes',  # deprecate
-    'six'
+    'six',
+    'leap.common',  # deprecate use of asserts
 ]
 
 client = [
