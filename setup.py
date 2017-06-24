@@ -28,7 +28,8 @@ from setuptools.command.develop import develop as _cmd_develop
 
 
 isset = lambda var: os.environ.get(var, None)
-if isset('VIRTUAL_ENV') or isset('LEAP_SKIP_INIT'):
+skip = ['VIRTUAL_ENV', 'LEAP_SKIP_INIT', 'READTHEDOCS']
+if len(filter(isset, skip)):
     data_files = None
 else:
     # XXX this should go only for linux/mac
