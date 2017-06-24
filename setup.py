@@ -32,7 +32,7 @@ if isset('VIRTUAL_ENV') or isset('LEAP_SKIP_INIT'):
     data_files = None
 else:
     # XXX this should go only for linux/mac
-    data_files = [("/etc/init.d/", ["pkg/soledad-server"])]
+    data_files = [("/etc/init.d/", ["pkg/server/soledad-server"])]
 
 
 trove_classifiers = (
