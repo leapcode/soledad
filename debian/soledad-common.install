@@ -1,2 +1,3 @@
 src/leap/soledad/__init__.py /usr/lib/python2.7/dist-packages/leap/soledad/
+src/leap/soledad/_version.py /usr/lib/python2.7/dist-packages/leap/soledad/
 src/leap/soledad/common /usr/lib/python2.7/dist-packages/leap/soledad/
