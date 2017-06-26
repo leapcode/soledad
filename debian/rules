@@ -4,10 +4,16 @@
 export http_proxy = http://127.0.0.1:9
 
 # Uncomment this to turn on verbose mode.
-#DH_VERBOSE=1
+DH_VERBOSE=1
+
+NAME=soledad-server
 
 %:
 	dh $@ --with python2 --namespace=leap.soledad --with=systemd
+
+override_dh_installinit:
+	dh_systemd_enable -p${NAME} --name=${NAME} ${NAME}.service
+	dh_installinit -p${NAME} --no-start --noscripts
 
 override_dh_auto_clean:
 	dh_auto_clean
