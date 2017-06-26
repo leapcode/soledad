@@ -73,7 +73,7 @@ database administrator. This implies the following side effects:
 Database creation:
 -----------------
 
-Can be done via a script located in ``pkg/server/create-user-db``
+Can be done via a script located in ``pkg/server/soledad-create-userdb``
 It reads a netrc file that should be placed on
 ``/etc/couchdb/couchdb-admin.netrc``.
 That file holds the admin credentials in netrc format and should be accessible
@@ -82,7 +82,7 @@ only by 'soledad-admin' user.
 The debian package will do the following in order to automate this:
 
 * create a user ``soledad-admin``
-* make this script available as ``create-user-db`` in ``/usr/bin``
+* make this script available as ``soledad-create-userdb`` in ``/usr/bin``
 * grant restricted sudo access, that only enables user ``soledad`` to call this
   exact command via ``soledad-admin`` user.
 
