@@ -25,31 +25,31 @@ class IBlobsBackend(Interface):
     An interface for a BlobsBackend.
     """
 
-    def read_blob(user, blob_id, request):
+    def read_blob(user, blob_id, request, namespace=''):
         """
         Read blob with a given blob_id, and write it to the passed request.
 
         :returns: a deferred that fires upon finishing.
         """
 
-    def write_blob(user, blob_id, request):
+    def write_blob(user, blob_id, request, namespace=''):
         """
         Write blob to the storage, reading it from the passed request.
 
         :returns: a deferred that fires upon finishing.
         """
 
-    def delete_blob(user, blob_id):
+    def delete_blob(user, blob_id, namespace=''):
         """
         Delete the given blob_id.
         """
 
-    def get_blob_size(user, blob_id):
+    def get_blob_size(user, blob_id, namespace=''):
         """
         Get the size of the given blob id.
         """
 
-    def list_blobs(user, request):
+    def list_blobs(user, request, namespace=''):
         """
         Returns a json-encoded list of ids from user's blob.
 
@@ -62,7 +62,7 @@ class IBlobsBackend(Interface):
         unders its namespace.
         """
 
-    def add_tag_header(user, blob_id, request):
+    def add_tag_header(user, blob_id, request, namespace=''):
         """
         Adds a header 'Tag' to the passed request object, containing the last
         16 bytes of the encoded blob, which according to the spec contains the

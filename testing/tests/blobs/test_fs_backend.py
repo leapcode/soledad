@@ -52,7 +52,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend._get_path = Mock(return_value='path')
         backend.read_blob('user', 'blob_id', request)
 
-        backend._get_path.assert_called_once_with('user', 'blob_id')
+        backend._get_path.assert_called_once_with('user', 'blob_id', '')
         ctype = 'application/octet-stream'
         _blobs.static.File.assert_called_once_with('path', defaultType=ctype)
         render_mock.render_GET.assert_called_once_with(request)
@@ -84,11 +84,23 @@ class FilesystemBackendTestCase(unittest.TestCase):
         request.setResponseCode.assert_called_once_with(507)
         request.write.assert_called_once_with('Quota Exceeded!')
 
-    def test_get_path_partitioning(self):
+    def test_get_path_partitioning_by_default(self):
         backend = _blobs.FilesystemBlobsBackend()
         backend.path = '/somewhere/'
-        path = backend._get_path('user', 'blob_id')
+        path = backend._get_path('user', 'blob_id', '')
         self.assertEquals(path, '/somewhere/user/b/blo/blob_i/blob_id')
+
+    def test_get_path_custom(self):
+        backend = _blobs.FilesystemBlobsBackend()
+        backend.path = '/somewhere/'
+        path = backend._get_path('user', 'blob_id', 'wonderland')
+        self.assertEquals(path, '/somewhere/user/wonderland/blob_id')
+
+    def test_get_path_namespace_traversal_raises(self):
+        backend = _blobs.FilesystemBlobsBackend()
+        backend.path = '/somewhere/'
+        with pytest.raises(Exception):
+            backend._get_path('user', 'blob_id', '..')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.walk')
@@ -99,27 +111,42 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(result, ['blob_0', 'blob_1'])
 
     @pytest.mark.usefixtures("method_tmpdir")
+    @mock.patch('leap.soledad.server._blobs.os.walk')
+    def test_list_blobs_limited_by_namespace(self, walk_mock):
+        backend, _ = _blobs.FilesystemBlobsBackend(self.tempdir), None
+        walk_mock.return_value = [(_, _, ['blob_0']), (_, _, ['blob_1'])]
+        result = json.loads(backend.list_blobs('user', DummyRequest(['']),
+                                               namespace='incoming'))
+        self.assertEquals(result, ['blob_0', 'blob_1'])
+        target_dir = os.path.join(self.tempdir, 'user', 'incoming')
+        walk_mock.assert_called_once_with(target_dir)
+
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_path_validation_on_read_blob(self):
-        blobs_path = self.tempdir
+        blobs_path, request = self.tempdir, DummyRequest([''])
         backend = _blobs.FilesystemBlobsBackend(blobs_path)
         with pytest.raises(Exception):
-            backend.read_blob('..', '..', DummyRequest(['']))
+            backend.read_blob('..', '..', request)
         with pytest.raises(Exception):
-            backend.read_blob('valid', '../../../', DummyRequest(['']))
+            backend.read_blob('user', '../../../', request)
         with pytest.raises(Exception):
-            backend.read_blob('../../../', 'valid', DummyRequest(['']))
+            backend.read_blob('../../../', 'blob_id', request)
+        with pytest.raises(Exception):
+            backend.read_blob('user', 'blob_id', request, namespace='..')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @defer.inlineCallbacks
     def test_path_validation_on_write_blob(self):
-        blobs_path = self.tempdir
+        blobs_path, request = self.tempdir, DummyRequest([''])
         backend = _blobs.FilesystemBlobsBackend(blobs_path)
         with pytest.raises(Exception):
-            yield backend.write_blob('..', '..', DummyRequest(['']))
+            yield backend.write_blob('..', '..', request)
         with pytest.raises(Exception):
-            yield backend.write_blob('valid', '../../../', DummyRequest(['']))
+            yield backend.write_blob('user', '../../../', request)
         with pytest.raises(Exception):
-            yield backend.write_blob('../../../', 'valid', DummyRequest(['']))
+            yield backend.write_blob('../../../', 'id1', request)
+        with pytest.raises(Exception):
+            yield backend.write_blob('user', 'id2', request, namespace='..')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.unlink')
@@ -128,3 +155,12 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend.delete_blob('user', 'blob_id')
         unlink_mock.assert_called_once_with(backend._get_path('user',
                                                               'blob_id'))
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @mock.patch('leap.soledad.server._blobs.os.unlink')
+    def test_delete_blob_custom_namespace(self, unlink_mock):
+        backend = _blobs.FilesystemBlobsBackend(self.tempdir)
+        backend.delete_blob('user', 'blob_id', namespace='trash')
+        unlink_mock.assert_called_once_with(backend._get_path('user',
+                                                              'blob_id',
+                                                              'trash'))

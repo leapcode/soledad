@@ -66,16 +66,16 @@ class FilesystemBlobsBackend(object):
             os.makedirs(blobs_path)
         self.path = blobs_path
 
-    def read_blob(self, user, blob_id, request):
+    def read_blob(self, user, blob_id, request, namespace=''):
         logger.info('reading blob: %s - %s' % (user, blob_id))
-        path = self._get_path(user, blob_id)
+        path = self._get_path(user, blob_id, namespace)
         logger.debug('blob path: %s' % path)
         _file = static.File(path, defaultType='application/octet-stream')
         return _file.render_GET(request)
 
     @defer.inlineCallbacks
-    def write_blob(self, user, blob_id, request):
-        path = self._get_path(user, blob_id)
+    def write_blob(self, user, blob_id, request, namespace=''):
+        path = self._get_path(user, blob_id, namespace)
         try:
             mkdir_p(os.path.split(path)[0])
         except OSError:
@@ -95,16 +95,16 @@ class FilesystemBlobsBackend(object):
         fbp = FileBodyProducer(request.content)
         yield fbp.startProducing(open(path, 'wb'))
 
-    def delete_blob(self, user, blob_id):
-        blob_path = self._get_path(user, blob_id)
+    def delete_blob(self, user, blob_id, namespace=''):
+        blob_path = self._get_path(user, blob_id, namespace)
         os.unlink(blob_path)
 
-    def get_blob_size(user, blob_id):
+    def get_blob_size(user, blob_id, namespace=''):
         raise NotImplementedError
 
-    def list_blobs(self, user, request):
+    def list_blobs(self, user, request, namespace=''):
         blob_ids = []
-        base_path = self._get_path(user)
+        base_path = self._get_path(user, custom_preffix=namespace)
         for _, _, filenames in os.walk(base_path):
             blob_ids += filenames
         return json.dumps(blob_ids)
@@ -112,8 +112,8 @@ class FilesystemBlobsBackend(object):
     def get_total_storage(self, user):
         return self._get_disk_usage(self._get_path(user))
 
-    def add_tag_header(self, user, blob_id, request):
-        with open(self._get_path(user, blob_id)) as doc_file:
+    def add_tag_header(self, user, blob_id, request, namespace=''):
+        with open(self._get_path(user, blob_id, namespace)) as doc_file:
             doc_file.seek(-16, 2)
             tag = base64.urlsafe_b64encode(doc_file.read())
             request.responseHeaders.setRawHeaders('Tag', [tag])
@@ -140,13 +140,18 @@ class FilesystemBlobsBackend(object):
             raise Exception(err)
         return desired_path
 
-    def _get_path(self, user, blob_id=False):
+    def _get_path(self, user, blob_id='', custom_preffix=''):
         parts = [user]
+        parts += self._get_preffix(blob_id, custom_preffix)
         if blob_id:
-            parts += [blob_id[0], blob_id[0:3], blob_id[0:6]]
             parts += [blob_id]
         path = os.path.join(self.path, *parts)
         return self._validate_path(path, user, blob_id)
+
+    def _get_preffix(self, blob_id, custom=''):
+        if custom or not blob_id:
+            return [custom]
+        return [blob_id[0], blob_id[0:3], blob_id[0:6]]
 
 
 class ImproperlyConfiguredException(Exception):
