@@ -1,2 +1,3 @@
-server/pkg/create-user-db usr/bin/
+pkg/server/soledad-create-userdb usr/bin/
 debian/soledad-sudoers etc/sudoers.d/
+src/leap/soledad/server usr/lib/python2.7/dist-packages/leap/soledad/
