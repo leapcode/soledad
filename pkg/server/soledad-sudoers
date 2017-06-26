@@ -1,2 +1,4 @@
 Cmnd_Alias SOLEDAD_CREATE_DB = /usr/bin/soledad-create-userdb
 soledad ALL=(soledad-admin) NOPASSWD: SOLEDAD_CREATE_DB
+# Old name, deprecated since 06/2017
+soledad ALL=(soledad-admin) NOPASSWD: /usr/bin/create-user-db
