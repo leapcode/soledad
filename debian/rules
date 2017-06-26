@@ -7,7 +7,7 @@ export http_proxy = http://127.0.0.1:9
 #DH_VERBOSE=1
 
 %:
-	dh $@ --with python2 --namespace=leap.soledad
+	dh $@ --with python2 --namespace=leap.soledad --with=systemd
 
 override_dh_auto_clean:
 	dh_auto_clean
