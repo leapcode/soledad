@@ -21,6 +21,7 @@ _trial_temp
 scripts/profiling/sync/profiles
 tags
 
+debian/debhelper-build-stamp
 testing/htmlcov
 testing/.coverage
 testing/test-env
