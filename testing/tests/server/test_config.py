@@ -60,7 +60,7 @@ class ConfigurationParsingTest(unittest.TestCase):
         expected = {'couch_url':
                     'http://soledad:passwd@localhost:5984',
                     'create_cmd':
-                    'sudo -u soledad-admin /usr/bin/create-user-db',
+                    'sudo -u soledad-admin /usr/bin/soledad-create-userdb',
                     'admin_netrc':
                     '/etc/couchdb/couchdb-soledad-admin.netrc',
                     'batching': False,

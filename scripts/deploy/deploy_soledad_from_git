@@ -39,7 +39,7 @@ rm -rf $SOLEDADPATH
 # copy over some stuff that we'll need -- stolen from debian package
 cp -r $LOCALREPO/server/src/leap/soledad/server $SOLEDADPATH
 cp $LOCALREPO/server/pkg/soledad-server.service $SYSTEMDINIT
-cp $LOCALREPO/server/pkg/create-user-db /usr/bin/
+cp $LOCALREPO/server/pkg/soledad-create-userdb /usr/bin/
 cp $LOCALREPO/server/pkg/soledad-sudoers /etc/sudoers.d/
 
 # Let's append the branch info to the version string! So that nobody is lost
