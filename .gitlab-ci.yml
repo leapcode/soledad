@@ -6,7 +6,6 @@ stages:
   - package
   - benchmark
 
-image: 0xacab.org:4567/leap/soledad:latest
 
 variables:
   DOCKER_DRIVER: overlay
@@ -44,12 +43,14 @@ before_script:
 
 code-check:
   stage: code-check
+  image: 0xacab.org:4567/leap/soledad:latest
   script:
     - cd testing
     - tox -e code-check
 
 tests:
   stage: tests
+  image: 0xacab.org:4567/leap/soledad:latest
   services:
     - couchdb
   script:
@@ -58,6 +59,7 @@ tests:
 
 benchmark:
   stage: benchmark
+  image: 0xacab.org:4567/leap/soledad:latest
   tags:
     - benchmark
   services:
@@ -79,8 +81,8 @@ benchmark:
         --couch-url http://couchdb:5984 -m 'not synchronous' | /usr/bin/ts -s
 
 build_docker_image:
-  image: 0xacab.org:4567/leap/soledad:latest
   stage: build
+  image: 0xacab.org:4567/leap/soledad:latest
   services:
     - docker:dind
   tags:
@@ -110,7 +112,7 @@ package:amd64_jessie:
     LINTIAN_OPTS: "-X filename-length"
   <<: *job_definition
 
-#package:amd64_stretch:
+# package:amd64_stretch:
 #  variables:
 #    ARCH: "amd64"
 #    DIST: "stretch"
