@@ -1,0 +1,3 @@
+# This is to avoid breaking unattended upgrades.
+# However, the previous naming is BAD, and we should deprecate the symlink after a couple of release cycles.
+usr/bin/soledad-create-userdb usr/bin/create-user-db
