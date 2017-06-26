@@ -3,13 +3,15 @@
 # Prevent setuptools/distribute from accessing the internet.
 export http_proxy = http://127.0.0.1:9
 
+export PYBUILD_NAME=leap.soledad
+
 # Uncomment this to turn on verbose mode.
 DH_VERBOSE=1
 
 NAME=soledad-server
 
 %:
-	dh $@ --with python2 --namespace=leap.soledad --with=systemd
+	dh $@ --with python2 --namespace=leap.soledad --buildsystem=pybuild --with=systemd
 
 override_dh_installinit:
 	dh_systemd_enable -p${NAME} --name=${NAME} ${NAME}.service
