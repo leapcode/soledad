@@ -22,7 +22,8 @@ Description: Synchronization of locally encrypted data among devices (server fil
 Package: soledad-common
 Architecture: all
 Provides: leap.soledad.common, ${python:Provides}
-Depends: ${misc:Depends}, ${python:Depends}, python-simplejson, python-six, python-twisted-core (>= 13.0.0)
+Depends: ${misc:Depends}, ${python:Depends}, python-simplejson, python-six, python-twisted-core (>= 13.0.0),
+ python-treq
 Description: Synchronization of locally encrypted data among devices (common files)
  Soledad is the part of LEAP that allows application data to be securely
  shared among devices. It provides, to other parts of the LEAP client, an
@@ -35,8 +36,7 @@ Package: soledad-client
 Architecture: all
 Provides: leap.soledad.client, ${python:Provides}
 Depends: ${misc:Depends}, ${python:Depends}, python-sqlcipher (>= 2.6.3.3+b1),
- python-simplejson, python-scrypt,
- python-dirspec, python-chardet,
+ python-simplejson, python-scrypt, python-dirspec, python-chardet,
 Description: Synchronization of locally encrypted data among devices (client files)
  Soledad is the part of LEAP that allows application data to be securely
  shared among devices. It provides, to other parts of the LEAP client, an
