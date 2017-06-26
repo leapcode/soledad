@@ -1,17 +1,13 @@
 #!/usr/bin/make -f
 
+# Prevent setuptools/distribute from accessing the internet.
+export http_proxy = http://127.0.0.1:9
+
 # Uncomment this to turn on verbose mode.
 #DH_VERBOSE=1
 
 %:
 	dh $@ --with python2 --namespace=leap.soledad
-
-#override_dh_auto_install: 
-	#cd client && python setup.py install --root=../debian/soledad-client
-	#cd common && python setup.py install --root=../debian/soledad-common
-	#cd server &&
-	# --root=../debian/soledad-server
-	#LEAP_SKIP_INIT=1 python setup.py install
 
 override_dh_auto_clean:
 	dh_auto_clean
