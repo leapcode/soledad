@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# _preamble.py
+# preamble.py
 # Copyright (C) 2017 LEAP Encryption Access Project
 #
 # This program is free software: you can redistribute it and/or modify

@@ -86,8 +86,11 @@ from cryptography.hazmat.backends import default_backend
 
 from zope.interface import implementer
 
-from ._preamble import InvalidPreambleException, decode_preamble, Preamble
-from ._preamble import ENC_SCHEME, ENC_METHOD, BLOB_SIGNATURE_MAGIC
+from leap.soledad.common.preamble import InvalidPreambleException
+from leap.soledad.common.preamble import decode_preamble
+from leap.soledad.common.preamble import Preamble
+from leap.soledad.common.preamble import ENC_SCHEME, ENC_METHOD
+from leap.soledad.common.preamble import BLOB_SIGNATURE_MAGIC
 
 
 SECRET_LENGTH = 64
