@@ -78,7 +78,7 @@ benchmark:
     # to an elasticsearch instance
     - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
     - /usr/bin/unbuffer tox --recreate -e benchmark -- \
-        --couch-url http://couchdb:5984 -m 'not synchronous' | /usr/bin/ts -s
+        --couch-url http://couchdb:5984 | /usr/bin/ts -s
 
 build_docker_image:
   stage: build
