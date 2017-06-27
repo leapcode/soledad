@@ -69,11 +69,8 @@ checked during PREAMBLE reading.
 
 import base64
 import hashlib
-import warnings
 import hmac
 import os
-import struct
-import time
 
 from io import BytesIO
 from collections import namedtuple
@@ -89,19 +86,14 @@ from cryptography.hazmat.backends import default_backend
 
 from zope.interface import implementer
 
+from ._preamble import InvalidPreambleException, decode_preamble, Preamble
+from ._preamble import ENC_SCHEME, ENC_METHOD, BLOB_SIGNATURE_MAGIC
+
 
 SECRET_LENGTH = 64
 SEPARATOR = ' '  # Anything that doesn't belong to base64 encoding
 
 CRYPTO_BACKEND = default_backend()
-
-PACMAN = struct.Struct('2sbbQ16s255p255pQ')
-LEGACY_PACMAN = struct.Struct('2sbbQ16s255p255p')
-BLOB_SIGNATURE_MAGIC = '\x13\x37'
-
-
-ENC_SCHEME = namedtuple('SCHEME', 'symkey')(1)
-ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr aes_256_gcm')(1, 2)
 DocInfo = namedtuple('DocInfo', 'doc_id rev')
 
 
@@ -288,18 +280,12 @@ class BlobEncryptor(object):
         return d
 
     def _encode_preamble(self):
-        current_time = int(time.time())
+        scheme = ENC_SCHEME.symkey
+        method = ENC_METHOD.aes_256_gcm
+        content_size = self._content_size
 
-        preamble = PACMAN.pack(
-            BLOB_SIGNATURE_MAGIC,
-            ENC_SCHEME.symkey,
-            ENC_METHOD.aes_256_gcm,
-            current_time,
-            self.iv,
-            str(self.doc_id),
-            str(self.rev),
-            self._content_size)
-        return preamble
+        return Preamble(self.doc_id, self.rev, scheme, method, iv=self.iv,
+                        content_size=content_size).encode()
 
     def _end_crypto_stream_and_encode_result(self):
 
@@ -309,10 +295,10 @@ class BlobEncryptor(object):
         # chunks?
         # FIXME also, it needs to be able to encode chunks with base64 if armor
 
-        preamble, encrypted = self._aes.end()
+        raw_preamble, encrypted = self._aes.end()
         result = BytesIO()
         result.write(
-            base64.urlsafe_b64encode(preamble))
+            base64.urlsafe_b64encode(raw_preamble))
         result.write(SEPARATOR)
 
         if self.armor:
@@ -374,7 +360,7 @@ class BlobDecryptor(object):
         self.fd.seek(0)
         try:
             parts = self.fd.getvalue().split(SEPARATOR, 1)
-            preamble = base64.urlsafe_b64decode(parts[0])
+            encoded_preamble = base64.urlsafe_b64decode(parts[0])
             if len(parts) == 2:
                 ciphertext = parts[1]
                 if self.armor:
@@ -390,40 +376,30 @@ class BlobDecryptor(object):
             raise InvalidBlob
 
         try:
-            if len(preamble) == LEGACY_PACMAN.size:
-                warnings.warn("Decrypting a legacy document without size. " +
-                              "This will be deprecated in 0.12. Doc was: " +
-                              "doc_id: %s rev: %s" % (self.doc_id, self.rev),
-                              Warning)
-                unpacked_data = LEGACY_PACMAN.unpack(preamble)
-                magic, sch, meth, ts, iv, doc_id, rev = unpacked_data
-            elif len(preamble) == PACMAN.size:
-                unpacked_data = PACMAN.unpack(preamble)
-                magic, sch, meth, ts, iv, doc_id, rev, doc_size = unpacked_data
-                self.size = doc_size
-            else:
-                raise InvalidBlob("Unexpected preamble size %d", len(preamble))
-        except struct.error as e:
+            preamble = decode_preamble(encoded_preamble)
+        except InvalidPreambleException as e:
             raise InvalidBlob(e)
 
-        if magic != BLOB_SIGNATURE_MAGIC:
+        if preamble.magic != BLOB_SIGNATURE_MAGIC:
             raise InvalidBlob
         # TODO check timestamp. Just as a sanity check, but for instance
         # we can refuse to process something that is in the future or
         # too far in the past (1984 would be nice, hehe)
-        if sch != ENC_SCHEME.symkey:
-            raise InvalidBlob('Invalid scheme: %s' % sch)
-        if meth != ENC_METHOD.aes_256_gcm:
-            raise InvalidBlob('Invalid encryption scheme: %s' % meth)
-        if rev != self.rev:
+        if preamble.scheme != ENC_SCHEME.symkey:
+            raise InvalidBlob('Invalid scheme: %s' % preamble.scheme)
+        if preamble.method != ENC_METHOD.aes_256_gcm:
+            method = preamble.method
+            raise InvalidBlob('Invalid encryption scheme: %s' % method)
+        if preamble.rev != self.rev:
+            rev = preamble.rev
             msg = 'Invalid revision. Expected: %s, was: %s' % (self.rev, rev)
             raise InvalidBlob(msg)
-        if doc_id != self.doc_id:
+        if preamble.doc_id != self.doc_id:
             msg = 'Invalid doc_id. '
-            + 'Expected: %s, was: %s' % (self.doc_id, doc_id)
+            + 'Expected: %s, was: %s' % (self.doc_id, preamble.doc_id)
             raise InvalidBlob(msg)
 
-        return preamble, iv
+        return encoded_preamble, preamble.iv
 
     def _end_stream(self):
         try:

@@ -34,6 +34,7 @@ from leap.soledad.common.document import SoledadDocument
 from test_soledad.util import BaseSoledadTest
 from leap.soledad.client import _crypto
 from leap.soledad.client import _scrypt
+from leap.soledad.client import _preamble
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -136,8 +137,8 @@ class BlobTestCase(unittest.TestCase):
         ciphertext = base64.urlsafe_b64decode(ciphertext)
         ciphertext = ciphertext[:-16]
 
-        assert len(preamble) == _crypto.PACMAN.size
-        unpacked_data = _crypto.PACMAN.unpack(preamble)
+        assert len(preamble) == _preamble.PACMAN.size
+        unpacked_data = _preamble.PACMAN.unpack(preamble)
         magic, sch, meth, ts, iv, doc_id, rev, _ = unpacked_data
         assert magic == _crypto.BLOB_SIGNATURE_MAGIC
         assert sch == 1
@@ -317,7 +318,7 @@ class PreambleTestCase(unittest.TestCase):
 
     def test_preamble_has_cipher_metadata(self):
         preamble = self.blob._encode_preamble()
-        unpacked = _crypto.PACMAN.unpack(preamble)
+        unpacked = _preamble.PACMAN.unpack(preamble)
         encryption_scheme, encryption_method = unpacked[1:3]
         assert encryption_scheme in _crypto.ENC_SCHEME
         assert encryption_method in _crypto.ENC_METHOD
@@ -325,14 +326,14 @@ class PreambleTestCase(unittest.TestCase):
 
     def test_preamble_has_document_sync_metadata(self):
         preamble = self.blob._encode_preamble()
-        unpacked = _crypto.PACMAN.unpack(preamble)
+        unpacked = _preamble.PACMAN.unpack(preamble)
         doc_id, doc_rev = unpacked[5:7]
         assert doc_id == self.doc_info.doc_id
         assert doc_rev == self.doc_info.rev
 
     def test_preamble_has_document_size(self):
         preamble = self.blob._encode_preamble()
-        unpacked = _crypto.PACMAN.unpack(preamble)
+        unpacked = _preamble.PACMAN.unpack(preamble)
         size = unpacked[7]
         assert size == _crypto._ceiling(len(snowden1))
 
@@ -341,8 +342,8 @@ class PreambleTestCase(unittest.TestCase):
         # XXX: This test case is here only to test backwards compatibility!
         preamble = self.blob._encode_preamble()
         # repack preamble using legacy format, without doc size
-        unpacked = _crypto.PACMAN.unpack(preamble)
-        preamble_without_size = _crypto.LEGACY_PACMAN.pack(*unpacked[0:7])
+        unpacked = _preamble.PACMAN.unpack(preamble)
+        preamble_without_size = _preamble.LEGACY_PACMAN.pack(*unpacked[0:7])
         # encrypt it manually for custom tag
         ciphertext, tag = _aes_encrypt(self.blob.sym_key, self.blob.iv,
                                        self.cleartext.getvalue(),
@@ -359,7 +360,7 @@ class PreambleTestCase(unittest.TestCase):
         assert cleartext.getvalue() == self.cleartext.getvalue()
         warnings = self.flushWarnings()
         assert len(warnings) == 1
-        assert 'legacy document without size' in warnings[0]['message']
+        assert 'legacy preamble without size' in warnings[0]['message']
 
 
 def _aes_encrypt(key, iv, data, aead=''):
