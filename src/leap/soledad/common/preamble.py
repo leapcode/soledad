@@ -33,8 +33,8 @@ from collections import namedtuple
 PACMAN = struct.Struct('2sbbQ16s255p255pQ')
 LEGACY_PACMAN = struct.Struct('2sbbQ16s255p255p')  # DEPRECATED
 BLOB_SIGNATURE_MAGIC = '\x13\x37'
-ENC_SCHEME = namedtuple('SCHEME', 'symkey')(1)
-ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr aes_256_gcm')(1, 2)
+ENC_SCHEME = namedtuple('SCHEME', 'symkey external')(1, 2)
+ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr aes_256_gcm pgp')(1, 2, 3)
 
 
 class InvalidPreambleException(Exception):
