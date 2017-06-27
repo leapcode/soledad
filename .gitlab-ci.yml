@@ -30,7 +30,7 @@ before_script:
     - build-build-package
     # Test the package with lintian
     - build-test-lintian
-    - upload-package
+    - "if [ -n \"${SSH_PRIVATE_KEY}\" ]; then upload-package; fi"
     # sleep 1h to allow debugging of running container
     # - sleep 3600
   artifacts:
