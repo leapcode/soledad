@@ -109,6 +109,8 @@ package:amd64_jessie:
     ARCH: "amd64"
     DIST: "jessie"
     REPONAMES: "platform"
+    # Default is to fail on warnings, we disable it here
+    # unless a manpage is included (see #8895)
     LINTIAN_OPTS: "-X filename-length"
   <<: *job_definition
 
@@ -117,5 +119,7 @@ package:amd64_jessie:
 #    ARCH: "amd64"
 #    DIST: "stretch"
 #    REPONAMES: "platform"
+#    # Default is to fail on warnings, we disable it here
+#    # unless a manpage is included (see #8895)
 #    LINTIAN_OPTS: "-X filename-length"
 #  <<: *job_definition
