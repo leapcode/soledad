@@ -1,3 +1,5 @@
+.. _blobs-spec:
+
 Document attachments
 ====================
 
