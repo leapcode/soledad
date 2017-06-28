@@ -11,7 +11,7 @@ Architecture: all
 Provides: leap.soledad.server, ${python:Provides}
 Depends: ${misc:Depends}, ${python:Depends}, lsb-base (>= 3.0-6), python-configparser, python-couchdb,
  python-simplejson, python-oauth, python-routes, python-six, python-twisted-web (>= 13.0.0-1~bpo70+1),
- python-beaker, sudo
+ python-beaker, sudo, ssl-cert
 Description: Synchronization of locally encrypted data among devices (server files)
  Soledad is the part of LEAP that allows application data to be securely
  shared among devices. It provides, to other parts of the LEAP client, an
