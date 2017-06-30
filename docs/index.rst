@@ -16,6 +16,7 @@ all user's devices that access a LEAP provider.
    client
    server
    attachments
+   tests
    incoming_box
    deprecation
 
