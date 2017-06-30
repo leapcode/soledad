@@ -16,13 +16,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import scrypt
 
 from leap.soledad.common.log import getLogger
 
 from leap.soledad.client._secrets.storage import SecretsStorage
 from leap.soledad.client._secrets.crypto import SecretsCrypto
 from leap.soledad.client._secrets.util import emit, UserDataMixin
+from leap.soledad.client import _scrypt
 
 
 logger = getLogger(__name__)
@@ -121,9 +121,8 @@ class Secrets(UserDataMixin):
     def local_key(self):
         # local storage key is scrypt-derived from `local_secret` and
         # `local_salt` above
-        secret = scrypt.hash(
-            password=self.local_secret,
+        return _scrypt.hash(
+            self.local_secret,
             salt=self.local_salt,
             buflen=32,  # we need a key with 256 bits (32 bytes)
         )
-        return secret

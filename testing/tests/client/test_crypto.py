@@ -33,6 +33,7 @@ from cryptography.exceptions import InvalidTag
 from leap.soledad.common.document import SoledadDocument
 from test_soledad.util import BaseSoledadTest
 from leap.soledad.client import _crypto
+from leap.soledad.client import _scrypt
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -44,6 +45,17 @@ snowden1 = (
     "agencies and not accept the risk. "
     "If they want to get you, over time "
     "they will.")
+
+
+class ScryptTest(unittest.TestCase):
+
+    def test_scrypt(self):
+        secret = 'supersikret'
+        salt = 'randomsalt'
+        key = _scrypt.hash(secret, salt, buflen=32)
+        expected = ('47996b569ea58d51ccbcc318d710'
+                    'a537acd28bb7a94615ab8d061d4b2a920f01')
+        assert binascii.b2a_hex(key) == expected
 
 
 class AESTest(unittest.TestCase):

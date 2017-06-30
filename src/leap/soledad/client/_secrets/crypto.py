@@ -18,13 +18,13 @@
 import binascii
 import json
 import os
-import scrypt
 
 from leap.soledad.common import soledad_assert
 from leap.soledad.common.log import getLogger
 
 from leap.soledad.client._crypto import encrypt_sym, decrypt_sym, ENC_METHOD
 from leap.soledad.client._secrets.util import SecretsError
+from leap.soledad.client import _scrypt
 
 
 logger = getLogger(__name__)
@@ -39,7 +39,7 @@ class SecretsCrypto(object):
 
     def _get_key(self, salt):
         passphrase = self._soledad.passphrase.encode('utf8')
-        key = scrypt.hash(passphrase, salt, buflen=32)
+        key = _scrypt.hash(passphrase, salt, buflen=32)
         return key
 
     #

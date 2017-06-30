@@ -1,3 +1,24 @@
+Changelog
+=========
+
+0.10.0 - `master`_
++++++++++++++++++++++++++++++++
+
+.. note:: This version is not yet released and is under active development.
+
+Client
+~~~~~~
+
+- `#8472 <https://0xacab.org/leap/soledad/issues/8472>`_: Use OpenSSL backend for scrypt if OpenSSL >= 1.1
+
+Misc
+~~~~
+
+- Unification of Client, Server and Common in a Single python package.
+
+
+
+
 0.9.6 - 31 May, 2017
 +++++++++++++++++++++++++++++++
 
@@ -235,3 +256,6 @@ Features
 Bugfixes
 ~~~~~~~~
 - `#7626 <https://leap.se/code/issues/7626>`_: Subclass a leaky leap.common.couch exception to avoid depending on couch.
+
+
+.. _`master`: https://0xacab.org/leap/soledad
