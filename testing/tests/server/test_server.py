@@ -40,6 +40,7 @@ from leap.soledad.client import _crypto
 from leap.soledad.client import Soledad
 
 
+@pytest.mark.needs_couch
 @pytest.mark.usefixtures("method_tmpdir")
 class EncryptedSyncTestCase(
         CouchDBTestCase, TestCaseWithServer):

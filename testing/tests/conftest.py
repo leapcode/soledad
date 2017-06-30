@@ -16,6 +16,14 @@ from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.client import Soledad
 
 
+# mark tests that depend on couchdb
+def pytest_collection_modifyitems(items):
+    marker = getattr(pytest.mark, 'needs_couch')
+    for item in items:
+        if 'soledad/testing/tests/couch/' in item.module.__file__:
+            item.add_marker(marker)
+
+
 #
 # default options for all tests
 #

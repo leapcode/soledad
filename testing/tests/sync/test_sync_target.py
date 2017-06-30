@@ -20,6 +20,7 @@ Test Leap backend bits: sync target
 import os
 import time
 import json
+import pytest
 import random
 import string
 import shutil
@@ -148,6 +149,7 @@ def make_local_db_and_token_soledad_target(
     return db, st
 
 
+@pytest.mark.needs_couch
 class TestSoledadSyncTarget(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
@@ -401,6 +403,7 @@ target_scenarios = [
 ]
 
 
+@pytest.mark.needs_couch
 class SoledadDatabaseSyncTargetTests(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
@@ -795,6 +798,7 @@ class SyncTimeoutError(Exception):
     pass
 
 
+@pytest.mark.needs_couch
 class TestSoledadDbSync(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
@@ -952,6 +956,7 @@ class TestSoledadDbSync(
         return d
 
 
+@pytest.mark.needs_couch
 class SQLCipherSyncTargetTests(SoledadDatabaseSyncTargetTests):
 
     # TODO: implement _set_trace_hook(_shallow) in SoledadHTTPSyncTarget so

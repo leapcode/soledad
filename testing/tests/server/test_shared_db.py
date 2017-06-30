@@ -28,6 +28,7 @@ from leap.soledad.common.document import SoledadDocument
 from leap.soledad.common.l2db.errors import RevisionConflict
 
 
+@pytest.mark.needs_couch
 class SharedDbTests(unittest.TestCase):
     """
     """

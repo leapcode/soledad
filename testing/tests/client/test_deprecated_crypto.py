@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from pytest import inlineCallbacks
 from six.moves.urllib.parse import urljoin
@@ -40,6 +41,7 @@ class DeprecatedCryptoTest(SoledadWithCouchServerMixin, TestCaseWithServer):
     def make_app_with_state(state):
         return make_token_soledad_app(state)
 
+    @pytest.mark.needs_couch
     @inlineCallbacks
     def test_touch_updates_remote_representation(self):
         self.startTwistedServer()

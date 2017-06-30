@@ -22,6 +22,7 @@ be two concurrent synchronization processes at the same time.
 """
 
 
+import pytest
 import time
 import uuid
 
@@ -72,6 +73,7 @@ SoledadSynchronizer.sync = _timed_sync
 # -- end of monkey-patching
 
 
+@pytest.mark.needs_couch
 class TestSyncMutex(
         BaseSoledadTest, CouchDBTestCase, TestCaseWithServer):
 

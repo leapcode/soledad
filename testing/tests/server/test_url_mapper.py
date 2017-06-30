@@ -17,6 +17,7 @@
 """
 Tests for server-related functionality.
 """
+import pytest
 
 from twisted.trial import unittest
 from uuid import uuid4
@@ -49,6 +50,7 @@ class URLMapperTestCase(unittest.TestCase):
         self._urlmap = URLMapper()
         self._dbname = 'user-%s' % self._uuid
 
+    @pytest.mark.needs_couch
     def test_root_authorized(self):
         match = self._urlmap.match('/', 'GET')
         self.assertIsNotNone(match)

@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
+import pytest
 import threading
 import time
 
@@ -141,6 +142,7 @@ class InterruptableSyncTestCase(
         return d
 
 
+@pytest.mark.needs_couch
 class TestSoledadDbSync(
         TestWithScenarios,
         SoledadWithCouchServerMixin,
