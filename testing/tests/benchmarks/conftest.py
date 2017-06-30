@@ -88,7 +88,7 @@ def txbenchmark_with_setup(monitored_benchmark_with_setup):
 
 class ResourceWatcher(threading.Thread):
 
-    sampling_interval = 1
+    sampling_interval = 0.1
 
     def __init__(self):
         threading.Thread.__init__(self)
