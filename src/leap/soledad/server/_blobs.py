@@ -237,3 +237,23 @@ if __name__ == '__main__':
     factory = Site(root)
     reactor.listenTCP(args.port, factory)
     reactor.run()
+
+
+class BlobsServerState(object):
+    """
+    Given a backend name, it gives a instance of IBlobsBackend
+    """
+    # Allowed backend classes are defined here
+    handlers = {"filesystem": FilesystemBlobsBackend}
+
+    def __init__(self, backend, **backend_kwargs):
+        if backend not in self.handlers:
+            raise ImproperlyConfiguredException("No such backend: %s", backend)
+        self.backend = self.handlers[backend](**backend_kwargs)
+
+    def open_database(self, user_id):
+        """
+        That method is just for compatibility with CouchServerState, so
+        IncomingAPI can change backends.
+        """
+        return self.backend

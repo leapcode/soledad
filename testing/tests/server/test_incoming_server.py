@@ -20,36 +20,46 @@ Integration tests for incoming API
 import pytest
 from io import BytesIO
 from uuid import uuid4
+from twisted.web.test.test_web import DummyRequest
 from twisted.web.server import Site
 from twisted.internet import reactor
 from twisted.internet import defer
 import treq
 
 from leap.soledad.server._incoming import IncomingResource
+from leap.soledad.server._blobs import BlobsServerState
 from leap.soledad.server._incoming import IncomingFormatter
 from leap.soledad.common.crypto import EncryptionSchemes
 from test_soledad.util import CouchServerStateForTests
 from test_soledad.util import CouchDBTestCase
 
 
-class IncomingServerTestCase(CouchDBTestCase):
+class IncomingOnCouchServerTestCase(CouchDBTestCase):
 
     def setUp(self):
-        self.state = CouchServerStateForTests(self.couch_url)
+        self.port = None
+
+    def tearDown(self):
+        if self.port:
+            self.port.stopListening()
+
+    def prepare(self, backend):
+        self.user_id = 'user-' + uuid4().hex
+        if backend == 'couch':
+            self.state = CouchServerStateForTests(self.couch_url)
+            self.state.ensure_database(self.user_id)
+        else:
+            self.state = BlobsServerState(backend)
         root = IncomingResource(self.state)
         site = Site(root)
         self.port = reactor.listenTCP(0, site, interface='127.0.0.1')
         self.host = self.port.getHost()
         self.uri = 'http://%s:%s/' % (self.host.host, self.host.port)
-        self.user_id = 'user-' + uuid4().hex
-        self.state.ensure_database(self.user_id)
-
-    def tearDown(self):
-        self.port.stopListening()
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_put_incoming_creates_a_document(self):
+    def test_put_incoming_creates_a_document_using_couch(self):
+        self.prepare('couch')
         user_id, doc_id = self.user_id, uuid4().hex
         content, scheme = 'Hi', EncryptionSchemes.PUBKEY
         formatter = IncomingFormatter()
@@ -59,3 +69,19 @@ class IncomingServerTestCase(CouchDBTestCase):
 
         doc = db.get_doc(doc_id)
         self.assertEquals(doc.content, formatter.format(content, scheme))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_put_incoming_creates_a_blob_using_filesystem(self):
+        self.prepare('filesystem')
+        user_id, doc_id = self.user_id, uuid4().hex
+        content = 'Hi'
+        formatter = IncomingFormatter()
+        incoming_endpoint = self.uri + '%s/%s' % (user_id, doc_id)
+        yield treq.put(incoming_endpoint, BytesIO(content), persistent=False)
+
+        db = self.state.open_database(user_id)
+        request = DummyRequest([user_id, doc_id])
+        yield db.read_blob(user_id, doc_id, request, 'incoming')
+        expected = formatter.preamble(content, doc_id) + content
+        self.assertEquals(expected, request.written[0])
