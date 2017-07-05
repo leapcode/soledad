@@ -1,16 +1,19 @@
 #!/bin/bash -x
 #
-# Go backwards in git history and run benchmark tests
+# Go backwards in git history and run benchmark tests.
+#
 # Export PYTEST_OPTS so pytest will post metrics to an elasticsearch
 # instance, i.e.
 #
 #     export PYTEST_OPTS='--benchmark-autosave --benchmark-storage="elasticsearch+https://USER:PASSWORD@moose.leap.se:9200"'
+#
 # or, for testing a single test group:
+#
 #     export PYTEST_OPTS='--benchmark-autosave --benchmark-storage="elasticsearch+https://USER:PASSWORD@moose.leap.se:9200" -m benchmark_test_instance'
 #
 # Todo
 #
-#   - Error handling. This script is dump and will run forever.
+#   - Error handling. This script is dumb and will run forever.
 
 # Too many commits just fail for different reasons,
 # so we just benchmark thoses that succeed.
@@ -56,5 +59,11 @@ do
   git show | head -6
   echo
 
+  # checkout next commit
   git reset --hard HEAD^
+
+  # stop if we reached the first commit in the repo
+  if [ $? -ne 0 ]; then
+    break
+  fi
 done
