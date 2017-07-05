@@ -86,9 +86,9 @@ benchmark:
         testing/tests/benchmarks/conftest.py
         testing/tests/conftest.py
         testing/check-pysqlcipher.py
-    - git checkout leap/benchmark-all-commits tune-adbapi-parameters.sh
+    - git checkout leap/benchmark-all-commits scripts/benchmark/tune-adbapi-parameters.sh
     # ensure larger timeout and more retries for async/concurrent sqlcipher access
-    - ./tune-adbapi-parameters.sh
+    - ./scripts/benchmark/tune-adbapi-parameters.sh
     - git status
     - git show -s --pretty=fuller
     - cd testing
