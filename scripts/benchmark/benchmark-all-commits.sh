@@ -23,6 +23,8 @@
 
 #rm -rf testing/.tox
 
+echo "$(date -Iseconds) Starting a new run of ${0}..." >> results.txt
+
 while /bin/true
 do
 
@@ -67,3 +69,5 @@ do
     break
   fi
 done
+
+echo "$(date -Iseconds) Finished the run of ${0}..." >> results.txt
