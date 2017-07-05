@@ -71,8 +71,11 @@ benchmark:
     # By default, gitlab-runner will checkout in a detached HEAD
     # (see https://gitlab.com/gitlab-org/gitlab-ce/issues/19421)
     # We want pytest-benchmark to report the proper branch name,
-    # so we make sure we stay at the current branch
-    - git checkout -B "$CI_BUILD_REF_NAME" "$CI_BUILD_REF"
+    # so we make sure we stay at the current branch.
+    # Also, variable names have changed in latest version of gitlab,
+    # but the doc seems to be outdated (see also
+    # https://docs.gitlab.com/ce/ci/variables/README.html).
+    - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_REF"
     # Gitlab will checkout current revision as master / origin/master
     # We need some files from the "furure" in order to post the right
     # benchmarking data to elasticsearch.
