@@ -19,6 +19,7 @@ all user's devices that access a LEAP provider.
    tests
    incoming_box
    deprecation
+   benchmarks
 
 Indices and tables
 ==================
