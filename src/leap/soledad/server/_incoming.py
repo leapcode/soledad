@@ -40,6 +40,10 @@ def _get_backend_from_config():
     return CouchServerState(conf['couch_url'])
 
 
+def uses_legacy(db):
+    return hasattr(db, 'put_doc')
+
+
 class IncomingResource(Resource):
     isLeaf = True
 
@@ -51,7 +55,7 @@ class IncomingResource(Resource):
         uuid, doc_id = request.postpath
         scheme = EncryptionSchemes.PUBKEY
         db = self.factory.open_database(uuid)
-        if hasattr(db, 'put_doc'):
+        if uses_legacy(db):
             doc = ServerDocument(doc_id)
             doc.content = self.formatter.format(request.content.read(), scheme)
             db.put_doc(doc)

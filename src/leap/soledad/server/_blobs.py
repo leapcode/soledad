@@ -256,4 +256,5 @@ class BlobsServerState(object):
         That method is just for compatibility with CouchServerState, so
         IncomingAPI can change backends.
         """
+        # TODO: deprecate/refactor it as it's here for compatibility.
         return self.backend
