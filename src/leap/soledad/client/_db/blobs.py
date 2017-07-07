@@ -240,7 +240,7 @@ class BlobManager(object):
             logger.error('sorry, dunno what happened')
 
     @defer.inlineCallbacks
-    def _encrypt_and_upload(self, blob_id, fd):
+    def _encrypt_and_upload(self, blob_id, fd, **params):
         # TODO ------------------------------------------
         # this is wrong, is doing 2 stages.
         # the crypto producer can be passed to
@@ -254,7 +254,7 @@ class BlobManager(object):
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=False)
         fd = yield crypter.encrypt()
-        response = yield self._client.put(uri, data=fd)
+        response = yield self._client.put(uri, data=fd, params=params)
         check_http_status(response.code)
         logger.info("Finished upload: %s" % (blob_id,))
 

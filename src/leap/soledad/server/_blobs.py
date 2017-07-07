@@ -184,23 +184,24 @@ class BlobsResource(resource.Resource):
 
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
-        user, blob_id = self._validate(request)
+        user, blob_id, namespace = self._validate(request)
         if not blob_id:
             order = request.args.get('order_by', [None])[0]
-            return self._handler.list_blobs(user, request, order_by=order)
+            return self._handler.list_blobs(user, request, namespace,
+                                            order_by=order)
         self._handler.add_tag_header(user, blob_id, request)
-        return self._handler.read_blob(user, blob_id, request)
+        return self._handler.read_blob(user, blob_id, request, namespace)
 
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)
-        user, blob_id = self._validate(request)
-        self._handler.delete_blob(user, blob_id)
+        user, blob_id, namespace = self._validate(request)
+        self._handler.delete_blob(user, blob_id, namespace)
         return ''
 
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)
-        user, blob_id = self._validate(request)
-        d = self._handler.write_blob(user, blob_id, request)
+        user, blob_id, namespace = self._validate(request)
+        d = self._handler.write_blob(user, blob_id, request, namespace)
         d.addCallback(lambda _: request.finish())
         d.addErrback(self._error, request)
         return NOT_DONE_YET
@@ -214,7 +215,10 @@ class BlobsResource(resource.Resource):
         for arg in request.postpath:
             if arg and not VALID_STRINGS.match(arg):
                 raise Exception('Invalid blob resource argument: %s' % arg)
-        return request.postpath
+        namespace = request.args.get('namespace', [''])[0]
+        if namespace and not VALID_STRINGS.match(namespace):
+            raise Exception('Invalid blob namespace: %s' % namespace)
+        return request.postpath + [namespace]
 
 
 if __name__ == '__main__':
