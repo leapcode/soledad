@@ -17,6 +17,7 @@
 """
 Integration tests for blobs server
 """
+import os
 import pytest
 from io import BytesIO
 from twisted.trial import unittest
@@ -63,6 +64,26 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         blobs_list = yield manager.remote_list()
         self.assertEquals(set(['blob_id1', 'blob_id2']), set(blobs_list))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_list_orders_by_date(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        yield manager._encrypt_and_upload('blob_id1', BytesIO("1"))
+        yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
+        blobs_list = yield manager.remote_list(order_by='date')
+        self.assertEquals(['blob_id1', 'blob_id2'], blobs_list)
+        self.__touch(self.tempdir, 'user', 'b', 'blo', 'blob_i', 'blob_id1')
+        blobs_list = yield manager.remote_list(order_by='+date')
+        self.assertEquals(['blob_id2', 'blob_id1'], blobs_list)
+        blobs_list = yield manager.remote_list(order_by='-date')
+        self.assertEquals(['blob_id1', 'blob_id2'], blobs_list)
+
+    def __touch(self, *args):
+        path = os.path.join(*args)
+        with open(path, 'a'):
+            os.utime(path, None)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")

@@ -102,11 +102,16 @@ class FilesystemBlobsBackend(object):
     def get_blob_size(user, blob_id, namespace=''):
         raise NotImplementedError
 
-    def list_blobs(self, user, request, namespace=''):
+    def list_blobs(self, user, request, namespace='', order_by=None):
         blob_ids = []
         base_path = self._get_path(user, custom_preffix=namespace)
-        for _, _, filenames in os.walk(base_path):
-            blob_ids += filenames
+        for root, dirs, filenames in os.walk(base_path):
+            blob_ids += [os.path.join(root, name) for name in filenames]
+        if order_by in ['date', '+date']:
+            blob_ids.sort(key=lambda x: os.path.getmtime(x))
+        elif order_by == '-date':
+            blob_ids.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        blob_ids = [os.path.basename(path) for path in blob_ids]
         return json.dumps(blob_ids)
 
     def get_total_storage(self, user):
@@ -181,7 +186,8 @@ class BlobsResource(resource.Resource):
         logger.info("http get: %s" % request.path)
         user, blob_id = self._validate(request)
         if not blob_id:
-            return self._handler.list_blobs(user, request)
+            order = request.args.get('order_by', [None])[0]
+            return self._handler.list_blobs(user, request, order_by=order)
         self._handler.add_tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request)
 

@@ -106,7 +106,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
     @mock.patch('leap.soledad.server._blobs.os.walk')
     def test_list_blobs(self, walk_mock):
         backend, _ = _blobs.FilesystemBlobsBackend(self.tempdir), None
-        walk_mock.return_value = [(_, _, ['blob_0']), (_, _, ['blob_1'])]
+        walk_mock.return_value = [('', _, ['blob_0']), ('', _, ['blob_1'])]
         result = json.loads(backend.list_blobs('user', DummyRequest([''])))
         self.assertEquals(result, ['blob_0', 'blob_1'])
 
@@ -114,7 +114,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
     @mock.patch('leap.soledad.server._blobs.os.walk')
     def test_list_blobs_limited_by_namespace(self, walk_mock):
         backend, _ = _blobs.FilesystemBlobsBackend(self.tempdir), None
-        walk_mock.return_value = [(_, _, ['blob_0']), (_, _, ['blob_1'])]
+        walk_mock.return_value = [('', _, ['blob_0']), ('', _, ['blob_1'])]
         result = json.loads(backend.list_blobs('user', DummyRequest(['']),
                                                namespace='incoming'))
         self.assertEquals(result, ['blob_0', 'blob_1'])

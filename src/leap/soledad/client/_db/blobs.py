@@ -167,9 +167,9 @@ class BlobManager(object):
             return self.local.close()
 
     @defer.inlineCallbacks
-    def remote_list(self):
+    def remote_list(self, **params):
         uri = urljoin(self.remote, self.user + '/')
-        data = yield self._client.get(uri)
+        data = yield self._client.get(uri, params=params)
         defer.returnValue((yield data.json()))
 
     def local_list(self):
