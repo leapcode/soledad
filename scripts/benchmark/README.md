@@ -16,6 +16,8 @@ So what this script does is the following:
 
   - check out .gitlab-ci.yml from current master.
   - use gitlab-runner to exec a build locally.
+  - set an environment variable (BENCHMARK_ALL_COMMITS=1)so the build script
+    knows that it has to setup the environment.
   - store timestamp and exit status of each run.
   - checkout previous commit and iterate.
 

@@ -45,8 +45,8 @@ do
   #git checkout testing/tox.ini testing/tests/benchmarks/conftest.py testing/tests/conftest.py
 
   # Option 2: Run couchdb + tox in docker container using gitlab-runner
-  git checkout origin/benchmark-all-commits .gitlab-ci.yml
-  time gitlab-runner exec docker \
+  git checkout origin/master .gitlab-ci.yml
+  BENCHMARK_ALL_COMMITS=1 time gitlab-runner exec docker \
     benchmark \
     --timeout 7200 \
     --env PYTEST_OPTS="$PYTEST_OPTS" \

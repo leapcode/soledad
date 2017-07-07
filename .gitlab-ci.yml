@@ -66,33 +66,10 @@ benchmark:
     - benchmark
   services:
     - couchdb
-  allow_failure: true
   script:
-    # By default, gitlab-runner will checkout in a detached HEAD
-    # (see https://gitlab.com/gitlab-org/gitlab-ce/issues/19421)
-    # We want pytest-benchmark to report the proper branch name,
-    # so we make sure we stay at the current branch.
-    # Also, variable names have changed in latest version of gitlab,
-    # but the doc seems to be outdated (see also
-    # https://docs.gitlab.com/ce/ci/variables/README.html).
-    - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_REF"
-    # Gitlab will checkout current revision as master / origin/master
-    # We need some files from the "furure" in order to post the right
-    # benchmarking data to elasticsearch.
-    - git remote add leap https://leap.se/git/soledad
-    - git fetch leap
-    - git checkout leap/master
-        testing/tox.ini
-        testing/tests/benchmarks/conftest.py
-        testing/tests/conftest.py
-        testing/check-pysqlcipher.py
-    - git checkout leap/benchmark-all-commits scripts/benchmark/tune-adbapi-parameters.sh
-    # ensure larger timeout and more retries for async/concurrent sqlcipher access
-    - ./scripts/benchmark/tune-adbapi-parameters.sh
-    - git status
-    - git show -s --pretty=fuller
     - cd testing
     - curl -s couchdb:5984
+    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
     # You can provide a $NETRC variable containing the creds for your
     # elasticsearch instance so it's protected from being leaked in the
     # CI console
