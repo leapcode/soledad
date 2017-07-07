@@ -22,14 +22,6 @@ server.ensure_server()
 # pytest customizations
 #
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--watch-resources", default=False, action="store_true",
-        help="whether to monitor CPU and memory percentages during test run. "
-             "**Warning**: enabling this will impact the time taken by the "
-             "benchmarked code, so use with caution!")
-
-
 # mark benchmark tests using their group names (thanks ionelmc! :)
 def pytest_collection_modifyitems(items):
     for item in items:
