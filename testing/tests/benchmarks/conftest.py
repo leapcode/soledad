@@ -24,8 +24,10 @@ server.ensure_server()
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--num-docs", type="int", default=100,
-        help="the number of documents to use in performance tests")
+        "--watch-resources", default=False, action="store_true",
+        help="whether to monitor CPU and memory percentages during test run. "
+             "**Warning**: enabling this will impact the time taken by the "
+             "benchmarked code, so use with caution!")
 
 
 # mark benchmark tests using their group names (thanks ionelmc! :)
@@ -139,12 +141,21 @@ def _monitored_benchmark(benchmark_fixture, benchmark_function,
     })
 
 
-@pytest.fixture
-def monitored_benchmark(benchmark):
-    return functools.partial(_monitored_benchmark, benchmark, benchmark)
+def _watch_resources(request):
+    return request.config.getoption('--watch-resources')
 
 
 @pytest.fixture
-def monitored_benchmark_with_setup(benchmark):
+def monitored_benchmark(benchmark, request):
+    if not _watch_resources(request):
+        return benchmark
+    return functools.partial(
+        _monitored_benchmark, benchmark, benchmark)
+
+
+@pytest.fixture
+def monitored_benchmark_with_setup(benchmark, request):
+    if not _watch_resources(request):
+        return benchmark.pedantic
     return functools.partial(
         _monitored_benchmark, benchmark, benchmark.pedantic)
