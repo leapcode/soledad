@@ -22,7 +22,7 @@ def build_test_sqlcipher_async_create(amount, size):
 
 
 def build_test_sqlcipher_create(amount, size):
-    @pytest.mark.synchronous
+    @pytest.mark.skip(reason="this test is lengthy and not a real use case")
     @pytest.mark.benchmark(group="test_sqlcipher_create")
     def test(soledad_client, monitored_benchmark, payload):
         client = soledad_client()._dbsyncer

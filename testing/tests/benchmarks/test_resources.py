@@ -1,3 +1,4 @@
+import pytest
 import random
 import time
 
@@ -22,6 +23,7 @@ def bellardBig(n):
     return pi
 
 
+@pytest.mark.skip(reason='not a real use case, used only for instrumentation')
 def test_cpu_intensive(monitored_benchmark):
 
     def _cpu_intensive():
@@ -34,6 +36,7 @@ def test_cpu_intensive(monitored_benchmark):
     monitored_benchmark(_cpu_intensive)
 
 
+@pytest.mark.skip(reason='not a real use case, used only for instrumentation')
 def test_memory_intensive(monitored_benchmark):
 
     def _memory_intensive():
