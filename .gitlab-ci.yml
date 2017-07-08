@@ -67,9 +67,9 @@ benchmark:
   services:
     - couchdb
   script:
+    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
     - cd testing
     - curl -s couchdb:5984
-    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
     # You can provide a $NETRC variable containing the creds for your
     # elasticsearch instance so it's protected from being leaked in the
     # CI console
