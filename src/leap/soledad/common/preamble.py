@@ -15,9 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Preamble is a metadata payload present on encrypted documents. It holds data
-about encryption scheme, iv, document id and sync related data.
-   BLOB_SIGNATURE_MAGIC, -> used to differentiate from other data formats
+Preamble is a binary packed metadata payload present on encrypted documents. It
+holds data about encryption scheme, iv, document id and sync related data.
+   MAGIC, -> used to differentiate from other data formats
    ENC_SCHEME, -> cryptographic scheme (symmetric or asymmetric)
    ENC_METHOD, -> cipher used, such as AES-GCM or AES-CTR or GPG
    current_time, -> time.time()
@@ -32,7 +32,7 @@ import time
 from collections import namedtuple
 PACMAN = struct.Struct('2sbbQ16s255p255pQ')
 LEGACY_PACMAN = struct.Struct('2sbbQ16s255p255p')  # DEPRECATED
-BLOB_SIGNATURE_MAGIC = '\x13\x37'
+MAGIC = '\x13\x37'
 ENC_SCHEME = namedtuple('SCHEME', 'symkey external')(1, 2)
 ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr aes_256_gcm pgp')(1, 2, 3)
 
@@ -41,7 +41,7 @@ class InvalidPreambleException(Exception):
     pass
 
 
-class Preamble:
+class Preamble(object):
 
     def __init__(self, doc_id, rev, scheme, method,
                  timestamp=0, iv='', magic=None, content_size=0):
@@ -51,7 +51,7 @@ class Preamble:
         self.method = method
         self.iv = iv
         self.timestamp = int(timestamp) or int(time.time())
-        self.magic = magic or BLOB_SIGNATURE_MAGIC
+        self.magic = magic or MAGIC
         self.content_size = int(content_size)
 
     def encode(self):

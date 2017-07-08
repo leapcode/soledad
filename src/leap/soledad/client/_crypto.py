@@ -33,7 +33,7 @@ Encryption
 ----------
 
 IV = os.urandom(16)
-PREAMBLE = BLOB_SIGNATURE_MAGIC, ENC_SCHEME, ENC_METHOD, time, IV, doc_id, rev,
+PREAMBLE = MAGIC, ENC_SCHEME, ENC_METHOD, time, IV, doc_id, rev,
 and size.
 
 PREAMBLE = base64_encoded(PREAMBLE)
@@ -90,7 +90,7 @@ from leap.soledad.common.preamble import InvalidPreambleException
 from leap.soledad.common.preamble import decode_preamble
 from leap.soledad.common.preamble import Preamble
 from leap.soledad.common.preamble import ENC_SCHEME, ENC_METHOD
-from leap.soledad.common.preamble import BLOB_SIGNATURE_MAGIC
+from leap.soledad.common.preamble import MAGIC
 
 
 SECRET_LENGTH = 64
@@ -383,7 +383,7 @@ class BlobDecryptor(object):
         except InvalidPreambleException as e:
             raise InvalidBlob(e)
 
-        if preamble.magic != BLOB_SIGNATURE_MAGIC:
+        if preamble.magic != MAGIC:
             raise InvalidBlob
         # TODO check timestamp. Just as a sanity check, but for instance
         # we can refuse to process something that is in the future or

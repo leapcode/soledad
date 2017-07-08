@@ -140,7 +140,7 @@ class BlobTestCase(unittest.TestCase):
         assert len(preamble) == _preamble.PACMAN.size
         unpacked_data = _preamble.PACMAN.unpack(preamble)
         magic, sch, meth, ts, iv, doc_id, rev, _ = unpacked_data
-        assert magic == _crypto.BLOB_SIGNATURE_MAGIC
+        assert magic == _crypto.MAGIC
         assert sch == 1
         assert meth == _crypto.ENC_METHOD.aes_256_gcm
         assert iv == self.blob.iv
@@ -314,7 +314,7 @@ class PreambleTestCase(unittest.TestCase):
 
     def test_preamble_starts_with_magic_signature(self):
         preamble = self.blob._encode_preamble()
-        assert preamble.startswith(_crypto.BLOB_SIGNATURE_MAGIC)
+        assert preamble.startswith(_crypto.MAGIC)
 
     def test_preamble_has_cipher_metadata(self):
         preamble = self.blob._encode_preamble()
