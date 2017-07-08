@@ -49,9 +49,11 @@ class IBlobsBackend(Interface):
         Get the size of the given blob id.
         """
 
-    def list_blobs(user, request, namespace=''):
+    def list_blobs(user, request, namespace='', order_by=None):
         """
-        Returns a json-encoded list of ids from user's blob.
+        Returns a json-encoded list of ids from user's blobs storage,
+        optionally ordered by order_by parameter and optionally restricted by
+        namespace.
 
         :returns: a deferred that fires upon finishing.
         """

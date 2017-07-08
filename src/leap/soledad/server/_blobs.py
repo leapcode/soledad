@@ -111,6 +111,8 @@ class FilesystemBlobsBackend(object):
             blob_ids.sort(key=lambda x: os.path.getmtime(x))
         elif order_by == '-date':
             blob_ids.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        elif order_by:
+            raise Exception("Unsupported order_by parameter: %s" % order_by)
         blob_ids = [os.path.basename(path) for path in blob_ids]
         return json.dumps(blob_ids)
 
