@@ -153,14 +153,19 @@ class FilesystemBackendTestCase(unittest.TestCase):
     def test_delete_blob(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
         backend.delete_blob('user', 'blob_id')
-        unlink_mock.assert_called_once_with(backend._get_path('user',
-                                                              'blob_id'))
+        unlink_mock.assert_any_call(backend._get_path('user',
+                                                      'blob_id'))
+        unlink_mock.assert_any_call(backend._get_path('user',
+                                                      'blob_id') + '.flags')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.unlink')
     def test_delete_blob_custom_namespace(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
         backend.delete_blob('user', 'blob_id', namespace='trash')
-        unlink_mock.assert_called_once_with(backend._get_path('user',
-                                                              'blob_id',
-                                                              'trash'))
+        unlink_mock.assert_any_call(backend._get_path('user',
+                                                      'blob_id',
+                                                      'trash'))
+        unlink_mock.assert_any_call(backend._get_path('user',
+                                                      'blob_id',
+                                                      'trash') + '.flags')

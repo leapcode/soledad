@@ -22,6 +22,7 @@ from urlparse import urljoin
 
 import binascii
 import os
+import json
 import base64
 
 from io import BytesIO
@@ -54,6 +55,10 @@ FIXED_REV = 'ImmutableRevision'  # Blob content is immutable
 
 
 class BlobAlreadyExistsError(SoledadError):
+    pass
+
+
+class InvalidFlagsError(SoledadError):
     pass
 
 
@@ -106,6 +111,8 @@ class ConnectionPool(adbapi.ConnectionPool):
 def check_http_status(code):
     if code == 409:
         raise BlobAlreadyExistsError()
+    elif code == 406:
+        raise InvalidFlagsError()
     elif code != 200:
         raise SoledadError("Server Error")
 
@@ -212,6 +219,24 @@ class BlobManager(object):
         # handle gets forwarded into a write on the connection handle
         fd = yield self.local.get(doc.blob_id)
         yield self._encrypt_and_upload(doc.blob_id, fd)
+
+    @defer.inlineCallbacks
+    def set_flags(self, blob_id, flags, **params):
+        flags = BytesIO(json.dumps(flags))
+        uri = urljoin(self.remote, self.user + "/" + blob_id)
+        response = yield self._client.post(uri, data=flags, params=params)
+        check_http_status(response.code)
+
+    @defer.inlineCallbacks
+    def get_flags(self, blob_id, **params):
+        uri = urljoin(self.remote, self.user + "/" + blob_id)
+        params.update({'only_flags': True})
+        data = yield self._client.get(uri, params=params)
+        try:
+            data = yield data.json()
+        except:
+            data = []
+        defer.returnValue(data)
 
     @defer.inlineCallbacks
     def get(self, blob_id):

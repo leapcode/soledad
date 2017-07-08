@@ -26,9 +26,11 @@ from twisted.internet import reactor
 from twisted.internet import defer
 from treq._utils import set_global_pool
 
+from leap.soledad.common.blobs import Flags
 from leap.soledad.server import _blobs as server_blobs
 from leap.soledad.client._db.blobs import BlobManager
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
+from leap.soledad.client._db.blobs import InvalidFlagsError
 
 
 class BlobServerTestCase(unittest.TestCase):
@@ -54,6 +56,50 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._encrypt_and_upload('blob_id', fd)
         blob, size = yield manager._download_and_decrypt('blob_id')
         self.assertEquals(blob.getvalue(), "save me")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_set_get_flags(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        fd = BytesIO("flag me")
+        yield manager._encrypt_and_upload('blob_id', fd)
+        yield manager.set_flags('blob_id', [Flags.PROCESSING])
+        flags = yield manager.get_flags('blob_id')
+        self.assertEquals([Flags.PROCESSING], flags)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_cant_set_invalid_flags(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        fd = BytesIO("flag me")
+        yield manager._encrypt_and_upload('blob_id', fd)
+        with pytest.raises(InvalidFlagsError):
+            yield manager.set_flags('blob_id', ['invalid'])
+        flags = yield manager.get_flags('blob_id')
+        self.assertEquals([], flags)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_empty_flags(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        fd = BytesIO("flag me")
+        yield manager._encrypt_and_upload('blob_id', fd)
+        flags = yield manager.get_flags('blob_id')
+        self.assertEquals([], flags)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_flags_ignored_by_listing(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        fd = BytesIO("flag me")
+        yield manager._encrypt_and_upload('blob_id', fd)
+        yield manager.set_flags('blob_id', [Flags.PROCESSING])
+        blobs_list = yield manager.remote_list()
+        self.assertEquals(['blob_id'], blobs_list)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")

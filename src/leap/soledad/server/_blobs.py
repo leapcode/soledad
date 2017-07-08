@@ -40,6 +40,7 @@ from zope.interface import implementer
 
 from leap.common.files import mkdir_p
 from leap.soledad.server import interfaces
+from leap.soledad.common.blobs import ACCEPTED_FLAGS
 
 
 __all__ = ['BlobsResource']
@@ -73,6 +74,40 @@ class FilesystemBlobsBackend(object):
         _file = static.File(path, defaultType='application/octet-stream')
         return _file.render_GET(request)
 
+    def get_flags(self, user, blob_id, request, namespace=''):
+        path = self._get_path(user, blob_id, namespace)
+        try:
+            mkdir_p(os.path.split(path)[0])
+        except OSError:
+            pass
+        if not os.path.isfile(path):
+            # 404 - Not Found
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
+        if not os.path.isfile(path + '.flags'):
+            return '[]'
+        with open(path + '.flags', 'r') as flags_file:
+            return flags_file.read()
+
+    def set_flags(self, user, blob_id, request, namespace=''):
+        path = self._get_path(user, blob_id, namespace)
+        try:
+            mkdir_p(os.path.split(path)[0])
+        except OSError:
+            pass
+        if not os.path.isfile(path):
+            # 404 - Not Found
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
+        raw_flags = request.content.read()
+        flags = json.loads(raw_flags)
+        for flag in flags:
+            if flag not in ACCEPTED_FLAGS:
+                request.setResponseCode(406)
+                return "Unsupported flag: %s" % flag
+        with open(path + '.flags', 'w') as flags_file:
+            flags_file.write(raw_flags)
+
     @defer.inlineCallbacks
     def write_blob(self, user, blob_id, request, namespace=''):
         path = self._get_path(user, blob_id, namespace)
@@ -98,6 +133,10 @@ class FilesystemBlobsBackend(object):
     def delete_blob(self, user, blob_id, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
         os.unlink(blob_path)
+        try:
+            os.unlink(blob_path + '.flags')
+        except:
+            pass
 
     def get_blob_size(user, blob_id, namespace=''):
         raise NotImplementedError
@@ -106,7 +145,8 @@ class FilesystemBlobsBackend(object):
         blob_ids = []
         base_path = self._get_path(user, custom_preffix=namespace)
         for root, dirs, filenames in os.walk(base_path):
-            blob_ids += [os.path.join(root, name) for name in filenames]
+            blob_ids += [os.path.join(root, name) for name in filenames
+                         if not name.endswith('.flags')]
         if order_by in ['date', '+date']:
             blob_ids.sort(key=lambda x: os.path.getmtime(x))
         elif order_by == '-date':
@@ -191,6 +231,8 @@ class BlobsResource(resource.Resource):
             order = request.args.get('order_by', [None])[0]
             return self._handler.list_blobs(user, request, namespace,
                                             order_by=order)
+        if 'only_flags' in request.args:
+            return self._handler.get_flags(user, blob_id, request, namespace)
         self._handler.add_tag_header(user, blob_id, request)
         return self._handler.read_blob(user, blob_id, request, namespace)
 
@@ -207,6 +249,12 @@ class BlobsResource(resource.Resource):
         d.addCallback(lambda _: request.finish())
         d.addErrback(self._error, request)
         return NOT_DONE_YET
+
+    def render_POST(self, request):
+        logger.info("http post: %s" % request.path)
+        user, blob_id, namespace = self._validate(request)
+        self._handler.set_flags(user, blob_id, request, namespace)
+        return ''
 
     def _error(self, e, request):
         logger.error('Error processing request: %s' % e.getErrorMessage())
