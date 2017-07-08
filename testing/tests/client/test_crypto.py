@@ -34,7 +34,7 @@ from leap.soledad.common.document import SoledadDocument
 from test_soledad.util import BaseSoledadTest
 from leap.soledad.client import _crypto
 from leap.soledad.client import _scrypt
-from leap.soledad.common import preamble as _preamble
+from leap.soledad.common.blobs import preamble as _preamble
 
 from twisted.trial import unittest
 from twisted.internet import defer

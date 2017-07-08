@@ -27,7 +27,7 @@ from leap.soledad.common.document import ServerDocument
 from leap.soledad.common.crypto import ENC_JSON_KEY
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.common.crypto import EncryptionSchemes
-from leap.soledad.common import preamble
+from leap.soledad.common.blobs import preamble
 
 
 __all__ = ['IncomingResource']
