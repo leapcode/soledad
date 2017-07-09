@@ -67,7 +67,7 @@ benchmark:
   services:
     - couchdb
   script:
-    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && git checkout origin/master scripts/benchmark/benchmark-all-commits.sh'
+    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && git checkout origin/master scripts/benchmark/setup-all-commits-env.sh'
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
     - cd testing
     - curl -s couchdb:5984
