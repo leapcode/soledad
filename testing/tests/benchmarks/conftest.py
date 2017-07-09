@@ -84,22 +84,26 @@ class ResourceWatcher(threading.Thread):
 
     sampling_interval = 0.1
 
-    def __init__(self):
+    def __init__(self, watch_memory):
         threading.Thread.__init__(self)
         self.process = psutil.Process(os.getpid())
         self.running = False
         # monitored resources
         self.cpu_percent = None
+        self.watch_memory = watch_memory
         self.memory_samples = []
         self.memory_percent = None
 
     def run(self):
         self.running = True
         self.process.cpu_percent()
+        # decide how long to sleep based on need to sample memory
+        sleep = self.sampling_interval if not self.watch_memory else 1
         while self.running:
-            sample = self.process.memory_percent(memtype='rss')
-            self.memory_samples.append(sample)
-            time.sleep(self.sampling_interval)
+            if self.watch_memory:
+                sample = self.process.memory_percent(memtype='rss')
+                self.memory_samples.append(sample)
+            time.sleep(sleep)
 
     def stop(self):
         self.running = False
@@ -107,47 +111,48 @@ class ResourceWatcher(threading.Thread):
         # save cpu usage info
         self.cpu_percent = self.process.cpu_percent()
         # save memory usage info
-        memory_percent = {
-            'sampling_interval': self.sampling_interval,
-            'samples': self.memory_samples,
-            'stats': {},
-        }
-        for stat in 'max', 'min', 'mean', 'std':
-            fun = getattr(numpy, stat)
-            memory_percent['stats'][stat] = fun(self.memory_samples)
-        self.memory_percent = memory_percent
+        if self.watch_memory:
+            memory_percent = {
+                'sampling_interval': self.sampling_interval,
+                'samples': self.memory_samples,
+                'stats': {},
+            }
+            for stat in 'max', 'min', 'mean', 'std':
+                fun = getattr(numpy, stat)
+                memory_percent['stats'][stat] = fun(self.memory_samples)
+            self.memory_percent = memory_percent
 
 
-def _monitored_benchmark(benchmark_fixture, benchmark_function,
+def _monitored_benchmark(benchmark_fixture, benchmark_function, request,
                          *args, **kwargs):
     # setup resource monitoring
-    watcher = ResourceWatcher()
+    watch_memory = _watch_memory(request)
+    watcher = ResourceWatcher(watch_memory)
     watcher.start()
     # run benchmarking function
     benchmark_function(*args, **kwargs)
     # store results
     watcher.stop()
     benchmark_fixture.extra_info.update({
-        'cpu_percent': watcher.cpu_percent,
-        'memory_percent': watcher.memory_percent,
+        'cpu_percent': watcher.cpu_percent
     })
+    if watch_memory:
+        benchmark_fixture.extra_info.update({
+            'memory_percent': watcher.memory_percent,
+        })
 
 
-def _watch_resources(request):
-    return request.config.getoption('--watch-resources')
+def _watch_memory(request):
+    return request.config.getoption('--watch-memory')
 
 
 @pytest.fixture
 def monitored_benchmark(benchmark, request):
-    if not _watch_resources(request):
-        return benchmark
     return functools.partial(
-        _monitored_benchmark, benchmark, benchmark)
+        _monitored_benchmark, benchmark, benchmark, request)
 
 
 @pytest.fixture
 def monitored_benchmark_with_setup(benchmark, request):
-    if not _watch_resources(request):
-        return benchmark.pedantic
     return functools.partial(
-        _monitored_benchmark, benchmark, benchmark.pedantic)
+        _monitored_benchmark, benchmark, benchmark.pedantic, request)

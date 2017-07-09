@@ -44,10 +44,10 @@ def pytest_addoption(parser):
     # the following option is only used in benchmarks, but has to be defined
     # here due to how pytest discovers plugins during startup.
     parser.addoption(
-        "--watch-resources", default=False, action="store_true",
-        help="whether to monitor CPU and memory percentages during test run. "
-             "**Warning**: enabling this will impact the time taken by the "
-             "benchmarked code, so use with caution!")
+        "--watch-memory", default=False, action="store_true",
+        help="whether to monitor memory percentages during test run. "
+             "**Warning**: enabling this will impact the time taken and the "
+             "CPU used by the benchmarked code, so use with caution!")
 
 
 @pytest.fixture
