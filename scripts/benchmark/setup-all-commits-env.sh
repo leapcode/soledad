@@ -35,6 +35,7 @@ git checkout leap/master \
     testing/tests/benchmarks/conftest.py \
     testing/tests/conftest.py \
     testing/check-pysqlcipher.py \
+    testing/ensure-pysqlcipher-has-usleep.sh \
     scripts/benchmark/tune-adbapi-parameters.sh
 
 # ensure larger timeout and more retries for async/concurrent sqlcipher access
