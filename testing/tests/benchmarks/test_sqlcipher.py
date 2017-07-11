@@ -15,9 +15,10 @@ def load_up(client, amount, payload, defer=True):
 def build_test_sqlcipher_async_create(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_sqlcipher_async_create")
-    def test(soledad_client, txbenchmark, payload):
+    def test(soledad_client, txbenchmark_with_setup, payload):
         client = soledad_client()
-        yield txbenchmark(load_up, client, amount, payload(size))
+        yield txbenchmark_with_setup(
+            lambda: None, load_up, client, amount, payload(size))
     return test
 
 
