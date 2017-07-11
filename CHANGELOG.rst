@@ -2,7 +2,7 @@ Changelog
 =========
 
 0.10.0 - `master`_
-+++++++++++++++++++++++++++++++
+-------------------------------
 
 .. note:: This version is not yet released and is under active development.
 
@@ -20,7 +20,7 @@ Misc
 
 
 0.9.6 - 31 May, 2017
-+++++++++++++++++++++++++++++++
+-------------------------------
 
 Server
 ~~~~~~
@@ -50,7 +50,7 @@ Misc
 
 
 0.9.5 -  17 March, 2017
-+++++++++++++++++++++++++++++++
+-------------------------------
 
 Server
 ~~~~~~
@@ -68,7 +68,7 @@ Misc
 - First steps porting soledad to python3
 
 0.9.3 -  06 March, 2017
-+++++++++++++++++++++++++++++++
+-------------------------------
 
 Server
 ~~~~~~
@@ -92,12 +92,12 @@ Misc
 
 
 0.9.2 - 22 December, 2016
-+++++++++++++++++++++++++
+-------------------------
 
 Performance improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-- use AES 256 GCM mode instead of CTR+HMAC.
+- use AES 256 GCM mode instead of CTR-HMAC.
 - streaming encryption/decryption and data transfer.
 
 Server
@@ -109,13 +109,13 @@ Client
 ~~~~~~
 
 - use twisted http agent in the client.
-- maintain backwards compatibility with old crypto scheme (AES 256 CTR+HMAC).
+- maintain backwards compatibility with old crypto scheme (AES 256 CTR-HMAC).
   No migration for now, only in 0.10.
 - remove the encryption/decryption pools, replace for inline streaming crypto.
 - use sqlcipher transactions on sync.
 
 0.9.1 - 27 November, 2016
-+++++++++++++++++++++++++
+-------------------------
 
 Server side bug fixes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -127,7 +127,7 @@ Server side bug fixes
 - separate server application into another file
 
 0.9.0 - 11 November, 2016
-+++++++++++++++++++++++++
+-------------------------
 
 Main features
 ~~~~~~~~~~~~~
@@ -137,7 +137,7 @@ Main features
 - Performance tests.
 
 Server
-======
+~~~~~~
 
 *** Attention: Migration needed! ***
 
@@ -165,25 +165,25 @@ Features
 
 
 0.8.1 - 14 July, 2016
-+++++++++++++++++++++
+---------------------
 
 Client
-======
+~~~~~~
 
 Features
-~~~~~~~~
+++++++++
 - Add recovery document format version for future migrations.
 - Use DeferredLock instead of its locking cousin.
 - Use DeferredSemaphore instead of its locking cousin.
 
 Bugfixes
-~~~~~~~~
+++++++++
 - `#8180 <https://leap.se/code/issues/8180>`_: Initialize OpenSSL context just once.
 - Remove document content conversion to unicode. Users of API are responsible
   for only passing valid JSON to Soledad for storage.
 
 Misc
-~~~~
+++++
 - Add ability to get information about sync phases for profiling purposes.
 - Add script for setting up develop environment.
 - Refactor bootstrap to remove shared db lock.
@@ -191,46 +191,46 @@ Misc
 - Remove user_id argument from Soledad init.
 
 Common
-======
+~~~~~~
 
 Features
-~~~~~~~~
+++++++++
 - Embed l2db, forking u1db.
 
 Misc
-~~~~
+++++
 - Toxify tests.
 
 0.8.0 - 18 Apr, 2016
-++++++++++++++++++++
+--------------------
 
 Client
-======
+~~~~~~
 
 Features
-~~~~~~~~
+++++++++
 - `#7656 <https://leap.se/code/issues/7656>`_: Emit multi-user aware events.
 - Client will now send documents at a limited size batch due to changes on SyncTarget. The default limit is 500kB. Disabled by default.
 
 Bugfixes
-~~~~~~~~
+++++++++
 - `#7503 <https://leap.se/code/issues/7503>`_: Do not signal sync completion if sync failed.
 - Handle missing design doc at GET (get_sync_info). Soledad server can handle this during sync.
 
 Misc
-~~~~
+++++
 - `#7195 <https://leap.se/code/issues/7195>`_: Use cryptography instead of pycryptopp.
 
 Known Issues
-~~~~~~~~~~~~
+++++++++++++
 - Upload phase of client syncs is still quite slow. Enabling size limited batching
   can help, but you have to make sure that your server is compatible.
 
 Server
-======
+~~~~~~
 
 Features
-~~~~~~~~
+++++++++
 - General performance improvements.
 - `#7509 <https://leap.se/code/issues/7509>`_: Moves config directory from /etc/leap to /etc/soledad.
 - Adds a new config parameter 'create_cmd', which allows sysadmin to specify
@@ -246,15 +246,15 @@ Features
   change database behaviour, allowing batch operations to be optimized.
 
 Common
-======
+~~~~~~
 
 Features
-~~~~~~~~
+++++++++
 - Add a sanitized command executor for database creation and re-enable user
   database creation on CouchServerState via command line.
 
 Bugfixes
-~~~~~~~~
+++++++++
 - `#7626 <https://leap.se/code/issues/7626>`_: Subclass a leaky leap.common.couch exception to avoid depending on couch.
 
 
