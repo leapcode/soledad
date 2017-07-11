@@ -11,19 +11,32 @@ Results of benchmarking can be seen in https://benchmarks.leap.se/.
 Test repetition
 ---------------
 
-`pytest-benchmark` runs tests multiple times so it can provide meaningful
+``pytest-benchmark`` runs tests multiple times so it can provide meaningful
 statistics for the time taken for a tipical run of a test function. The number
-of times that the test is run can be manually or automatically configured. When
-automatically configured, the number of runs is decided by taking into account
-multiple `pytest-benchmark` configuration parameters. See the `the
+of times that the test is run can be manually or automatically configured.
+
+When automatically configured, the number of runs is decided by taking into
+account multiple ``pytest-benchmark`` configuration parameters. See the `the
 corresponding documenation
 <https://pytest-benchmark.readthedocs.io/en/stable/calibration.html>`_ for more
 details on how automatic calibration works.
 
-The actual number of times a test is run depends on many parameters: the time
-taken for a sample run and the configuration of the minimum number of rounds
-and maximum time allowed for a benchmark. For a snapshot of the number of
-rounds for each test function see `the soledad benchmarks wiki page
+To achieve a reasonable number of repetitions and a reasonable amount of time
+at the same time, we let ``pytest-benchmark`` choose the number of repetitions
+for faster tests, and manually limit the number of repetitions for slower tests.
+
+Currently, tests for `synchronization` and `sqlcipher asynchronous document
+creation` are fixed to run 4 times each. All the other tests are left for
+``pytest-benchmark`` to decide how many times to run each one. With this setup,
+the benchmark suite is taking approximatelly 7 minutes to run in our CI server.
+As the benchmark suite is run twice (once for time and cpu stats and a second
+time for memory stats), the whole benchmarks run takes around 15 minutes.
+
+The actual number of times a test is run when calibration is done automatically
+by ``pytest-benchmark`` depends on many parameters: the time taken for a sample
+run and the configuration of the minimum number of rounds and maximum time
+allowed for a benchmark. For a snapshot of the number of rounds for each test
+function see `the soledad benchmarks wiki page
 <https://0xacab.org/leap/soledad/wikis/benchmarks>`_.
 
 Sync size statistics
