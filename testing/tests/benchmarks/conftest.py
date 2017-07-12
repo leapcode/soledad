@@ -57,7 +57,7 @@ def txbenchmark(monitored_benchmark):
 
 @pytest.fixture()
 def txbenchmark_with_setup(monitored_benchmark_with_setup):
-    def blockOnThreadWithSetup(setup, f):
+    def blockOnThreadWithSetup(setup, f, *args, **kwargs):
         def blocking_runner(*args, **kwargs):
             return threads.blockingCallFromThread(reactor, f, *args, **kwargs)
 
@@ -71,7 +71,8 @@ def txbenchmark_with_setup(monitored_benchmark_with_setup):
         def bench():
             return monitored_benchmark_with_setup(
                 blocking_runner, setup=blocking_setup,
-                rounds=4, warmup_rounds=1)
+                rounds=4, warmup_rounds=1, iterations=1,
+                args=args, kwargs=kwargs)
         return threads.deferToThread(bench)
     return blockOnThreadWithSetup
 
@@ -153,6 +154,7 @@ def monitored_benchmark(benchmark, request):
 
 
 @pytest.fixture
-def monitored_benchmark_with_setup(benchmark, request):
+def monitored_benchmark_with_setup(benchmark, request, *args, **kwargs):
     return functools.partial(
-        _monitored_benchmark, benchmark, benchmark.pedantic, request)
+        _monitored_benchmark, benchmark, benchmark.pedantic, request,
+        *args, **kwargs)
