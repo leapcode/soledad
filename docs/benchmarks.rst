@@ -6,7 +6,17 @@ Benchmarks
 We currently use `pytest-benchmark <https://pytest-benchmark.readthedocs.io/>`_
 to write tests to assess the time and resources taken by various tasks.
 
-Results of benchmarking can be seen in https://benchmarks.leap.se/.
+To run benchmark tests, once inside a cloned Soledad repository, do the
+following::
+
+    cd testing/
+    tox -e benchmark
+
+Results of automated benchmarking for each commit in the repository can be seen
+in: https://benchmarks.leap.se/.
+
+Benchmark tests also depend on `tox` and `CouchDB`. See the :ref:`tests` page
+for more information on how to setup the test environment.
 
 Test repetition
 ---------------
