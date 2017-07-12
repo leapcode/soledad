@@ -68,26 +68,30 @@ sizes are in KB):
 | stddev | 1376.930  | 732.933   |
 +--------+-----------+-----------+
 
-Test scenarios
---------------
+Sync test scenarios
+-------------------
 
 Ideally, we would want to run tests for a big data set (i.e. a high number of
 documents and a big payload size), but that may be infeasible given time and
 resource limitations. Because of that, we choose a smaller data set and suppose
 that the behaviour is somewhat linear to get an idea for larger sets.
 
-Supposing a data set size of 10MB, some possibilities for number of documents
-and document sizes for testing download and upload are:
+Supposing a data set total size of 10MB, some possibilities for number of
+documents and document sizes for testing download and upload can be seen below.
+Scenarios marked in bold are the ones that are actually run in the current sync
+benchmark tests, and you can see the current graphs for each one by following
+the corresponding links:
+
 
 * 10 x 1M
-* 20 x 500K
-* 100 x 100K
+* **20 x 500K** (`upload <https://benchmarks.leap.se/test-dashboard_test_upload_20_500k.html>`_, `download <https://benchmarks.leap.se/test-dashboard_test_download_20_500k.html>`_)
+* **100 x 100K** (`upload <https://benchmarks.leap.se/test-dashboard_test_upload_100_100k.html>`_, `download <https://benchmarks.leap.se/test-dashboard_test_download_100_100k.html>`_)
 * 200 x 50K
-* 1000 x 10K
+* **1000 x 10K** (`upload <https://benchmarks.leap.se/test-dashboard_test_upload_1000_10k.html>`_, `download <https://benchmarks.leap.se/test-dashboard_test_download_1000_10k.html>`_)
 
-The above scenarios all have documents of the same size. If we want to account
-for some variability on document sizes, it is sufficient to come up with a
-simple scenario where the average, minimum and maximum sizes are somehow
-coherent with the above statistics, like the following one:
+In each of the above scenarios all the documents are of the same size. If we
+want to account for some variability on document sizes, it is sufficient to
+come up with a simple scenario where the average, minimum and maximum sizes are
+somehow coherent with the above statistics, like the following one:
 
 * 60 x 15KB + 1 x 1MB

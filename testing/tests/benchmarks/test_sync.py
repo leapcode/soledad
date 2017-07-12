@@ -30,6 +30,8 @@ def create_upload(uploads, size):
     return test
 
 
+# ATTENTION: update the documentation in ../docs/benchmarks.rst if you change
+# the number of docs or the doc sizes for the tests below.
 test_upload_20_500k = create_upload(20, 500 * 1000)
 test_upload_100_100k = create_upload(100, 100 * 1000)
 test_upload_1000_10k = create_upload(1000, 10 * 1000)
@@ -63,6 +65,8 @@ def create_download(downloads, size):
     return test
 
 
+# ATTENTION: update the documentation in ../docs/benchmarks.rst if you change
+# the number of docs or the doc sizes for the tests below.
 test_download_20_500k = create_download(20, 500 * 1000)
 test_download_100_100k = create_download(100, 100 * 1000)
 test_download_1000_10k = create_download(1000, 10 * 1000)
