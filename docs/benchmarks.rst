@@ -71,10 +71,10 @@ sizes are in KB):
 Test scenarios
 --------------
 
-Ideally, we would want to run tests for a big data set, but that may be
-infeasible given time and resource limitations. Because of that, we choose a
-smaller data set and suppose that the behaviour is somewhat linear to get an
-idea for larger sets.
+Ideally, we would want to run tests for a big data set (i.e. a high number of
+documents and a big payload size), but that may be infeasible given time and
+resource limitations. Because of that, we choose a smaller data set and suppose
+that the behaviour is somewhat linear to get an idea for larger sets.
 
 Supposing a data set size of 10MB, some possibilities for number of documents
 and document sizes for testing download and upload are:
