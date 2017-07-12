@@ -7,5 +7,6 @@ should help you get started with development for Soledad.
 .. toctree::
    :maxdepth: 1
 
+   contributing
    tests
    benchmarks
