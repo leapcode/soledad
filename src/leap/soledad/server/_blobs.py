@@ -148,7 +148,8 @@ class FilesystemBlobsBackend(object):
             count += len(filenames)
         return json.dumps({"count": count})
 
-    def list_blobs(self, user, request, namespace='', order_by=None):
+    def list_blobs(self, user, request, namespace='', order_by=None,
+                   filter_flag=False):
         blob_ids = []
         base_path = self._get_path(user, custom_preffix=namespace)
         for root, dirs, filenames in os.walk(base_path):
@@ -160,8 +161,20 @@ class FilesystemBlobsBackend(object):
             blob_ids.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         elif order_by:
             raise Exception("Unsupported order_by parameter: %s" % order_by)
+        if filter_flag:
+            blob_ids = list(self._filter_flag(blob_ids, filter_flag))
         blob_ids = [os.path.basename(path) for path in blob_ids]
         return json.dumps(blob_ids)
+
+    def _filter_flag(self, blob_paths, flag):
+        for blob_path in blob_paths:
+            flag_path = blob_path + '.flags'
+            if not os.path.isfile(flag_path):
+                continue
+            with open(flag_path, 'r') as flags_file:
+                blob_flags = json.loads(flags_file.read())
+            if flag in blob_flags:
+                yield blob_path
 
     def get_total_storage(self, user):
         return self._get_disk_usage(self._get_path(user))
@@ -238,8 +251,10 @@ class BlobsResource(resource.Resource):
             return self._handler.count(user, request, namespace)
         elif not blob_id:
             order = request.args.get('order_by', [None])[0]
+            filter_flag = request.args.get('filter_flag', [False])[0]
             return self._handler.list_blobs(user, request, namespace,
-                                            order_by=order)
+                                            order_by=order,
+                                            filter_flag=filter_flag)
         if 'only_flags' in request.args:
             return self._handler.get_flags(user, blob_id, request, namespace)
         self._handler.add_tag_header(user, blob_id, request)

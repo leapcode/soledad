@@ -70,6 +70,38 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_list_filter_flag(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        fd = BytesIO("flag me")
+        yield manager._encrypt_and_upload('blob_id', fd)
+        yield manager.set_flags('blob_id', [Flags.PROCESSING])
+        blobs_list = yield manager.remote_list(filter_flag=Flags.PENDING)
+        self.assertEquals([], blobs_list)
+        blobs_list = yield manager.remote_list(filter_flag=Flags.PROCESSING)
+        self.assertEquals(['blob_id'], blobs_list)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_list_filter_flag_order_by_date(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        yield manager._encrypt_and_upload('blob_id1', BytesIO("x"))
+        yield manager._encrypt_and_upload('blob_id2', BytesIO("x"))
+        yield manager._encrypt_and_upload('blob_id3', BytesIO("x"))
+        yield manager.set_flags('blob_id1', [Flags.PROCESSING])
+        yield manager.set_flags('blob_id2', [Flags.PROCESSING])
+        yield manager.set_flags('blob_id3', [Flags.PROCESSING])
+        blobs_list = yield manager.remote_list(filter_flag=Flags.PROCESSING,
+                                               order_by='+date')
+        expected_list = ['blob_id1', 'blob_id2', 'blob_id3']
+        self.assertEquals(expected_list, blobs_list)
+        blobs_list = yield manager.remote_list(filter_flag=Flags.PROCESSING,
+                                               order_by='-date')
+        self.assertEquals(list(reversed(expected_list)), blobs_list)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_cant_set_invalid_flags(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
