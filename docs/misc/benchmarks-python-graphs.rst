@@ -5,15 +5,21 @@ This page documents an example of how to query elasticsearch and plot the
 results with python. We are currently using ``kibana`` to plot and show graphs,
 but in the future we might want/need the flexibility of python for that.
 
+Generated image
+---------------
+
+.. image:: benchmarks-python-graphs.png
+   :alt: Example of image generated with the code above.
+
+Code example
+------------
+
 Some notes about the code example:
 
 * Depends on ``elasticsearch`` for querying and ``matplotlib`` for plotting.
 * Searches need to be scrolled to get all results using a ``scroll_id``.
 * Commit datetime ranges (`1 <https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html>`_, `2 <https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#date-math>`_, `3 <https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-daterange-aggregation.html#date-format-pattern>`_) can be put in place to limit results.
 
-
-Code example
-------------
 
 .. code:: python
 
