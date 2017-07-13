@@ -32,10 +32,10 @@ def build_test_sqlcipher_create(amount, size):
     return test
 
 
-test_async_create_20_500k = build_test_sqlcipher_async_create(20, 500 * 1000)
+test_async_create_10_1000k = build_test_sqlcipher_async_create(10, 1000 * 1000)
 test_async_create_100_100k = build_test_sqlcipher_async_create(100, 100 * 1000)
 test_async_create_1000_10k = build_test_sqlcipher_async_create(1000, 10 * 1000)
 # synchronous
-test_create_20_500k = build_test_sqlcipher_create(20, 500 * 1000)
+test_create_10_1000k = build_test_sqlcipher_create(10, 1000 * 1000)
 test_create_100_100k = build_test_sqlcipher_create(100, 100 * 1000)
 test_create_1000_10k = build_test_sqlcipher_create(1000, 10 * 1000)
