@@ -203,3 +203,17 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._delete_from_remote('blob_id1')
         blobs_list = yield manager.remote_list()
         self.assertEquals(set(['blob_id2']), set(blobs_list))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_upload_then_delete_updates_list_using_namespace(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        namespace = 'special_archives'
+        yield manager._encrypt_and_upload('blob_id1', BytesIO("1"),
+                                          namespace=namespace)
+        yield manager._encrypt_and_upload('blob_id2', BytesIO("2"),
+                                          namespace=namespace)
+        yield manager._delete_from_remote('blob_id1', namespace=namespace)
+        blobs_list = yield manager.remote_list(namespace=namespace)
+        self.assertEquals(set(['blob_id2']), set(blobs_list))

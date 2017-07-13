@@ -307,16 +307,16 @@ class BlobManager(object):
         defer.returnValue((fd, size))
 
     @defer.inlineCallbacks
-    def delete(self, blob_id):
+    def delete(self, blob_id, **params):
         logger.info("Staring deletion of blob: %s" % blob_id)
-        yield self._delete_from_remote(blob_id)
+        yield self._delete_from_remote(blob_id, **params)
         if (yield self.local.exists(blob_id)):
             yield self.local.delete(blob_id)
 
-    def _delete_from_remote(self, blob_id):
+    def _delete_from_remote(self, blob_id, **params):
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
-        return self._client.delete(uri)
+        return self._client.delete(uri, params=params)
 
 
 class SQLiteBlobBackend(object):
