@@ -42,3 +42,10 @@ test process. Some notes about the current resource consumption estimation proce
   interval might have to be configured on a per-test basis, as different tests
   take different times to execute (from milliseconds to tens of seconds). For
   now, an interval of 0.1s seems to cover all tests.
+
+
+Benchmarks website
+------------------
+
+To update the benchmarks website, see the documentation in
+``../../../docs/misc/benchmarks-website.rst``.
