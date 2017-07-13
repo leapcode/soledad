@@ -11,13 +11,12 @@ Devices. It is LEAP's solution for synchronizing client-encrypted data among
 all user's devices that access a LEAP provider.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    client
    server
    reference
    development
-   changelog
 
 Indices and tables
 ==================

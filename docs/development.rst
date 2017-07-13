@@ -11,3 +11,4 @@ should help you get started with development for Soledad.
    deprecation
    tests
    benchmarks
+   changelog
