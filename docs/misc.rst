@@ -8,3 +8,4 @@ relevant information about the development process.
    :maxdepth: 2
 
    misc/benchmarks-website.rst
+   misc/benchmarks-python-graphs.rst
