@@ -141,6 +141,13 @@ class FilesystemBlobsBackend(object):
     def get_blob_size(user, blob_id, namespace=''):
         raise NotImplementedError
 
+    def count(self, user, request, namespace=''):
+        base_path = self._get_path(user, custom_preffix=namespace)
+        count = 0
+        for _, _, filenames in os.walk(base_path):
+            count += len(filenames)
+        return json.dumps({"count": count})
+
     def list_blobs(self, user, request, namespace='', order_by=None):
         blob_ids = []
         base_path = self._get_path(user, custom_preffix=namespace)
@@ -227,7 +234,9 @@ class BlobsResource(resource.Resource):
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        if not blob_id:
+        if not blob_id and request.args.get('only_count', False):
+            return self._handler.count(user, request, namespace)
+        elif not blob_id:
             order = request.args.get('order_by', [None])[0]
             return self._handler.list_blobs(user, request, namespace,
                                             order_by=order)

@@ -49,6 +49,11 @@ class IBlobsBackend(Interface):
         Get the size of the given blob id.
         """
 
+    def count(user, request, namespace=''):
+        """
+        Counts the total number of blobs.
+        """
+
     def list_blobs(user, request, namespace='', order_by=None):
         """
         Returns a json-encoded list of ids from user's blobs storage,
