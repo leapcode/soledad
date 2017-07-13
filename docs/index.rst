@@ -15,8 +15,7 @@ all user's devices that access a LEAP provider.
 
    client
    server
-   attachments
-   deprecation
+   reference
    development
    changelog
 

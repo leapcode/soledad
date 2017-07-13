@@ -8,5 +8,6 @@ should help you get started with development for Soledad.
    :maxdepth: 1
 
    contributing
+   deprecation
    tests
    benchmarks
