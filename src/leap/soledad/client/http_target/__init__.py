@@ -27,7 +27,7 @@ import os
 from twisted.web.client import Agent
 from twisted.internet import reactor
 
-from leap.common.certs import get_compatible_ssl_context_factory
+from leap.common.http import getPolicyForHTTPS
 from leap.soledad.common.log import getLogger
 from leap.soledad.client.http_target.send import HTTPDocSender
 from leap.soledad.client.http_target.api import SyncTargetAPI
@@ -87,7 +87,7 @@ class SoledadHTTPSyncTarget(SyncTargetAPI, HTTPDocSender, HTTPDocFetcher):
         self._insert_doc_cb = None
 
         # Twisted default Agent with our own ssl context factory
-        factory = get_compatible_ssl_context_factory(cert_file)
+        factory = getPolicyForHTTPS(cert_file)
         self._http = Agent(reactor, factory)
 
         if DO_STATS:

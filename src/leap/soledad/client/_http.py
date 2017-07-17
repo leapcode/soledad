@@ -28,7 +28,7 @@ from treq.client import HTTPClient as _HTTPClient
 
 from zope.interface import implementer
 
-from leap.common.certs import get_compatible_ssl_context_factory
+from leap.common.http import getPolicyForHTTPS
 
 
 __all__ = ['HTTPClient', 'PinnedTokenAgent']
