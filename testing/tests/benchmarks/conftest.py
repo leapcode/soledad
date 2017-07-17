@@ -141,6 +141,11 @@ def _monitored_benchmark(benchmark_fixture, benchmark_function, request,
         benchmark_fixture.extra_info.update({
             'memory_percent': watcher.memory_percent,
         })
+    # add docstring info
+    if request.scope == 'function':
+        fun = request.function
+        doc = fun.__doc__
+        benchmark_fixture.extra_info.update({'doc': doc or ''})
 
 
 def _watch_memory(request):
