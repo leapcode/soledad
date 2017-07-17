@@ -16,6 +16,9 @@ def build_test_sqlcipher_async_create(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_sqlcipher_async_create")
     def test(soledad_client, txbenchmark_with_setup, payload):
+        """
+        Create many documents of a given size concurrently.
+        """
         client = soledad_client()
         yield txbenchmark_with_setup(
             lambda: None, load_up, client, amount, payload(size))
@@ -26,6 +29,9 @@ def build_test_sqlcipher_create(amount, size):
     @pytest.mark.skip(reason="this test is lengthy and not a real use case")
     @pytest.mark.benchmark(group="test_sqlcipher_create")
     def test(soledad_client, monitored_benchmark, payload):
+        """
+        Create many documents of a given size serially.
+        """
         client = soledad_client()._dbsyncer
         monitored_benchmark(
             load_up, client, amount, payload(size), defer=False)

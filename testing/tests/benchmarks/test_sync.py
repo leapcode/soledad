@@ -21,6 +21,9 @@ def create_upload(uploads, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_upload")
     def test(soledad_client, txbenchmark_with_setup, payload):
+        """
+        Upload many documents of a given size.
+        """
         client = soledad_client()
 
         def setup():
@@ -49,6 +52,9 @@ def create_download(downloads, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_download")
     def test(soledad_client, txbenchmark_with_setup, payload):
+        """
+        Download many documents of the same size.
+        """
         client = soledad_client()
 
         yield load_up(client, downloads, payload(size))
@@ -75,6 +81,9 @@ test_download_1000_10k = create_download(1000, 10 * 1000)
 @pytest.inlineCallbacks
 @pytest.mark.benchmark(group="test_nothing_to_sync")
 def test_nothing_to_sync(soledad_client, txbenchmark_with_setup):
+    """
+    Sync two replicas that are already in sync.
+    """
     def setup():
         return soledad_client()
 

@@ -144,8 +144,8 @@ def _monitored_benchmark(benchmark_fixture, benchmark_function, request,
     # add docstring info
     if request.scope == 'function':
         fun = request.function
-        doc = fun.__doc__
-        benchmark_fixture.extra_info.update({'doc': doc or ''})
+        doc = fun.__doc__ or ''
+        benchmark_fixture.extra_info.update({'doc': doc.strip()})
 
 
 def _watch_memory(request):

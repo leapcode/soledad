@@ -22,6 +22,9 @@ def create_doc_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_encrypt_doc")
     @pytest.inlineCallbacks
     def test_doc_encryption(soledad_client, txbenchmark, payload):
+        """
+        Encrypt a document of a given size.
+        """
         crypto = soledad_client()._crypto
 
         DOC_CONTENT = {'payload': payload(size)}
@@ -40,6 +43,9 @@ def create_doc_decryption(size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group="test_crypto_decrypt_doc")
     def test_doc_decryption(soledad_client, txbenchmark, payload):
+        """
+        Decrypt a document of a given size.
+        """
         crypto = soledad_client()._crypto
 
         DOC_CONTENT = {'payload': payload(size)}
@@ -57,6 +63,9 @@ def create_doc_decryption(size):
 def create_raw_encryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_encrypt")
     def test_raw_encrypt(monitored_benchmark, payload):
+        """
+        Encrypt raw payload using default mode from crypto module.
+        """
         key = payload(32)
         monitored_benchmark(_crypto.encrypt_sym, payload(size), key)
     return test_raw_encrypt
@@ -65,6 +74,9 @@ def create_raw_encryption(size):
 def create_raw_decryption(size):
     @pytest.mark.benchmark(group="test_crypto_raw_decrypt")
     def test_raw_decrypt(monitored_benchmark, payload):
+        """
+        Decrypt raw payload using default mode from crypto module.
+        """
         key = payload(32)
         iv, ciphertext = _crypto.encrypt_sym(payload(size), key)
         monitored_benchmark(_crypto.decrypt_sym, ciphertext, key, iv)
