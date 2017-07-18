@@ -18,18 +18,26 @@
 try:
     from cryptography.hazmat.backends.interfaces import ScryptBackend
     from cryptography.hazmat.backends import default_backend
+    from cryptography.exceptions import UnsupportedAlgorithm
     backend = default_backend()
     OPENSSL_HAS_SCRYPT = isinstance(backend, ScryptBackend)
 except ImportError:
     OPENSSL_HAS_SCRYPT = False
 
+def _fallback_hash(secret, salt, buflen=32):
+    import scrypt
+    return scrypt.hash(secret, salt, buflen=buflen)
+
 if OPENSSL_HAS_SCRYPT:
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
     def hash(secret, salt, buflen=32):
-        return Scrypt(salt, buflen, 16384, 8, 1, backend).derive(secret)
-else:
-    import scrypt
+        try:
+            _hash = Scrypt(
+                salt, buflen, 16384, 8, 1, backend).derive(secret)
+	except UnsupportedAlgorithm:
+            _hash = _fallback_hash(secret, salt, buflen)
+        return _hash
 
-    def hash(secret, salt, buflen=32):
-        return scrypt.hash(secret, salt, buflen=buflen)
+else:
+    hash = _fallback_hash
