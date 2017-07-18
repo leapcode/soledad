@@ -24,9 +24,11 @@ try:
 except ImportError:
     OPENSSL_HAS_SCRYPT = False
 
+
 def _fallback_hash(secret, salt, buflen=32):
     import scrypt
     return scrypt.hash(secret, salt, buflen=buflen)
+
 
 if OPENSSL_HAS_SCRYPT:
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
@@ -35,7 +37,7 @@ if OPENSSL_HAS_SCRYPT:
         try:
             _hash = Scrypt(
                 salt, buflen, 16384, 8, 1, backend).derive(secret)
-	except UnsupportedAlgorithm:
+        except UnsupportedAlgorithm:
             _hash = _fallback_hash(secret, salt, buflen)
         return _hash
 
