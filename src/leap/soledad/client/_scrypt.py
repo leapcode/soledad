@@ -15,11 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from cryptography.hazmat.backends.interfaces import ScryptBackend
-from cryptography.hazmat.backends import default_backend
-
-backend = default_backend()
-OPENSSL_HAS_SCRYPT = isinstance(backend, ScryptBackend)
+try:
+    from cryptography.hazmat.backends.interfaces import ScryptBackend
+    from cryptography.hazmat.backends import default_backend
+    backend = default_backend()
+    OPENSSL_HAS_SCRYPT = isinstance(backend, ScryptBackend)
+except ImportError:
+    OPENSSL_HAS_SCRYPT = False
 
 if OPENSSL_HAS_SCRYPT:
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
