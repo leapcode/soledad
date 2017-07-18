@@ -290,7 +290,8 @@ class BaseSoledadTest(BaseLeapTest, MockedSharedDBTest):
             server_url=server_url,  # Soledad will fail if not given an url
             cert_file=cert_file,
             shared_db=MockSharedDB(),
-            auth_token=auth_token)
+            auth_token=auth_token,
+            with_blobs=True)
         self.addCleanup(soledad.close)
         return soledad
 
