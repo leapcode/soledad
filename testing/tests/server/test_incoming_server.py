@@ -82,6 +82,6 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
 
         db = self.state.open_database(user_id)
         request = DummyRequest([user_id, doc_id])
-        yield db.read_blob(user_id, doc_id, request, 'incoming')
+        yield db.read_blob(user_id, doc_id, request, 'MX')
         expected = formatter.preamble(content, doc_id) + content
         self.assertEquals(expected, request.written[0])

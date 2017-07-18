@@ -64,7 +64,7 @@ class IncomingResource(Resource):
             raw_content = request.content.read()
             preamble = self.formatter.preamble(raw_content, doc_id)
             request.content = BytesIO(preamble + raw_content)
-            d = db.write_blob(uuid, doc_id, request, namespace='incoming')
+            d = db.write_blob(uuid, doc_id, request, namespace='MX')
             d.addCallback(lambda _: self._finish(request))
         return NOT_DONE_YET
 
