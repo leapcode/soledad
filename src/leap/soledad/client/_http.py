@@ -53,7 +53,7 @@ class PinnedTokenAgent(Agent):
         self._creds = None
         self.set_token(token)
         # pin this agent with the platform TLS certificate
-        factory = get_compatible_ssl_context_factory(cert_file)
+        factory = getPolicyForHTTPS(cert_file)
         Agent.__init__(self, reactor, contextFactory=factory)
 
     def set_token(self, token):
