@@ -1,23 +1,39 @@
 Changelog
 =========
 
-0.10.0 - `master`_
+0.10.0 - 18 July, 2017
 -------------------------------
 
 .. note:: This version is not yet released and is under active development.
 
+Blobs
+~~~~~
+
+- Add an incoming API for email delivery. In the future, this may be used by
+  external applications for message delivery.
+- Add namespace capability.
+- List incoming blobs in chronological order.
+- Finish minimal filesystem backend for blobs.
+- Update BlobManager to support new server features, such as: namespaces,
+  incoming and listing.
+- Make the backend configurable for incoming API, so it can use CouchDB now and
+  Blobs later.
+
 Client
 ~~~~~~
 
-- `#8472 <https://0xacab.org/leap/soledad/issues/8472>`_: Use OpenSSL backend for scrypt if OpenSSL >= 1.1
+- Use OpenSSL backend for scrypt if OpenSSL >= 1.1
 
 Misc
 ~~~~
 
+- Refactor preamble to account for PGP encryption scheme
+- Removes scrypt dependency
 - Unification of Client, Server and Common in a Single python package.
-
-
-
+- Build soledad debian package with git-buildpackage.
+- Document deprecation policy.
+- Upload documentation to: https://soledad.readthedocs.io/
+- Launch benchmarks website: https://benchmarks.leap.se/
 
 0.9.6 - 31 May, 2017
 -------------------------------
