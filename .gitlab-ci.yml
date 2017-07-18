@@ -67,6 +67,7 @@ benchmark:
   services:
     - couchdb
   script:
+    - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && git checkout origin/master scripts/benchmark/setup-all-commits-env.sh'
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
     - cd testing
