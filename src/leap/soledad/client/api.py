@@ -291,7 +291,8 @@ class Soledad(object):
         """
         logger.debug("closing soledad")
         self._dbpool.close()
-        self.blobmanager.close()
+        if self.blobmanager:
+            self.blobmanager.close()
         if getattr(self, '_dbsyncer', None):
             self._dbsyncer.close()
 
