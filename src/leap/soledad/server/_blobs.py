@@ -76,10 +76,6 @@ class FilesystemBlobsBackend(object):
 
     def get_flags(self, user, blob_id, request, namespace=''):
         path = self._get_path(user, blob_id, namespace)
-        try:
-            mkdir_p(os.path.split(path)[0])
-        except OSError:
-            pass
         if not os.path.isfile(path):
             # 404 - Not Found
             request.setResponseCode(404)
@@ -91,10 +87,6 @@ class FilesystemBlobsBackend(object):
 
     def set_flags(self, user, blob_id, request, namespace=''):
         path = self._get_path(user, blob_id, namespace)
-        try:
-            mkdir_p(os.path.split(path)[0])
-        except OSError:
-            pass
         if not os.path.isfile(path):
             # 404 - Not Found
             request.setResponseCode(404)

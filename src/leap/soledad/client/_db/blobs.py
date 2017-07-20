@@ -114,7 +114,7 @@ def check_http_status(code):
     elif code == 406:
         raise InvalidFlagsError()
     elif code != 200:
-        raise SoledadError("Server Error")
+        raise SoledadError("Server Error: %s" % code)
 
 
 class DecrypterBuffer(object):
@@ -272,6 +272,11 @@ class BlobManager(object):
         flags = BytesIO(json.dumps(flags))
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         response = yield self._client.post(uri, data=flags, params=params)
+        if response.code == 404:
+            logger.error("Blob not found during set_flags: %s" % blob_id)
+            msg = "No blob found on server while trying to set flags: %s"
+            raise SoledadError(msg % (blob_id))
+
         check_http_status(response.code)
 
     @defer.inlineCallbacks
@@ -290,12 +295,11 @@ class BlobManager(object):
         """
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         params.update({'only_flags': True})
-        data = yield self._client.get(uri, params=params)
-        try:
-            data = yield data.json()
-        except:
-            data = []
-        defer.returnValue(data)
+        response = yield self._client.get(uri, params=params)
+        if response.code == 404:
+            logger.warn("Blob not found in server: %s" % blob_id)
+            defer.returnValue(None)
+        defer.returnValue((yield response.json()))
 
     @defer.inlineCallbacks
     def get(self, blob_id):

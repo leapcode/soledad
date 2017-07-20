@@ -31,6 +31,7 @@ from leap.soledad.server import _blobs as server_blobs
 from leap.soledad.client._db.blobs import BlobManager
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import InvalidFlagsError
+from leap.soledad.client._db.blobs import SoledadError
 
 
 class BlobServerTestCase(unittest.TestCase):
@@ -67,6 +68,14 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager.set_flags('blob_id', [Flags.PROCESSING])
         flags = yield manager.get_flags('blob_id')
         self.assertEquals([Flags.PROCESSING], flags)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_set_flags_raises_if_no_blob_found(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        with pytest.raises(SoledadError):
+            yield manager.set_flags('missing_id', [Flags.PENDING])
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
