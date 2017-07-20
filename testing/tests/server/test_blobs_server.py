@@ -160,7 +160,7 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_list_with_count_parameter(self):
+    def test_count(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')
         deferreds = []
@@ -168,7 +168,7 @@ class BlobServerTestCase(unittest.TestCase):
             deferreds.append(manager._encrypt_and_upload(str(i), BytesIO("1")))
         yield defer.gatherResults(deferreds)
 
-        result = yield manager.remote_list(only_count=True)
+        result = yield manager.count()
         self.assertEquals({"count": len(deferreds)}, result)
 
     @defer.inlineCallbacks

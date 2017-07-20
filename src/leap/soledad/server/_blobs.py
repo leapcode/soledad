@@ -145,7 +145,7 @@ class FilesystemBlobsBackend(object):
         base_path = self._get_path(user, custom_preffix=namespace)
         count = 0
         for _, _, filenames in os.walk(base_path):
-            count += len(filenames)
+            count += len(filter(lambda i: not i.endswith('.flags'), filenames))
         return json.dumps({"count": count})
 
     def list_blobs(self, user, request, namespace='', order_by=None,
