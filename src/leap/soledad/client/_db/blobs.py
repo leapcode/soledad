@@ -173,8 +173,41 @@ class BlobManager(object):
         if hasattr(self, 'local') and self.local:
             return self.local.close()
 
+    def count(self, **params):
+        """
+        Counts the number of blobs.
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        :return: A deferred that fires with a dict parsed from the JSON
+            response, which `count` key has the number of blobs as value.
+            Eg.: {"count": 42}
+        :rtype: twisted.internet.defer.Deferred
+        """
+        params['only_count'] = True
+        return self.remote_list(**params)
+
     @defer.inlineCallbacks
     def remote_list(self, **params):
+        """
+        List blobs from server, with filtering and ordering capabilities.
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        :param order_by:
+            Optional parameter to order results. Possible values are:
+            date or +date - Ascending order (older first)
+            -date - Descending order (newer first)
+        :type order_by: str
+        :param filter_flag:
+            Optional parameter to filter listing to results containing the
+            specified tag.
+        :type filter_flag: leap.soledad.common.blobs.Flags
+        :return: A deferred that fires with a list parsed from the JSON
+            response, holding the requested list of blobs.
+            Eg.: ['blob_id1', 'blob_id2']
+        :rtype: twisted.internet.defer.Deferred
+        """
         uri = urljoin(self.remote, self.user + '/')
         data = yield self._client.get(uri, params=params)
         defer.returnValue((yield data.json()))
@@ -222,6 +255,20 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def set_flags(self, blob_id, flags, **params):
+        """
+        Set flags for a given blob_id.
+        :param blob_id:
+            Unique identifier of a blob.
+        :type blob_id: str
+        :param flags:
+            List of flags to be set.
+        :type flags: [leap.soledad.common.blobs.Flags]
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        :return: A deferred that fires when the operation finishes.
+        :rtype: twisted.internet.defer.Deferred
+        """
         flags = BytesIO(json.dumps(flags))
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         response = yield self._client.post(uri, data=flags, params=params)
@@ -229,6 +276,18 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def get_flags(self, blob_id, **params):
+        """
+        Get flags from a given blob_id.
+        :param blob_id:
+            Unique identifier of a blob.
+        :type blob_id: str
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        :return: A deferred that fires with a list parsed from JSON response.
+            Eg.: [Flags.PENDING]
+        :rtype: twisted.internet.defer.Deferred
+        """
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         params.update({'only_flags': True})
         data = yield self._client.get(uri, params=params)
@@ -308,6 +367,17 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def delete(self, blob_id, **params):
+        """
+        Deletes a blob from local and remote storages.
+        :param blob_id:
+            Unique identifier of a blob.
+        :type blob_id: str
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        :return: A deferred that fires when the operation finishes.
+        :rtype: twisted.internet.defer.Deferred
+        """
         logger.info("Staring deletion of blob: %s" % blob_id)
         yield self._delete_from_remote(blob_id, **params)
         if (yield self.local.exists(blob_id)):
