@@ -366,3 +366,50 @@ class ISecretsStorage(Interface):
 
         :raise NoStorageSecret: Raised if there's no storage secret available.
         """
+
+
+class IIncomingBoxConsumer(Interface):
+    """
+    Interface that users can implement to provide a consumer for incoming box.
+
+    Note that processing and saving are separated from each other. That's
+    important for error handling on Soledad side as saving has side effects
+    while processing doesn't, so we can always retry processing while retrying
+    to save is risky.
+    Remember that on multiple devices scenario a replica that fails processing
+    of an item can give it to another replica retry, as long as there are no
+    side effects from processing.
+    """
+    name = Attribute("Consumer name, for readable error logging")
+
+    def process(self, item, item_id, encrypted=True):
+        """
+        This method process an incoming box item.
+        :param item: Incoming box item data
+        :type item: file-like object
+        :param item_id: Unique identifier of the item being processed.
+        :type item_id: str
+        :param encrypted: Should this function decrypt?
+            If Soledad knows how to decrypt the item, then `encrypted`
+            parameter will be `False` and item will be cleartext. Otherwise, it
+            will be `True` and item will be an encrypted blob.
+        :param encrypted: bool
+        :return:
+            A deferred that fires with a list of parts to be delivered to
+            `save` function. This list type should match `save` method `parts`
+            parameter. It is implementation dependant.
+        :rtype: Deferred
+        """
+
+    def save(self, parts, item_id):
+        """
+        This method persists resulting items from processing.
+        :param parts: resulting parts from processing
+        :type parts: Implementation dependant.
+        :param item_id: Unique identifier of the item being processed.
+        :type item_id: str
+        :return:
+            A deferred that fires when all parts are persisted, returning a
+            boolean telling if the operation succeeded or not.
+        :rtype: Deferred
+        """
