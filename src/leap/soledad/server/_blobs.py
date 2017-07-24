@@ -68,7 +68,7 @@ class FilesystemBlobsBackend(object):
         self.path = blobs_path
 
     def read_blob(self, user, blob_id, request, namespace=''):
-        logger.info('reading blob: %s - %s' % (user, blob_id))
+        logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
         path = self._get_path(user, blob_id, namespace)
         logger.debug('blob path: %s' % path)
         _file = static.File(path, defaultType='application/octet-stream')
@@ -249,7 +249,7 @@ class BlobsResource(resource.Resource):
                                             filter_flag=filter_flag)
         if 'only_flags' in request.args:
             return self._handler.get_flags(user, blob_id, request, namespace)
-        self._handler.add_tag_header(user, blob_id, request)
+        self._handler.add_tag_header(user, blob_id, request, namespace)
         return self._handler.read_blob(user, blob_id, request, namespace)
 
     def render_DELETE(self, request):

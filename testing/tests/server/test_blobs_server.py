@@ -192,6 +192,17 @@ class BlobServerTestCase(unittest.TestCase):
         blobs_list = yield manager.remote_list(namespace=namespace)
         self.assertEquals(['blob_id1'], blobs_list)
 
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_download_from_namespace(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        namespace, blob_id, content = 'incoming', 'blob_id1', 'test'
+        yield manager._encrypt_and_upload(blob_id, BytesIO(content),
+                                          namespace=namespace)
+        got_blob = yield manager._download_and_decrypt(blob_id, namespace)
+        self.assertEquals(content, got_blob[0].getvalue())
+
     def __touch(self, *args):
         path = os.path.join(*args)
         with open(path, 'a'):

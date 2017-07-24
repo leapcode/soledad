@@ -302,13 +302,13 @@ class BlobManager(object):
         defer.returnValue((yield response.json()))
 
     @defer.inlineCallbacks
-    def get(self, blob_id):
+    def get(self, blob_id, namespace=None):
         local_blob = yield self.local.get(blob_id)
         if local_blob:
             logger.info("Found blob in local database: %s" % blob_id)
             defer.returnValue(local_blob)
 
-        result = yield self._download_and_decrypt(blob_id)
+        result = yield self._download_and_decrypt(blob_id, namespace)
 
         if not result:
             defer.returnValue(None)
@@ -347,11 +347,12 @@ class BlobManager(object):
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
-    def _download_and_decrypt(self, blob_id):
+    def _download_and_decrypt(self, blob_id, namespace=None):
         logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
-        data = yield self._client.get(uri)
+        params = {'namespace': namespace} if namespace else None
+        data = yield self._client.get(uri, params=params)
 
         if data.code == 404:
             logger.warn("Blob not found in server: %s" % blob_id)

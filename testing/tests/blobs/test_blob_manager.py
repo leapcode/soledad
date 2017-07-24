@@ -50,7 +50,8 @@ class BlobManagerTestCase(unittest.TestCase):
         bad_blob_id = 'inexsistent_id'
         result = yield self.manager.get(bad_blob_id)
         self.assertIsNone(result)
-        self.manager._download_and_decrypt.assert_called_once_with(bad_blob_id)
+        args = bad_blob_id, None
+        self.manager._download_and_decrypt.assert_called_once_with(*args)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
