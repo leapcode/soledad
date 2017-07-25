@@ -108,6 +108,10 @@ class InvalidBlob(Exception):
     pass
 
 
+class EncryptionSchemeNotImplementedException(Exception):
+    pass
+
+
 class SoledadCrypto(object):
     """
     This class provides convenient methods for document encryption and
@@ -389,7 +393,7 @@ class BlobDecryptor(object):
         # we can refuse to process something that is in the future or
         # too far in the past (1984 would be nice, hehe)
         if preamble.scheme != ENC_SCHEME.symkey:
-            raise InvalidBlob('Invalid scheme: %s' % preamble.scheme)
+            raise EncryptionSchemeNotImplementedException(preamble.scheme)
         if preamble.method != ENC_METHOD.aes_256_gcm:
             method = preamble.method
             raise InvalidBlob('Invalid encryption scheme: %s' % method)

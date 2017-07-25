@@ -42,6 +42,7 @@ from .._document import BlobDoc
 from .._crypto import DocInfo
 from .._crypto import BlobEncryptor
 from .._crypto import BlobDecryptor
+from .._crypto import EncryptionSchemeNotImplementedException
 from .._http import HTTPClient
 from .._pipes import TruncatedTailPipe
 from .._pipes import PreamblePipe
@@ -124,22 +125,30 @@ class DecrypterBuffer(object):
         self.secret = secret
         self.tag = tag
         self.preamble_pipe = PreamblePipe(self._make_decryptor)
+        self.decrypter = None
 
     def _make_decryptor(self, preamble):
-        self.decrypter = BlobDecryptor(
-            self.doc_info, preamble,
-            secret=self.secret,
-            armor=False,
-            start_stream=False,
-            tag=self.tag)
-        return TruncatedTailPipe(self.decrypter, tail_size=len(self.tag))
+        try:
+            self.decrypter = BlobDecryptor(
+                self.doc_info, preamble,
+                secret=self.secret,
+                armor=False,
+                start_stream=False,
+                tag=self.tag)
+            return TruncatedTailPipe(self.decrypter, tail_size=len(self.tag))
+        except EncryptionSchemeNotImplementedException:
+            self.raw_data = BytesIO()
+            return self.raw_data
 
     def write(self, data):
         self.preamble_pipe.write(data)
 
     def close(self):
-        real_size = self.decrypter.decrypted_content_size
-        return self.decrypter._end_stream(), real_size
+        if self.decrypter:
+            real_size = self.decrypter.decrypted_content_size
+            return self.decrypter._end_stream(), real_size
+        else:
+            return self.raw_data, self.raw_data.tell()
 
 
 class BlobManager(object):
