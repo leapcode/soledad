@@ -41,7 +41,7 @@ class IncomingBoxProcessingLoop(object):
         self._loop = LoopingCall(self._process)
 
     def __call__(self):
-        return self._loop()
+        return self._process()
 
     @property
     def running(self):
