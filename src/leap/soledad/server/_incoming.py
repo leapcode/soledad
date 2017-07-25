@@ -18,6 +18,7 @@
 A twisted resource that saves externally delivered documents into user's db.
 """
 import json
+import base64
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
 from twisted.web.test.test_web import DummyRequest
@@ -66,7 +67,7 @@ class IncomingResource(Resource):
         else:
             raw_content = request.content.read()
             preamble = self.formatter.preamble(raw_content, doc_id)
-            request.content = BytesIO(preamble + raw_content)
+            request.content = BytesIO(preamble + ' ' + raw_content)
             d = db.write_blob(uuid, doc_id, request, namespace='MX')
             # FIXME: We really need to decouple request handling from the
             # backend! This is very ugly, but will change when this refactor
@@ -107,5 +108,6 @@ class IncomingFormatter(object):
         scheme = preamble.ENC_SCHEME.external
         method = preamble.ENC_METHOD.pgp
         size = len(raw_content)
-        return preamble.Preamble(doc_id, rev, scheme, method,
-                                 content_size=size).encode()
+        raw_preamble = preamble.Preamble(doc_id, rev, scheme, method,
+                                         content_size=size).encode()
+        return base64.urlsafe_b64encode(raw_preamble)

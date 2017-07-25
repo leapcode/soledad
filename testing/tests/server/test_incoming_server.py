@@ -87,6 +87,6 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
         yield db.read_blob(user_id, doc_id, request, 'MX')
         flags = db.get_flags(user_id, doc_id, request, 'MX')
         flags = json.loads(flags)
-        expected = formatter.preamble(content, doc_id) + content
+        expected = formatter.preamble(content, doc_id) + ' ' + content
         self.assertEquals(expected, request.written[0])
         self.assertIn(Flags.PENDING, flags)
