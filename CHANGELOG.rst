@@ -1,13 +1,17 @@
 Changelog
 =========
 
-0.10.0 - 18 July, 2017
+0.10.1 -  `master`_ 
 -------------------------------
 
 .. note:: This version is not yet released and is under active development.
 
-Blobs
-~~~~~
+
+0.10.0 - 18 July, 2017
+-------------------------------
+
+Server
+~~~~~~
 
 - Add an incoming API for email delivery. In the future, this may be used by
   external applications for message delivery.
@@ -32,7 +36,7 @@ Misc
 - Unification of Client, Server and Common in a Single python package.
 - Build soledad debian package with git-buildpackage.
 - Document deprecation policy.
-- Upload documentation to: https://soledad.readthedocs.io/
+- Documentation is automatically uploaded to: https://soledad.readthedocs.io/
 - Launch benchmarks website: https://benchmarks.leap.se/
 
 0.9.6 - 31 May, 2017
