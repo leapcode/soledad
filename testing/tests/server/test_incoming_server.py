@@ -18,6 +18,7 @@
 Integration tests for incoming API
 """
 import pytest
+import json
 from io import BytesIO
 from uuid import uuid4
 from twisted.web.test.test_web import DummyRequest
@@ -30,6 +31,7 @@ from leap.soledad.server._incoming import IncomingResource
 from leap.soledad.server._blobs import BlobsServerState
 from leap.soledad.server._incoming import IncomingFormatter
 from leap.soledad.common.crypto import EncryptionSchemes
+from leap.soledad.common.blobs import Flags
 from test_soledad.util import CouchServerStateForTests
 from test_soledad.util import CouchDBTestCase
 
@@ -83,5 +85,8 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
         db = self.state.open_database(user_id)
         request = DummyRequest([user_id, doc_id])
         yield db.read_blob(user_id, doc_id, request, 'MX')
+        flags = db.get_flags(user_id, doc_id, request, 'MX')
+        flags = json.loads(flags)
         expected = formatter.preamble(content, doc_id) + content
         self.assertEquals(expected, request.written[0])
+        self.assertIn(Flags.PENDING, flags)
