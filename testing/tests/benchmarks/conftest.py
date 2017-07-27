@@ -1,10 +1,8 @@
-import base64
 import functools
 import numpy
 import os
 import psutil
 import pytest
-import random
 import threading
 import time
 
@@ -35,16 +33,6 @@ def pytest_collection_modifyitems(items):
 #
 # benchmark fixtures
 #
-
-@pytest.fixture()
-def payload():
-    def generate(size):
-        random.seed(1337)  # same seed to avoid different bench results
-        payload_bytes = bytearray(random.getrandbits(8) for _ in xrange(size))
-        # encode as base64 to avoid ascii encode/decode errors
-        return base64.b64encode(payload_bytes)[:size]  # remove b64 overhead
-    return generate
-
 
 @pytest.fixture()
 def txbenchmark(monitored_benchmark):

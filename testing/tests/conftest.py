@@ -1,8 +1,10 @@
 import glob
+import base64
 import json
 import os
 import pytest
 import re
+import random
 import requests
 import signal
 import socket
@@ -331,3 +333,17 @@ if 'pytest_benchmark' in sys.modules:
         """
         hostname = os.environ.get('HOST_HOSTNAME', socket.gethostname())
         machine_info['host'] = hostname
+
+
+#
+# benchmark/responsiveness fixtures
+#
+
+@pytest.fixture()
+def payload():
+    def generate(size):
+        random.seed(1337)  # same seed to avoid different bench results
+        payload_bytes = bytearray(random.getrandbits(8) for _ in xrange(size))
+        # encode as base64 to avoid ascii encode/decode errors
+        return base64.b64encode(payload_bytes)[:size]  # remove b64 overhead
+    return generate
