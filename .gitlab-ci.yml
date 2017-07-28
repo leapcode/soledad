@@ -85,6 +85,20 @@ benchmark:
     # Output locally saved benchmarks if they exist
     - 'if [ -d .benchmarks ]; then find .benchmarks -type f -exec cat {} \; ; fi'
 
+responsiveness:
+  stage: benchmark
+  image: 0xacab.org:4567/leap/soledad:latest
+  tags:
+    - benchmark
+  services:
+    - couchdb
+  script:
+    - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
+    - cd testing
+    - curl -s couchdb:5984
+    - echo "addopts=--elasticsearch-url=\"$ELASTICSEARCH_URL\"" >> pytest.ini && chmod 600 pytest.ini
+    - /usr/bin/unbuffer tox --recreate -e responsiveness -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
+
 build_docker_image:
   stage: build
   image: 0xacab.org:4567/leap/soledad:latest

@@ -59,6 +59,12 @@ def pytest_addoption(parser):
         help="Soledad Server URL. A local server will be started if and only "
              "if  no URL is passed.")
 
+    # the following option is only used in responsiveness tests, but has to be
+    # defined here due to how pytest discovers plugins during startup.
+    parser.addoption(
+        "--elasticsearch-url", type="string", default=None,
+        help="the url for posting responsiveness results to elasticsearch")
+
 
 def _request(method, url, data=None, do=True):
     if do:
