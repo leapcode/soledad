@@ -77,3 +77,31 @@ class IBlobsBackend(Interface):
 
         :returns: a deferred that fires upon finishing.
         """
+
+
+class IIncomingBoxBackend(Interface):
+
+    """
+    An interface for an IncomingBoxBackend implementation.
+    """
+
+    def get_flags(user, blob_id, request, namespace=''):
+        """
+        Given a blob_id, return it's associated flags.
+
+        :returns: a JSON encoded string with a list of flags.
+        """
+
+    def set_flags(self, user, blob_id, request, namespace=''):
+        """
+        Set flags for a blob_id.
+        """
+
+    def list_blobs(self, user, request, namespace='', order_by=None,
+                   filter_flag=False):
+        """
+        Blobs listing with flags support. Accepts a filter_flag parameter,
+        which is a flag that can be used to filter results matching it.
+
+        :returns: a deferred that fires upon finishing.
+        """
