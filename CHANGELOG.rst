@@ -6,6 +6,19 @@ Changelog
 
 .. note:: This version is not yet released and is under active development.
 
+Server
+~~~~~~
+
+- Fixes IncomingBox missing preamble separator (space) which causes client to
+  fail parsing.
+
+Client
+~~~~~~
+
+- Adds IncomingBoxProcessLoop and implement the process flow for IncominBox
+  specification.
+- Adds IIncomingBoxConsumer interface, which can be used by Soledad apps to
+  implement consumers for IncomingBox feature.
 
 0.10.0 - 18 July, 2017
 -------------------------------
