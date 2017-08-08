@@ -131,7 +131,7 @@ class IncomingBoxProcessingTestCase(unittest.TestCase):
         consumer = GoodConsumer()
         self.loop.add_consumer(consumer)
         yield self.loop()
-        self.box.set_processed.has_calls([call(x) for x in items])
+        self.box.set_processed.assert_has_calls([call(x) for x in items])
 
     @defer.inlineCallbacks
     def test_good_consumer_deletes_items(self):
@@ -140,7 +140,7 @@ class IncomingBoxProcessingTestCase(unittest.TestCase):
         consumer = GoodConsumer()
         self.loop.add_consumer(consumer)
         yield self.loop()
-        self.box.delete.has_calls([call(x) for x in items])
+        self.box.delete.assert_has_calls([call(x) for x in items])
 
     @defer.inlineCallbacks
     def test_processing_failed_doesnt_mark_as_processed(self):
