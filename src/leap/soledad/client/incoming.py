@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # incoming.py
-# Copyright (C) 2014 LEAP
+# Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -118,10 +118,9 @@ class IncomingBox:
     @defer.inlineCallbacks
     def fetch_for_processing(self, blob_id):
         """
-        Try to flag a blob as PROCESSING, if server allows (no other replica
-        with it), then it gets reserved and fetched. Otherwise `None` is
-        returned, making the loop skip this item as another replica reserved it
-        already.
+        Try to reserve a blob (by flagging it as PROCESSING) and then fetch it.
+        If it is already reserved by another replica, return `None` causing the
+        loop to skip this item.
         :param blob_id: Unique identifier of a blob.
         :type blob_id: str
         :return: A deferred that fires when operation finishes.
@@ -133,7 +132,7 @@ class IncomingBox:
             yield self.blob_manager.set_flags(blob_id, [Flags.PROCESSED],
                                               namespace=self.namespace)
         except:
-            defer.returnValue([])
+            defer.returnValue(None)
         blob = yield self.blob_manager.get(blob_id, namespace=self.namespace)
         defer.returnValue(blob)
 
@@ -149,7 +148,7 @@ class IncomingBox:
 
     def set_processed(self, blob_id):
         """
-        Flag a blob as Flags.FAILED
+        Flag a blob with Flags.PROCESSED
         :param blob_id: Unique identifier of a blob.
         :type blob_id: str
         :return: A deferred that fires when operation finishes.
@@ -160,7 +159,7 @@ class IncomingBox:
 
     def set_failed(self, blob_id):
         """
-        Flag a blob as Flags.FAILED
+        Flag a blob with Flags.FAILED
         :param blob_id: Unique identifier of a blob.
         :type blob_id: str
         :return: A deferred that fires when operation finishes.

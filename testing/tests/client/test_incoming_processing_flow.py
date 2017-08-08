@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# test_incoming_server.py
+# test_incoming_processing_flow.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -51,7 +51,7 @@ class ProcessingFailedConsumer(GoodConsumer):
 
 class SavingFailedConsumer(GoodConsumer):
     def __init__(self):
-        self.name = 'ProcessingFailedConsumer'
+        self.name = 'SavingFailedConsumer'
         self.processed, self.saved = [], []
 
     def save(self, parts, item_id):

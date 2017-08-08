@@ -375,16 +375,16 @@ class IIncomingBoxConsumer(Interface):
     Note that processing and saving are separated from each other. That's
     important for error handling on Soledad side as saving has side effects
     while processing doesn't, so we can always retry processing while retrying
-    to save is risky.
+    persistence is risky.
     Remember that on multiple devices scenario a replica that fails processing
-    of an item can give it to another replica retry, as long as there are no
+    of an item can give up to another replica retry, as long as there are no
     side effects from processing.
     """
     name = Attribute("Consumer name, for readable error logging")
 
     def process(self, item, item_id, encrypted=True):
         """
-        This method process an incoming box item.
+        This method processes an incoming box item.
         :param item: Incoming box item data
         :type item: file-like object
         :param item_id: Unique identifier of the item being processed.
@@ -397,7 +397,7 @@ class IIncomingBoxConsumer(Interface):
         :return:
             A deferred that fires with a list of parts to be delivered to
             `save` function. This list type should match `save` method `parts`
-            parameter. It is implementation dependant.
+            parameter. It is implementation dependent.
         :rtype: Deferred
         """
 
@@ -405,7 +405,7 @@ class IIncomingBoxConsumer(Interface):
         """
         This method persists resulting items from processing.
         :param parts: resulting parts from processing
-        :type parts: Implementation dependant.
+        :type parts: Implementation dependent.
         :param item_id: Unique identifier of the item being processed.
         :type item_id: str
         :return:
