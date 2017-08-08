@@ -435,7 +435,7 @@ class BlobDecryptor(object):
         return self._producer.startProducing(self._aes)
 
     def endStream(self):
-        self._end_stream()
+        return self._end_stream()
 
     def write(self, data):
         self._aes.write(data)

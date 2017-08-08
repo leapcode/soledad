@@ -149,7 +149,7 @@ class DecrypterBuffer(object):
     def close(self):
         if self.decrypter:
             real_size = self.decrypter.decrypted_content_size
-            return self.decrypter._end_stream(), real_size
+            return self.decrypter.endStream(), real_size
         else:
             return self.raw_data, self.raw_data.tell()
 
