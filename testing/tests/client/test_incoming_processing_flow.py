@@ -77,6 +77,14 @@ class IncomingBoxProcessingTestCase(unittest.TestCase):
         self.box.fetch_for_processing.assert_called_once_with('one_item')
 
     @defer.inlineCallbacks
+    def test_no_consumers(self):
+        items = ['one', 'two', 'three']
+        self._set_pending_items(items)
+        yield self.loop()
+        self.box.fetch_for_processing.assert_not_called()
+        self.box.delete.assert_not_called()
+
+    @defer.inlineCallbacks
     def test_pending_list_with_multiple_items(self):
         items = ['one', 'two', 'three']
         self._set_pending_items(items)

@@ -73,6 +73,8 @@ class IncomingBoxProcessingLoop:
 
     @defer.inlineCallbacks
     def _process(self):
+        if not self.consumers:
+            defer.returnValue(None)
         pending = yield self.incoming_box.list_pending()
         for item_id in pending:
             item = yield self.incoming_box.fetch_for_processing(item_id)
