@@ -117,8 +117,12 @@ class SoledadServer(object):
     def start(self):
         self._create_conf_file()
         # start the server
+        executable = 'twistd'
+        if 'VIRTUAL_ENV' not in os.environ:
+            executable = os.path.join(
+                os.path.dirname(os.environ['_']), 'twistd')
         check_call([
-            'twistd',
+            executable,
             '--logfile=%s' % self._logfile,
             '--pidfile=%s' % self._pidfile,
             'web',
