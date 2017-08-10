@@ -485,6 +485,11 @@ def _init_blob_table(conn):
         "blob_id PRIMARY KEY, "
         "payload BLOB)")
     conn.execute(maybe_create)
+    columns = [row[1] for row in conn.execute("pragma"
+               " table_info(blobs)").fetchall()]
+    if 'namespace' not in columns:
+        # migrate
+        conn.execute('ALTER TABLE blobs ADD COLUMN namespace TEXT')
 
 
 def _sqlcipherInitFactory(fun):
