@@ -88,13 +88,15 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend = _blobs.FilesystemBlobsBackend()
         backend.path = '/somewhere/'
         path = backend._get_path('user', 'blob_id', '')
-        self.assertEquals(path, '/somewhere/user/b/blo/blob_i/blob_id')
+        expected = '/somewhere/user/default/b/blo/blob_i/blob_id'
+        self.assertEquals(path, expected)
 
     def test_get_path_custom(self):
         backend = _blobs.FilesystemBlobsBackend()
         backend.path = '/somewhere/'
         path = backend._get_path('user', 'blob_id', 'wonderland')
-        self.assertEquals(path, '/somewhere/user/wonderland/blob_id')
+        expected = '/somewhere/user/wonderland/b/blo/blob_i/blob_id'
+        self.assertEquals(expected, path)
 
     def test_get_path_namespace_traversal_raises(self):
         backend = _blobs.FilesystemBlobsBackend()

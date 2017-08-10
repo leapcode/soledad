@@ -161,7 +161,8 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         blobs_list = yield manager.remote_list(order_by='date')
         self.assertEquals(['blob_id1', 'blob_id2'], blobs_list)
-        self.__touch(self.tempdir, 'user', 'b', 'blo', 'blob_i', 'blob_id1')
+        parts = ['user', 'default', 'b', 'blo', 'blob_i', 'blob_id1']
+        self.__touch(self.tempdir, *parts)
         blobs_list = yield manager.remote_list(order_by='+date')
         self.assertEquals(['blob_id2', 'blob_id1'], blobs_list)
         blobs_list = yield manager.remote_list(order_by='-date')

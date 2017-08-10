@@ -135,7 +135,7 @@ class FilesystemBlobsBackend(object):
         raise NotImplementedError
 
     def count(self, user, request, namespace=''):
-        base_path = self._get_path(user, custom_preffix=namespace)
+        base_path = self._get_path(user, namespace=namespace)
         count = 0
         for _, _, filenames in os.walk(base_path):
             count += len(filter(lambda i: not i.endswith('.flags'), filenames))
@@ -144,7 +144,7 @@ class FilesystemBlobsBackend(object):
     def list_blobs(self, user, request, namespace='', order_by=None,
                    filter_flag=False):
         blob_ids = []
-        base_path = self._get_path(user, custom_preffix=namespace)
+        base_path = self._get_path(user, namespace=namespace)
         for root, dirs, filenames in os.walk(base_path):
             blob_ids += [os.path.join(root, name) for name in filenames
                          if not name.endswith('.flags')]
@@ -200,18 +200,22 @@ class FilesystemBlobsBackend(object):
             raise Exception(err)
         return desired_path
 
-    def _get_path(self, user, blob_id='', custom_preffix=''):
+    def _get_path(self, user, blob_id='', namespace=''):
         parts = [user]
-        parts += self._get_preffix(blob_id, custom_preffix)
         if blob_id:
-            parts += [blob_id]
+            namespace = namespace or 'default'
+            parts += self._get_path_parts(blob_id, namespace)
+        elif namespace and not blob_id:
+            parts += [namespace]  # namespace path
+        else:
+            pass  # root path
         path = os.path.join(self.path, *parts)
         return self._validate_path(path, user, blob_id)
 
-    def _get_preffix(self, blob_id, custom=''):
-        if custom or not blob_id:
+    def _get_path_parts(self, blob_id, custom):
+        if custom and not blob_id:
             return [custom]
-        return [blob_id[0], blob_id[0:3], blob_id[0:6]]
+        return [custom] + [blob_id[0], blob_id[0:3], blob_id[0:6]] + [blob_id]
 
 
 class ImproperlyConfiguredException(Exception):
