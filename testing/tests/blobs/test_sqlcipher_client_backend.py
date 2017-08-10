@@ -71,4 +71,4 @@ class SQLBackendTestCase(unittest.TestCase):
                              len(content)))
         yield defer.gatherResults(deferreds)
         result = yield self.local.list()
-        self.assertEquals(blob_ids, result)
+        self.assertEquals(set(blob_ids), set(result))

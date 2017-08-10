@@ -50,7 +50,7 @@ class BlobManagerTestCase(unittest.TestCase):
         bad_blob_id = 'inexsistent_id'
         result = yield self.manager.get(bad_blob_id)
         self.assertIsNone(result)
-        args = bad_blob_id, None
+        args = bad_blob_id, 'default'
         self.manager._download_and_decrypt.assert_called_once_with(*args)
 
     @defer.inlineCallbacks
@@ -143,4 +143,5 @@ class BlobManagerTestCase(unittest.TestCase):
         yield self.manager.delete(blob_id)
         local_list = yield self.manager.local_list()
         self.assertEquals(0, len(local_list))
-        self.manager._delete_from_remote.assert_called_with(blob_id)
+        params = {'namespace': 'default'}
+        self.manager._delete_from_remote.assert_called_with(blob_id, **params)
