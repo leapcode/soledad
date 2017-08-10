@@ -195,6 +195,18 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_list_default_doesnt_list_other_namespaces(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, 'user')
+        namespace = 'incoming'
+        yield manager._encrypt_and_upload('blob_id1', BytesIO("1"),
+                                          namespace=namespace)
+        yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
+        blobs_list = yield manager.remote_list()
+        self.assertEquals(['blob_id2'], blobs_list)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_download_from_namespace(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, 'user')

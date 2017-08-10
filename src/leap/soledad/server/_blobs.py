@@ -143,6 +143,7 @@ class FilesystemBlobsBackend(object):
 
     def list_blobs(self, user, request, namespace='', order_by=None,
                    filter_flag=False):
+        namespace = namespace or 'default'
         blob_ids = []
         base_path = self._get_path(user, namespace=namespace)
         for root, dirs, filenames in os.walk(base_path):
@@ -286,7 +287,7 @@ class BlobsResource(resource.Resource):
         for arg in request.postpath:
             if arg and not VALID_STRINGS.match(arg):
                 raise Exception('Invalid blob resource argument: %s' % arg)
-        namespace = request.args.get('namespace', [''])[0]
+        namespace = request.args.get('namespace', ['default'])[0]
         if namespace and not VALID_STRINGS.match(namespace):
             raise Exception('Invalid blob namespace: %s' % namespace)
         return request.postpath + [namespace]
