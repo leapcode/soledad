@@ -224,13 +224,11 @@ class BlobManager(object):
         data = yield self._client.get(uri, params=params)
         defer.returnValue((yield data.json()))
 
-    def local_list(self, namespace='default'):
-        assert namespace
+    def local_list(self, namespace=''):
         return self.local.list(namespace)
 
     @defer.inlineCallbacks
-    def send_missing(self, namespace='default'):
-        assert namespace
+    def send_missing(self, namespace=''):
         our_blobs = yield self.local_list(namespace)
         server_blobs = yield self.remote_list(namespace=namespace)
         missing = [b_id for b_id in our_blobs if b_id not in server_blobs]
@@ -242,8 +240,7 @@ class BlobManager(object):
             yield self._encrypt_and_upload(blob_id, fd)
 
     @defer.inlineCallbacks
-    def fetch_missing(self, namespace='default'):
-        assert namespace
+    def fetch_missing(self, namespace=''):
         # TODO: Use something to prioritize user requests over general new docs
         our_blobs = yield self.local_list(namespace)
         server_blobs = yield self.remote_list(namespace=namespace)
@@ -255,8 +252,7 @@ class BlobManager(object):
             yield self.get(blob_id, namespace)
 
     @defer.inlineCallbacks
-    def put(self, doc, size, namespace='default'):
-        assert namespace
+    def put(self, doc, size, namespace=''):
         if (yield self.local.exists(doc.blob_id, namespace)):
             error_message = "Blob already exists: %s" % doc.blob_id
             raise BlobAlreadyExistsError(error_message)
@@ -318,8 +314,7 @@ class BlobManager(object):
         defer.returnValue((yield response.json()))
 
     @defer.inlineCallbacks
-    def get(self, blob_id, namespace='default'):
-        assert namespace
+    def get(self, blob_id, namespace=''):
         local_blob = yield self.local.get(blob_id, namespace=namespace)
         if local_blob:
             logger.info("Found blob in local database: %s" % blob_id)
@@ -364,8 +359,7 @@ class BlobManager(object):
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
-    def _download_and_decrypt(self, blob_id, namespace='default'):
-        assert namespace
+    def _download_and_decrypt(self, blob_id, namespace=''):
         logger.info("Staring download of blob: %s" % blob_id)
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
@@ -389,7 +383,7 @@ class BlobManager(object):
         defer.returnValue((fd, size))
 
     @defer.inlineCallbacks
-    def delete(self, blob_id, namespace='default', **params):
+    def delete(self, blob_id, namespace='', **params):
         """
         Deletes a blob from local and remote storages.
         :param blob_id:
@@ -401,7 +395,6 @@ class BlobManager(object):
         :return: A deferred that fires when the operation finishes.
         :rtype: twisted.internet.defer.Deferred
         """
-        assert namespace
         params['namespace'] = namespace
         logger.info("Staring deletion of blob: %s" % blob_id)
         yield self._delete_from_remote(blob_id, **params)
@@ -441,8 +434,7 @@ class SQLiteBlobBackend(object):
             pass
 
     @defer.inlineCallbacks
-    def put(self, blob_id, blob_fd, size=None, namespace='default'):
-        assert namespace
+    def put(self, blob_id, blob_fd, size=None, namespace=''):
         logger.info("Saving blob in local database...")
         insert = 'INSERT INTO blobs (blob_id, namespace, payload) '
         insert += 'VALUES (?, ?, zeroblob(?))'
@@ -461,18 +453,16 @@ class SQLiteBlobBackend(object):
         defer.returnValue(done)
 
     @defer.inlineCallbacks
-    def get(self, blob_id, namespace='default'):
+    def get(self, blob_id, namespace=''):
         # TODO we can also stream the blob value using sqlite
         # incremental interface for blobs - and just return the raw fd instead
-        assert namespace
         select = 'SELECT payload FROM blobs WHERE blob_id = ? AND namespace= ?'
         result = yield self.dbpool.runQuery(select, (blob_id, namespace,))
         if result:
             defer.returnValue(BytesIO(str(result[0][0])))
 
     @defer.inlineCallbacks
-    def list(self, namespace='default'):
-        assert namespace
+    def list(self, namespace=''):
         query = 'select blob_id from blobs where namespace = ?'
         result = yield self.dbpool.runQuery(query, (namespace,))
         if result:
@@ -490,13 +480,12 @@ class SQLiteBlobBackend(object):
             defer.returnValue([])
 
     @defer.inlineCallbacks
-    def exists(self, blob_id, namespace='default'):
+    def exists(self, blob_id, namespace=''):
         query = 'SELECT blob_id from blobs WHERE blob_id = ? AND namespace= ?'
         result = yield self.dbpool.runQuery(query, (blob_id, namespace,))
         defer.returnValue(bool(len(result)))
 
-    def delete(self, blob_id, namespace='default'):
-        assert namespace
+    def delete(self, blob_id, namespace=''):
         query = 'DELETE FROM blobs WHERE blob_id = ? AND namespace = ?'
         return self.dbpool.runQuery(query, (blob_id, namespace,))
 
