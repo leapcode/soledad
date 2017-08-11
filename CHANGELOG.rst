@@ -1,10 +1,14 @@
 Changelog
 =========
 
-0.10.1 -  `master`_ 
+0.10.2 -  `master`_ 
 -------------------------------
 
 .. note:: This version is not yet released and is under active development.
+
+
+0.10.1 - Mon 07 Aug, 2017
+---------------------------------
 
 Server
 ~~~~~~
