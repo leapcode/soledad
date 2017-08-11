@@ -39,7 +39,7 @@ NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and
 Terminology
 -----------
 - ``Blob`` refers to an encrypted payload that is stored by soledad server as-is. It is assumed that the blob was end-to-end encrypted by an external component before reaching the server. (See the :ref:`Blobs Spec <blobs-spec>` for more detail)
-- A ``BlobBackend`` implementation is a particular backend setup by the Soledad Server that stores all the blobs that a given user owns. For now, only Filesystem Backend is provided.
+- A ``BlobsBackend`` implementation is a particular backend setup by the Soledad Server that stores all the blobs that a given user owns. For now, only a filesystem backend is provided.
 - An ``Incoming Message`` makes reference to the representation of an abstract entity that matches exactly one message item, no matter how it is stored (ie, docs vs. blobs, single blob vs chunked, etc). It can represent one Email Message, one URL, an uploaded File, etc. For the purpose of the email use case, an Incoming Message refers to the encrypted message that MX has delivered to the incoming endpoint, which is pgp-encrypted, and can have been further obfuscated.
 - By ``Message Processing`` we understand the sequence of downloading an incoming message, decrypting it, transform it in any needed way, and deleting the original incoming message.
 - An ``Incoming Box`` is a subset of the Blobs stored for an user, together with the mechanisms that provide semantics to store, list, fetch and process incoming message data chronologically. 
@@ -48,10 +48,9 @@ Components
 ----------
 * Soledad Server is the particular implementation that runs in the server (the
   twisted implementation is the only one to the moment). This exposes several
-  endpoints (documents synchronization, blob storage, incoming message box)
-  that.
-* The BlobBackend is the particular implementation of the BlobBackend
-  interface that the server has configured
+  endpoints (documents synchronization, blob storage, incoming message box).
+* BlobsBackend is a particular implementation of the IBlobsBackend interface,
+  such as FilesystemBlobsBackend, that the server has been configured to use.
 * Soledad Client is the particular client that runs in different desktop
   replicas in the u1db sense (the twisted implementation is the only one to the
   moment). It executes a sync periodically, that syncs all metadata docs
@@ -66,28 +65,48 @@ Components
   the user incoming box. Initially, LEAP's Encrypting Remailer Proxy (MX, for
   short) is going to be the main trusted application that will drive the
   development of the Incoming Box.
-* On the client side, there's the client counterpart of the trusted application,
-  that consumes the incoming messages. In the encrypted email case, this
-  component is the Incoming Mail Service in Bitmask Mail.
-  
+* Client Trusted Application Consumer is any implementation of Soledad's client
+  IIncomingBoxConsumer, which is the interface that the client counterpart of
+  the Trusted Application needs to implement in order to receive messages. It
+  provides implementation for processing and saving Incoming Messages. In the
+  encrypted email case, this component is the Incoming Mail Service in Bitmask
+  Mail.
 
 The User Experience
 -------------------
-* For the end user (ie, the user of Bitmask Mail in this case), the behaviour of the Incoming Box in Soledad is completely transparent. Periodically, new "messages" of any particular type will appear on the Client Trusted Application backed by the Soledad Client Storage, without any other intervention that introducing the master passphrase.
+* From the end user perspective (ie, the user of Bitmask Mail in this case),
+  the behaviour of the Incoming Box client in Soledad is completely
+  transparent.  Periodically, Soledad will call the Client Trusted Application
+  Consumer with new "messages" of any particular type backed by the Soledad
+  Client Storage, without any other intervention that introducing the master
+  passphrase.
   
-* From the API perspective in the Soledad Client, the "Incoming Box" will appear an object that, upon executing one if its methods, will return an iterable set that, in a given moment, contains the UIDs for all the messages that are yet pending to be processed. The request can be qualified by some modifiers (sorting, skipping, pagination). This ``IncomingBox`` entity will be qualified by a particular namespace that defines a particular storage space inside an user store.
+* From the client API perspective (considering the user is a Client Trusted
+  Application developer), all it needs to do is to implement
+  ``IIncomingBoxConsumer`` interface and register this new consumer on Soledad
+  API, telling the desired namespace it wants to consume messages from.
+  Soledad will then take care of calling the consumer back for processing and
+  saving of Incoming Messages.
 
 Writing Data Into The Incoming Box
 ----------------------------------
 * Any payload MUST arrive already encrypted to the endpoint of the Incoming Box.
   Soledad Server, at version 1 of this spec, will not add any encryption to the
   payloads.
-* The details of the encryption scheme used by the Trusted Application to encrypt the delivered payload (MX in this case) MUST be shared with the domain-specific application that processes the incoming message on the client side (Incoming Mail Service in Bitmask Mail, in this case). This means that the encryption schema MUST be communicated to the Incoming Box API in the moment of the delivery.
-* Incoming Boxes MUST NOT be writeable by any other user or any external applications.
+* The details of the encryption scheme used by the Trusted Application to
+  encrypt the delivered payload (MX in this case) MUST be shared with the
+  domain-specific application that processes the incoming message on the client
+  side (Incoming Mail Service in Bitmask Mail, in this case). This means that
+  the encryption schema MUST be communicated to the Incoming Box API in the
+  moment of the delivery.
+* Incoming Boxes MUST NOT be writeable by any other user or any external
+  applications.
 
 Authentication
 --------------
-* The Trusted Application and the Soledad Server exposing the Incoming Box endpoint MUST share a secret, that is written into the configuration files of both services.
+* The Trusted Application and the Soledad Server exposing the Incoming Box
+  endpoint MUST share a secret, that is written into the configuration files of
+  both services.
 * The Incoming Box MUST NOT be accessible as a public service from the outside.
 
 Listing All Incoming Messages
@@ -99,21 +118,39 @@ Listing All Incoming Messages
 
 Processing Incoming Messages
 -----------------------------
-* The Blobs containing the Incoming Messages need the capability to be
-  marked as in one of the following states: PENDING, PROCESSING, PROCESSED.
-* The default state for a message in the Incoming Box is PENDING.
-* Before delivering a Message to a client for processing, the server MUST mark the blob that contains it as PROCESSING, reserving the message for this client so other replicas don't try to repeat the processing.
-* The server MAY expire the PROCESSING flag if the defined PROCESSING_THRESHOLD is passed, to avoid data left unusable by stalled clients. 
-  * A message marked as PROCESSING MUST only be marked as PROCESSED by the server when it receives a confirmation by the replica that initiated the download request. This confirmation signals that the message is ready to be deleted.
-* A Client MUST request to the server to mark an incoming message as PROCESSED only when there are guarantees that the incoming message has been processed without errors, and the parts resulting of its processing are acknowleged to have been uploaded successfully to the central replica in the server.
+* The Blobs containing the Incoming Messages need the capability to be marked
+  as in one of the following states: PENDING, PROCESSING, PROCESSED, FAILED.
+* The default state for a new message in the Incoming Box is PENDING.
+* Before delivering a Message to a client for processing, the server MUST mark
+  the blob that contains it as PROCESSING, reserving the message for this
+  client so other replicas don't try to repeat the processing.
+* The server MAY expire the PROCESSING flag if the defined PROCESSING_THRESHOLD
+  is passed, to avoid data left unusable by stalled clients.
+* A message marked as PROCESSING MUST only be marked as PROCESSED by the server
+  when it receives a confirmation by the replica that initiated the download
+  request. This confirmation signals that the message is ready to be deleted.
+* A Client MUST request to the server to mark an incoming message as PROCESSED
+  only when there are guarantees that the incoming message has been processed
+  without errors, and the parts resulting of its processing are acknowleged to
+  have been uploaded successfully to the central replica in the server.
 
 Marking a Message as Failed
 ---------------------------
 
-* A Soledad Client SHOULD be able to mark a given message as temporarily failed. This covers the case in which a given message failed to be decrypted by a implementation-related reason (for instance: uncatched exceptions related to encoding, wrong format in serialization). The rationale is that we don't want to increase overhead by retrying decryption on every syncing loop, but we don't want to discard a particular payload. Future versions of the client might implement bugfixes or workarounds to try succeed in the processing.
-* Therefore, a Soledad Client SHOULD be able to add its own version when it marks a message as temporarily failed. 
-* After some versions, a message should be able to be marked as permanently
-  failed
+* A Soledad Client MUST be able to mark a given message as FAILED. This covers
+  the case in which a given message failed to be decrypted by a
+  implementation-related reason (for instance: uncatched exceptions related to
+  encoding, wrong format in serialization). The rationale is that we don't want
+  to increase overhead by retrying decryption on every syncing loop, but we
+  don't want to discard a particular payload. Future versions of the client
+  might implement bugfixes or workarounds to try succeed in the processing.
+* Therefore, a Soledad Client SHOULD be able to add its own version when it
+  marks a message as temporarily failed.
+* After some versions, a message SHOULD be able to be marked as permanently
+  failed.
+* Reservation MUST be released, as any other replica MUST be able to pick the
+  message to retry. This covers the case of a new replica being added with an
+  updated version, which can be able to handle the failure.
 
 Deleting Incoming Messagges
 ---------------------------
@@ -127,20 +164,23 @@ Implementation Details
 Server Blob Backend
 +++++++++++++++++++
 In the Server Side, the implementation of the ``Incoming Box`` MUST be done
-exclusively at the level of the BlobStorage.  The Blobs implementation in both Soledad Server and Client have enough knowledge of the incoming box semantics to allow its processing to be done without resorting to writing documents in the main soledad json storage.
+exclusively at the level of the BlobStorage.  The Blobs implementation in both
+Soledad Server and Client have enough knowledge of the incoming box semantics
+to allow its processing to be done without resorting to writing documents in
+the main soledad json storage.
  
-For simplicity, the ``IncomingBox`` endpoint is assumed to be running under the same process space than the rest of the Soledad Server.
+For simplicity, the ``IncomingBox`` endpoint is assumed to be running under the
+same process space than the rest of the Soledad Server.
 
 Preffix Namespaces
 ~~~~~~~~~~~~~~~~~~
 
-The ``Incoming Box`` endpoint should use an uuid for each incoming message, qualified
-by a reserved preffix per each Trusted App ('incoming-mx'). This is the main
-mechanism to store the set of "Incoming Messages" inside the bigger namespace
-of Blobs.
-
-This means that the general Blob spec MAY contemplate a mechanism to limiting
-the listing of Blobs to a particular incremental preffix.
+The Trusted Application code responsible for writing messages through Soledad
+Server ``Incoming Box`` endpoint MUST specify a dedicated "namespace" that it
+desires to use and be authorized to write into it. This is done so Soledad can
+list, filter, flag, fetch and reserve only messages known to the Trusted
+Application, avoiding to mix operations with blobs from the global namespace or
+messages from another Trusted Application.
 
 LIST commands
 ~~~~~~~~~~~~~
@@ -149,66 +189,44 @@ The server MUST reply to several LIST commands, qualified by namespace and by
 other query parameters. Some of these commands are optional, but the server
 SHOULD reply to them signaling that they are not supported by the implementation.
 
-The Server MUST return a tuple with the UIDs of the messages.
+The Server MUST return a list with the UIDs of the messages.
 
-COUNT
-~~~~~
-Returns the number of messages in the incoming box. By default, only messages marked as PENDING are returned.
-
-Example::
-
-  IncomingBox.count('mx')
-
-GET_ALL
-~~~~~~~
-The response to a "get_all" request by a client should return all the blobs under a given namespace.
-It returns a list of uuids.
-
-Example::
-
-  IncomingBox.get_all('mx')
-
-
+Supported listing features are:
+* Filter by namespace, which selects the namespace to do the list operation.
+* Filter by flag, which lists only messages/blobs marked with the provided flag.
+* Ordering, which changes the order of listing, such as older or newer first.
+* Count, which returns the total list size after filtering, instead of the list itself.
 
 Client side Processing
 ++++++++++++++++++++++
 
-It is assumed, for simplicity, that the consuming app shares the process memory space with the soledad client, but this doesn't have to hold true in the future.
+It is assumed, for simplicity, that the Trusted Application consumer
+implementation shares the process memory space with the soledad client, but
+this doesn't have to hold true in the future.
 
-* To begin a processing round, the client starts by asking a list of the pending messages.
-* To avoid potentially costly traversals, the client limits the query to the most recent N blobs flagged as PENDING.
-* To avoid downloading bulky messages in the incoming queue (for example, messages with very big attachments), the client MAY limit the query on a first pass to all pending blobs  smaller than X Kb.
-* After getting the list of Incoming Messages in the PENDING set, the client MUST start downloading the blobs according to the uuids returned. 
-* Download SHOULD happen in chronological order, from the list. Download may happen in several modalities: concurrently, or sequentially.
-* The Soledad Client MUST provide a mechanism so that any clientside counterpart of the Trusted Application (ie: Bitmask Mail) can execute a callback for each downloaded message to be processed.
-* In the reference implementation, since the callbacks that the client registers are executed in the common event loop of the Soledad Client process, attention SHOULD be payed to the callbacks not blocking the main event loop.
+The class responsible for client side processing on Soledad Client is named
+``IncomingBoxProcessingLoop``. It's role is to orchestrate processing with the
+Incoming Box features on server side, so it can deliver messages to it's
+registered Trusted Application Consumers.
 
-
-Example 1, serial::
-
-  for blob_id in IncomingBox('mx').get_all():
-    blob = yield blob_manager.get(blob_id) # this will trigger a local save as well
-    success = yield process(blob)
-    if success:
-      yield blob_manager.delete(blob_id)
-    else:
-      yield blob_manager.set_flags(blob_id, ['FAILED'])
-
-
-Example 2, concurrent::
-
-  def callback(blob_id, blob):
-    success = yield process(blob)
-    if success:
-      yield blob_manager.delete(blob_id)
-    else:
-      yield blob_manager.set_flags(blob_id, ['FAILED'])
-  for blob_id in IncomingBox('mx).get_all():
-    blob_manager.get(blob_id)
-    d.addCallback(callback)
-    deferreds.append(d)
-  yield gatherResults(deferreds)
-
+* To begin a processing round, the client starts by asking a list of the
+  pending messages.
+* To avoid potentially costly traversals, the client limits the query to the
+  most recent N blobs flagged as PENDING.
+* To avoid downloading bulky messages in the incoming queue (for example,
+  messages with very big attachments), the client MAY limit the query on a
+  first pass to all pending blobs  smaller than X Kb.
+* After getting the list of Incoming Messages in the PENDING set, the client
+  MUST start downloading the blobs according to the uuids returned.
+* Download SHOULD happen in chronological order, from the list. Download may
+  happen in several modalities: concurrently, or sequentially.
+* The Soledad Client MUST provide a mechanism so that any clientside
+  counterpart of the Trusted Application (ie: Bitmask Mail) can register a
+  consumer for processing and saving each downloaded message.
+* In the reference implementation, since the consumers that the client
+  registers are executed in the common event loop of the Soledad Client
+  process, attention SHOULD be payed to the callbacks not blocking the main
+  event loop.
 
 Future Features
 ---------------
@@ -250,7 +268,7 @@ PAGINATION
 
 Example::
 
-  IncomingBox.get_all('mx', limit=20, page=1)
+  IncomingBox.list('mx', limit=20, page=1)
 
 SKIP-BY-SIZE
 ~~~~~~~~~~~~
@@ -259,16 +277,4 @@ SKIP-BY-SIZE
 
 Example::
 
-  IncomingBox.get_all('mx', size_limit=10MB)
-
-ORDER_BY
-~~~~~~~~
-
-Server CAN allow an order_by parameter in LIST commands.
-
-* Chronological order (by default, implicit, older first)
-* Reverse Chronological order (newest first)
-
-Example::
-
-  IncomingBox.get_all('mx', order_by='date')
+  IncomingBox.list('mx', size_limit=10MB)
