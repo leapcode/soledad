@@ -6,7 +6,7 @@ export http_proxy = http://127.0.0.1:9
 export PYBUILD_NAME=leap.soledad
 
 # Uncomment this to turn on verbose mode.
-DH_VERBOSE=1
+#DH_VERBOSE=1
 
 NAME=soledad-server
 

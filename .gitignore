@@ -20,8 +20,10 @@ _trial_temp
 .DS_Store
 scripts/profiling/sync/profiles
 tags
+.pybuild
 
 debian/debhelper-build-stamp
+debian/python-leap.soledad
 testing/htmlcov
 testing/.coverage
 testing/test-env
