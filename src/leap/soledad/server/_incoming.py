@@ -40,7 +40,7 @@ __all__ = ['IncomingResource']
 def _get_backend_from_config():
     conf = get_config()
     if conf['blobs']:
-        return BlobsServerState("filesystem", conf['blobs_path'])
+        return BlobsServerState("filesystem", blobs_path=conf['blobs_path'])
     return CouchServerState(conf['couch_url'])
 
 
