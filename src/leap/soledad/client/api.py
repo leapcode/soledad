@@ -276,7 +276,7 @@ class Soledad(object):
 
     def _init_blobmanager(self):
         path = os.path.join(os.path.dirname(self._local_db_path), 'blobs')
-        url = urlparse.urljoin(self.server_url, 'blobs/%s' % uuid)
+        url = urlparse.urljoin(self.server_url, 'blobs/%s' % self.uuid)
         key = self._secrets.local_key
         self.blobmanager = blobs.BlobManager(path, url, key, self.uuid,
                                              self.token, SOLEDAD_CERT)
