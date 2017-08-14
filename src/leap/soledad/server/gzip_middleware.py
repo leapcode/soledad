@@ -33,7 +33,7 @@ class GzipMiddleware(object):
         if 'gzip' not in environ.get('HTTP_ACCEPT_ENCODING', ''):
             return self.app(environ, start_response)
 
-        buffer = StringIO.StringIO()
+        buffer = StringIO()
         output = GzipFile(
             mode='wb',
             compresslevel=self.compresslevel,
