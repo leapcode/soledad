@@ -64,6 +64,6 @@ class ConfigurationParsingTest(unittest.TestCase):
                     'admin_netrc':
                     '/etc/couchdb/couchdb-soledad-admin.netrc',
                     'batching': False,
-                    'blobs': False,
-                    'blobs_path': '/srv/leap/soledad/blobs'}
+                    'blobs': True,
+                    'blobs_path': '/tmp/soledad/blobs'}
         self.assertDictEqual(expected, config['soledad-server'])
