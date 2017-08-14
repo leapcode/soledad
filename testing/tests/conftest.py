@@ -109,6 +109,7 @@ class SoledadServer(object):
 
     def __init__(self, tmpdir_factory, couch_url):
         tmpdir = tmpdir_factory.mktemp('soledad-server')
+        self.tmpdir = tmpdir
         self._pidfile = os.path.join(tmpdir.strpath, 'soledad-server.pid')
         self._logfile = os.path.join(tmpdir.strpath, 'soledad-server.log')
         self._couch_url = couch_url
