@@ -75,7 +75,7 @@ class URLMapper(object):
                       ['GET', 'PUT', 'POST'])
         # auth info for blobs resource
         self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT'])
-        self._connect('/blobs/{uuid}', ['GET'])
+        self._connect('/blobs/{uuid}/', ['GET'])
 
         # incoming resource
         self._connect('/incoming/{uuid}/{incoming_id}', ['PUT'])
