@@ -175,12 +175,12 @@ same process space than the rest of the Soledad Server.
 Preffix Namespaces
 ~~~~~~~~~~~~~~~~~~
 
-The Trusted Application code responsible for writing messages through Soledad
-Server ``Incoming Box`` endpoint MUST specify a dedicated "namespace" that it
-desires to use and be authorized to write into it. This is done so Soledad can
-list, filter, flag, fetch and reserve only messages known to the Trusted
-Application, avoiding to mix operations with blobs from the global namespace or
-messages from another Trusted Application.
+The Trusted Application code responsible for delivering messages into Soledad
+Server ``Incoming Box`` endpoint MUST specify as a request parameter the
+dedicated namespace that it desires to use and be authorized to write into it.
+This is done so Soledad can list, filter, flag, fetch and reserve only messages
+known to the Trusted Application, avoiding to mix operations with blobs from
+the global namespace or messages from another Trusted Application.
 
 LIST commands
 ~~~~~~~~~~~~~
@@ -205,7 +205,7 @@ implementation shares the process memory space with the soledad client, but
 this doesn't have to hold true in the future.
 
 The class responsible for client side processing on Soledad Client is named
-``IncomingBoxProcessingLoop``. It's role is to orchestrate processing with the
+``IncomingBoxProcessingLoop``. Its role is to orchestrate processing with the
 Incoming Box features on server side, so it can deliver messages to it's
 registered Trusted Application Consumers.
 
@@ -227,6 +227,24 @@ registered Trusted Application Consumers.
   registers are executed in the common event loop of the Soledad Client
   process, attention SHOULD be payed to the callbacks not blocking the main
   event loop.
+
+Example of a Trusted Application Client Consumer:
+
+```python
+@implementer(interfaces.IIncomingBoxConsumer)
+class MyConsumer(object):
+    def __init__(self):
+        self.name = 'My Consumer'
+
+    def process(self, item, item_id, encrypted=True):
+        cleartext = my_custom_decrypt(item) if encrypted else item
+        processed_parts = my_custom_processing(item)
+        return defer.succeed(processed_parts)
+
+    def save(self, parts, item_id):
+        return defer.gatherResults([db.save(part) for part in parts])
+```
+
 
 Future Features
 ---------------
