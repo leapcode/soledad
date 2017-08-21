@@ -74,7 +74,7 @@ class URLMapper(object):
         self._connect('/user-{uuid}/sync-from/{source_replica_uid}',
                       ['GET', 'PUT', 'POST'])
         # auth info for blobs resource
-        self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT'])
+        self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT', 'DELETE'])
         self._connect('/blobs/{uuid}/', ['GET'])
 
         # incoming resource
