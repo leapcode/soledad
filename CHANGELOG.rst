@@ -1,10 +1,25 @@
 Changelog
 =========
 
-0.10.2 -  `master`_ 
+0.10.3 -  `master`_ 
 -------------------------------
 
 .. note:: This version is not yet released and is under active development.
+
+0.10.2 - Mon 21 Aug, 2017
+----------------------------------
+
+Server
+~~~~~~
+
+- Enforce namespace to default on server
+- Add path partitioning to namespaces
+
+Client
+~~~~~~
+
+- Add namespace to local blobs db table
+- Track namespace information on blobs client
 
 
 0.10.1 - Mon 07 Aug, 2017
