@@ -15,6 +15,7 @@ all user's devices that access a LEAP provider.
 
    client
    server
+   auth
    reference
    development
 
