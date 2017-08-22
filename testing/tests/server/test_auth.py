@@ -17,7 +17,9 @@
 """
 Tests for auth pieces.
 """
+import os
 import collections
+import pytest
 
 from contextlib import contextmanager
 
@@ -31,7 +33,8 @@ from twisted.web.test import test_httpauth
 
 import leap.soledad.server.auth as auth_module
 from leap.soledad.server.auth import SoledadRealm
-from leap.soledad.server.auth import TokenChecker
+from leap.soledad.server.auth import CouchDBTokenChecker
+from leap.soledad.server.auth import FileTokenChecker
 from leap.soledad.server.auth import TokenCredentialFactory
 from leap.soledad.server._resource import SoledadResource
 
@@ -66,7 +69,7 @@ def dummy_server(token):
     yield collections.defaultdict(lambda: DummyServer(token))
 
 
-class TokenCheckerTestCase(unittest.TestCase):
+class DatabaseTokenCheckerTestCase(unittest.TestCase):
 
     @inlineCallbacks
     def test_good_creds(self):
@@ -74,7 +77,7 @@ class TokenCheckerTestCase(unittest.TestCase):
         token = {'user_id': 'user', 'type': 'Token'}
         server = dummy_server(token)
         # setup the checker with the custom server
-        checker = TokenChecker()
+        checker = CouchDBTokenChecker()
         auth_module.couch_server = lambda url: server
         # assert the checker *can* verify the creds
         creds = UsernamePassword('user', 'pass')
@@ -87,10 +90,41 @@ class TokenCheckerTestCase(unittest.TestCase):
         token = None
         server = dummy_server(token)
         # setup the checker with the custom server
-        checker = TokenChecker()
+        checker = CouchDBTokenChecker()
         auth_module.couch_server = lambda url: server
         # assert the checker *cannot* verify the creds
         creds = UsernamePassword('user', '')
+        with self.assertRaises(UnauthorizedLogin):
+            yield checker.requestAvatarId(creds)
+
+
+class FileTokenCheckerTestCase(unittest.TestCase):
+
+    @inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_good_creds(self):
+        auth_file_path = os.path.join(self.tempdir, 'auth.file')
+        with open(auth_file_path, 'w') as tempfile:
+            tempfile.write('goodservice:goodtoken')
+        # setup the checker with the auth tokens file
+        conf = {'services_tokens_file': auth_file_path}
+        checker = FileTokenChecker(conf)
+        # assert the checker *can* verify the creds
+        creds = UsernamePassword('goodservice', 'goodtoken')
+        avatarId = yield checker.requestAvatarId(creds)
+        self.assertEqual('goodservice', avatarId)
+
+    @inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_bad_creds(self):
+        auth_file_path = os.path.join(self.tempdir, 'auth.file')
+        with open(auth_file_path, 'w') as tempfile:
+            tempfile.write('service:token')
+        # setup the checker with the auth tokens file
+        conf = {'services_tokens_file': auth_file_path}
+        checker = FileTokenChecker(conf)
+        # assert the checker *cannot* verify the creds
+        creds = UsernamePassword('service', 'wrongtoken')
         with self.assertRaises(UnauthorizedLogin):
             yield checker.requestAvatarId(creds)
 

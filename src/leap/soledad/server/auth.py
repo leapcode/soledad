@@ -39,6 +39,7 @@ from twisted.web.resource import IResource
 from leap.soledad.common.couch import couch_server
 
 from ._resource import SoledadResource, SoledadAnonResource
+from ._resource import LocalResource
 from ._blobs import BlobsResource
 from ._config import get_config
 
@@ -77,8 +78,63 @@ class SoledadRealm(object):
         raise NotImplementedError()
 
 
+@implementer(IRealm)
+class LocalServicesRealm(object):
+
+    def __init__(self, conf=None):
+        if conf is None:
+            conf = get_config()
+        self.anon_resource = SoledadAnonResource(
+            enable_blobs=conf['blobs'])
+        self.auth_resource = LocalResource(conf)
+
+    def requestAvatar(self, avatarId, mind, *interfaces):
+
+        # Anonymous access
+        if IAnonymous.providedBy(avatarId):
+            return (IResource, self.anon_resource,
+                    lambda: None)
+
+        # Authenticated access
+        else:
+            if IResource in interfaces:
+                return (IResource, self.auth_resource,
+                        lambda: None)
+        raise NotImplementedError()
+
+
 @implementer(ICredentialsChecker)
-class TokenChecker(object):
+class FileTokenChecker(object):
+
+    def __init__(self, conf=None):
+        conf = conf or get_config()
+        self._trusted_services_tokens = {}
+        self._tokens_file_path = conf['services_tokens_file']
+        self._reload_tokens()
+
+    def _reload_tokens(self):
+        with open(self._tokens_file_path) as tokens_file:
+            for line in tokens_file.readlines():
+                line = line.strip()
+                if not line.startswith('#'):
+                    service, token = line.split(':')
+                    self._trusted_services_tokens[service] = token
+
+    def requestAvatarId(self, credentials):
+        if IAnonymous.providedBy(credentials):
+            return defer.succeed(Anonymous())
+
+        service = credentials.username
+        token = credentials.password
+
+        if self._trusted_services_tokens[service] != token:
+            return defer.fail(error.UnauthorizedLogin())
+
+        return defer.succeed(service)
+
+
+@implementer(ICredentialsChecker)
+class CouchDBTokenChecker(object):
 
     credentialInterfaces = [IUsernamePassword, IAnonymous]
 
@@ -164,10 +220,17 @@ class TokenCredentialFactory(object):
             raise error.LoginFailed('Invalid credentials')
 
 
-def portalFactory(sync_pool):
-    realm = SoledadRealm(sync_pool=sync_pool)
-    checker = TokenChecker()
-    return Portal(realm, [checker])
+def portalFactory(public=True, sync_pool=None):
+    database_checker = CouchDBTokenChecker()
+    file_checker = FileTokenChecker()
+    if public:
+        assert sync_pool
+        realm = SoledadRealm(sync_pool=sync_pool)
+        auth_checkers = [database_checker]
+    else:
+        realm = LocalServicesRealm()
+        auth_checkers = [file_checker, database_checker]
+    return Portal(realm, auth_checkers)
 
 
 credentialFactory = TokenCredentialFactory()

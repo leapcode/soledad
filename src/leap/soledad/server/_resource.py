@@ -50,6 +50,15 @@ class SoledadAnonResource(Resource):
         self.putChild('robots.txt', _Robots())
 
 
+class LocalResource(Resource):
+    """
+    Used for localhost endpoints, like IncomingBox delivery.
+    """
+
+    def __init__(conf):
+        pass
+
+
 class SoledadResource(Resource):
     """
     This is a dummy twisted resource, used only to allow different entry points

@@ -40,7 +40,7 @@ class SoledadEntrypoint(SoledadSession):
         pool = threadpool.ThreadPool(name='wsgi')
         reactor.callWhenRunning(pool.start)
         reactor.addSystemEventTrigger('after', 'shutdown', pool.stop)
-        portal = portalFactory(pool)
+        portal = portalFactory(public=True, sync_pool=pool)
         SoledadSession.__init__(self, portal)
 
 
