@@ -55,8 +55,9 @@ class LocalResource(Resource):
     Used for localhost endpoints, like IncomingBox delivery.
     """
 
-    def __init__(conf):
-        pass
+    def __init__(self):
+        Resource.__init__(self)
+        self.putChild('incoming', IncomingResource())
 
 
 class SoledadResource(Resource):

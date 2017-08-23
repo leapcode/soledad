@@ -7,6 +7,13 @@ from leap.soledad.server import entrypoint
 
 application = service.Application('soledad-server')
 
+# local entrypoint
+local_description = 'tcp:2323:interface=127.0.0.1'
+local_site = server.Site(entrypoint.LocalServicesEntrypoint())
+
+local_server = strports.service(local_description, local_site)
+local_server.setServiceParent(application)
+
 # public entrypoint
 port = os.getenv('HTTPS_PORT', None)
 if port:

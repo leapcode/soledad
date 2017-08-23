@@ -44,7 +44,14 @@ class SoledadEntrypoint(SoledadSession):
         SoledadSession.__init__(self, portal)
 
 
+class LocalServicesEntrypoint(SoledadSession):
+
+    def __init__(self):
+        portal = portalFactory(public=False)
+        SoledadSession.__init__(self, portal)
+
 # see the comments in application.py recarding why couch state has to be
 # initialized when the reactor is running
+
 
 reactor.callWhenRunning(init_couch_state, conf)

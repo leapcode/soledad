@@ -86,7 +86,7 @@ class LocalServicesRealm(object):
             conf = get_config()
         self.anon_resource = SoledadAnonResource(
             enable_blobs=conf['blobs'])
-        self.auth_resource = LocalResource(conf)
+        self.auth_resource = LocalResource()
 
     def requestAvatar(self, avatarId, mind, *interfaces):
 
@@ -105,6 +105,7 @@ class LocalServicesRealm(object):
 
 @implementer(ICredentialsChecker)
 class FileTokenChecker(object):
+    credentialInterfaces = [IUsernamePassword, IAnonymous]
 
     def __init__(self, conf=None):
         conf = conf or get_config()
