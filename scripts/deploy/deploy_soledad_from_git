@@ -37,13 +37,13 @@ cd $LOCALREPO && git checkout -- . && git fetch $REMOTE && git checkout $REMOTE/
 rm -rf $SOLEDADPATH
 
 # copy over some stuff that we'll need -- stolen from debian package
-cp -r $LOCALREPO/server/src/leap/soledad/server $SOLEDADPATH
-cp $LOCALREPO/server/pkg/soledad-server.service $SYSTEMDINIT
-cp $LOCALREPO/server/pkg/soledad-create-userdb /usr/bin/
-cp $LOCALREPO/server/pkg/soledad-sudoers /etc/sudoers.d/
+cp -r $LOCALREPO/src/leap/soledad/server $SOLEDADPATH
+cp $LOCALREPO/pkg/server/soledad-server.service $SYSTEMDINIT
+cp $LOCALREPO/pkg/server/soledad-create-userdb /usr/bin/
+cp $LOCALREPO/pkg/server/soledad-sudoers /etc/sudoers.d/
 
 # Let's append the branch info to the version string! So that nobody is lost
-cd $LOCALREPO &&  echo "__version__ = '"`git describe`"~"`git status | head -n 1 | cut -d' ' -f 4`"'" >> $SOLEDADPATH/__init__.py
+cd $LOCALREPO &&  echo "__version__ = '"`git describe`"~"`git status | head -n 1 | cut -d' ' -f 4`"'" >> $SOLEDADPATH/../__init__.py
 
 # restart the daemon
 systemctl --system daemon-reload >/dev/null || true
