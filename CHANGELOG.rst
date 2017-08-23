@@ -6,6 +6,25 @@ Changelog
 
 .. note:: This version is not yet released and is under active development.
 
+Server
+~~~~~~
+
+- [bug] Add DELETE method to url mapper.
+- [bug[ Use correct keyword argument for server state initialization.
+
+Client
+~~~~~~
+
+- [bug] Several bugfixes for BlobManager initialization.
+- [bug] Fix usage of StringIO class in gzip middleware.
+
+Misc
+~~~~
+
+- Use latest version of pytest-benchmark.
+- Find correct twistd when outside tox envs
+
+
 0.10.2 - Mon 21 Aug, 2017
 ----------------------------------
 
