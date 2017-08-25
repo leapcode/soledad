@@ -424,7 +424,7 @@ class SQLiteBlobBackend(object):
 
         self.dbpool = ConnectionPool(
             backend, self.path, check_same_thread=False, timeout=5,
-            cp_openfun=openfun, cp_min=1, cp_max=2, cp_name='blob_pool')
+            cp_openfun=openfun, cp_min=1, cp_max=10, cp_name='blob_pool')
 
     def close(self):
         from twisted._threads import AlreadyQuit
