@@ -24,6 +24,7 @@ from twisted.web.resource import getChildForRequest
 from twisted.internet import reactor
 
 from leap.soledad.server._resource import SoledadResource
+from leap.soledad.server._resource import LocalResource
 from leap.soledad.server._server_info import ServerInfo
 from leap.soledad.server._blobs import BlobsResource
 from leap.soledad.server._incoming import IncomingResource
@@ -70,8 +71,14 @@ class SoledadResourceTestCase(unittest.TestCase):
         self.assertIsInstance(child, WSGIResource)
         self.assertIsInstance(child._application, GzipMiddleware)
 
-    def test_get_incoming(self):
+    def test_no_incoming_on_public_resource(self):
         resource = SoledadResource(None, sync_pool=_pool)
+        request = DummyRequest(['incoming'])
+        child = getChildForRequest(resource, request)
+        self.assertIsInstance(child, WSGIResource)
+
+    def test_get_incoming(self):
+        resource = LocalResource()
         request = DummyRequest(['incoming'])
         child = getChildForRequest(resource, request)
         self.assertIsInstance(child, IncomingResource)

@@ -86,9 +86,6 @@ class SoledadResource(Resource):
         if blobs_resource:
             self.putChild('blobs', blobs_resource)
 
-        # requests to /incoming goes into IncomingResource
-        self.putChild('incoming', IncomingResource())
-
         # other requests are routed to legacy sync resource
         self._sync_resource = get_sync_resource(sync_pool)
 
