@@ -3,7 +3,7 @@ Description=Soledad Server
 
 [Service]
 Environment=PATH=/sbin:/bin:/usr/sbin:/usr/bin
-Environment=CLASS=leap.soledad.server.entrypoint.SoledadEntrypoint
+Environment=TAC=usr/lib/python2.7/dist-packages/leap/soledad/server/server.tac
 Environment=HTTPS_PORT=2424
 Environment=CERT_PATH=/etc/soledad/soledad-server.pem
 Environment=PRIVKEY_PATH=/etc/soledad/soledad-server.key
@@ -16,9 +16,7 @@ ExecStart=/usr/bin/twistd \
   --pidfile= \
   --syslog \
   --prefix=soledad-server \
-  web \
-  --class=${CLASS} \
-  --port=ssl:${HTTPS_PORT}:privateKey=${PRIVKEY_PATH}:certKey=${CERT_PATH}:sslmethod=${SSL_METHOD}
+  ${TAC}
 
 WorkingDirectory=/var/lib/soledad/
 
