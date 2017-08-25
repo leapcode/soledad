@@ -26,14 +26,14 @@ import socket
 import pytest
 import treq
 
+from pkg_resources import resource_filename
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
 from twisted.internet.protocol import ProcessProtocol
 from twisted.web.client import Agent
 
 
-TAC_FILE_PATH = ('..', '..', '..', '..', 'pkg', 'server.tac')
-TAC_FILE_PATH = os.path.abspath(os.path.join(__file__, *TAC_FILE_PATH))
+TAC_FILE_PATH = resource_filename('leap.soledad.server', 'server.tac')
 
 
 class TacServerTestCase(unittest.TestCase):
