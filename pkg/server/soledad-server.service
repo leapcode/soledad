@@ -3,8 +3,9 @@ Description=Soledad Server
 
 [Service]
 Environment=PATH=/sbin:/bin:/usr/sbin:/usr/bin
-Environment=TAC=usr/lib/python2.7/dist-packages/leap/soledad/server/server.tac
+Environment=TAC=/usr/lib/python2.7/dist-packages/leap/soledad/server/server.tac
 Environment=HTTPS_PORT=2424
+Environment=LOCAL_SERVICES_PORT=2525
 Environment=CERT_PATH=/etc/soledad/soledad-server.pem
 Environment=PRIVKEY_PATH=/etc/soledad/soledad-server.key
 Environment=HOME=/var/lib/soledad/
@@ -16,6 +17,7 @@ ExecStart=/usr/bin/twistd \
   --pidfile= \
   --syslog \
   --prefix=soledad-server \
+  --python \
   ${TAC}
 
 WorkingDirectory=/var/lib/soledad/
