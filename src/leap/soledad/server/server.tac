@@ -5,14 +5,14 @@ from twisted.application import service, strports
 from twisted.web import server
 from twisted.python import log
 
-from leap.soledad.server import entrypoint
+from leap.soledad.server import entrypoints
 
 application = service.Application('soledad-server')
 
 # local entrypoint
-local_port = os.getenv('LOCAL_SERVICES_PORT', 2323)
+local_port = os.getenv('LOCAL_SERVICES_PORT', 2525)
 local_description = 'tcp:%s:interface=127.0.0.1' % local_port
-local_site = server.Site(entrypoint.LocalServicesEntrypoint())
+local_site = server.Site(entrypoints.LocalServicesEntrypoint())
 
 local_server = strports.service(local_description, local_site)
 local_server.setServiceParent(application)
@@ -33,9 +33,13 @@ if port:
         'privateKey=' + privateKey,
         'certKey=' + certKey,
         'sslmethod=' + sslmethod])
-else:
+elif os.getenv('DEBUG_SERVER', False):
     public_description = 'tcp:port=2424:interface=0.0.0.0'
-public_site = server.Site(entrypoint.SoledadEntrypoint())
+else:
+    log.err("HTTPS_PORT env var is required to be set!")
+    sys.exit(20)
+
+public_site = server.Site(entrypoints.SoledadEntrypoint())
 
 public_server = strports.service(public_description, public_site)
 public_server.setServiceParent(application)

@@ -24,7 +24,7 @@ from ._incoming import IncomingResource
 from ._wsgi import get_sync_resource
 
 
-__all__ = ['SoledadResource', 'SoledadAnonResource']
+__all__ = ['PublicResource', 'SoledadAnonResource']
 
 
 class _Robots(Resource):
@@ -60,7 +60,7 @@ class LocalResource(Resource):
         self.putChild('incoming', IncomingResource())
 
 
-class SoledadResource(Resource):
+class PublicResource(Resource):
     """
     This is a dummy twisted resource, used only to allow different entry points
     for the Soledad Server.

@@ -36,7 +36,7 @@ from leap.soledad.server.auth import SoledadRealm
 from leap.soledad.server.auth import CouchDBTokenChecker
 from leap.soledad.server.auth import FileTokenChecker
 from leap.soledad.server.auth import TokenCredentialFactory
-from leap.soledad.server._resource import SoledadResource
+from leap.soledad.server._resource import PublicResource
 
 
 class SoledadRealmTestCase(unittest.TestCase):
@@ -47,7 +47,7 @@ class SoledadRealmTestCase(unittest.TestCase):
         pool = reactor.getThreadPool()
         realm = SoledadRealm(conf=conf, sync_pool=pool)
         iface, avatar, logout = realm.requestAvatar('any', None, IResource)
-        self.assertIsInstance(avatar, SoledadResource)
+        self.assertIsInstance(avatar, PublicResource)
         self.assertIsNone(logout())
 
 
@@ -69,7 +69,7 @@ def dummy_server(token):
     yield collections.defaultdict(lambda: DummyServer(token))
 
 
-class DatabaseTokenCheckerTestCase(unittest.TestCase):
+class CouchDBTokenCheckerTestCase(unittest.TestCase):
 
     @inlineCallbacks
     def test_good_creds(self):

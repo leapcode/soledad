@@ -23,7 +23,7 @@ from twisted.web.wsgi import WSGIResource
 from twisted.web.resource import getChildForRequest
 from twisted.internet import reactor
 
-from leap.soledad.server._resource import SoledadResource
+from leap.soledad.server._resource import PublicResource
 from leap.soledad.server._resource import LocalResource
 from leap.soledad.server._server_info import ServerInfo
 from leap.soledad.server._blobs import BlobsResource
@@ -34,11 +34,11 @@ from leap.soledad.server.gzip_middleware import GzipMiddleware
 _pool = reactor.getThreadPool()
 
 
-class SoledadResourceTestCase(unittest.TestCase):
+class PublicResourceTestCase(unittest.TestCase):
 
     def test_get_root(self):
         blobs_resource = None  # doesn't matter
-        resource = SoledadResource(
+        resource = PublicResource(
             blobs_resource=blobs_resource, sync_pool=_pool)
         request = DummyRequest([''])
         child = getChildForRequest(resource, request)
@@ -46,7 +46,7 @@ class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_blobs_enabled(self):
         blobs_resource = BlobsResource("filesystem", '/tmp')
-        resource = SoledadResource(
+        resource = PublicResource(
             blobs_resource=blobs_resource, sync_pool=_pool)
         request = DummyRequest(['blobs'])
         child = getChildForRequest(resource, request)
@@ -54,7 +54,7 @@ class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_blobs_disabled(self):
         blobs_resource = None
-        resource = SoledadResource(
+        resource = PublicResource(
             blobs_resource=blobs_resource, sync_pool=_pool)
         request = DummyRequest(['blobs'])
         child = getChildForRequest(resource, request)
@@ -64,7 +64,7 @@ class SoledadResourceTestCase(unittest.TestCase):
 
     def test_get_sync(self):
         blobs_resource = None  # doesn't matter
-        resource = SoledadResource(
+        resource = PublicResource(
             blobs_resource=blobs_resource, sync_pool=_pool)
         request = DummyRequest(['user-db', 'sync-from', 'source-id'])
         child = getChildForRequest(resource, request)
@@ -72,9 +72,10 @@ class SoledadResourceTestCase(unittest.TestCase):
         self.assertIsInstance(child._application, GzipMiddleware)
 
     def test_no_incoming_on_public_resource(self):
-        resource = SoledadResource(None, sync_pool=_pool)
+        resource = PublicResource(None, sync_pool=_pool)
         request = DummyRequest(['incoming'])
         child = getChildForRequest(resource, request)
+        # WSGIResource is returned if a path is unknown
         self.assertIsInstance(child, WSGIResource)
 
     def test_get_incoming(self):

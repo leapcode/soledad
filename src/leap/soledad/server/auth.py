@@ -17,6 +17,7 @@
 """
 Twisted http token auth.
 """
+import os
 import binascii
 import time
 
@@ -38,7 +39,7 @@ from twisted.web.resource import IResource
 
 from leap.soledad.common.couch import couch_server
 
-from ._resource import SoledadResource, SoledadAnonResource
+from ._resource import PublicResource, SoledadAnonResource
 from ._resource import LocalResource
 from ._blobs import BlobsResource
 from ._config import get_config
@@ -59,7 +60,7 @@ class SoledadRealm(object):
                                        conf['blobs_path']) if blobs else None
         self.anon_resource = SoledadAnonResource(
             enable_blobs=blobs)
-        self.auth_resource = SoledadResource(
+        self.auth_resource = PublicResource(
             blobs_resource=blobs_resource,
             sync_pool=sync_pool)
 
@@ -81,9 +82,8 @@ class SoledadRealm(object):
 @implementer(IRealm)
 class LocalServicesRealm(object):
 
-    def __init__(self, conf=None):
-        if conf is None:
-            conf = get_config()
+    def __init__(self):
+        conf = get_config()
         self.anon_resource = SoledadAnonResource(
             enable_blobs=conf['blobs'])
         self.auth_resource = LocalResource()
@@ -108,12 +108,16 @@ class FileTokenChecker(object):
     credentialInterfaces = [IUsernamePassword, IAnonymous]
 
     def __init__(self, conf=None):
+        # conf parameter is only used during tests
         conf = conf or get_config()
         self._trusted_services_tokens = {}
         self._tokens_file_path = conf['services_tokens_file']
         self._reload_tokens()
 
     def _reload_tokens(self):
+        if not os.path.isfile(self._tokens_file_path):
+            log.warn("No local token auth file at %s" % self._tokens_file_path)
+            return
         with open(self._tokens_file_path) as tokens_file:
             for line in tokens_file.readlines():
                 line = line.strip()
@@ -128,6 +132,7 @@ class FileTokenChecker(object):
         service = credentials.username
         token = credentials.password
 
+        # TODO: Use constant time comparison
         if self._trusted_services_tokens[service] != token:
             return defer.fail(error.UnauthorizedLogin())
 
@@ -221,16 +226,17 @@ class TokenCredentialFactory(object):
             raise error.LoginFailed('Invalid credentials')
 
 
-def portalFactory(public=True, sync_pool=None):
+def publicPortal(sync_pool):
     database_checker = CouchDBTokenChecker()
+    realm = SoledadRealm(sync_pool=sync_pool)
+    auth_checkers = [database_checker]
+    return Portal(realm, auth_checkers)
+
+
+def localPortal():
     file_checker = FileTokenChecker()
-    if public:
-        assert sync_pool
-        realm = SoledadRealm(sync_pool=sync_pool)
-        auth_checkers = [database_checker]
-    else:
-        realm = LocalServicesRealm()
-        auth_checkers = [file_checker, database_checker]
+    realm = LocalServicesRealm()
+    auth_checkers = [file_checker]
     return Portal(realm, auth_checkers)
 
 

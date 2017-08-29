@@ -13,12 +13,12 @@ client.
 There are currently two distinct authenticated entry points:
 
 * A public TLS encrypted **Users API**, providing the *Synchronization*,
-  *Blobs* and *Incoming* services, verified against the Leap Platform
+  *Blobs* services, verified against the Leap Platform
   ``tokens`` database.
 
 * A local plaintext **Services API**, providing the delivery part of the
-  *Incoming* service, authenticated against tokens defined in the server
-  configuration file.
+  *Incoming* service, authenticated against tokens defined in a file specified
+  on the server configuration file.
 
 Authorization header
 --------------------
@@ -34,13 +34,9 @@ server (as the version of the server and runtime configuration options).
 Special credentials for local services
 --------------------------------------
 
-Some special credentials can be configured in the Soledad Server configuration
-file. Currently, the only special credential provided is for the `/incoming`
-API, and defaults to the value `mx:default_mx_token`.
-
-If a credential header is sent in the request and the uuid is not one in a
-special credential configured in the Soledad Server configuration file, then a
-CouchDB database called `tokens` is consulted to check for a valid token.
+Some special credentials can be added into a file and then configured in the
+Soledad Server configuration file. Currently, the only special credential
+provided is for the `/incoming` API.
 
 Implementation
 --------------
@@ -50,8 +46,10 @@ daemon that loads a `.tac file
 <https://twistedmatrix.com/documents/12.2.0/core/howto/application.html#auto5>`_.
 When the server is started, two services are spawned:
 
-* A local entrypoint for services (serving on localhost only on port 2323).
-* A public entrypoint for users (serving on public IP on port 2424).
+* A local entrypoint for services (serving on localhost only).
+* A public entrypoint for users (serving on public IP).
+* Localhost and public IP ports are configurable. Default is 2424 for public IP
+  and 2525 for localhost.
 
 .. code-block:: none
 
@@ -61,7 +59,7 @@ When the server is started, two services are spawned:
     '------------------------------------------------------'
        |                                                |
     .--------------.                      .----------------.
-    | 0.0.0.0:2424 |                      | 127.0.0.1:2323 |
+    | 0.0.0.0:2424 |                      | 127.0.0.1:2525 |
     |     (TLS)    |                      |     (TCP)      |
     '--------------'                      '----------------'
        |                                                |
@@ -79,8 +77,4 @@ When the server is started, two services are spawned:
        |  '-------'                | (delivery only) |
        |  .--------.               '-----------------'
        '->| /blobs |
-       |  '--------'
-       |  .-------------.
-       '->|  /incoming  |
-          | (users API) |
-          '-------------'
+          '--------'

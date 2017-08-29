@@ -31,7 +31,7 @@ CONFIG_DEFAULTS = {
         'batching': True,
         'blobs': False,
         'blobs_path': '/srv/leap/soledad/blobs',
-        'services_tokens_file': '/dev/null',
+        'services_tokens_file': '/etc/soledad/incoming.tokens',
     },
     'database-security': {
         'members': ['soledad'],

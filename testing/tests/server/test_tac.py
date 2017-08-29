@@ -45,7 +45,7 @@ class TacServerTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_local_public_default_ports_on_server_tac(self):
         yield self._spawnServer()
-        result = yield self._get('http://localhost:2323/incoming')
+        result = yield self._get('http://localhost:2525/incoming')
         fail_msg = "Localhost endpoint must require authentication!"
         self.assertEquals(401, result.code, fail_msg)
 
@@ -56,7 +56,7 @@ class TacServerTestCase(unittest.TestCase):
         result = yield self._get(public_endpoint_url + 'other')
         self.assertEquals(401, result.code, "public server lacks auth!")
 
-        public_using_local_port_url = 'http://%s:2323/' % self._get_public_ip()
+        public_using_local_port_url = 'http://%s:2525/' % self._get_public_ip()
         with pytest.raises(Exception):
             yield self._get(public_using_local_port_url)
 
@@ -66,7 +66,8 @@ class TacServerTestCase(unittest.TestCase):
         executable = os.path.join(env, 'bin', 'twistd')
         no_pid_argument = '--pidfile='
         args = [executable, no_pid_argument, '-noy', TAC_FILE_PATH]
-        t = reactor.spawnProcess(protocol, executable, args)
+        env = {'DEBUG_SERVER': 'yes'}
+        t = reactor.spawnProcess(protocol, executable, args, env=env)
         self.addCleanup(os.kill, t.pid, signal.SIGKILL)
         self.addCleanup(t.loseConnection)
         return self._sleep(1)  # it takes a while to start server

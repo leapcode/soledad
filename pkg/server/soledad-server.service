@@ -3,6 +3,7 @@ Description=Soledad Server
 
 [Service]
 Environment=PATH=/sbin:/bin:/usr/sbin:/usr/bin
+# TODO: Change this dist-packages path as it's Debian specific
 Environment=TAC=/usr/lib/python2.7/dist-packages/leap/soledad/server/server.tac
 Environment=HTTPS_PORT=2424
 Environment=LOCAL_SERVICES_PORT=2525
@@ -17,8 +18,7 @@ ExecStart=/usr/bin/twistd \
   --pidfile= \
   --syslog \
   --prefix=soledad-server \
-  --python \
-  ${TAC}
+  --python=${TAC}
 
 WorkingDirectory=/var/lib/soledad/
 
