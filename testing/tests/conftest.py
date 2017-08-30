@@ -131,13 +131,26 @@ class SoledadServer(object):
         ])
 
     def _create_conf_file(self):
+
+        # come up with name of the configuration file
+        fname = '/etc/soledad/soledad-server.conf'
         if not os.access('/etc', os.W_OK):
-            return
-        if not os.path.isdir('/etc/soledad'):
-            os.mkdir('/etc/soledad')
-        with open('/etc/soledad/soledad-server.conf', 'w') as f:
-            content = '[soledad-server]\ncouch_url = %s' % self._couch_url
+            fname = os.path.join(self.tmpdir.strpath, 'soledad-server.conf')
+
+        # create the configuration file
+        dirname = os.path.dirname(fname)
+        if not os.path.isdir(dirname):
+            os.mkdir(dirname)
+        with open(fname, 'w') as f:
+            blobs_path = os.path.join(str(self.tmpdir), 'blobs')
+            content = '''[soledad-server]
+couch_url = %s
+blobs = true
+blobs_path = %s''' % (self._couch_url, blobs_path)
             f.write(content)
+
+        # update the environment to use that file
+        os.environ.update({'SOLEDAD_SERVER_CONFIG_FILE': fname})
 
     def stop(self):
         pid = get_pid(self._pidfile)
