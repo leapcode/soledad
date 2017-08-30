@@ -17,11 +17,12 @@
 
 
 import configparser
+import os
 
 
 __all__ = ['get_config']
 
-
+DEFAULT_CONFIG_FILE = '/etc/soledad/soledad-server.conf'
 CONFIG_DEFAULTS = {
     'soledad-server': {
         'couch_url': 'http://localhost:5984',
@@ -46,7 +47,9 @@ _config = None
 def get_config(section='soledad-server'):
     global _config
     if not _config:
-        _config = _load_config('/etc/soledad/soledad-server.conf')
+        fname = os.environ.get(
+            'SOLEDAD_SERVER_CONFIG_FILE', DEFAULT_CONFIG_FILE)
+        _config = _load_config(fname)
     return _config[section]
 
 
