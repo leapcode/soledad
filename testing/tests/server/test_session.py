@@ -184,3 +184,12 @@ class SoledadSessionTestCase(unittest.TestCase):
         request.render(child)
         self.assertEqual(request.responseCode, 500)
         self.assertEqual(len(self.flushLoggedErrors(UnexpectedException)), 1)
+
+    def test_cantAccessOtherUserPathByDefault(self):
+        request = self.makeRequest([])
+        # valid url_mapper path, but for another user
+        request.path = '/blobs/another-user/'
+        child = self._authorizedTokenLogin(request)
+
+        request.render(child)
+        self.assertEqual(request.responseCode, 500)
