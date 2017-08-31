@@ -50,3 +50,8 @@ class IncomingResourceTestCase(unittest.TestCase):
         doc = self.couchdb.put_doc.call_args[0][0]
         self.assertEquals(doc_id, doc.doc_id)
         self.assertEquals(formatter.format(content, scheme), doc.content)
+
+    def test_formatter(self):
+        formatter = IncomingFormatter()
+        formatted = formatter.format('content', EncryptionSchemes.PUBKEY)
+        self.assertEquals(formatted['_enc_scheme'], EncryptionSchemes.PUBKEY)

@@ -100,7 +100,7 @@ class IncomingFormatter(object):
     def format(self, raw_content, enc_scheme):
         return {self.INCOMING_KEY: True,
                 self.ERROR_DECRYPTING_KEY: False,
-                ENC_SCHEME_KEY: EncryptionSchemes.NONE,
+                ENC_SCHEME_KEY: enc_scheme,
                 ENC_JSON_KEY: raw_content}
 
     def preamble(self, raw_content, doc_id):
