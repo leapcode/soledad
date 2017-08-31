@@ -123,6 +123,7 @@ class FileTokenChecker(object):
                 line = line.strip()
                 if not line.startswith('#'):
                     service, token = line.split(':')
+                    log.info("Loaded credentials for service: %s" % service)
                     self._trusted_services_tokens[service] = token
 
     def requestAvatarId(self, credentials):

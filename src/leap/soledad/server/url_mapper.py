@@ -78,4 +78,4 @@ class URLMapper(object):
         self._connect('/blobs/{uuid}/', ['GET'])
 
         # incoming resource
-        self._connect('/incoming/{uuid}/{incoming_id}', ['PUT'])
+        self._connect('/incoming/{target_user_uuid}/{incoming_id}', ['PUT'])
