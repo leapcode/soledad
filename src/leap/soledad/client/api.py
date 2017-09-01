@@ -275,7 +275,7 @@ class Soledad(object):
         return sync_phase, sync_exchange_phase
 
     def _init_blobmanager(self):
-        path = os.path.join(os.path.dirname(self._local_db_path), 'blobs')
+        path = os.path.dirname(self._local_db_path)
         url = urlparse.urljoin(self.server_url, 'blobs/%s' % self.uuid)
         key = self._secrets.local_key
         self.blobmanager = blobs.BlobManager(

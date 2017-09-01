@@ -175,7 +175,7 @@ class BlobManager(object):
             cert_file=None):
         if local_path:
             mkdir_p(os.path.dirname(local_path))
-            self.local = SQLiteBlobBackend(local_path, key)
+            self.local = SQLiteBlobBackend(local_path, key=key, user=user)
         self.remote = remote
         self.secret = secret
         self.user = user
@@ -409,9 +409,10 @@ class BlobManager(object):
 
 class SQLiteBlobBackend(object):
 
-    def __init__(self, path, key=None):
+    def __init__(self, path, key=None, user=None):
+        dbname = '%s_blobs.db' % (user or 'soledad')
         self.path = os.path.abspath(
-            os.path.join(path, 'soledad_blob.db'))
+            os.path.join(path, dbname))
         mkdir_p(os.path.dirname(self.path))
         if not key:
             raise ValueError('key cannot be None')
