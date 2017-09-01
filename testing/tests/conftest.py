@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 import pytest
@@ -234,10 +235,11 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
         # in some tests we might want to use the same user and remote database
         # but with a clean/empty local database (i.e. download benchmarks), so
         # here we provide a way to do that.
-        db_file = '%s.db' % default_uuid
+        idx = 1
         if force_fresh_db:
-            prefix = uuid4().hex
-            db_file = prefix + '-' + db_file
+            # find the next index for this user
+            idx = len(glob.glob('%s/*-*.db' % tmpdir.strpath)) + 1
+        db_file = '%s-%d.db' % (default_uuid, idx)
         local_db_path = os.path.join(tmpdir.strpath, db_file)
 
         soledad_client = Soledad(
