@@ -11,6 +11,7 @@ Server
 
 - [bug] Add DELETE method to url mapper.
 - [bug[ Use correct keyword argument for server state initialization.
+- [feat] Get config file name from environment variable.
 
 Client
 ~~~~~~
@@ -23,6 +24,7 @@ Misc
 
 - Use latest version of pytest-benchmark.
 - Find correct twistd when outside tox envs
+- Build packages for zesty and stretch.
 
 
 0.10.2 - Mon 21 Aug, 2017
