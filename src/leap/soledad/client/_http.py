@@ -23,6 +23,7 @@ from twisted.internet import reactor
 from twisted.web.iweb import IAgent
 from twisted.web.client import Agent
 from twisted.web.client import CookieAgent
+from twisted.web.client import HTTPConnectionPool
 from twisted.web.http_headers import Headers
 
 from cookielib import CookieJar
@@ -57,7 +58,8 @@ class PinnedTokenAgent(Agent):
         self.set_token(token)
         # pin this agent with the platform TLS certificate
         factory = getPolicyForHTTPS(cert_file)
-        Agent.__init__(self, reactor, contextFactory=factory)
+        pool = HTTPConnectionPool(reactor, persistent=True)
+        Agent.__init__(self, reactor, contextFactory=factory, pool=pool)
 
     def set_token(self, token):
         self._token = token
