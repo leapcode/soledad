@@ -22,10 +22,11 @@ import base64
 from twisted.internet import reactor
 from twisted.web.iweb import IAgent
 from twisted.web.client import Agent
+from twisted.web.client import CookieAgent
 from twisted.web.http_headers import Headers
 
+from cookielib import CookieJar
 from treq.client import HTTPClient as _HTTPClient
-
 from zope.interface import implementer
 
 from leap.common.http import getPolicyForHTTPS
@@ -37,7 +38,9 @@ __all__ = ['HTTPClient', 'PinnedTokenAgent']
 class HTTPClient(_HTTPClient):
 
     def __init__(self, uuid, token, cert_file):
-        self._agent = PinnedTokenAgent(uuid, token, cert_file)
+        agent = PinnedTokenAgent(uuid, token, cert_file)
+        jar = CookieJar()
+        self._agent = CookieAgent(agent, jar)
         super(self.__class__, self).__init__(self._agent)
 
     def set_token(self, token):
