@@ -22,14 +22,40 @@ from zope.interface import implementer
 from twisted.cred.credentials import Anonymous
 from twisted.cred import error
 from twisted.python import log
+from twisted.python.components import registerAdapter
 from twisted.web import util
 from twisted.web._auth import wrapper
 from twisted.web.guard import HTTPAuthSessionWrapper
 from twisted.web.resource import ErrorPage
 from twisted.web.resource import IResource
+from twisted.web.server import Session
+
+from zope.interface import Interface
+from zope.interface import Attribute
 
 from leap.soledad.server.auth import credentialFactory
 from leap.soledad.server.url_mapper import URLMapper
+
+
+class ISessionData(Interface):
+    username = Attribute('An uuid.')
+    password = Attribute('A token.')
+
+
+@implementer(ISessionData)
+class SessionData(object):
+    def __init__(self, session):
+        self.username = None
+        self.password = None
+
+
+registerAdapter(SessionData, Session, ISessionData)
+
+
+def _sessionData(request):
+    session = request.getSession()
+    data = ISessionData(session)
+    return data
 
 
 @implementer(IResource)
@@ -103,5 +129,19 @@ class SoledadSession(HTTPAuthSessionWrapper):
         if request_uuid and request_uuid != credentials.username:
             return ErrorPage(500, None, None)
 
-        # if all checks pass, try to login with credentials
-        return util.DeferredResource(self._login(credentials))
+        # eventually return a cached resouce
+        sessionData = _sessionData(request)
+        if sessionData.username == credentials.username \
+                and sessionData.password == credentials.password:
+            return self._portal.realm.auth_resource
+
+        # if all checks pass, try to login with credentials and cache
+        # credentials in case of success
+        def _cacheSessionData(res):
+            sessionData.username = credentials.username
+            sessionData.password = credentials.password
+            return res
+
+        d = self._login(credentials)
+        d.addCallback(_cacheSessionData)
+        return util.DeferredResource(d)
