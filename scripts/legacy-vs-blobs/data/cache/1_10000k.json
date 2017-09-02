@@ -1,0 +1,111 @@
+{
+    "datetime": "2017-09-02T03:46:17.875002", 
+    "machine_info": {
+        "processor": "", 
+        "python_implementation_version": "2.7.13", 
+        "python_version": "2.7.13", 
+        "machine": "x86_64", 
+        "python_build": [
+            "default", 
+            "Jan 19 2017 14:48:08"
+        ], 
+        "python_implementation": "CPython", 
+        "python_compiler": "GCC 6.3.0 20170118", 
+        "cpu": {
+            "vendor_id": "GenuineIntel", 
+            "brand": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz", 
+            "hardware": "unknown"
+        }, 
+        "release": "4.9.0-3-amd64", 
+        "system": "Linux", 
+        "host": "pajeh", 
+        "node": "pajeh"
+    }, 
+    "version": "3.1.1", 
+    "commit_info": {
+        "time": "2017-09-02T00:39:13-03:00", 
+        "id": "2dea7ebc513eaa506704fd7ae68bae94b220eea8", 
+        "project": "soledad", 
+        "author_time": "2017-09-02T00:27:58-03:00", 
+        "branch": "8856", 
+        "dirty": true
+    }, 
+    "benchmarks": [
+        {
+            "extra_info": {
+                "cpu_percent": 25.8, 
+                "doc": ""
+            }, 
+            "name": "test_legacy_1_10000k", 
+            "params": null, 
+            "options": {
+                "max_time": 1.0, 
+                "min_rounds": 5, 
+                "min_time": 5e-06, 
+                "warmup": false, 
+                "timer": "time", 
+                "disable_gc": false
+            }, 
+            "group": "test_legacy_vs_blobs_1_10000k", 
+            "fullname": "tests/benchmarks/test_legacy_vs_blobs.py::test_legacy_1_10000k", 
+            "param": null, 
+            "stats": {
+                "mean": 9.607597470283508, 
+                "ld15iqr": 9.551655054092407, 
+                "iqr_outliers": 0, 
+                "outliers": "1;0", 
+                "q3": 9.663439989089966, 
+                "q1": 9.55175495147705, 
+                "iqr": 0.11168503761291504, 
+                "total": 38.43038988113403, 
+                "rounds": 4, 
+                "median": 9.563774466514587, 
+                "stddev_outliers": 1, 
+                "min": 9.551655054092407, 
+                "hd15iqr": 9.751185894012451, 
+                "ops": 0.10408429402803564, 
+                "stddev": 0.09638854573531173, 
+                "iterations": 1, 
+                "max": 9.751185894012451
+            }
+        }, 
+        {
+            "extra_info": {
+                "cpu_percent": 40.2, 
+                "doc": ""
+            }, 
+            "name": "test_blobs_1_10000k", 
+            "params": null, 
+            "options": {
+                "max_time": 1.0, 
+                "min_rounds": 5, 
+                "min_time": 5e-06, 
+                "warmup": false, 
+                "timer": "time", 
+                "disable_gc": false
+            }, 
+            "group": "test_legacy_vs_blobs_1_10000k", 
+            "fullname": "tests/benchmarks/test_legacy_vs_blobs.py::test_blobs_1_10000k", 
+            "param": null, 
+            "stats": {
+                "mean": 2.179791212081909, 
+                "ld15iqr": 2.1572468280792236, 
+                "iqr_outliers": 0, 
+                "outliers": "2;0", 
+                "q3": 2.193374514579773, 
+                "q1": 2.1662079095840454, 
+                "iqr": 0.02716660499572754, 
+                "total": 8.719164848327637, 
+                "rounds": 4, 
+                "median": 2.1782270669937134, 
+                "stddev_outliers": 2, 
+                "min": 2.1572468280792236, 
+                "hd15iqr": 2.2054638862609863, 
+                "ops": 0.45875953369171735, 
+                "stddev": 0.01992429175453132, 
+                "iterations": 1, 
+                "max": 2.2054638862609863
+            }
+        }
+    ]
+}

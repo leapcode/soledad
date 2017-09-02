@@ -1,0 +1,111 @@
+{
+    "benchmarks": [
+        {
+            "params": null, 
+            "fullname": "tests/benchmarks/test_legacy_vs_blobs.py::test_legacy_10_1000k", 
+            "extra_info": {
+                "doc": "", 
+                "cpu_percent": 27.7
+            }, 
+            "group": "test_legacy_vs_blobs_10_1000k", 
+            "stats": {
+                "q1": 8.741152048110962, 
+                "rounds": 4, 
+                "q3": 8.863584876060486, 
+                "median": 8.83247196674347, 
+                "stddev_outliers": 1, 
+                "iqr": 0.12243282794952393, 
+                "mean": 8.802368462085724, 
+                "iqr_outliers": 0, 
+                "iterations": 1, 
+                "total": 35.209473848342896, 
+                "min": 8.67733097076416, 
+                "outliers": "1;0", 
+                "ops": 0.11360578738634734, 
+                "ld15iqr": 8.67733097076416, 
+                "stddev": 0.08786766595777334, 
+                "hd15iqr": 8.867198944091797, 
+                "max": 8.867198944091797
+            }, 
+            "name": "test_legacy_10_1000k", 
+            "param": null, 
+            "options": {
+                "min_rounds": 5, 
+                "timer": "time", 
+                "max_time": 1.0, 
+                "min_time": 5e-06, 
+                "warmup": false, 
+                "disable_gc": false
+            }
+        }, 
+        {
+            "params": null, 
+            "fullname": "tests/benchmarks/test_legacy_vs_blobs.py::test_blobs_10_1000k", 
+            "extra_info": {
+                "doc": "", 
+                "cpu_percent": 37.0
+            }, 
+            "group": "test_legacy_vs_blobs_10_1000k", 
+            "stats": {
+                "q1": 1.8672034740447998, 
+                "rounds": 4, 
+                "q3": 1.9366559982299805, 
+                "median": 1.8831886053085327, 
+                "stddev_outliers": 1, 
+                "iqr": 0.06945252418518066, 
+                "mean": 1.9019297361373901, 
+                "iqr_outliers": 0, 
+                "iterations": 1, 
+                "total": 7.6077189445495605, 
+                "min": 1.8517439365386963, 
+                "outliers": "1;0", 
+                "ops": 0.5257817788952025, 
+                "ld15iqr": 1.8517439365386963, 
+                "stddev": 0.06029736288568101, 
+                "hd15iqr": 1.9895977973937988, 
+                "max": 1.9895977973937988
+            }, 
+            "name": "test_blobs_10_1000k", 
+            "param": null, 
+            "options": {
+                "min_rounds": 5, 
+                "timer": "time", 
+                "max_time": 1.0, 
+                "min_time": 5e-06, 
+                "warmup": false, 
+                "disable_gc": false
+            }
+        }
+    ], 
+    "datetime": "2017-09-02T03:48:24.650044", 
+    "version": "3.1.1", 
+    "machine_info": {
+        "python_implementation_version": "2.7.13", 
+        "system": "Linux", 
+        "host": "pajeh", 
+        "python_compiler": "GCC 6.3.0 20170118", 
+        "release": "4.9.0-3-amd64", 
+        "python_implementation": "CPython", 
+        "processor": "", 
+        "node": "pajeh", 
+        "python_build": [
+            "default", 
+            "Jan 19 2017 14:48:08"
+        ], 
+        "python_version": "2.7.13", 
+        "machine": "x86_64", 
+        "cpu": {
+            "brand": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz", 
+            "hardware": "unknown", 
+            "vendor_id": "GenuineIntel"
+        }
+    }, 
+    "commit_info": {
+        "author_time": "2017-09-02T00:27:58-03:00", 
+        "time": "2017-09-02T00:39:13-03:00", 
+        "project": "soledad", 
+        "branch": "8856", 
+        "id": "2dea7ebc513eaa506704fd7ae68bae94b220eea8", 
+        "dirty": true
+    }
+}

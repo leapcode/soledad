@@ -1,0 +1,73 @@
+{
+    "machine_info": {
+        "host": "pajeh", 
+        "python_compiler": "GCC 6.3.0 20170118", 
+        "python_build": [
+            "default", 
+            "Jan 19 2017 14:48:08"
+        ], 
+        "python_implementation": "CPython", 
+        "processor": "", 
+        "cpu": {
+            "hardware": "unknown", 
+            "vendor_id": "GenuineIntel", 
+            "brand": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz"
+        }, 
+        "node": "pajeh", 
+        "system": "Linux", 
+        "release": "4.9.0-3-amd64", 
+        "python_version": "2.7.13", 
+        "machine": "x86_64", 
+        "python_implementation_version": "2.7.13"
+    }, 
+    "commit_info": {
+        "branch": "8856", 
+        "author_time": "2017-09-02T02:38:57-03:00", 
+        "time": "2017-09-02T02:38:57-03:00", 
+        "id": "1e132568857e6c2d4fbbbf886d3b7ab2009c3c9e", 
+        "project": "soledad", 
+        "dirty": true
+    }, 
+    "version": "3.1.1", 
+    "benchmarks": [
+        {
+            "group": "test_legacy_vs_blobs_100_100k", 
+            "params": null, 
+            "name": "test_blobs_100_100k", 
+            "stats": {
+                "total": 20.738121271133423, 
+                "stddev_outliers": 2, 
+                "stddev": 0.9161744731162039, 
+                "hd15iqr": 6.378293991088867, 
+                "rounds": 4, 
+                "max": 6.378293991088867, 
+                "median": 5.054657578468323, 
+                "iqr": 1.3696125745773315, 
+                "q3": 5.8693366050720215, 
+                "q1": 4.49972403049469, 
+                "mean": 5.184530317783356, 
+                "ops": 0.1928815029916827, 
+                "iqr_outliers": 0, 
+                "min": 4.25051212310791, 
+                "iterations": 1, 
+                "ld15iqr": 4.25051212310791, 
+                "outliers": "2;0"
+            }, 
+            "options": {
+                "timer": "time", 
+                "disable_gc": false, 
+                "warmup": false, 
+                "max_time": 1.0, 
+                "min_rounds": 5, 
+                "min_time": 5e-06
+            }, 
+            "param": null, 
+            "extra_info": {
+                "cpu_percent": 24.7, 
+                "doc": ""
+            }, 
+            "fullname": "tests/benchmarks/test_legacy_vs_blobs.py::test_blobs_100_100k"
+        }
+    ], 
+    "datetime": "2017-09-02T05:56:28.497384"
+}

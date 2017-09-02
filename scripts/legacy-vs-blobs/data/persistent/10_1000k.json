@@ -1,0 +1,73 @@
+{
+    "machine_info": {
+        "python_compiler": "GCC 6.3.0 20170118", 
+        "python_implementation_version": "2.7.13", 
+        "node": "pajeh", 
+        "machine": "x86_64", 
+        "host": "pajeh", 
+        "cpu": {
+            "hardware": "unknown", 
+            "vendor_id": "GenuineIntel", 
+            "brand": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz"
+        }, 
+        "system": "Linux", 
+        "python_build": [
+            "default", 
+            "Jan 19 2017 14:48:08"
+        ], 
+        "release": "4.9.0-3-amd64", 
+        "python_version": "2.7.13", 
+        "processor": "", 
+        "python_implementation": "CPython"
+    }, 
+    "commit_info": {
+        "id": "1e132568857e6c2d4fbbbf886d3b7ab2009c3c9e", 
+        "time": "2017-09-02T02:38:57-03:00", 
+        "dirty": true, 
+        "branch": "8856", 
+        "author_time": "2017-09-02T02:38:57-03:00", 
+        "project": "soledad"
+    }, 
+    "version": "3.1.1", 
+    "benchmarks": [
+        {
+            "stats": {
+                "ops": 0.4919825789326136, 
+                "stddev": 0.1042862860397157, 
+                "mean": 2.032592296600342, 
+                "stddev_outliers": 2, 
+                "q3": 2.112483024597168, 
+                "q1": 1.9527015686035156, 
+                "rounds": 4, 
+                "max": 2.1607320308685303, 
+                "hd15iqr": 2.1607320308685303, 
+                "iqr_outliers": 0, 
+                "ld15iqr": 1.91776704788208, 
+                "iterations": 1, 
+                "median": 2.0259350538253784, 
+                "iqr": 0.15978145599365234, 
+                "total": 8.130369186401367, 
+                "outliers": "2;0", 
+                "min": 1.91776704788208
+            }, 
+            "param": null, 
+            "fullname": "tests/benchmarks/test_legacy_vs_blobs.py::test_blobs_10_1000k", 
+            "params": null, 
+            "name": "test_blobs_10_1000k", 
+            "group": "test_legacy_vs_blobs_10_1000k", 
+            "options": {
+                "disable_gc": false, 
+                "min_rounds": 5, 
+                "timer": "time", 
+                "warmup": false, 
+                "min_time": 5e-06, 
+                "max_time": 1.0
+            }, 
+            "extra_info": {
+                "cpu_percent": 36.3, 
+                "doc": ""
+            }
+        }
+    ], 
+    "datetime": "2017-09-02T05:57:48.679847"
+}
