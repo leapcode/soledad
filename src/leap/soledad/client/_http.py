@@ -18,6 +18,7 @@
 A twisted-based, TLS-pinned, token-authenticated HTTP client.
 """
 import base64
+import os
 
 from twisted.internet import reactor
 from twisted.web.iweb import IAgent
@@ -58,7 +59,8 @@ class PinnedTokenAgent(Agent):
         self.set_token(token)
         # pin this agent with the platform TLS certificate
         factory = getPolicyForHTTPS(cert_file)
-        pool = HTTPConnectionPool(reactor, persistent=True)
+        persistent = os.environ.get('SOLEDAD_HTTP_PERSIST', None)
+        pool = HTTPConnectionPool(reactor, persistent=bool(persistent))
         Agent.__init__(self, reactor, contextFactory=factory, pool=pool)
 
     def set_token(self, token):

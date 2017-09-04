@@ -7,3 +7,7 @@ migrated here in the future.
 
 You can also take a look at :ref:`client-side-code-api` and
 :ref:`client-side-attachments-api` for information on the API.
+
+.. toctree::
+
+    environment_variables
