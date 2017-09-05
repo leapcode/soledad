@@ -24,7 +24,7 @@ from ._incoming import IncomingResource
 from ._wsgi import get_sync_resource
 
 
-__all__ = ['PublicResource', 'SoledadAnonResource']
+__all__ = ['PublicResource', 'AnonymousResource']
 
 
 class _Robots(Resource):
@@ -35,7 +35,7 @@ class _Robots(Resource):
             '# you are not a robot, are you???')
 
 
-class SoledadAnonResource(Resource):
+class AnonymousResource(Resource):
 
     """
     The parts of Soledad Server that unauthenticated users can see.

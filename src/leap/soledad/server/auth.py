@@ -39,7 +39,7 @@ from twisted.web.resource import IResource
 
 from leap.soledad.common.couch import couch_server
 
-from ._resource import PublicResource, SoledadAnonResource
+from ._resource import PublicResource, AnonymousResource
 from ._resource import LocalResource
 from ._blobs import BlobsResource
 from ._config import get_config
@@ -58,7 +58,7 @@ class SoledadRealm(object):
         blobs = conf['blobs']
         blobs_resource = BlobsResource("filesystem",
                                        conf['blobs_path']) if blobs else None
-        self.anon_resource = SoledadAnonResource(
+        self.anon_resource = AnonymousResource(
             enable_blobs=blobs)
         self.auth_resource = PublicResource(
             blobs_resource=blobs_resource,
@@ -84,7 +84,7 @@ class LocalServicesRealm(object):
 
     def __init__(self):
         conf = get_config()
-        self.anon_resource = SoledadAnonResource(
+        self.anon_resource = AnonymousResource(
             enable_blobs=conf['blobs'])
         self.auth_resource = LocalResource()
 
