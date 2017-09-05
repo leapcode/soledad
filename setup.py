@@ -17,7 +17,6 @@
 """
 Setup file for leap.soledad
 """
-import os
 import re
 import sys
 import versioneer
@@ -25,15 +24,6 @@ import versioneer
 from setuptools import setup
 from setuptools import find_packages
 from setuptools.command.develop import develop as _cmd_develop
-
-
-isset = lambda var: os.environ.get(var, None)
-skip = ['VIRTUAL_ENV', 'LEAP_SKIP_INIT', 'READTHEDOCS']
-if len(filter(isset, skip)):
-    data_files = None
-else:
-    # XXX this should go only for linux/mac
-    data_files = [("/etc/init.d/", ["pkg/server/soledad-server"])]
 
 
 trove_classifiers = (
@@ -137,6 +127,5 @@ setup(
     package_dir={'': 'src'},
     package_data={'': ["*.sql"]},
     install_requires=install_requires,
-    extras_require=extras,
-    data_files=data_files
+    extras_require=extras
 )
