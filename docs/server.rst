@@ -14,9 +14,7 @@ twistd command. To start the soledad server, run:
 
 .. code-block:: bash
 
-    twistd -n web \
-        --class=leap.soledad.server.entrypoint.SoledadEntrypoint \
-        --port=X
+    twistd -n --python /path/to/leap/soledad/server/server.tac
 
 An systemd script is included and will be installed system wide to make it
 feasible to start and stop the Soledad server service using a standard
