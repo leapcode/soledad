@@ -12,7 +12,7 @@ client.
 
 There are currently two distinct authenticated entry points:
 
-* A public TLS encrypted **Users API**, providing the *Synchronization*,
+* A public TLS encrypted **Users API**, providing the *Synchronization* and
   *Blobs* services, verified against the Leap Platform
   ``tokens`` database.
 
@@ -34,7 +34,8 @@ server (as the version of the server and runtime configuration options).
 Special credentials for local services
 --------------------------------------
 
-Some special credentials can be added into a file and then configured in the
+Some special credentials can be added into a file
+(``/etc/soledad/incoming.tokens``, by default) and then configured in the
 Soledad Server configuration file. Currently, the only special credential
 provided is for the `/incoming` API.
 
@@ -70,7 +71,7 @@ When the server is started, two services are spawned:
        |                                                |
     .------------------.        .-------------------------.
     |    Users API     |        |      Services API       |
-    | (PublicResource) |        | (LocalServicesResource) |
+    | (PublicResource) |        |     (LocalResource)     |
     '------------------'        '-------------------------'
        |  .-------.                .-----------------.  |
        '->| /sync |                |    /incoming    |<-'
