@@ -2,14 +2,16 @@ import glob
 import json
 import os
 import pytest
+import re
 import requests
 import signal
 import socket
+import subprocess
 import sys
 import time
+import urlparse
 
 from hashlib import sha512
-from subprocess import check_call
 from six.moves.urllib.parse import urljoin
 from uuid import uuid4
 
@@ -42,7 +44,7 @@ def pytest_addoption(parser):
         "--couch-url", type="string", default="http://127.0.0.1:5984",
         help="the url for the couch server to be used during tests")
 
-    # the following option is only used in benchmarks, but has to be defined
+    # the following options are only used in benchmarks, but has to be defined
     # here due to how pytest discovers plugins during startup.
     parser.addoption(
         "--watch-memory", default=False, action="store_true",
@@ -50,10 +52,26 @@ def pytest_addoption(parser):
              "**Warning**: enabling this will impact the time taken and the "
              "CPU used by the benchmarked code, so use with caution!")
 
+    parser.addoption(
+        "--soledad-server-url", type="string", default=None,
+        help="Soledad Server URL. A local server will be started if and only "
+             "if  no URL is passed.")
+
+
+def _request(method, url, data=None, do=True):
+    if do:
+        method = getattr(requests, method)
+        method(url, data=data)
+    else:
+        cmd = 'curl --netrc -X %s %s' % (method.upper(), url)
+        if data:
+            cmd += ' -d "%s"' % json.dumps(data)
+        print cmd
+
 
 @pytest.fixture
 def couch_url(request):
-    url = request.config.getoption('--couch-url')
+    url = request.config.option.couch_url
     request.cls.couch_url = url
 
 
@@ -69,23 +87,27 @@ def method_tmpdir(request, tmpdir):
 
 class UserDatabase(object):
 
-    def __init__(self, url, uuid):
+    def __init__(self, url, uuid, create=True):
         self._remote_db_url = urljoin(url, 'user-%s' % uuid)
+        self._create = create
 
     def setup(self):
-        return CouchDatabase.open_database(
-            url=self._remote_db_url, create=True, replica_uid=None)
+        if self._create:
+            return CouchDatabase.open_database(
+                url=self._remote_db_url, create=True, replica_uid=None)
+        else:
+            _request('put', self._remote_db_url, do=False)
 
     def teardown(self):
-        requests.delete(self._remote_db_url)
+        _request('delete', self._remote_db_url, do=self._create)
 
 
 @pytest.fixture()
 def remote_db(request):
     couch_url = request.config.option.couch_url
 
-    def create(uuid):
-        db = UserDatabase(couch_url, uuid)
+    def create(uuid, create=True):
+        db = UserDatabase(couch_url, uuid, create=create)
         request.addfinalizer(db.teardown)
         return db.setup()
     return create
@@ -122,7 +144,7 @@ class SoledadServer(object):
         if 'VIRTUAL_ENV' not in os.environ:
             executable = os.path.join(
                 os.path.dirname(os.environ['_']), 'twistd')
-        check_call([
+        subprocess.check_call([
             executable,
             '--logfile=%s' % self._logfile,
             '--pidfile=%s' % self._pidfile,
@@ -160,6 +182,13 @@ blobs_path = %s''' % (self._couch_url, blobs_path)
 
 @pytest.fixture(scope='module')
 def soledad_server(tmpdir_factory, request):
+
+    # avoid starting a server if the url is remote
+    soledad_url = request.config.option.soledad_server_url
+    if soledad_url is not None:
+        return None
+
+    # start a soledad server
     couch_url = request.config.option.couch_url
     server = SoledadServer(tmpdir_factory, couch_url)
     server.start()
@@ -180,35 +209,36 @@ def _token_dbname():
 
 class SoledadDatabases(object):
 
-    def __init__(self, url):
+    def __init__(self, url, create=True):
         self._token_db_url = urljoin(url, _token_dbname())
         self._shared_db_url = urljoin(url, 'shared')
+        self._create = create
 
     def setup(self, uuid):
         self._create_dbs()
         self._add_token(uuid)
 
     def _create_dbs(self):
-        requests.put(self._token_db_url)
-        requests.put(self._shared_db_url)
+        _request('put', self._token_db_url, do=self._create)
+        _request('put', self._shared_db_url, do=self._create)
 
     def _add_token(self, uuid):
         token = sha512(DEFAULT_TOKEN).hexdigest()
         content = {'type': 'Token', 'user_id': uuid}
-        requests.put(
-            self._token_db_url + '/' + token, data=json.dumps(content))
+        _request('put', self._token_db_url + '/' + token,
+                 data=json.dumps(content), do=self._create)
 
     def teardown(self):
-        requests.delete(self._token_db_url)
-        requests.delete(self._shared_db_url)
+        _request('delete', self._token_db_url, do=self._create)
+        _request('delete', self._shared_db_url, do=self._create)
 
 
 @pytest.fixture()
 def soledad_dbs(request):
     couch_url = request.config.option.couch_url
 
-    def create(uuid):
-        db = SoledadDatabases(couch_url)
+    def create(uuid, create=True):
+        db = SoledadDatabases(couch_url, create=create)
         request.addfinalizer(db.teardown)
         return db.setup(uuid)
     return create
@@ -218,14 +248,43 @@ def soledad_dbs(request):
 # soledad_client fixture: provides a clean soledad client for a test function.
 #
 
+def _get_certfile(url, tmpdir):
+
+    # download the certificate
+    parsed = urlparse.urlsplit(url)
+    netloc = re.sub('^[^\.]+\.', '', parsed.netloc)
+    host, _ = netloc.split(':')
+    response = requests.get('https://%s/ca.crt' % host, verify=False)
+
+    # store it in a temporary file
+    cert_file = os.path.join(tmpdir.strpath, 'cert.pem')
+    with open(cert_file, 'w') as f:
+        f.write(response.text)
+
+    return cert_file
+
+
 @pytest.fixture()
 def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
     passphrase = DEFAULT_PASSPHRASE
-    server_url = DEFAULT_URL
     token = DEFAULT_TOKEN
+
+    # default values for local server
+    server_url = DEFAULT_URL
     default_uuid = uuid4().hex
-    remote_db(default_uuid)
-    soledad_dbs(default_uuid)
+    create = True
+    cert_file = None
+
+    # use values for remote server if server url is passed
+    url_arg = request.config.option.soledad_server_url
+    if url_arg:
+        server_url = url_arg
+        default_uuid = 'test-user'
+        create = False
+        cert_file = _get_certfile(server_url, tmpdir)
+
+    remote_db(default_uuid, create=create)
+    soledad_dbs(default_uuid, create=create)
 
     # get a soledad instance
     def create(force_fresh_db=False):
@@ -248,7 +307,7 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
             secrets_path=secrets_path,
             local_db_path=local_db_path,
             server_url=server_url,
-            cert_file=None,
+            cert_file=cert_file,
             auth_token=token,
             with_blobs=True)
         request.addfinalizer(soledad_client.close)

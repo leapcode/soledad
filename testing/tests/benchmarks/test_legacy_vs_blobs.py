@@ -171,10 +171,23 @@ semaphore = DeferredSemaphore(2)
 
 
 # deliver data to a user by using the incoming api at given url.
-def deliver(url, user_uuid, token, data):
+def deliver_using_incoming_api(url, user_uuid, token, data):
     auth = 'Token %s' % base64.b64encode('%s:%s' % (user_uuid, token))
     uri = "%s/incoming/%s/%s?namespace=MX" % (url, user_uuid, uuid.uuid4().hex)
     return treq.put(uri, headers={'Authorization': auth}, data=BytesIO(data))
+
+
+# deliver data to a user by faking incoming using blobs
+@pytest.inlineCallbacks
+def deliver_using_blobs(client, fd):
+    # put
+    blob_id = uuid.uuid4().hex
+    doc = BlobDoc(fd, blob_id=blob_id)
+    size = sys.getsizeof(fd)
+    yield client.blobmanager.put(doc, size, namespace='MX')
+    # and flag
+    flags = [Flags.PENDING]
+    yield client.blobmanager.set_flags(blob_id, flags, namespace='MX')
 
 
 def reclaim_free_space(client):
@@ -194,19 +207,33 @@ def load_up_blobs(client, amount, data):
     yield client.sync()
 
     # delete all payload from blobs db and server
-    ids = yield client.blobmanager.local_list(namespace='payload')
-    for blob_id in ids:
-        yield client.blobmanager.delete(blob_id, namespace='payload')
-    yield reclaim_free_space(client)
+    for namespace in ['MX', 'payload']:
+        ids = yield client.blobmanager.remote_list(namespace=namespace)
+        deferreds = []
+        for blob_id in ids:
+            d = semaphore.run(
+                client.blobmanager.delete, blob_id, namespace=namespace)
+            deferreds.append(d)
+    yield gatherResults(deferreds)
 
     # create a bunch of incoming blobs
     deferreds = []
-    semaphore = DeferredSemaphore(100)
     for i in xrange(amount):
-        d = semaphore.run(
-            deliver, client.server_url, client.uuid, client.token, data)
+        # choose method of delivery based in test being local or remote
+        if '127.0.0.1' in client.server_url:
+            fun = deliver_using_incoming_api
+            args = (client.server_url, client.uuid, client.token, data)
+        else:
+            fun = deliver_using_blobs
+            args = (client, BytesIO(data))
+        d = semaphore.run(fun, *args)
         deferreds.append(d)
     yield gatherResults(deferreds)
+
+    # empty local blobs db
+    yield client.blobmanager.local.dbpool.runQuery(
+        "DELETE FROM blobs WHERE 1;")
+    yield reclaim_free_space(client)
 
 
 @pytest.inlineCallbacks
