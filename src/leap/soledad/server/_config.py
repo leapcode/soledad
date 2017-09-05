@@ -22,6 +22,7 @@ import os
 
 __all__ = ['get_config']
 
+# make sure to update documentation if this default is changed.
 DEFAULT_CONFIG_FILE = '/etc/soledad/soledad-server.conf'
 CONFIG_DEFAULTS = {
     'soledad-server': {
