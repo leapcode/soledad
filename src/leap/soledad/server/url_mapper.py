@@ -57,25 +57,25 @@ class URLMapper(object):
             /shared-db                      | GET
             /shared-db/doc/{any_id}         | GET, PUT, DELETE
             /user-{uuid}/sync-from/{source} | GET, PUT, POST
-            /blobs/{uuid}/{blob_id}         | GET, PUT, POST
+            /blobs/{uuid}/{blob_id}         | GET, PUT, DELETE, POST
             /blobs/{uuid}                   | GET
             /incoming/                      | PUT
         """
-        # auth info for global resource
+        # global resource
         self._connect('/', ['GET'])
         # robots
         self._connect('/robots.txt', ['GET'])
-        # auth info for shared-db database resource
+        # shared-db database resource
         self._connect('/%s' % SHARED_DB_NAME, ['GET'])
-        # auth info for shared-db doc resource
+        # shared-db doc resource
         self._connect('/%s/doc/{id:.*}' % SHARED_DB_NAME,
                       ['GET', 'PUT', 'DELETE'])
-        # auth info for user-db sync resource
+        # user-db sync resource
         self._connect('/user-{uuid}/sync-from/{source_replica_uid}',
                       ['GET', 'PUT', 'POST'])
-        # auth info for blobs resource
-        self._connect('/blobs/{uuid}/{blob_id}', ['GET', 'PUT', 'DELETE'])
+        # blobs resource
+        self._connect('/blobs/{uuid}/{blob_id}',
+                      ['GET', 'PUT', 'DELETE', 'POST'])
         self._connect('/blobs/{uuid}/', ['GET'])
-
         # incoming resource
         self._connect('/incoming/{target_user_uuid}/{incoming_id}', ['PUT'])
