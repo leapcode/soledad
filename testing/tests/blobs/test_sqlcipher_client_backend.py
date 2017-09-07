@@ -21,6 +21,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from leap.soledad.client._db.blobs import SQLiteBlobBackend
 from io import BytesIO
+from uuid import uuid4
 import pytest
 
 
@@ -34,7 +35,7 @@ class SQLBackendTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_inexisting(self):
-        bad_blob_id = 'inexsisting_id'
+        bad_blob_id = uuid4().hex
         self.assertFalse((yield self.local.exists(bad_blob_id)))
         result = yield self.local.get(bad_blob_id)
         self.assertIsNone(result)
@@ -42,7 +43,7 @@ class SQLBackendTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_existing(self):
-        blob_id = 'blob_id'
+        blob_id = uuid4().hex
         content = "x"
         yield self.local.put(blob_id, BytesIO(content), len(content))
         result = yield self.local.get(blob_id)
@@ -52,18 +53,18 @@ class SQLBackendTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_delete(self):
-        blob_id = 'blob_id'
+        blob_id1, blob_id2 = uuid4().hex, uuid4().hex
         content = "x"
-        yield self.local.put(blob_id, BytesIO(content), len(content))
-        yield self.local.put('remains', BytesIO(content), len(content))
-        yield self.local.delete(blob_id)
-        self.assertFalse((yield self.local.exists(blob_id)))
-        self.assertTrue((yield self.local.exists('remains')))
+        yield self.local.put(blob_id1, BytesIO(content), len(content))
+        yield self.local.put(blob_id2, BytesIO(content), len(content))
+        yield self.local.delete(blob_id1)
+        self.assertFalse((yield self.local.exists(blob_id1)))
+        self.assertTrue((yield self.local.exists(blob_id2)))
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_list(self):
-        blob_ids = [('blob_id%s' % i) for i in range(10)]
+        blob_ids = [uuid4().hex for _ in range(10)]
         content = "x"
         deferreds = []
         for blob_id in blob_ids:

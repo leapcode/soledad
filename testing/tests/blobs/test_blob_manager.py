@@ -42,17 +42,17 @@ class BlobManagerTestCase(unittest.TestCase):
         self.manager = BlobManager(
             self.tempdir, '',
             'A' * 32, self.secret,
-            'uuid', 'token', None)
+            uuid4().hex, 'token', None)
         self.addCleanup(self.manager.close)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_get_inexistent(self):
+    def test_get_missing(self):
         self.manager._download_and_decrypt = Mock(return_value=None)
-        bad_blob_id = 'inexsistent_id'
-        result = yield self.manager.get(bad_blob_id)
+        missing_blob_id = uuid4().hex
+        result = yield self.manager.get(missing_blob_id)
         self.assertIsNone(result)
-        args = bad_blob_id, ''
+        args = missing_blob_id, ''
         self.manager._download_and_decrypt.assert_called_once_with(*args)
 
     @defer.inlineCallbacks
@@ -109,26 +109,26 @@ class BlobManagerTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_send_missing(self):
-        fd = BytesIO('test')
+        fd, missing_id = BytesIO('test'), uuid4().hex
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager.remote_list = Mock(return_value=[])
-        yield self.manager.local.put('missing_id', fd, 4)
+        yield self.manager.local.put(missing_id, fd, 4)
         yield self.manager.send_missing()
 
         call_list = self.manager._encrypt_and_upload.call_args_list
         self.assertEquals(1, len(call_list))
         call_blob_id, call_fd = call_list[0][0]
-        self.assertEquals('missing_id', call_blob_id)
+        self.assertEquals(missing_id, call_blob_id)
         self.assertEquals('test', call_fd.getvalue())
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_duplicated_blob_error_on_put(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
-        content = "Blob content"
-        doc1 = BlobDoc(BytesIO(content), 'existing_id')
+        content, existing_id = "Blob content", uuid4().hex
+        doc1 = BlobDoc(BytesIO(content), existing_id)
         yield self.manager.put(doc1, len(content))
-        doc2 = BlobDoc(BytesIO(content), 'existing_id')
+        doc2 = BlobDoc(BytesIO(content), existing_id)
         self.manager._encrypt_and_upload.reset_mock()
         with pytest.raises(BlobAlreadyExistsError):
             yield self.manager.put(doc2, len(content))

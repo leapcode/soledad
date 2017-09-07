@@ -19,6 +19,7 @@ Integration tests for blobs server
 """
 import os
 import pytest
+from uuid import uuid4
 from io import BytesIO
 from twisted.trial import unittest
 from twisted.web.server import Site
@@ -52,7 +53,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_download(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("save me")
         yield manager._encrypt_and_upload('blob_id', fd)
         blob, size = yield manager._download_and_decrypt('blob_id')
@@ -62,7 +63,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_set_get_flags(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("flag me")
         yield manager._encrypt_and_upload('blob_id', fd)
         yield manager.set_flags('blob_id', [Flags.PROCESSING])
@@ -73,7 +74,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_set_flags_raises_if_no_blob_found(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         with pytest.raises(SoledadError):
             yield manager.set_flags('missing_id', [Flags.PENDING])
 
@@ -81,7 +82,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_list_filter_flag(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("flag me")
         yield manager._encrypt_and_upload('blob_id', fd)
         yield manager.set_flags('blob_id', [Flags.PROCESSING])
@@ -94,7 +95,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_list_filter_flag_order_by_date(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         yield manager._encrypt_and_upload('blob_id1', BytesIO("x"))
         yield manager._encrypt_and_upload('blob_id2', BytesIO("x"))
         yield manager._encrypt_and_upload('blob_id3', BytesIO("x"))
@@ -113,7 +114,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_cant_set_invalid_flags(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("flag me")
         yield manager._encrypt_and_upload('blob_id', fd)
         with pytest.raises(InvalidFlagsError):
@@ -125,7 +126,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_empty_flags(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("flag me")
         yield manager._encrypt_and_upload('blob_id', fd)
         flags = yield manager.get_flags('blob_id')
@@ -135,7 +136,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_flags_ignored_by_listing(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("flag me")
         yield manager._encrypt_and_upload('blob_id', fd)
         yield manager.set_flags('blob_id', [Flags.PROCESSING])
@@ -146,7 +147,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_changes_remote_list(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         yield manager._encrypt_and_upload('blob_id1', BytesIO("1"))
         yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         blobs_list = yield manager.remote_list()
@@ -155,13 +156,14 @@ class BlobServerTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_list_orders_by_date(self):
+        user_uid = uuid4().hex
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, user_uid)
         yield manager._encrypt_and_upload('blob_id1', BytesIO("1"))
         yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         blobs_list = yield manager.remote_list(order_by='date')
         self.assertEquals(['blob_id1', 'blob_id2'], blobs_list)
-        parts = ['user', 'default', 'b', 'blo', 'blob_i', 'blob_id1']
+        parts = [user_uid, 'default', 'b', 'blo', 'blob_i', 'blob_id1']
         self.__touch(self.tempdir, *parts)
         blobs_list = yield manager.remote_list(order_by='+date')
         self.assertEquals(['blob_id2', 'blob_id1'], blobs_list)
@@ -172,7 +174,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_count(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         deferreds = []
         for i in range(10):
             deferreds.append(manager._encrypt_and_upload(str(i), BytesIO("1")))
@@ -185,7 +187,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_list_restricted_by_namespace(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         namespace = 'incoming'
         yield manager._encrypt_and_upload('blob_id1', BytesIO("1"),
                                           namespace=namespace)
@@ -197,7 +199,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_list_default_doesnt_list_other_namespaces(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         namespace = 'incoming'
         yield manager._encrypt_and_upload('blob_id1', BytesIO("1"),
                                           namespace=namespace)
@@ -209,7 +211,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_download_from_namespace(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         namespace, blob_id, content = 'incoming', 'blob_id1', 'test'
         yield manager._encrypt_and_upload(blob_id, BytesIO(content),
                                           namespace=namespace)
@@ -225,7 +227,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_deny_duplicates(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         fd = BytesIO("save me")
         yield manager._encrypt_and_upload('blob_id', fd)
         fd = BytesIO("save me")
@@ -236,7 +238,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_send_missing(self):
         manager = BlobManager(self.tempdir, self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         self.addCleanup(manager.close)
         blob_id = 'local_only_blob_id'
         yield manager.local.put(blob_id, BytesIO("X"), size=1)
@@ -249,7 +251,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_fetch_missing(self):
         manager = BlobManager(self.tempdir, self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         self.addCleanup(manager.close)
         blob_id = 'remote_only_blob_id'
         yield manager._encrypt_and_upload(blob_id, BytesIO("X"))
@@ -262,7 +264,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_then_delete_updates_list(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         yield manager._encrypt_and_upload('blob_id1', BytesIO("1"))
         yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         yield manager._delete_from_remote('blob_id1')
@@ -273,7 +275,7 @@ class BlobServerTestCase(unittest.TestCase):
     @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_then_delete_updates_list_using_namespace(self):
         manager = BlobManager('', self.uri, self.secret,
-                              self.secret, 'user')
+                              self.secret, uuid4().hex)
         namespace = 'special_archives'
         yield manager._encrypt_and_upload('blob_id1', BytesIO("1"),
                                           namespace=namespace)
