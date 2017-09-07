@@ -18,6 +18,7 @@ all user's devices that access a LEAP provider.
    auth
    reference
    development
+   migrations
 
 Indices and tables
 ==================
