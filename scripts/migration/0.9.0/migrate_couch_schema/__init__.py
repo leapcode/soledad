@@ -78,7 +78,7 @@ def _report_missing_u1db_config_doc(dbname, db):
                     "[%s] '%s' document exists, and schema versions match "
                     "(expected %r and found %r). This database reports to be "
                     "using the new schema version, so I am skipping it."
-                    % (dbname, CONFIG_DOC_ID))
+                    % (dbname, CONFIG_DOC_ID, SCHEMA_VERSION, version))
             else:
                 logger.error(
                     "[%s] '%s' document exists, but schema versions don't "
