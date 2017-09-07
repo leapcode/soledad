@@ -43,9 +43,9 @@ To actually run the migration, add the --do-migrate command line option:
 Log
 ---
 
-The script will be installed in ``/usr/share/soledad-server/migration/0.9.0``,
+The script will be installed in ``/usr/share/soledad-server/migration/0.9``,
 and will log the results of any run by default to the ``logs/`` subdirectory of
-that folder (i.e. ``/usr/share/soledad-server/migration/0.9.0/logs``).
+that folder (i.e. ``/usr/share/soledad-server/migration/0.9/logs``).
 
 If you don't pass a ``--log-file`` command line option, a log will be written
 to the log folder as described above.
