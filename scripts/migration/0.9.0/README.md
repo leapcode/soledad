@@ -1,7 +1,12 @@
-CouchDB schema migration to Soledad 0.8.2
-=========================================
+CouchDB schema migration script: from soledad-server < 0.9.0 to >= 0.9.0
+========================================================================
 
-Migrate couch database schema from <= 0.8.1 version to 0.8.2 version.
+Starting with Soledad Server 0.9.0, the CouchDB database schema was changed to
+improve speed of the server side storage backend. Because of that, this script
+has to be run for all Leap providers that used to provide email using Soledad
+Server < 0.9.0.
+
+If you never provided email with Leap, you don't need to run this script.
 
 
 ATTENTION!
@@ -10,14 +15,23 @@ ATTENTION!
   - This script does not backup your data for you. Make sure you have a backup
     copy of your databases before running this script!
 
-  - Make sure you turn off any service that might be writing to the couch
-    database before running this script.
+  - Make sure you turn off any service that might be writing to the couch user
+    databases before running this script. From the Leap side, these would be
+    Leap MX in the "mx" node and Soledad Server in the "soledad" node.
 
 
 Usage
 -----
 
-To see what the script would do, run:
+When you run the script, you will see no output. All the output will be logged
+to files, as explained in the Log section below.
+
+To see command line options, run:
+
+    ./migrate.py --help
+
+To see what the script would do, run the following and check the logs
+afterwards:
 
     ./migrate.py
 
@@ -25,16 +39,16 @@ To actually run the migration, add the --do-migrate command line option:
 
     ./migrate.py --do-migrate
 
-See command line options:
-
-    ./migrate.py --help
-
 
 Log
 ---
 
-If you don't pass a --log-file command line option, a log will be written to
-the `log/` folder.
+The script will be installed in ``/usr/share/soledad-server/migration/0.9.0``,
+and will log the results of any run by default to the ``logs/`` subdirectory of
+that folder (i.e. ``/usr/share/soledad-server/migration/0.9.0/logs``).
+
+If you don't pass a ``--log-file`` command line option, a log will be written
+to the log folder as described above.
 
 
 Differences between old and new couch schema

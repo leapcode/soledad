@@ -2,7 +2,7 @@
 # migrate.py
 
 """
-Migrate CouchDB schema to Soledad 0.8.2 schema.
+Migrate CouchDB schema to version 1 (soledad-server >= 0.9.0).
 
 ******************************************************************************
                                ATTENTION!
@@ -32,7 +32,7 @@ from leap.soledad.server import get_config
 from migrate_couch_schema import migrate
 
 
-TARGET_VERSION = '0.8.2'
+TARGET_VERSION = '0.9'
 DEFAULT_COUCH_URL = 'http://127.0.0.1:5984'
 CONF = get_config()
 NETRC_PATH = CONF['admin_netrc']
