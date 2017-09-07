@@ -15,8 +15,8 @@ Server < 0.9.0.
 
 The migration script can be found:
 
-* In `the Soledad repository <https://0xacab.org/leap/soledad/tree/master/scripts/migration/0.8-to-0.9>`_.
-* In ``/usr/share/soledad-server/migration/0.8-to-0.9/`` when the ``soledad-server`` debian package is installed.
+* In `the Soledad repository <https://0xacab.org/leap/soledad/tree/master/scripts/migration/0.9>`_.
+* In ``/usr/share/soledad-server/migration/0.9/`` when the ``soledad-server`` debian package is installed.
 
 Instructions for migration can be found in the ``README.md`` file. Make sure to read it carefully and backup your data before starting the migration process.
 
