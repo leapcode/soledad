@@ -22,10 +22,10 @@ OUTPUT_FILENAME = 'legacy-vs-blobs.png'
 # The baseline values will be the legacy results in ./data/no-cache/.
 
 graphs = [
-    '1_10000k',
-    '10_1000k',
-    '100_100k',
     '1000_10k',
+    '100_100k',
+    '10_1000k',
+    '1_10000k',
 ]
 
 
@@ -104,10 +104,12 @@ def plot_data(data):
     rects4 = ax.bar(ind + (3 * width), persistent, width)
 
     # add some text for labels, title and axes ticks
-    ax.set_ylabel('Normalized execution time')
-    ax.set_title('Legacy vs Blobs mail pipeline')
+    ax.set_ylabel('Ratio of time (legacy is baseline)')
+    ax.set_xlabel('Amount and size of email messages')
+    ax.set_title('Inbox loading time: legacy vs blobs mail pipeline')
     ax.set_xticks(ind + (1.5 * width))
-    ax.set_xticklabels(tuple(map(lambda name: name.replace('_', ' '), graphs)))
+    ax.set_xticklabels(
+        tuple(map(lambda name: name.replace('_', ' x '), graphs)))
 
     ax.legend(
         (rects1[0], rects2[0], rects3[0], rects4[0]),
