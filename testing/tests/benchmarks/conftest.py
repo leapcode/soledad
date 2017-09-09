@@ -9,25 +9,26 @@ import time
 from twisted.internet import threads, reactor
 
 
-# we have to manually setup the events server in order to be able to signal
-# events. This is usually done by the enclosing application using soledad
-# client (i.e. bitmask client).
-from leap.common.events import server
-server.ensure_server()
-
-
 #
 # pytest customizations
 #
 
 # mark benchmark tests using their group names (thanks ionelmc! :)
-def pytest_collection_modifyitems(items):
+def pytest_collection_modifyitems(items, config):
     for item in items:
         bench = item.get_marker("benchmark")
         if bench and bench.kwargs.get('group'):
             group = bench.kwargs['group']
             marker = getattr(pytest.mark, 'benchmark_' + group)
             item.add_marker(marker)
+
+    subdir = config.getoption('subdir')
+    if subdir == 'benchmarks':
+        # we have to manually setup the events server in order to be able to
+        # signal events. This is usually done by the enclosing application
+        # using soledad client (i.e. bitmask client).
+        from leap.common.events import server
+        server.ensure_server()
 
 
 #
