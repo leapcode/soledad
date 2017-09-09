@@ -21,12 +21,51 @@ from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.client import Soledad
 
 
-# mark tests that depend on couchdb
-def pytest_collection_modifyitems(items):
+def _select_subdir(subdir, blacklist, items):
+
+    # allow blacklisted subdir if explicited in command line
+    if subdir and subdir in blacklist:
+        blacklist.remove(subdir)
+
+    # determine blacklisted subdirs
+    dirname = os.path.dirname(__file__)
+    blacklisted_subdirs = map(lambda s: os.path.join(dirname, s), blacklist)
+
+    # determine base path for selected tests
+    path = dirname
+    if subdir:
+        path = os.path.join(dirname, subdir)
+
+    # remove tests from blacklisted subdirs
+    selected = []
+    deselected = []
+    for item in items:
+        filename = item.module.__file__
+        blacklisted = any(
+            map(lambda s: filename.startswith(s), blacklisted_subdirs))
+        if blacklisted or not filename.startswith(path):
+            deselected.append(item)
+        else:
+            selected.append(item)
+
+    return selected, deselected
+
+
+def pytest_collection_modifyitems(items, config):
+
+    # mark tests that depend on couchdb
     marker = getattr(pytest.mark, 'needs_couch')
     for item in items:
         if 'soledad/testing/tests/couch/' in item.module.__file__:
             item.add_marker(marker)
+
+    # select/deselect tests based on a blacklist and the subdir option given in
+    # command line
+    blacklist = ['benchmarks', 'responsiveness']
+    subdir = config.getoption('subdir')
+    selected, deselected = _select_subdir(subdir, blacklist, items)
+    config.hook.pytest_deselected(items=deselected)
+    items[:] = selected
 
 
 #
@@ -64,6 +103,10 @@ def pytest_addoption(parser):
     parser.addoption(
         "--elasticsearch-url", type="string", default=None,
         help="the url for posting responsiveness results to elasticsearch")
+
+    parser.addoption(
+        "--subdir", type="string", default=None,
+        help="select only tests from a certain subdirectory of ./tests/")
 
 
 def _request(method, url, data=None, do=True):
