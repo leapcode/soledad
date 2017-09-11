@@ -119,9 +119,12 @@ class BlobTestCase(unittest.TestCase):
     def test_unarmored_blob_encrypt(self):
         self.blob.armor = False
         encrypted = yield self.blob.encrypt()
-        decode = base64.urlsafe_b64decode
-        with pytest.raises(TypeError):
-            assert map(decode, encrypted.getvalue().split())
+
+        decryptor = _crypto.BlobDecryptor(
+            self.doc_info, encrypted, armor=False,
+            secret='A' * 96)
+        decrypted = yield decryptor.decrypt()
+        assert decrypted.getvalue() == snowden1
 
     @defer.inlineCallbacks
     def test_default_armored_blob_encrypt(self):
