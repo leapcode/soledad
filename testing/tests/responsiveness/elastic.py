@@ -6,19 +6,20 @@ from pytest_benchmark.utils import get_commit_info, get_tag, get_machine_id
 from pytest_benchmark.storage.elasticsearch import BenchmarkJSONSerializer
 
 
-ELASTICSEARCH_URL = 'http://elastic:changeme@127.0.0.1:9200/'
-
-
-def post(seconds_blocked, request):
-    es = elasticsearch.Elasticsearch(
-        hosts=[ELASTICSEARCH_URL],
-        serializer=BenchmarkJSONSerializer())
+def post(seconds_blocked, request,):
     body, doc_id = get_doc(seconds_blocked, request)
-    es.index(
-        index='responsiveness',
-        doc_type='responsiveness',
-        id=doc_id,
-        body=body)
+    url = request.config.getoption("elasticsearch_url")
+    if url:
+        es = elasticsearch.Elasticsearch(
+            hosts=[url],
+            serializer=BenchmarkJSONSerializer())
+        es.index(
+            index='responsiveness',
+            doc_type='responsiveness',
+            id=doc_id,
+            body=body)
+    else:
+        print body
 
 
 def get_doc(seconds_blocked, request):

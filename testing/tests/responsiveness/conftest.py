@@ -18,8 +18,3 @@ def watchdog(request):
         deferred_fun().addCallback(lambda _: dog.stop())
         return dog_d
     return _run
-
-
-def pytest_configure(config):
-    option = config.getoption("elasticsearch_url", elastic.ELASTICSEARCH_URL)
-    elastic.ELASTICSEARCH_URL = option
