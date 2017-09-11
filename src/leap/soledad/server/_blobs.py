@@ -121,7 +121,8 @@ class FilesystemBlobsBackend(object):
             defer.returnValue(None)
         logger.info('writing blob: %s - %s' % (user, blob_id))
         fbp = FileBodyProducer(request.content)
-        yield fbp.startProducing(open(path, 'wb'))
+        with open(path, 'wb') as blobfile:
+            yield fbp.startProducing(blobfile)
 
     def delete_blob(self, user, blob_id, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)

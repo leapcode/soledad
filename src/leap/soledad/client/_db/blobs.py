@@ -469,7 +469,8 @@ class SQLiteBlobBackend(object):
         # have a look at how treq does cope with closing the handle
         # for uploading a file
         producer = FileBodyProducer(blob_fd)
-        done = yield producer.startProducing(handle)
+        with handle:
+            done = yield producer.startProducing(handle)
         logger.info("Finished saving blob in local database.")
         defer.returnValue(done)
 
