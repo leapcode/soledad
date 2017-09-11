@@ -12,12 +12,16 @@ Server
 - [bug] Add DELETE method to url mapper.
 - [bug[ Use correct keyword argument for server state initialization.
 - [feat] Get config file name from environment variable.
+- [bug] FileBodyProducer consumer usage wasn't closing the file
+- [feat] Finished adding support for Incoming API
 
 Client
 ~~~~~~
 
 - [bug] Several bugfixes for BlobManager initialization.
 - [bug] Fix usage of StringIO class in gzip middleware.
+- [bug] FileBodyProducer consumer usage wasn't closing the db handle
+- [feat] Add columns for sync state of blobs inside sqlcipher
 
 Misc
 ~~~~
@@ -25,6 +29,8 @@ Misc
 - Use latest version of pytest-benchmark.
 - Find correct twistd when outside tox envs
 - Build packages for zesty and stretch.
+- Add benchmark comparing legacy vs blobs sync
+- Add reactor responsiveness tests
 
 
 0.10.2 - Mon 21 Aug, 2017
