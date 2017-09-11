@@ -1,6 +1,12 @@
+soledad (0.10.3) unstable; urgency=medium
+
+  * Update to 0.10.3 release.
+
+ -- Kali Kaneko <kali@leap.se>  Mon, 11 Sep 2017 00:00:00 -0400
+
 soledad (0.10.2) unstable; urgency=medium
 
-  * Update to 0.10.0 release.
+  * Update to 0.10.2 release.
 
  -- Kali Kaneko <kali@leap.se>  Mon, 21 Aug 2017 00:00:00 -0400
 

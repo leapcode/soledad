@@ -1,27 +1,30 @@
 Changelog
 =========
 
-0.10.3 -  `master`_ 
+0.10.4 -  `master`_ 
 -------------------------------
 
 .. note:: This version is not yet released and is under active development.
 
+0.10.3 - Mon 11 Sep, 2017
+----------------------------------
+
 Server
 ~~~~~~
 
-- [bug] Add DELETE method to url mapper.
-- [bug[ Use correct keyword argument for server state initialization.
-- [feat] Get config file name from environment variable.
-- [bug] FileBodyProducer consumer usage wasn't closing the file
 - [feat] Finished adding support for Incoming API
+- [feat] Get config file name from environment variable.
+- [bug] Add DELETE method to url mapper.
+- [bug] Use correct keyword argument for server state initialization.
+- `#8924 <https://0xacab.org/leap/soledad/issues/8924>`_: [bug] FileBodyProducer consumer usage wasn't closing the file
 
 Client
 ~~~~~~
 
+- [feat] Add columns for sync state of blobs inside sqlcipher
 - [bug] Several bugfixes for BlobManager initialization.
 - [bug] Fix usage of StringIO class in gzip middleware.
-- [bug] FileBodyProducer consumer usage wasn't closing the db handle
-- [feat] Add columns for sync state of blobs inside sqlcipher
+- `#8924 <https://0xacab.org/leap/soledad/issues/8924>`_: [bug] FileBodyProducer consumer usage wasn't closing the file
 
 Misc
 ~~~~
@@ -29,8 +32,8 @@ Misc
 - Use latest version of pytest-benchmark.
 - Find correct twistd when outside tox envs
 - Build packages for zesty and stretch.
-- Add benchmark comparing legacy vs blobs sync
-- Add reactor responsiveness tests
+- Add benchmark comparing legacy vs blobs sync.
+- Add reactor responsiveness tests.
 
 
 0.10.2 - Mon 21 Aug, 2017
