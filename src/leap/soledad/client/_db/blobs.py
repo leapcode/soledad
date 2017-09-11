@@ -233,7 +233,7 @@ class BlobManager(object):
         data = yield self._client.get(uri, params=params)
         defer.returnValue((yield data.json()))
 
-    def local_list(self, namespace='', sync_status=False):
+    def local_list(self, namespace='', sync_status=None):
         return self.local.list(namespace, sync_status)
 
     @defer.inlineCallbacks
@@ -545,7 +545,10 @@ def _init_blob_table(conn):
         conn.execute('ALTER TABLE blobs ADD COLUMN namespace TEXT')
     if 'sync_status' not in columns:
         # sync status migration
-        conn.execute('ALTER TABLE blobs ADD COLUMN sync_status INT default 2')
+        default_status = SyncStatus.PENDING_UPLOAD
+        sync_column = 'ALTER TABLE blobs ADD COLUMN sync_status INT default %s'
+        sync_column %= default_status
+        conn.execute(sync_column)
         conn.execute('ALTER TABLE blobs ADD COLUMN retries INT default 0')
 
 
