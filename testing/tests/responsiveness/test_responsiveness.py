@@ -20,7 +20,7 @@ def create_upload(amount, size):
 
         client = soledad_client()
         yield load_up(client, amount, payload(size))
-        yield watchdog(lambda: client.sync())
+        yield watchdog(client.sync)
 
     return _test
 
