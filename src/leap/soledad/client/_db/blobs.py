@@ -31,7 +31,6 @@ from functools import partial
 from twisted.logger import Logger
 from twisted.enterprise import adbapi
 from twisted.internet import defer
-from twisted.web.client import FileBodyProducer
 
 import treq
 
@@ -124,6 +123,23 @@ class ConnectionPool(adbapi.ConnectionPool):
         :rtype: pysqlcipher.dbapi.Blob
         """
         return self.runInteraction(self._blob, table, column, irow, flags)
+
+    def write(self, table, column, irow, blob_fd):
+        return self.runInteraction(self._write_blob, table, column, irow,
+                                   blob_fd)
+
+    def _write_blob(self, trans, table, column, irow, blob_fd):
+        blob_fd.seek(0)
+        # XXX I have to copy the buffer here so that I'm able to
+        # return a non-closed file to the caller (blobmanager.get)
+        # FIXME should remove this duplication!
+        # have a look at how treq does cope with closing the handle
+        # for uploading a file
+        with trans._connection.blob(table, column, irow, 1) as handle:
+            data = blob_fd.read(2**12)
+            while data:
+                handle.write(data)
+                data = blob_fd.read(2**12)
 
     def _blob(self, trans, table, column, irow, flags):
         # TODO: should not use transaction private variable here
@@ -475,18 +491,8 @@ class SQLiteBlobBackend(object):
         insert += ' VALUES (?, ?, zeroblob(?), ?)'
         values = (blob_id, namespace, size, status)
         irow = yield self.dbpool.insertAndGetLastRowid(insert, values)
-        handle = yield self.dbpool.blob('blobs', 'payload', irow, 1)
-        blob_fd.seek(0)
-        # XXX I have to copy the buffer here so that I'm able to
-        # return a non-closed file to the caller (blobmanager.get)
-        # FIXME should remove this duplication!
-        # have a look at how treq does cope with closing the handle
-        # for uploading a file
-        producer = FileBodyProducer(blob_fd)
-        with handle:
-            done = yield producer.startProducing(handle)
+        yield self.dbpool.write('blobs', 'payload', irow, blob_fd)
         logger.info("Finished saving blob in local database.")
-        defer.returnValue(done)
 
     @defer.inlineCallbacks
     def get(self, blob_id, namespace=''):
