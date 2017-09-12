@@ -31,7 +31,7 @@ logger = getLogger(__name__)
 _db_init_lock = threading.Lock()
 
 
-def set_init_pragmas(conn, opts=None, extra_queries=None):
+def set_init_pragmas(conn, opts=None, extra_queries=None, schema_func=None):
     """
     Set the initialization pragmas.
 
@@ -43,6 +43,8 @@ def set_init_pragmas(conn, opts=None, extra_queries=None):
     with _db_init_lock:
         # only one execution path should initialize the db
         _set_init_pragmas(conn, opts, extra_queries)
+        if schema_func:
+            schema_func(conn)
 
 
 def _set_init_pragmas(conn, opts, extra_queries):

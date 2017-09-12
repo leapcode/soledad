@@ -73,6 +73,20 @@ class SyncStatus:
 
 class ConnectionPool(adbapi.ConnectionPool):
 
+    def blocking_create_schema(self, create_schema_function):
+        """
+        Grabs a connection and executes schema creation from current thread,
+        disconnecting right after it. This ensures that schema creation blocks
+        everything and doesn't run concurrently.
+
+        :param create_schema_function: A function that receives a connection
+            and executes schema criation and/or migrations.
+        :type create_schema_function: function
+        """
+        conn = self.connect()
+        create_schema_function(conn)
+        self.disconnect(conn)
+
     def insertAndGetLastRowid(self, *args, **kwargs):
         """
         Execute an SQL query and return the last rowid.
@@ -439,8 +453,8 @@ class SQLiteBlobBackend(object):
         opts = sqlcipher.SQLCipherOptions(
             '/tmp/ignored', binascii.b2a_hex(key),
             is_raw_key=True, create=True)
-        pragmafun = partial(pragmas.set_init_pragmas, opts=opts)
-        openfun = _sqlcipherInitFactory(pragmafun)
+        openfun = partial(pragmas.set_init_pragmas, opts=opts,
+                          schema_func=_init_blob_table)
 
         self.dbpool = ConnectionPool(
             backend, self.path, check_same_thread=False, timeout=5,
@@ -551,13 +565,6 @@ def _init_blob_table(conn):
         sync_column %= default_status
         conn.execute(sync_column)
         conn.execute('ALTER TABLE blobs ADD COLUMN retries INT default 0')
-
-
-def _sqlcipherInitFactory(fun):
-    def _initialize(conn):
-        fun(conn)
-        _init_blob_table(conn)
-    return _initialize
 
 
 #
