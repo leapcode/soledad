@@ -32,7 +32,7 @@ CONFIG_DEFAULTS = {
         'batching': True,
         'blobs': False,
         'blobs_path': '/var/lib/soledad/blobs',
-        'services_tokens_file': '/etc/soledad/incoming.tokens',
+        'services_tokens_file': '/etc/soledad/services.tokens',
     },
     'database-security': {
         'members': ['soledad'],
