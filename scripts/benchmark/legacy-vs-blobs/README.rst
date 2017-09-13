@@ -1,5 +1,5 @@
-Ploggin Legacy vs Blobs results
-===============================
+Plotting Legacy vs Blobs results
+================================
 
 This script produces a bar graph comparing different implementations of the
 mail pipeline (legacy, blobs, blobs with session cache, blobs with session

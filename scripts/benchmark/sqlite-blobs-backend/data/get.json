@@ -1,0 +1,187 @@
+{
+    "commit_info": {
+        "project": "soledad", 
+        "id": "81200dec8ac063a1ad77a5991c2bc7223e4445af", 
+        "time": "2017-09-13T11:11:15-03:00", 
+        "author_time": "2017-09-11T14:38:36-03:00", 
+        "dirty": true, 
+        "branch": "8942"
+    }, 
+    "version": "3.1.1", 
+    "benchmarks": [
+        {
+            "extra_info": {
+                "doc": "", 
+                "cpu_percent": 152.0
+            }, 
+            "params": null, 
+            "name": "test_sqlite_blobs_backend_get_100_100k", 
+            "fullname": "tests/benchmarks/test_sqlite_blobs_backend.py::test_sqlite_blobs_backend_get_100_100k", 
+            "group": null, 
+            "options": {
+                "max_time": 1.0, 
+                "min_time": 5e-06, 
+                "min_rounds": 5, 
+                "warmup": false, 
+                "disable_gc": false, 
+                "timer": "time"
+            }, 
+            "stats": {
+                "q1": 0.03407096862792969, 
+                "iterations": 1, 
+                "q3": 0.03496694564819336, 
+                "stddev_outliers": 3, 
+                "ld15iqr": 0.03357100486755371, 
+                "total": 0.6347811222076416, 
+                "iqr_outliers": 3, 
+                "min": 0.03357100486755371, 
+                "median": 0.03432202339172363, 
+                "rounds": 18, 
+                "hd15iqr": 0.03844714164733887, 
+                "iqr": 0.0008959770202636719, 
+                "outliers": "3;3", 
+                "mean": 0.03526561790042453, 
+                "max": 0.041728973388671875, 
+                "stddev": 0.002284116271186255, 
+                "ops": 28.3562307861324
+            }, 
+            "param": null
+        }, 
+        {
+            "extra_info": {
+                "doc": "", 
+                "cpu_percent": 79.6
+            }, 
+            "params": null, 
+            "name": "test_sqlite_blobs_backend_get_1_10000k", 
+            "fullname": "tests/benchmarks/test_sqlite_blobs_backend.py::test_sqlite_blobs_backend_get_1_10000k", 
+            "group": null, 
+            "options": {
+                "max_time": 1.0, 
+                "min_time": 5e-06, 
+                "min_rounds": 5, 
+                "warmup": false, 
+                "disable_gc": false, 
+                "timer": "time"
+            }, 
+            "stats": {
+                "q1": 0.04414188861846924, 
+                "iterations": 1, 
+                "q3": 0.04668295383453369, 
+                "stddev_outliers": 3, 
+                "ld15iqr": 0.04377603530883789, 
+                "total": 0.36537861824035645, 
+                "iqr_outliers": 0, 
+                "min": 0.04377603530883789, 
+                "median": 0.0463564395904541, 
+                "rounds": 8, 
+                "hd15iqr": 0.04724001884460449, 
+                "iqr": 0.002541065216064453, 
+                "outliers": "3;0", 
+                "mean": 0.045672327280044556, 
+                "max": 0.04724001884460449, 
+                "stddev": 0.001407690906727707, 
+                "ops": 21.89509621150675
+            }, 
+            "param": null
+        }, 
+        {
+            "extra_info": {
+                "doc": "", 
+                "cpu_percent": 151.1
+            }, 
+            "params": null, 
+            "name": "test_sqlite_blobs_backend_get_1000_10k", 
+            "fullname": "tests/benchmarks/test_sqlite_blobs_backend.py::test_sqlite_blobs_backend_get_1000_10k", 
+            "group": null, 
+            "options": {
+                "max_time": 1.0, 
+                "min_time": 5e-06, 
+                "min_rounds": 5, 
+                "warmup": false, 
+                "disable_gc": false, 
+                "timer": "time"
+            }, 
+            "stats": {
+                "q1": 0.1577029824256897, 
+                "iterations": 1, 
+                "q3": 0.2019520401954651, 
+                "stddev_outliers": 2, 
+                "ld15iqr": 0.15537214279174805, 
+                "total": 0.8811802864074707, 
+                "iqr_outliers": 0, 
+                "min": 0.15537214279174805, 
+                "median": 0.16169404983520508, 
+                "rounds": 5, 
+                "hd15iqr": 0.20454716682434082, 
+                "iqr": 0.04424905776977539, 
+                "outliers": "2;0", 
+                "mean": 0.17623605728149414, 
+                "max": 0.20454716682434082, 
+                "stddev": 0.0243984691038373, 
+                "ops": 5.674207738333273
+            }, 
+            "param": null
+        }, 
+        {
+            "extra_info": {
+                "doc": "", 
+                "cpu_percent": 167.9
+            }, 
+            "params": null, 
+            "name": "test_sqlite_blobs_backend_get_10_1000k", 
+            "fullname": "tests/benchmarks/test_sqlite_blobs_backend.py::test_sqlite_blobs_backend_get_10_1000k", 
+            "group": null, 
+            "options": {
+                "max_time": 1.0, 
+                "min_time": 5e-06, 
+                "min_rounds": 5, 
+                "warmup": false, 
+                "disable_gc": false, 
+                "timer": "time"
+            }, 
+            "stats": {
+                "q1": 0.0267794132232666, 
+                "iterations": 1, 
+                "q3": 0.027324676513671875, 
+                "stddev_outliers": 2, 
+                "ld15iqr": 0.026620864868164062, 
+                "total": 0.434096097946167, 
+                "iqr_outliers": 1, 
+                "min": 0.026620864868164062, 
+                "median": 0.02689993381500244, 
+                "rounds": 16, 
+                "hd15iqr": 0.028914213180541992, 
+                "iqr": 0.0005452632904052734, 
+                "outliers": "2;1", 
+                "mean": 0.027131006121635437, 
+                "max": 0.028914213180541992, 
+                "stddev": 0.0005876147817628755, 
+                "ops": 36.85819816326519
+            }, 
+            "param": null
+        }
+    ], 
+    "machine_info": {
+        "processor": "", 
+        "machine": "x86_64", 
+        "python_implementation_version": "2.7.13", 
+        "python_compiler": "GCC 6.3.0 20170118", 
+        "python_implementation": "CPython", 
+        "python_build": [
+            "default", 
+            "Jan 19 2017 14:48:08"
+        ], 
+        "python_version": "2.7.13", 
+        "cpu": {
+            "hardware": "unknown", 
+            "brand": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz", 
+            "vendor_id": "GenuineIntel"
+        }, 
+        "release": "4.9.0-3-amd64", 
+        "system": "Linux", 
+        "node": "pajeh", 
+        "host": "pajeh"
+    }, 
+    "datetime": "2017-09-13T14:35:32.735207"
+}
