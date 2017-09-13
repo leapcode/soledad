@@ -72,20 +72,6 @@ class SyncStatus:
 
 class ConnectionPool(adbapi.ConnectionPool):
 
-    def blocking_create_schema(self, create_schema_function):
-        """
-        Grabs a connection and executes schema creation from current thread,
-        disconnecting right after it. This ensures that schema creation blocks
-        everything and doesn't run concurrently.
-
-        :param create_schema_function: A function that receives a connection
-            and executes schema criation and/or migrations.
-        :type create_schema_function: function
-        """
-        conn = self.connect()
-        create_schema_function(conn)
-        self.disconnect(conn)
-
     def insertAndGetLastRowid(self, *args, **kwargs):
         """
         Execute an SQL query and return the last rowid.
@@ -124,17 +110,12 @@ class ConnectionPool(adbapi.ConnectionPool):
         """
         return self.runInteraction(self._blob, table, column, irow, flags)
 
-    def write(self, table, column, irow, blob_fd):
+    def write_blob(self, table, column, irow, blob_fd):
         return self.runInteraction(self._write_blob, table, column, irow,
                                    blob_fd)
 
     def _write_blob(self, trans, table, column, irow, blob_fd):
         blob_fd.seek(0)
-        # XXX I have to copy the buffer here so that I'm able to
-        # return a non-closed file to the caller (blobmanager.get)
-        # FIXME should remove this duplication!
-        # have a look at how treq does cope with closing the handle
-        # for uploading a file
         with trans._connection.blob(table, column, irow, 1) as handle:
             data = blob_fd.read(2**12)
             while data:
@@ -491,7 +472,7 @@ class SQLiteBlobBackend(object):
         insert += ' VALUES (?, ?, zeroblob(?), ?)'
         values = (blob_id, namespace, size, status)
         irow = yield self.dbpool.insertAndGetLastRowid(insert, values)
-        yield self.dbpool.write('blobs', 'payload', irow, blob_fd)
+        yield self.dbpool.write_blob('blobs', 'payload', irow, blob_fd)
         logger.info("Finished saving blob in local database.")
 
     @defer.inlineCallbacks
