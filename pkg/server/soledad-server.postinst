@@ -17,7 +17,7 @@ id soledad > /dev/null 2>&1
 RET=$?
 
 if [ ! $RET -eq 0 ]; then
-  adduser --system soledad --no-create-home --home /srv/leap/ --ingroup soledad
+  adduser --system soledad --no-create-home --home /var/lib/soledad/ --ingroup soledad
 fi
 
 # allow soledad user to read ssl certificates
@@ -28,7 +28,7 @@ id soledad-admin > /dev/null 2>&1
 RET=$?
 
 if [ ! $RET -eq 0 ]; then
-  adduser --system soledad-admin --no-create-home --home /srv/leap/ --ingroup soledad
+  adduser --system soledad-admin --no-create-home --home /var/lib/soledad/ --ingroup soledad
 fi
 
 # update systemd and start service
