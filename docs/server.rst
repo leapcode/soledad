@@ -67,3 +67,29 @@ This has some implications:
 The authorization for creating, updating, deleting and retrieving recovery
 documents on the shared database is handled by `leap.soledad.server.auth`
 module.
+
+.. _server-config-file:
+
+Server Configuration File
+-------------------------
+
+Soledad Server looks for a configuration file in
+``/etc/soledad/soledad-server.conf`` and will read the following configuration
+options from the ``[soledad-server]`` section:
+
+==================== =============================================== ================================
+Option               Description                                     Default value
+==================== =============================================== ================================
+couch_url            The URL of the CouchDB backend storage.         ``http://localhost:5984``
+create_cmd           The shell command to create user databases.     None
+admin_netrc          The netrc file to be used for authenticating    ``/etc/couchdb/couchdb.netrc``
+                     with the CouchDB backend storage.
+batching             Whether to use batching capabilities for        ``true``
+                     synchronization.
+blobs                Whether to provide the Blobs functionality or   ``false``
+                     not.
+blobs_path           The path for blobs storage in the server's file ``/var/lib/soledad/blobs``
+                     system.
+services_tokens_file The file containing authentication tokens for   ``/etc/soledad/services.tokens``
+                     services provided through the Services API.
+==================== =============================================== ================================

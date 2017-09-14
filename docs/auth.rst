@@ -16,9 +16,10 @@ There are currently two distinct authenticated entry points:
   *Blobs* services, verified against the Leap Platform
   ``tokens`` database.
 
-* A local plaintext **Services API**, providing the delivery part of the
-  *Incoming* service, authenticated against tokens defined in a file specified
-  on the server configuration file.
+* A local plaintext **Services API**, currently providing only the delivery
+  part of the *Incoming* service, authenticated against tokens defined in
+  a file specified on the server configuration file (see the
+  :ref:`services-tokens-file` section).
 
 Authorization header
 --------------------
@@ -31,13 +32,22 @@ If no token is provided, the request is considered an "anonymous" request.
 Anonymous requests can only access `GET /`, which returns information about the
 server (as the version of the server and runtime configuration options).
 
-Special credentials for local services
---------------------------------------
+.. _services-tokens-file:
 
-Some special credentials can be added into a file
-(``/etc/soledad/incoming.tokens``, by default) and then configured in the
-Soledad Server configuration file. Currently, the only special credential
-provided is for the `/incoming` API.
+Services API tokens file
+------------------------
+
+Credentials for services accessible through the local Services API entrypoint
+can be added into a file, one in each line with the format
+``servicename:token``, like this::
+
+    incoming:Zm9yYSB0ZW1lciEK
+
+By default, Soledad Server will look for the tokens file in
+``/etc/soledad/services.tokens`` but that is configurable (see
+:ref:`server-config-file` for more information).
+
+Currently, the only special credential provided is for the *Incoming* service.
 
 Implementation
 --------------
@@ -78,4 +88,4 @@ When the server is started, two services are spawned:
        |  '-------'                | (delivery only) |
        |  .--------.               '-----------------'
        '->| /blobs |
-          '--------'
+          '--------
