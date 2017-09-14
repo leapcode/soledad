@@ -18,7 +18,7 @@ the tests for measuring memory. This script only plots time, for now.
 Once you done the above, chdir into `soledad/tests` and do something like this,
 for each test group:
 
-  tox -e benchmarks -- -m benchmark_test_legacy_vs_blobs_10_1000k --benchmark-autosave
+  tox -e benchmark -- -m benchmark_test_legacy_vs_blobs_10_1000k --benchmark-autosave
 
 Each run of tox as above produces a JSON file in `soledad/tests/.benchmarks`
 with stats. Each file has to be copied in a subdirectory of the `data/`

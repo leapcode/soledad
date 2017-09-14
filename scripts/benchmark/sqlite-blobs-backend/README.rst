@@ -14,10 +14,12 @@ twice by default, you should remove the second call to pytest in `tox.ini` that
 would cause a second run of the tests for measuring memory. This script only
 plots time, for now.
 
-Once you done the above, chdir into `soledad/tests` and do something like this:
-
-  tox -e benchmarks -- -m sqlite_blobs_backend_get --benchmark-autosave
-  tox -e benchmarks -- -m sqlite_blobs_backend_put --benchmark-autosave
+Once you done the above, do the following to benchmark and generate data:
+```bash
+  chdir soledad/tests
+  tox -e benchmark -- -m sqlite_blobs_backend_get --benchmark-autosave
+  tox -e benchmark -- -m sqlite_blobs_backend_put --benchmark-autosave
+```
 
 Each run of tox as above produces a JSON file in `soledad/tests/.benchmarks`
 with stats. Copy the first file into `data/get.json` and the second file into

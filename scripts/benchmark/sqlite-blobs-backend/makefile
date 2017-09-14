@@ -7,8 +7,10 @@ env:
 	if [ ! -d $(VIRTUALENV_ROOT) ]; then \
 	  mkdir -p $$(dirname $(VIRTUALENV_ROOT)); \
 	  virtualenv $(VIRTUALENV_ROOT); \
-	  $(VIRTUALENV_ROOT)/bin/pip install requirements.pip; \
 	fi
 
-graph: env
+deps: env
+	$(VIRTUALENV_ROOT)/bin/pip install -r requirements.pip
+
+graph: deps
 	$(VIRTUALENV_ROOT)/bin/python ./gen-graph.py
