@@ -19,7 +19,6 @@ Tests for BlobManager.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from twisted.web.error import SchemeNotSupported
 from leap.soledad.client._db.blobs import BlobManager, BlobDoc, FIXED_REV
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import SyncStatus
@@ -170,7 +169,7 @@ class BlobManagerTestCase(unittest.TestCase):
         with pytest.raises(Exception):
             yield self.manager.put(doc1, len(content))
         for _ in range(self.manager.max_retries + 1):
-            with pytest.raises(SchemeNotSupported):
+            with pytest.raises(defer.FirstError):
                 yield self.manager.send_missing()
         failed_upload = SyncStatus.FAILED_UPLOAD
         local_list = yield self.manager.local_list(sync_status=failed_upload)
