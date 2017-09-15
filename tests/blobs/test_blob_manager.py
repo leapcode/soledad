@@ -174,3 +174,22 @@ class BlobManagerTestCase(unittest.TestCase):
         failed_upload = SyncStatus.FAILED_UPLOAD
         local_list = yield self.manager.local_list(sync_status=failed_upload)
         self.assertIn(blob_id, local_list)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_local_list_doesnt_include_unavailable_blobs(self):
+        local = self.manager.local
+        unavailable_ids, deferreds = [], []
+        for unavailable_status in SyncStatus.UNAVAILABLE_STATUSES:
+            current_blob_id = uuid4().hex
+            deferreds.append(local.put(current_blob_id, BytesIO(''), 0,
+                                       status=unavailable_status))
+            unavailable_ids.append(current_blob_id)
+        available_blob_id = uuid4().hex
+        content, length = self.cleartext, len(self.cleartext.getvalue())
+        deferreds.append(local.put(available_blob_id, content, length))
+        yield defer.gatherResults(deferreds)
+        local_list = yield local.list()
+        message = 'Unavailable blob showing up on listing!'
+        for blob_id in unavailable_ids:
+            self.assertNotIn(blob_id, local_list, message)

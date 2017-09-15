@@ -72,6 +72,7 @@ class SyncStatus:
     PENDING_DOWNLOAD = 3
     FAILED_UPLOAD = 4
     FAILED_DOWNLOAD = 5
+    UNAVAILABLE_STATUSES = (3, 5)
 
 
 class ConnectionPool(adbapi.ConnectionPool):
@@ -573,6 +574,11 @@ class SQLiteBlobBackend(object):
         if sync_status:
             query += ' and sync_status = ?'
             values += (sync_status,)
+        else:
+            avoid_values = SyncStatus.UNAVAILABLE_STATUSES
+            query += ' AND sync_status NOT IN (%s)'
+            query %= ','.join(['?' for _ in avoid_values])
+            values += avoid_values
         result = yield self.dbpool.runQuery(query, values)
         if result:
             defer.returnValue([b_id[0] for b_id in result])
