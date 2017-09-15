@@ -6,5 +6,6 @@ This page gathers reference documentation to understanding the internals of Sole
 .. toctree::
    :maxdepth: 1
 
-   attachments
-   incoming_box
+   reference/environment_variables
+   reference/attachments
+   reference/incoming_box
