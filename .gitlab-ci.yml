@@ -120,6 +120,12 @@ responsiveness:
     - echo "addopts=--elasticsearch-url=\"$ELASTICSEARCH_URL\"" >> pytest.ini && chmod 600 pytest.ini
     - /usr/bin/unbuffer tox --recreate -e responsiveness -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
 
+e2e:
+  stage: tests
+  image: 0xacab.org:4567/leap/soledad:latest
+  script:
+    - tox -e e2e
+
 build_docker_image:
   stage: build
   image: 0xacab.org:4567/leap/soledad:latest

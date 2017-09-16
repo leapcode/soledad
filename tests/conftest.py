@@ -61,7 +61,7 @@ def pytest_collection_modifyitems(items, config):
 
     # select/deselect tests based on a blacklist and the subdir option given in
     # command line
-    blacklist = ['benchmarks', 'responsiveness']
+    blacklist = ['benchmarks', 'responsiveness', 'e2e']
     subdir = config.getoption('subdir')
     selected, deselected = _select_subdir(subdir, blacklist, items)
     config.hook.pytest_deselected(items=deselected)
