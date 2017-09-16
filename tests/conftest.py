@@ -317,8 +317,6 @@ def _get_certfile(url, tmpdir):
 
 @pytest.fixture()
 def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
-    passphrase = DEFAULT_PASSPHRASE
-    token = DEFAULT_TOKEN
 
     # default values for local server
     server_url = DEFAULT_URL
@@ -338,8 +336,10 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
     soledad_dbs(default_uuid, create=create)
 
     # get a soledad instance
-    def create(force_fresh_db=False):
-        secrets_file = '%s.secret' % default_uuid
+    def create(force_fresh_db=False, uuid=default_uuid,
+               passphrase=DEFAULT_PASSPHRASE, token=DEFAULT_TOKEN):
+
+        secrets_file = '%s.secret' % uuid
         secrets_path = os.path.join(tmpdir.strpath, secrets_file)
 
         # in some tests we might want to use the same user and remote database
@@ -349,11 +349,11 @@ def soledad_client(tmpdir, soledad_server, remote_db, soledad_dbs, request):
         if force_fresh_db:
             # find the next index for this user
             idx = len(glob.glob('%s/*-*.db' % tmpdir.strpath)) + 1
-        db_file = '%s-%d.db' % (default_uuid, idx)
+        db_file = '%s-%d.db' % (uuid, idx)
         local_db_path = os.path.join(tmpdir.strpath, db_file)
 
         soledad_client = Soledad(
-            default_uuid,
+            uuid,
             unicode(passphrase),
             secrets_path=secrets_path,
             local_db_path=local_db_path,
