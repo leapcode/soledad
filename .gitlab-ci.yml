@@ -16,7 +16,7 @@ cache:
   untracked: true
   key: soledad-shared-pip-cache
   paths:
-    - testing/.cache/
+    - .cache/
 
 before_script:
   - echo "Running on ${HOST_HOSTNAME:=$(hostname)}"
@@ -47,7 +47,6 @@ code-check:
   stage: code-check
   image: 0xacab.org:4567/leap/soledad:latest
   script:
-    - cd testing
     - tox -e code-check
 
 tests:
@@ -56,7 +55,6 @@ tests:
   services:
     - couchdb
   script:
-    - cd testing
     - tox -- --couch-url http://couchdb:5984
 
 benchmark:
@@ -70,7 +68,6 @@ benchmark:
     - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && git checkout origin/master scripts/benchmark/setup-all-commits-env.sh'
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
-    - cd testing
     - curl -s couchdb:5984
     # You can provide a $NETRC variable containing the creds for your
     # elasticsearch instance so it's protected from being leaked in the
@@ -94,7 +91,6 @@ responsiveness:
     - couchdb
   script:
     - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
-    - cd testing
     - curl -s couchdb:5984
     - echo "addopts=--elasticsearch-url=\"$ELASTICSEARCH_URL\"" >> pytest.ini && chmod 600 pytest.ini
     - /usr/bin/unbuffer tox --recreate -e responsiveness -- --couch-url http://couchdb:5984 | /usr/bin/ts -s

@@ -11,7 +11,6 @@ couchdb server to be run against.
 If you do have a couchdb server running on localhost on default port, the
 following command should be enough to run tests::
 
-    cd testing
     tox
 
 CouchDB dependency
@@ -20,13 +19,11 @@ CouchDB dependency
 In case you want to use a couchdb on another host or port, use the
 `--couch-url` parameter for `pytest`::
 
-    cd testing
     tox -- --couch-url=http://couch_host:5984
 
 If you want to exclude all tests that depend on couchdb, deselect tests marked
 with `needs_couch`::
 
-    cd testing
     tox -- -m 'not needs_couch'
 
 Benchmark tests

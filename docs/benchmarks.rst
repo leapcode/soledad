@@ -9,7 +9,6 @@ to write tests to assess the time and resources taken by various tasks.
 To run benchmark tests, once inside a cloned Soledad repository, do the
 following::
 
-    cd testing/
     tox -e benchmark
 
 Results of automated benchmarking for each commit in the repository can be seen
