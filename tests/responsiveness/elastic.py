@@ -37,6 +37,7 @@ def get_doc(seconds_blocked, request):
         "name": name,
         "group": group,
         "machine_info": pytest_benchmark_generate_machine_info(),
+        "seconds_blocked": seconds_blocked,
     }
 
     # generate a doc id like the one used by pytest-benchmark
