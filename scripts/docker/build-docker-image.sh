@@ -19,11 +19,10 @@ if [ -z "${LAST_COMMIT}" ]; then
   exit 1
 fi
 
-if git diff "${LAST_COMMIT}" HEAD --name-only | grep testing/docker; then
+if git diff "${LAST_COMMIT}" HEAD --name-only | grep scripts/docker; then
   docker --version
   docker info
   docker login -u gitlab-ci-token -e sysdev@leap.se -p "${CI_JOB_TOKEN}" "${CI_REGISTRY}"
-  docker build -t "${CI_REGISTRY_IMAGE}:latest" testing/docker
+  docker build -t "${CI_REGISTRY_IMAGE}:latest" scripts/docker
   docker push "${CI_REGISTRY_IMAGE}":latest
 fi
-
