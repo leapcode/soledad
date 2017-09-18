@@ -22,7 +22,11 @@ RUN apt-get -y install --no-install-recommends libpython2.7-dev \
   # needed to build pysqlcipher module
   build-essential \
   # needed to build docker images
-  docker.io
+  docker.io \
+  # needed to send email during e2e tests
+  swaks \
+  libnet-dns-perl \
+  libnet-ssleay-perl
 
 # We need git from backports because it has
 # the "%cI: committer date, strict ISO 8601 format"
