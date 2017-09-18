@@ -8,8 +8,7 @@ import treq
 import urllib
 
 from string import ascii_lowercase
-from email.mime.text import MIMEText
-from subprocess import Popen, PIPE
+from subprocess import check_call
 
 from twisted.internet import reactor
 from twisted.internet.defer import returnValue
@@ -138,11 +137,17 @@ def send_email(username):
     address = "%s@%s" % (username, _provider)
     print("sending email to %s" % address)
     secret = ''.join(random.choice(ascii_lowercase) for i in range(20))
-    msg = MIMEText(secret)
-    msg["To"] = address
-    msg["Subject"] = "e2e test token"
-    p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
-    p.communicate(msg.as_string())
+    cmd = [
+        'swaks',
+        '--silent', '2',
+        '--helo', 'ci.leap.se',
+        '-f', 'ci@leap.se',
+        '-t', address,
+        '-h-Subject', 'e2e test token',
+        '--body', secret,
+        '-tlsc'
+    ]
+    check_call(cmd)
     return secret
 
 
