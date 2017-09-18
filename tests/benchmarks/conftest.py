@@ -1,5 +1,4 @@
 import functools
-import numpy
 import os
 import psutil
 import pytest
@@ -70,6 +69,18 @@ def txbenchmark_with_setup(monitored_benchmark_with_setup):
 # resource monitoring
 #
 
+def _mean(l):
+    return float(sum(l)) / len(l)
+
+
+def _std(l):
+    if len(l) <= 1:
+        return 0
+    mean = _mean(l)
+    squares = [(x - mean) ** 2 for x in l]
+    return (sum(squares) / (len(l) - 1)) ** 0.5
+
+
 class ResourceWatcher(threading.Thread):
 
     sampling_interval = 0.1
@@ -102,14 +113,17 @@ class ResourceWatcher(threading.Thread):
         self.cpu_percent = self.process.cpu_percent()
         # save memory usage info
         if self.watch_memory:
+            stats = {
+                'max': max(self.memory_samples),
+                'min': min(self.memory_samples),
+                'mean': _mean(self.memory_samples),
+                'std': _std(self.memory_samples),
+            }
             memory_percent = {
                 'sampling_interval': self.sampling_interval,
                 'samples': self.memory_samples,
-                'stats': {},
+                'stats': stats,
             }
-            for stat in 'max', 'min', 'mean', 'std':
-                fun = getattr(numpy, stat)
-                memory_percent['stats'][stat] = fun(self.memory_samples)
             self.memory_percent = memory_percent
 
 
