@@ -11,10 +11,10 @@ import socket
 import subprocess
 import sys
 import time
-import urlparse
 
 from hashlib import sha512
 from six.moves.urllib.parse import urljoin
+from six.moves.urllib.parse import urlsplit
 from uuid import uuid4
 
 from leap.soledad.common.couch import CouchDatabase
@@ -117,7 +117,7 @@ def _request(method, url, data=None, do=True):
         cmd = 'curl --netrc -X %s %s' % (method.upper(), url)
         if data:
             cmd += ' -d "%s"' % json.dumps(data)
-        print cmd
+        print(cmd)
 
 
 @pytest.fixture
@@ -302,7 +302,7 @@ def soledad_dbs(request):
 def _get_certfile(url, tmpdir):
 
     # download the certificate
-    parsed = urlparse.urlsplit(url)
+    parsed = urlsplit(url)
     netloc = re.sub('^[^\.]+\.', '', parsed.netloc)
     host, _ = netloc.split(':')
     response = requests.get('https://%s/ca.crt' % host, verify=False)
