@@ -31,6 +31,7 @@ from leap.soledad.server._incoming import IncomingResource
 from leap.soledad.server._blobs import BlobsServerState
 from leap.soledad.server._incoming import IncomingFormatter
 from leap.soledad.common.crypto import EncryptionSchemes
+from leap.soledad.common.blobs.preamble import decode_preamble
 from leap.soledad.common.blobs import Flags
 from test_soledad.util import CouchServerStateForTests
 from test_soledad.util import CouchDBTestCase
@@ -87,6 +88,10 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
         yield db.read_blob(user_id, doc_id, request, 'MX')
         flags = db.get_flags(user_id, doc_id, request, 'MX')
         flags = json.loads(flags)
-        expected = formatter.preamble(content, doc_id) + ' ' + content
-        self.assertEquals(expected, request.written[0])
+        expected_preamble = formatter.preamble(content, doc_id)
+        expected_preamble = decode_preamble(expected_preamble, True)
+        written_preamble, written_content = request.written[0].split()
+        written_preamble = decode_preamble(written_preamble, True)
+        self.assertEquals(expected_preamble, written_preamble)
+        self.assertEquals(content, written_content)
         self.assertIn(Flags.PENDING, flags)

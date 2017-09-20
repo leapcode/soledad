@@ -26,6 +26,7 @@ holds data about encryption scheme, iv, document id and sync related data.
    str(self.rev), -> current revision
    self._content_size) -> size, rounded to ceiling
 """
+import base64
 import warnings
 import struct
 import time
@@ -66,8 +67,24 @@ class Preamble(object):
             self.content_size)
         return preamble
 
+    def __eq__(self, other):
+        # timestamp insn't included on comparison on purpose since it's not
+        # part of the document identity (you can have the very same document at
+        # two different times, but you can't have any other field changed and
+        # still be able to consider it as the same document).
+        fields = ['doc_id', 'rev', 'scheme', 'method', 'iv', 'magic',
+                  'content_size']
+        for field in fields:
+            if not hasattr(other, field):
+                return False
+            if getattr(self, field) != getattr(other, field):
+                return False
+        return True
 
-def decode_preamble(encoded_preamble):
+
+def decode_preamble(encoded_preamble, armored=False):
+    if armored:
+        encoded_preamble = base64.b64decode(encoded_preamble)
     preamble_size = len(encoded_preamble)
     try:
         if preamble_size == LEGACY_PACMAN.size:
