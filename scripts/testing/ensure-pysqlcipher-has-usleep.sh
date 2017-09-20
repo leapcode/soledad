@@ -9,5 +9,8 @@ install_bundled_pysqlcipher() {
   pip uninstall -y pysqlcipher
   pip install --install-option="--bundled" pysqlcipher
 }
-
-./check-pysqlcipher.py || (install_bundled_pysqlcipher && ./check-pysqlcipher.py)
+check_pysqlcipher() {
+    SCRIPTPATH=$( cd $(dirname $0) ; pwd -P )
+    $SCRIPTPATH/check-pysqlcipher.py
+}
+check_pysqlcipher || (install_bundled_pysqlcipher && check_pysqlcipher)
