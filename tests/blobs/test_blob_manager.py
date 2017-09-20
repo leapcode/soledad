@@ -193,3 +193,24 @@ class BlobManagerTestCase(unittest.TestCase):
         message = 'Unavailable blob showing up on listing!'
         for blob_id in unavailable_ids:
             self.assertNotIn(blob_id, local_list, message)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_persist_sync_statuses_listing_from_server(self):
+        local = self.manager.local
+        remote_ids = [uuid4().hex for _ in range(10)]
+        local_ids = [uuid4().hex for _ in range(10)]
+        self.manager.remote_list = Mock(return_value=defer.succeed(remote_ids))
+        content, pending = self.cleartext, SyncStatus.PENDING_UPLOAD
+        length, deferreds = len(content.getvalue()), []
+        for blob_id in local_ids:
+            d = local.put(blob_id, content, length, status=pending)
+            deferreds.append(d)
+        yield defer.gatherResults(deferreds)
+        yield self.manager.refresh_sync_status_from_server()
+        d = self.manager.local_list(sync_status=SyncStatus.PENDING_UPLOAD)
+        pending_upload_list = yield d
+        d = self.manager.local_list(sync_status=SyncStatus.PENDING_DOWNLOAD)
+        pending_download_list = yield d
+        self.assertEquals(set(pending_upload_list), set(local_ids))
+        self.assertEquals(set(pending_download_list), set(remote_ids))

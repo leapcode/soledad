@@ -275,6 +275,15 @@ class BlobManager(object):
         return self.local.list(namespace, sync_status)
 
     @defer.inlineCallbacks
+    def refresh_sync_status_from_server(self):
+        d1 = self.remote_list()
+        d2 = self.local_list()
+        remote_list, local_list = yield defer.gatherResults([d1, d2])
+        pending_download_ids = tuple(set(remote_list) - set(local_list))
+        yield self.local.update_batch_sync_status(
+            pending_download_ids, sync_status=SyncStatus.PENDING_DOWNLOAD)
+
+    @defer.inlineCallbacks
     def send_missing(self, namespace=''):
         """
         Compare local and remote blobs and send what's missing in server.
@@ -589,6 +598,17 @@ class SQLiteBlobBackend(object):
         query = 'update blobs set sync_status = ? where blob_id = ?'
         values = (sync_status, blob_id,)
         return self.dbpool.runQuery(query, values)
+
+    def update_batch_sync_status(self, blob_id_list, sync_status,
+                                 namespace=''):
+        insert = 'INSERT INTO blobs (blob_id, namespace, payload, sync_status)'
+        first_blob_id, blob_id_list = blob_id_list[0], blob_id_list[1:]
+        insert += ' VALUES (?, ?, zeroblob(0), ?)'
+        values = (first_blob_id, namespace, sync_status)
+        for blob_id in blob_id_list:
+            insert += ', (?, ?, zeroblob(0), ?)'
+            values += (blob_id, namespace, sync_status)
+        return self.dbpool.runQuery(insert, values)
 
     def increment_retries(self, blob_id):
         query = 'update blobs set retries = retries + 1 where blob_id = ?'
