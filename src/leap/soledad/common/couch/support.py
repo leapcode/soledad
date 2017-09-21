@@ -49,13 +49,14 @@ class MultipartWriter(object):
         self._boundary = boundary
         self._build_headers('related', headers)
 
-    def add(self, mimetype, content, headers={}):
+    def add(self, mimetype, content, headers=None):
         """
         Add a part to the multipart stream.
         """
         self.fileobj.write('--')
         self.fileobj.write(self._boundary)
         self.fileobj.write(self.CRLF)
+        headers = headers or {}
         headers['Content-Type'] = mimetype
         self._write_headers(headers)
         if content:

@@ -143,10 +143,10 @@ class HTTPError(U1DBError):
 
     wire_description = None
 
-    def __init__(self, status, message=None, headers={}):
+    def __init__(self, status, message=None, headers=None):
         self.status = status
         self.message = message
-        self.headers = headers
+        self.headers = headers or {}
 
     def __str__(self):
         if not self.message:
@@ -160,8 +160,8 @@ class Unavailable(HTTPError):
 
     wire_description = "unavailable"
 
-    def __init__(self, message=None, headers={}):
-        super(Unavailable, self).__init__(503, message, headers)
+    def __init__(self, message=None, headers=None):
+        super(Unavailable, self).__init__(503, message, headers or {})
 
     def __str__(self):
         if not self.message:

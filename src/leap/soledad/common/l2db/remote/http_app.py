@@ -453,11 +453,12 @@ class HTTPResponder(object):
         self.content_type = 'application/json'
         self.content = []
 
-    def start_response(self, status, obj_dic=None, headers={}):
+    def start_response(self, status, obj_dic=None, headers=None):
         """start sending response with optional first json object."""
         if self._started:
             return
         self._started = True
+        headers = headers or {}
         status_text = httplib.responses[status]
         self._write = self._start_response(
             '%d %s' % (status, status_text),
@@ -473,13 +474,15 @@ class HTTPResponder(object):
         """finish sending response."""
         self.sent_response = True
 
-    def send_response_json(self, status=200, headers={}, **kwargs):
+    def send_response_json(self, status=200, headers=None, **kwargs):
         """send and finish response with json object body from keyword args."""
         content = json.dumps(kwargs) + "\r\n"
+        headers = headers or {}
         self.send_response_content(content, headers=headers, status=status)
 
-    def send_response_content(self, content, status=200, headers={}):
+    def send_response_content(self, content, status=200, headers=None):
         """send and finish response with content"""
+        headers = headers or {}
         headers['content-length'] = str(len(content))
         self.start_response(status, headers=headers)
         if self._stream_state == 1:
