@@ -196,6 +196,25 @@ class BlobManagerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_doesnt_include_unavailable_blobs(self):
+        local = self.manager.local
+        unavailable_ids, deferreds = [], []
+        for unavailable_status in SyncStatus.UNAVAILABLE_STATUSES:
+            current_blob_id = uuid4().hex
+            deferreds.append(local.put(current_blob_id, BytesIO(''), 0,
+                                       status=unavailable_status))
+            unavailable_ids.append(current_blob_id)
+        available_blob_id = uuid4().hex
+        content, length = self.cleartext, len(self.cleartext.getvalue())
+        deferreds.append(local.put(available_blob_id, content, length))
+        yield defer.gatherResults(deferreds)
+        message = 'Unavailable blob showing up on GET!'
+        for blob_id in unavailable_ids:
+            blob = yield local.get(blob_id)
+            self.assertFalse(blob, message)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_persist_sync_statuses_listing_from_server(self):
         local = self.manager.local
         remote_ids = [uuid4().hex for _ in range(10)]

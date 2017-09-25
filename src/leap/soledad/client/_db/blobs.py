@@ -552,6 +552,11 @@ class SQLiteBlobBackend(object):
     @defer.inlineCallbacks
     def put(self, blob_id, blob_fd, size=None,
             namespace='', status=SyncStatus.PENDING_UPLOAD):
+        previous_state = yield self.get_sync_status(blob_id)
+        unavailable = SyncStatus.UNAVAILABLE_STATUSES
+        if previous_state and previous_state[0] in unavailable:
+            yield self.delete(blob_id, namespace)
+            status = SyncStatus.SYNCED
         logger.info("Saving blob in local database...")
         insert = 'INSERT INTO blobs (blob_id, namespace, payload, sync_status)'
         insert += ' VALUES (?, ?, zeroblob(?), ?)'
@@ -565,7 +570,12 @@ class SQLiteBlobBackend(object):
         # TODO we can also stream the blob value using sqlite
         # incremental interface for blobs - and just return the raw fd instead
         select = 'SELECT payload FROM blobs WHERE blob_id = ? AND namespace= ?'
-        result = yield self.dbpool.runQuery(select, (blob_id, namespace,))
+        values = (blob_id, namespace,)
+        avoid_values = SyncStatus.UNAVAILABLE_STATUSES
+        select += ' AND sync_status NOT IN (%s)'
+        select %= ','.join(['?' for _ in avoid_values])
+        values += avoid_values
+        result = yield self.dbpool.runQuery(select, values)
         if result:
             defer.returnValue(BytesIO(str(result[0][0])))
 
