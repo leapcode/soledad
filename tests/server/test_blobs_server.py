@@ -33,11 +33,21 @@ from leap.soledad.client._db.blobs import BlobManager
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import InvalidFlagsError
 from leap.soledad.client._db.blobs import SoledadError
+from leap.soledad.client._db.blobs import SyncStatus
+from leap.soledad.client._db import blobs as client_blobs
+from leap.soledad.client._crypto import InvalidBlob
+
+
+def sleep(x):
+    d = defer.Deferred()
+    reactor.callLater(x, d.callback, None)
+    return d
 
 
 class BlobServerTestCase(unittest.TestCase):
 
     def setUp(self):
+        client_blobs.MAX_WAIT = 0.1
         root = server_blobs.BlobsResource("filesystem", self.tempdir)
         self.site = Site(root)
         self.port = reactor.listenTCP(0, self.site, interface='127.0.0.1')
@@ -265,12 +275,8 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager.local.put(blob_id, BytesIO("X"), size=1)
         yield self.port.stopListening()
 
-        def sleep(x):
-            d = defer.Deferred()
-            reactor.callLater(x, d.callback, None)
-            return d
         d = manager.send_missing()
-        yield sleep(1)
+        yield sleep(0.1)
         self.port = reactor.listenTCP(
             self.host.port, self.site, interface='127.0.0.1')
         yield d
@@ -302,18 +308,36 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager.refresh_sync_status_from_server()
         yield self.port.stopListening()
 
-        def sleep(x):
-            d = defer.Deferred()
-            reactor.callLater(x, d.callback, None)
-            return d
         d = manager.fetch_missing()
-        yield sleep(1)
+        yield sleep(0.1)
         self.port = reactor.listenTCP(
             self.host.port, self.site, interface='127.0.0.1')
         yield d
         result = yield manager.local.get(blob_id)
         self.assertIsNotNone(result)
         self.assertEquals(result.getvalue(), "X")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_download_corrupted_tag_marks_blob_as_failed(self):
+        user_id = uuid4().hex
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, user_id)
+        self.addCleanup(manager.close)
+        blob_id = 'corrupted'
+        yield manager._encrypt_and_upload(blob_id, BytesIO("corrupted"))
+        parts = ['default'] + [blob_id[0], blob_id[0:3], blob_id[0:6]]
+        parts += [blob_id]
+        corrupted_blob_path = os.path.join(self.tempdir, user_id, *parts)
+        with open(corrupted_blob_path, 'r+b') as corrupted_blob:
+            # Corrupt the tag (last 16 bytes)
+            corrupted_blob.seek(-16, 2)
+            corrupted_blob.write('x' * 16)
+        with pytest.raises(InvalidBlob):
+            yield manager.sync()
+        status, retries = yield manager.local.get_sync_status(blob_id)
+        self.assertEquals(status, SyncStatus.FAILED_DOWNLOAD)
+        self.assertEquals(retries, 3)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
