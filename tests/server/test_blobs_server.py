@@ -39,8 +39,8 @@ class BlobServerTestCase(unittest.TestCase):
 
     def setUp(self):
         root = server_blobs.BlobsResource("filesystem", self.tempdir)
-        site = Site(root)
-        self.port = reactor.listenTCP(0, site, interface='127.0.0.1')
+        self.site = Site(root)
+        self.port = reactor.listenTCP(0, self.site, interface='127.0.0.1')
         self.host = self.port.getHost()
         self.uri = 'http://%s:%s/' % (self.host.host, self.host.port)
         self.secret = 'A' * 96
@@ -264,6 +264,30 @@ class BlobServerTestCase(unittest.TestCase):
         blob_id = 'remote_only_blob_id'
         yield manager._encrypt_and_upload(blob_id, BytesIO("X"))
         yield manager.sync()
+        result = yield manager.local.get(blob_id)
+        self.assertIsNotNone(result)
+        self.assertEquals(result.getvalue(), "X")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_sync_fetch_missing_retry(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, uuid4().hex)
+        self.addCleanup(manager.close)
+        blob_id = 'remote_only_blob_id'
+        yield manager._encrypt_and_upload(blob_id, BytesIO("X"))
+        yield manager.refresh_sync_status_from_server()
+        yield self.port.stopListening()
+
+        def sleep(x):
+            d = defer.Deferred()
+            reactor.callLater(x, d.callback, None)
+            return d
+        d = manager.fetch_missing()
+        yield sleep(1)
+        self.port = reactor.listenTCP(
+            self.host.port, self.site, interface='127.0.0.1')
+        yield d
         result = yield manager.local.get(blob_id)
         self.assertIsNotNone(result)
         self.assertEquals(result.getvalue(), "X")

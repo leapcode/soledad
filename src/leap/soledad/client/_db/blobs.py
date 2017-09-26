@@ -31,6 +31,7 @@ from functools import partial
 from twisted.logger import Logger
 from twisted.enterprise import adbapi
 from twisted.internet import defer
+from twisted.internet import error
 
 import treq
 
@@ -338,8 +339,19 @@ class BlobManager(object):
             for _ in range(min(self.concurrency_limit, len(docs_we_want))):
                 blob_id = docs_we_want.pop()
                 logger.info("Fetching new doc: %s" % blob_id)
-                deferreds.append(self.get(blob_id, namespace))
+                d = self.__with_retry(self.get, blob_id, namespace)
+                deferreds.append(d)
             yield defer.gatherResults(deferreds)
+
+    @defer.inlineCallbacks
+    def __with_retry(self, func, *args, **kwargs):
+        retries, max_retries = 0, 300
+        while retries < max_retries:
+            try:
+                yield func(*args, **kwargs)
+                break
+            except(error.ConnectError, error.ConnectionClosed):
+                retries += 1
 
     @defer.inlineCallbacks
     def sync(self, namespace=''):
