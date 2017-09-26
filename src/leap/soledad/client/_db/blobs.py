@@ -31,6 +31,7 @@ from functools import partial
 from twisted.logger import Logger
 from twisted.enterprise import adbapi
 from twisted.internet import defer
+from twisted.internet import reactor
 from twisted.internet import error
 
 import treq
@@ -143,6 +144,24 @@ def check_http_status(code, blob_id=None, flags=None):
         raise InvalidFlagsError((blob_id, flags))
     elif code != 200:
         raise SoledadError("Server Error: %s" % code)
+
+
+def sleep(seconds):
+    d = defer.Deferred()
+    reactor.callLater(seconds, d.callback, None)
+    return d
+
+
+@defer.inlineCallbacks
+def with_retry(func, *args, **kwargs):
+    retry_wait, max_wait = 1, 60
+    while True:
+        try:
+            yield func(*args, **kwargs)
+            break
+        except(error.ConnectError, error.ConnectionClosed):
+            yield sleep(retry_wait)
+            retry_wait = min(retry_wait + 10, max_wait)
 
 
 class DecrypterBuffer(object):
@@ -302,7 +321,8 @@ class BlobManager(object):
             deferreds = []
             for _ in range(min(self.concurrency_limit, len(missing))):
                 blob_id = missing.pop()
-                deferreds.append(self.__send_one(blob_id, namespace))
+                d = with_retry(self.__send_one, blob_id, namespace)
+                deferreds.append(d)
             yield defer.gatherResults(deferreds)
 
     @defer.inlineCallbacks
@@ -339,19 +359,9 @@ class BlobManager(object):
             for _ in range(min(self.concurrency_limit, len(docs_we_want))):
                 blob_id = docs_we_want.pop()
                 logger.info("Fetching new doc: %s" % blob_id)
-                d = self.__with_retry(self.get, blob_id, namespace)
+                d = with_retry(self.get, blob_id, namespace)
                 deferreds.append(d)
             yield defer.gatherResults(deferreds)
-
-    @defer.inlineCallbacks
-    def __with_retry(self, func, *args, **kwargs):
-        retries, max_retries = 0, 300
-        while retries < max_retries:
-            try:
-                yield func(*args, **kwargs)
-                break
-            except(error.ConnectError, error.ConnectionClosed):
-                retries += 1
 
     @defer.inlineCallbacks
     def sync(self, namespace=''):

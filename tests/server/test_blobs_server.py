@@ -257,6 +257,29 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_send_missing_retry(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, uuid4().hex)
+        self.addCleanup(manager.close)
+        blob_id = 'remote_only_blob_id'
+        yield manager.local.put(blob_id, BytesIO("X"), size=1)
+        yield self.port.stopListening()
+
+        def sleep(x):
+            d = defer.Deferred()
+            reactor.callLater(x, d.callback, None)
+            return d
+        d = manager.send_missing()
+        yield sleep(1)
+        self.port = reactor.listenTCP(
+            self.host.port, self.site, interface='127.0.0.1')
+        yield d
+        result = yield manager._download_and_decrypt(blob_id)
+        self.assertIsNotNone(result)
+        self.assertEquals(result[0].getvalue(), "X")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_sync_fetch_missing(self):
         manager = BlobManager(self.tempdir, self.uri, self.secret,
                               self.secret, uuid4().hex)
