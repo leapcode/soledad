@@ -156,6 +156,19 @@ package:amd64_stretch:
     LINTIAN_OPTS: "-X filename-length"
   <<: *job_definition
 
+package:amd64_buster:
+  variables:
+    ARCH: "amd64"
+    DIST: "buster"
+    REPONAMES: "platform,client"
+    # Default is to fail on warnings, we disable it here
+    # unless a manpage is included (see #8895)
+    # Also, ignore the `build-depends-on-obsolete-package` tag
+    # until we can deprecate jessie and take out the dh-systemd
+    # build-depends (see #8963)
+    LINTIAN_OPTS: "-X filename-length --suppress-tags build-depends-on-obsolete-package"
+  <<: *job_definition
+
 package:amd64_zesty:
   variables:
     ARCH: "amd64"
