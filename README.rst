@@ -13,10 +13,10 @@ for the client and the server backends.
 
 **leap.soledad**
 
-.. image:: https://badge.fury.io/py/leap.soledad.common.svg
-    :target: http://badge.fury.io/py/leap.soledad.common
-.. image:: https://img.shields.io/pypi/dm/leap.soledad.common.svg
-    :target: http://badge.fury.io/py/leap.soledad.common
+.. image:: https://badge.fury.io/py/leap.soledad.svg
+    :target: http://badge.fury.io/py/leap.soledad
+.. image:: https://img.shields.io/pypi/dm/leap.soledad.svg
+    :target: http://badge.fury.io/py/leap.soledad
 
 
 Installing extra dependencies
