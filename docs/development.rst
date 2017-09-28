@@ -7,8 +7,8 @@ should help you get started with development for Soledad.
 .. toctree::
    :maxdepth: 1
 
-   contributing
-   deprecation
-   tests
-   benchmarks
+   development/contributing
+   development/deprecation
+   development/tests
+   development/benchmarks
    changelog
