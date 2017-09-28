@@ -1,5 +1,7 @@
-Soledad "Incoming Box" Specification
-====================================
+.. _incoming-box:
+
+Incoming Box
+============
 
 *A mechanism for Trusted Applications to write encrypted data for a given user into the Soledad Server, which will sync it to the client to be processed afterwards.*
 
@@ -38,7 +40,7 @@ NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and
 
 Terminology
 -----------
-- ``Blob`` refers to an encrypted payload that is stored by soledad server as-is. It is assumed that the blob was end-to-end encrypted by an external component before reaching the server. (See the :ref:`Blobs Spec <blobs-spec>` for more detail)
+- ``Blob`` refers to an encrypted payload that is stored by soledad server as-is. It is assumed that the blob was end-to-end encrypted by an external component before reaching the server. (See the :ref:`blobs` for more detail)
 - A ``BlobsBackend`` implementation is a particular backend setup by the Soledad Server that stores all the blobs that a given user owns. For now, only a filesystem backend is provided.
 - An ``Incoming Message`` makes reference to the representation of an abstract entity that matches exactly one message item, no matter how it is stored (ie, docs vs. blobs, single blob vs chunked, etc). It can represent one Email Message, one URL, an uploaded File, etc. For the purpose of the email use case, an Incoming Message refers to the encrypted message that MX has delivered to the incoming endpoint, which is pgp-encrypted, and can have been further obfuscated.
 - By ``Message Processing`` we understand the sequence of downloading an incoming message, decrypting it, transform it in any needed way, and deleting the original incoming message.

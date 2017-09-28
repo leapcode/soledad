@@ -1,3 +1,5 @@
+.. _authentication:
+
 Authentication
 ==============
 
@@ -13,7 +15,7 @@ client.
 There are currently two distinct authenticated entry points:
 
 * A public TLS encrypted **Users API**, providing the *Synchronization* and
-  *Blobs* services, verified against the Leap Platform
+  :ref:`blobs` services, verified against the Leap Platform
   ``tokens`` database.
 
 * A local plaintext **Services API**, currently providing only the delivery
