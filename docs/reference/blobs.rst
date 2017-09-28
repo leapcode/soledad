@@ -36,9 +36,9 @@ HTTP Blobs API
 The public endpoint provides the following REST API for interacting with the
 *Blobs* service:
 
-=========================== ========== ================================= ============================
+=========================== ========== ================================= ============================================
 path                        method     action                            accepted query string fields
-=========================== ========== ================================= ============================
+=========================== ========== ================================= ============================================
 ``/blobs/{uuid}             ``GET``    Get a list of blobs. filtered by  ``namespace``, ``filter_flag``, ``order_by``
                                        a flag.
 ``/blobs/{uuid}/{blob_id}`` ``GET``    Get the contents of a blob.       ``namespace``
@@ -49,7 +49,7 @@ path                        method     action                            accepte
                                        of flags should be sent in the
                                        body of the request.
 ``/blobs/{uuid}/{blob_id}`` ``DELETE`` Delete a blob.                    ``namespace``
-============================ ============ =================================
+=========================== ========== ================================= ============================================
 
 The Blobs service supports *namespaces*. All requests can be modified by the
 ``namespace`` query string parameter, and the results will be restricted to
