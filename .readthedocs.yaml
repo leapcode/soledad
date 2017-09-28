@@ -1,8 +1,0 @@
-requirements_file: docs/requirements.pip
-
-python:
-    pip_install: true
-    extra_requirements:
-            - client
-            - server
-            - signaling
