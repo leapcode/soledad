@@ -175,24 +175,30 @@ class DecrypterBuffer(object):
 
 class BlobManager(object):
     """
-    Ideally, the decrypting flow goes like this:
-
-    - GET a blob from remote server.
-    - Decrypt the preamble
-    - Allocate a zeroblob in the sqlcipher sink
-    - Mark the blob as unusable (ie, not verified)
-    - Decrypt the payload incrementally, and write chunks to sqlcipher
-      ** Is it possible to use a small buffer for the aes writer w/o
-      ** allocating all the memory in openssl?
-    - Finalize the AES decryption
-    - If preamble + payload verifies correctly, mark the blob as usable
-
+    The BlobManager can list, put, get, set flags and synchronize blobs stored
+    in local and remote storages.
     """
     max_retries = 3
 
     def __init__(
             self, local_path, remote, key, secret, user, token=None,
             cert_file=None):
+        """
+        Initialize the blob manager.
+
+        :param local_path: The path for the local blobs database.
+        :type local_path: str
+        :param remote: The URL of the remote storage.
+        :type remote: str
+        :param secret: The secret used to encrypt/decrypt blobs.
+        :type secret: str
+        :param user: The uuid of the user.
+        :type user: str
+        :param token: The access token for interacting with remote storage.
+        :type token: str
+        :param cert_file: The path to the CA certificate file.
+        :type cert_file: str
+        """
         if local_path:
             mkdir_p(os.path.dirname(local_path))
             self.local = SQLiteBlobBackend(local_path, key=key, user=user)
@@ -207,7 +213,8 @@ class BlobManager(object):
 
     def count(self, **params):
         """
-        Counts the number of blobs.
+        Count the number of blobs.
+
         :param namespace:
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
@@ -223,6 +230,7 @@ class BlobManager(object):
     def remote_list(self, **params):
         """
         List blobs from server, with filtering and ordering capabilities.
+
         :param namespace:
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
@@ -249,6 +257,13 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def send_missing(self, namespace=''):
+        """
+        Compare local and remote blobs and send what's missing in server.
+
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        """
         our_blobs = yield self.local_list(namespace)
         server_blobs = yield self.remote_list(namespace=namespace)
         missing = [b_id for b_id in our_blobs if b_id not in server_blobs]
@@ -270,6 +285,14 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def fetch_missing(self, namespace=''):
+        """
+        Compare local and remote blobs and fetch what's missing in local
+        storage.
+
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        """
         # TODO: Use something to prioritize user requests over general new docs
         our_blobs = yield self.local_list(namespace)
         server_blobs = yield self.remote_list(namespace=namespace)
@@ -282,6 +305,17 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def put(self, doc, size, namespace=''):
+        """
+        Put a blob in local storage and upload it to server.
+
+        :param doc: A BlobDoc representing the blob.
+        :type doc: leap.soledad.client._document.BlobDoc
+        :param size: The size of the blob.
+        :type size: int
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        """
         if (yield self.local.exists(doc.blob_id, namespace)):
             error_message = "Blob already exists: %s" % doc.blob_id
             raise BlobAlreadyExistsError(error_message)
@@ -299,6 +333,7 @@ class BlobManager(object):
     def set_flags(self, blob_id, flags, **params):
         """
         Set flags for a given blob_id.
+
         :param blob_id:
             Unique identifier of a blob.
         :type blob_id: str
@@ -325,6 +360,7 @@ class BlobManager(object):
     def get_flags(self, blob_id, **params):
         """
         Get flags from a given blob_id.
+
         :param blob_id:
             Unique identifier of a blob.
         :type blob_id: str
@@ -345,6 +381,16 @@ class BlobManager(object):
 
     @defer.inlineCallbacks
     def get(self, blob_id, namespace=''):
+        """
+        Get the blob from local storage or, if not available, from the server.
+
+        :param blob_id:
+            Unique identifier of a blob.
+        :type blob_id: str
+        :param namespace:
+            Optional parameter to restrict operation to a given namespace.
+        :type namespace: str
+        """
         local_blob = yield self.local.get(blob_id, namespace=namespace)
         if local_blob:
             logger.info("Found blob in local database: %s" % blob_id)
@@ -415,7 +461,8 @@ class BlobManager(object):
     @defer.inlineCallbacks
     def delete(self, blob_id, namespace='', **params):
         """
-        Deletes a blob from local and remote storages.
+        Delete a blob from local and remote storages.
+
         :param blob_id:
             Unique identifier of a blob.
         :type blob_id: str

@@ -41,6 +41,7 @@ Soledad documentation
    client
    reference
    development
+   api
 
 Indices and tables
 ==================
