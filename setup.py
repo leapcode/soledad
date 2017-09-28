@@ -17,6 +17,7 @@
 """
 Setup file for leap.soledad
 """
+import os
 import re
 import sys
 import versioneer
@@ -83,10 +84,12 @@ client = [
 ]
 
 # needed until kali merges the py3 fork back into the main pysqlcipher repo
-if sys.version_info.major >= 3:
-    client += ['pysqlcipher3']
-else:
-    client += ['pysqlcipher']
+readthedocs = bool(os.environ.get('READTHEDOCS'))
+if not readthedocs:
+    if sys.version_info.major >= 3:
+        client += ['pysqlcipher3']
+    else:
+        client += ['pysqlcipher']
 
 server = [
     'configparser',
