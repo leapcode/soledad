@@ -3,12 +3,20 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Soledad documentation
-=====================
+Soledad: synchronization of locally encrypted data among devices
+================================================================
 
-Soledad is an acronym for Synchronization of Locally Encrypted Data Among
-Devices. It is LEAP's solution for synchronizing client-encrypted data among
-all user's devices that access a LEAP provider.
+Soledad consists of a client library and a server daemon that allow
+applications to securely share a common state among devices. It is LEAP's
+solution for synchronizing client-encrypted data among user's devices that
+access a LEAP provider.
+
+
+The local application is presented with a simple, document-centric searchable
+database API. Any data saved to the database by the application is
+client-encrypted, backed up in the cloud, and synchronized among a user's
+devices. Soledad is cross-platform, open source, scalable, and features
+a highly efficient synchronization algorithm.
 
 The application is written in Python and the `source code
 <https://0xacab.org/leap/soledad>`_ is available and licensed as free software.
@@ -19,8 +27,8 @@ Both client and server are `distributed through pypi
 .. toctree::
    :maxdepth: 2
 
-   client
    server
+   client
    reference
    development
    migrations
