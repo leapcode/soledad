@@ -7,5 +7,6 @@ relevant information about the development process.
 .. toctree::
    :maxdepth: 2
 
-   misc/benchmarks-website.rst
-   misc/benchmarks-python-graphs.rst
+   misc/sync
+   misc/benchmarks-website
+   misc/benchmarks-python-graphs
