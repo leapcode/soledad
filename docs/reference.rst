@@ -7,6 +7,7 @@ This page gathers reference documentation to understanding the internals of Sole
    :maxdepth: 1
 
    reference/environment_variables
+   reference/server-database
    reference/auth
    reference/blobs
    reference/incoming_box
