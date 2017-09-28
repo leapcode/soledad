@@ -27,7 +27,6 @@ from setuptools.command.develop import develop as _cmd_develop
 
 
 trove_classifiers = (
-    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: "
     "GNU General Public License v3 or later (GPLv3+)",
