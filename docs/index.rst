@@ -31,7 +31,6 @@ Both client and server are `distributed through pypi
    client
    reference
    development
-   migrations
 
 Indices and tables
 ==================
