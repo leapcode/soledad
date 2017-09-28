@@ -6,6 +6,12 @@ Changelog
 
 .. note:: This version is not yet released and is under active development.
 
+Misc
+~~~~
+
+- Add packages for debian buster.
+
+
 0.10.3 - Mon 11 Sep, 2017
 ----------------------------------
 
