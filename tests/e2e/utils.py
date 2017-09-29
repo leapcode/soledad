@@ -162,7 +162,7 @@ def get_incoming_fd(client):
     while not pending:
         print("attempting to fetch incoming blob (%d/10)" % attempts)
         pending = yield client.blobmanager.remote_list(
-            namespace='MX', filter_flags=Flags.PENDING)
+            namespace='MX', filter_flag=Flags.PENDING)
         if not pending and attempts == 10:
             raise Exception("Timed out waiting for message to get delivered.")
         attempts += 1
