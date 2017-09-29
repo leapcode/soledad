@@ -217,7 +217,7 @@ class BlobManager(object):
         if hasattr(self, 'local') and self.local:
             return self.local.close()
 
-    def count(self, **params):
+    def count(self, namespace=''):
         """
         Count the number of blobs.
 
@@ -229,11 +229,11 @@ class BlobManager(object):
             Eg.: {"count": 42}
         :rtype: twisted.internet.defer.Deferred
         """
-        params['only_count'] = True
-        return self.remote_list(**params)
+        return self.remote_list(namespace=namespace, only_count=True)
 
     @defer.inlineCallbacks
-    def remote_list(self, **params):
+    def remote_list(self, namespace='', order_by=None,
+                    filter_flag=False, only_count=False):
         """
         List blobs from server, with filtering and ordering capabilities.
 
@@ -249,12 +249,21 @@ class BlobManager(object):
             Optional parameter to filter listing to results containing the
             specified tag.
         :type filter_flag: leap.soledad.common.blobs.Flags
+        :param only_count:
+            Optional paramter to return only the number of blobs found.
+        :type only_count: bool
         :return: A deferred that fires with a list parsed from the JSON
             response, holding the requested list of blobs.
             Eg.: ['blob_id1', 'blob_id2']
         :rtype: twisted.internet.defer.Deferred
         """
         uri = urljoin(self.remote, self.user + '/')
+        params = {'namespace': namespace} if namespace else {}
+        params.update({
+            'order_by': order_by,
+            'filter_flag': filter_flag,
+            'only_count': only_count,
+        })
         response = yield self._client.get(uri, params=params)
         check_http_status(response.code)
         defer.returnValue((yield response.json()))
@@ -337,7 +346,7 @@ class BlobManager(object):
         yield self.local.update_sync_status(doc.blob_id, SyncStatus.SYNCED)
 
     @defer.inlineCallbacks
-    def set_flags(self, blob_id, flags, **params):
+    def set_flags(self, blob_id, flags, namespace=''):
         """
         Set flags for a given blob_id.
 
@@ -353,13 +362,14 @@ class BlobManager(object):
         :return: A deferred that fires when the operation finishes.
         :rtype: twisted.internet.defer.Deferred
         """
+        params = {'namespace': namespace} if namespace else None
         flagsfd = BytesIO(json.dumps(flags))
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         response = yield self._client.post(uri, data=flagsfd, params=params)
         check_http_status(response.code, blob_id=blob_id, flags=flags)
 
     @defer.inlineCallbacks
-    def get_flags(self, blob_id, **params):
+    def get_flags(self, blob_id, namespace=''):
         """
         Get flags from a given blob_id.
 
@@ -374,7 +384,8 @@ class BlobManager(object):
         :rtype: twisted.internet.defer.Deferred
         """
         uri = urljoin(self.remote, self.user + "/" + blob_id)
-        params.update({'only_flags': True})
+        params = {'namespace': namespace} if namespace else {}
+        params['only_flags'] = True
         response = yield self._client.get(uri, params=params)
         check_http_status(response.code, blob_id=blob_id)
         defer.returnValue((yield response.json()))
@@ -416,7 +427,7 @@ class BlobManager(object):
             logger.error('sorry, dunno what happened')
 
     @defer.inlineCallbacks
-    def _encrypt_and_upload(self, blob_id, fd, **params):
+    def _encrypt_and_upload(self, blob_id, fd, namespace=''):
         # TODO ------------------------------------------
         # this is wrong, is doing 2 stages.
         # the crypto producer can be passed to
@@ -430,6 +441,7 @@ class BlobManager(object):
         crypter = BlobEncryptor(doc_info, fd, secret=self.secret,
                                 armor=False)
         fd = yield crypter.encrypt()
+        params = {'namespace': namespace} if namespace else None
         response = yield self._client.put(uri, data=fd, params=params)
         check_http_status(response.code, blob_id)
         logger.info("Finished upload: %s" % (blob_id,))
@@ -440,8 +452,7 @@ class BlobManager(object):
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
         params = {'namespace': namespace} if namespace else None
-        response = yield self._client.get(uri, params=params,
-                                          namespace=namespace)
+        response = yield self._client.get(uri, params=params)
         check_http_status(response.code, blob_id=blob_id)
 
         if not response.headers.hasHeader('Tag'):
@@ -459,7 +470,7 @@ class BlobManager(object):
         defer.returnValue((fd, size))
 
     @defer.inlineCallbacks
-    def delete(self, blob_id, namespace='', **params):
+    def delete(self, blob_id, namespace=''):
         """
         Delete a blob from local and remote storages.
 
@@ -472,16 +483,16 @@ class BlobManager(object):
         :return: A deferred that fires when the operation finishes.
         :rtype: twisted.internet.defer.Deferred
         """
-        params['namespace'] = namespace
         logger.info("Staring deletion of blob: %s" % blob_id)
-        yield self._delete_from_remote(blob_id, **params)
+        yield self._delete_from_remote(blob_id, namespace=namespace)
         if (yield self.local.exists(blob_id, namespace)):
             yield self.local.delete(blob_id, namespace)
 
     @defer.inlineCallbacks
-    def _delete_from_remote(self, blob_id, **params):
+    def _delete_from_remote(self, blob_id, namespace=''):
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
+        params = {'namespace': namespace} if namespace else None
         response = yield self._client.delete(uri, params=params)
         check_http_status(response.code, blob_id=blob_id)
         defer.returnValue(response)
