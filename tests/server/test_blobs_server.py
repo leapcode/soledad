@@ -292,3 +292,21 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._delete_from_remote('blob_id1', namespace=namespace)
         blobs_list = yield manager.remote_list(namespace=namespace)
         self.assertEquals(set(['blob_id2']), set(blobs_list))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_fails_if_no_blob_found(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, uuid4().hex)
+        self.addCleanup(manager.close)
+        with pytest.raises(SoledadError):
+            yield manager.get('missing_id')
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_delete_fails_if_no_blob_found(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, uuid4().hex)
+        self.addCleanup(manager.close)
+        with pytest.raises(SoledadError):
+            yield manager.delete('missing_id')

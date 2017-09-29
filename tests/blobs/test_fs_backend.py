@@ -20,6 +20,7 @@ Tests for blobs backend on server side.
 from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.web.test.test_web import DummyRequest
+from leap.common.files import mkdir_p
 from leap.soledad.server import _blobs
 from io import BytesIO
 from mock import Mock
@@ -38,18 +39,25 @@ class FilesystemBackendTestCase(unittest.TestCase):
         expected_tag = base64.urlsafe_b64encode('B' * 16)
         expected_method = Mock()
         backend = _blobs.FilesystemBlobsBackend()
+        # write a blob...
+        path = backend._get_path('user', 'blob_id', '')
+        mkdir_p(os.path.split(path)[0])
+        with open(path, "w") as f:
+            f.write("bl0b")
+        # ...and get its tag
         request = Mock(responseHeaders=Mock(setRawHeaders=expected_method))
         backend.add_tag_header('user', 'blob_id', request)
 
         expected_method.assert_called_once_with('Tag', [expected_tag])
 
     @mock.patch.object(_blobs.static, 'File')
+    @mock.patch.object(_blobs.FilesystemBlobsBackend, '_get_path',
+                       Mock(return_value='path'))
     def test_read_blob(self, file_mock):
         render_mock = Mock()
         file_mock.return_value = render_mock
         backend = _blobs.FilesystemBlobsBackend()
         request = DummyRequest([''])
-        backend._get_path = Mock(return_value='path')
         backend.read_blob('user', 'blob_id', request)
 
         backend._get_path.assert_called_once_with('user', 'blob_id', '')
@@ -58,11 +66,12 @@ class FilesystemBackendTestCase(unittest.TestCase):
         render_mock.render_GET.assert_called_once_with(request)
 
     @mock.patch.object(os.path, 'isfile')
+    @mock.patch.object(_blobs.FilesystemBlobsBackend, '_get_path',
+                       Mock(return_value='path'))
     @defer.inlineCallbacks
     def test_cannot_overwrite(self, isfile):
         isfile.return_value = True
         backend = _blobs.FilesystemBlobsBackend()
-        backend._get_path = Mock(return_value='path')
         request = DummyRequest([''])
         yield backend.write_blob('user', 'blob_id', request)
         self.assertEquals(request.written[0], "Blob already exists: blob_id")
@@ -154,7 +163,14 @@ class FilesystemBackendTestCase(unittest.TestCase):
     @mock.patch('leap.soledad.server._blobs.os.unlink')
     def test_delete_blob(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
-        backend.delete_blob('user', 'blob_id')
+        request = DummyRequest([''])
+        # write a blob...
+        path = backend._get_path('user', 'blob_id', '')
+        mkdir_p(os.path.split(path)[0])
+        with open(path, "w") as f:
+            f.write("bl0b")
+        # ...and delete it
+        backend.delete_blob('user', 'blob_id', request)
         unlink_mock.assert_any_call(backend._get_path('user',
                                                       'blob_id'))
         unlink_mock.assert_any_call(backend._get_path('user',
@@ -164,7 +180,14 @@ class FilesystemBackendTestCase(unittest.TestCase):
     @mock.patch('leap.soledad.server._blobs.os.unlink')
     def test_delete_blob_custom_namespace(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
-        backend.delete_blob('user', 'blob_id', namespace='trash')
+        request = DummyRequest([''])
+        # write a blob...
+        path = backend._get_path('user', 'blob_id', 'trash')
+        mkdir_p(os.path.split(path)[0])
+        with open(path, "w") as f:
+            f.write("bl0b")
+        # ...and delete it
+        backend.delete_blob('user', 'blob_id', request, namespace='trash')
         unlink_mock.assert_any_call(backend._get_path('user',
                                                       'blob_id',
                                                       'trash'))

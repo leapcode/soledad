@@ -132,11 +132,13 @@ class ConnectionPool(adbapi.ConnectionPool):
         return handle
 
 
-def check_http_status(code):
+def check_http_status(code, blob_id=None, flags=None):
+    if code == 404:
+        raise BlobNotFoundError(blob_id)
     if code == 409:
-        raise BlobAlreadyExistsError()
+        raise BlobAlreadyExistsError(blob_id)
     elif code == 406:
-        raise InvalidFlagsError()
+        raise InvalidFlagsError((blob_id, flags))
     elif code != 200:
         raise SoledadError("Server Error: %s" % code)
 
@@ -253,8 +255,9 @@ class BlobManager(object):
         :rtype: twisted.internet.defer.Deferred
         """
         uri = urljoin(self.remote, self.user + '/')
-        data = yield self._client.get(uri, params=params)
-        defer.returnValue((yield data.json()))
+        response = yield self._client.get(uri, params=params)
+        check_http_status(response.code)
+        defer.returnValue((yield response.json()))
 
     def local_list(self, namespace='', sync_status=None):
         return self.local.list(namespace, sync_status)
@@ -350,15 +353,10 @@ class BlobManager(object):
         :return: A deferred that fires when the operation finishes.
         :rtype: twisted.internet.defer.Deferred
         """
-        flags = BytesIO(json.dumps(flags))
+        flagsfd = BytesIO(json.dumps(flags))
         uri = urljoin(self.remote, self.user + "/" + blob_id)
-        response = yield self._client.post(uri, data=flags, params=params)
-        if response.code == 404:
-            logger.error("Blob not found during set_flags: %s" % blob_id)
-            msg = "No blob found on server while trying to set flags: %s"
-            raise SoledadError(msg % (blob_id))
-
-        check_http_status(response.code)
+        response = yield self._client.post(uri, data=flagsfd, params=params)
+        check_http_status(response.code, blob_id=blob_id, flags=flags)
 
     @defer.inlineCallbacks
     def get_flags(self, blob_id, **params):
@@ -378,9 +376,7 @@ class BlobManager(object):
         uri = urljoin(self.remote, self.user + "/" + blob_id)
         params.update({'only_flags': True})
         response = yield self._client.get(uri, params=params)
-        if response.code == 404:
-            logger.error("Blob not found in server: %r" % blob_id)
-            raise BlobNotFoundError(blob_id)
+        check_http_status(response.code, blob_id=blob_id)
         defer.returnValue((yield response.json()))
 
     @defer.inlineCallbacks
@@ -435,7 +431,7 @@ class BlobManager(object):
                                 armor=False)
         fd = yield crypter.encrypt()
         response = yield self._client.put(uri, data=fd, params=params)
-        check_http_status(response.code)
+        check_http_status(response.code, blob_id)
         logger.info("Finished upload: %s" % (blob_id,))
 
     @defer.inlineCallbacks
@@ -444,20 +440,20 @@ class BlobManager(object):
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
         params = {'namespace': namespace} if namespace else None
-        data = yield self._client.get(uri, params=params, namespace=namespace)
+        response = yield self._client.get(uri, params=params,
+                                          namespace=namespace)
+        check_http_status(response.code, blob_id=blob_id)
 
-        if data.code == 404:
-            logger.warn("Blob not found in server: %s" % blob_id)
-            defer.returnValue(None)
-        elif not data.headers.hasHeader('Tag'):
-            logger.error("Server didn't send a tag header for: %s" % blob_id)
-            defer.returnValue(None)
-        tag = data.headers.getRawHeaders('Tag')[0]
+        if not response.headers.hasHeader('Tag'):
+            msg = "Server didn't send a tag header for: %s" % blob_id
+            logger.error(msg)
+            raise SoledadError(msg)
+        tag = response.headers.getRawHeaders('Tag')[0]
         tag = base64.urlsafe_b64decode(tag)
         buf = DecrypterBuffer(blob_id, self.secret, tag)
 
         # incrementally collect the body of the response
-        yield treq.collect(data, buf.write)
+        yield treq.collect(response, buf.write)
         fd, size = buf.close()
         logger.info("Finished download: (%s, %d)" % (blob_id, size))
         defer.returnValue((fd, size))
@@ -482,10 +478,13 @@ class BlobManager(object):
         if (yield self.local.exists(blob_id, namespace)):
             yield self.local.delete(blob_id, namespace)
 
+    @defer.inlineCallbacks
     def _delete_from_remote(self, blob_id, **params):
         # TODO this needs to be connected in a tube
         uri = urljoin(self.remote, self.user + '/' + blob_id)
-        return self._client.delete(uri, params=params)
+        response = yield self._client.delete(uri, params=params)
+        check_http_status(response.code, blob_id=blob_id)
+        defer.returnValue(response)
 
 
 class SQLiteBlobBackend(object):

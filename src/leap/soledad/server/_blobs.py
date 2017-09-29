@@ -124,8 +124,11 @@ class FilesystemBlobsBackend(object):
         with open(path, 'wb') as blobfile:
             yield fbp.startProducing(blobfile)
 
-    def delete_blob(self, user, blob_id, namespace=''):
+    def delete_blob(self, user, blob_id, request, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
+        if not os.path.isfile(blob_path):
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
         os.unlink(blob_path)
         try:
             os.unlink(blob_path + '.flags')
@@ -175,7 +178,12 @@ class FilesystemBlobsBackend(object):
         return self._get_disk_usage(self._get_path(user))
 
     def add_tag_header(self, user, blob_id, request, namespace=''):
-        with open(self._get_path(user, blob_id, namespace)) as doc_file:
+        blob_path = self._get_path(user, blob_id, namespace)
+        if not os.path.isfile(blob_path):
+            # 404 - Not Found
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
+        with open(blob_path) as doc_file:
             doc_file.seek(-16, 2)
             tag = base64.urlsafe_b64encode(doc_file.read())
             request.responseHeaders.setRawHeaders('Tag', [tag])
@@ -201,6 +209,10 @@ class FilesystemBlobsBackend(object):
                                                                   desired_path)
             raise Exception(err)
         return desired_path
+
+    def exists(self, user, blob_id, namespace):
+        return os.path.isfile(
+            self._get_path(user, blob_id=blob_id, namespace=namespace))
 
     def _get_path(self, user, blob_id='', namespace=''):
         parts = [user]
@@ -262,7 +274,7 @@ class BlobsResource(resource.Resource):
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        self._handler.delete_blob(user, blob_id, namespace)
+        self._handler.delete_blob(user, blob_id, request, namespace=namespace)
         return ''
 
     def render_PUT(self, request):
