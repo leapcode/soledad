@@ -80,6 +80,14 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_flags_raises_if_no_blob_found(self):
+        manager = BlobManager('', self.uri, self.secret,
+                              self.secret, uuid4().hex)
+        with pytest.raises(SoledadError):
+            yield manager.get_flags('missing_id')
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_list_filter_flag(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, uuid4().hex)

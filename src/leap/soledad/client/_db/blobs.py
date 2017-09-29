@@ -58,6 +58,10 @@ class BlobAlreadyExistsError(SoledadError):
     pass
 
 
+class BlobNotFoundError(SoledadError):
+    pass
+
+
 class InvalidFlagsError(SoledadError):
     pass
 
@@ -375,8 +379,8 @@ class BlobManager(object):
         params.update({'only_flags': True})
         response = yield self._client.get(uri, params=params)
         if response.code == 404:
-            logger.warn("Blob not found in server: %s" % blob_id)
-            defer.returnValue(None)
+            logger.error("Blob not found in server: %r" % blob_id)
+            raise BlobNotFoundError(blob_id)
         defer.returnValue((yield response.json()))
 
     @defer.inlineCallbacks
