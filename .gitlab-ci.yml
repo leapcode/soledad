@@ -4,7 +4,6 @@ stages:
   - build
   - tests
   - package
-  - benchmark
 
 
 variables:
@@ -58,7 +57,7 @@ tests:
     - tox -- --couch-url http://couchdb:5984
 
 time-cpu:
-  stage: benchmark
+  stage: tests
   image: 0xacab.org:4567/leap/soledad:latest
   tags:
     - benchmark
@@ -83,7 +82,7 @@ time-cpu:
     - 'if [ -d .benchmarks ]; then find .benchmarks -type f -exec cat {} \; ; fi'
 
 memory:
-  stage: benchmark
+  stage: tests
   image: 0xacab.org:4567/leap/soledad:latest
   tags:
     - benchmark
@@ -108,7 +107,7 @@ memory:
     - 'if [ -d .benchmarks ]; then find .benchmarks -type f -exec cat {} \; ; fi'
 
 responsiveness:
-  stage: benchmark
+  stage: tests
   image: 0xacab.org:4567/leap/soledad:latest
   tags:
     - benchmark
