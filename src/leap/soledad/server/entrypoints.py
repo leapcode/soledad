@@ -20,9 +20,11 @@ The entrypoint for Soledad server.
 This is the entrypoint for the application that is loaded from the initscript
 or the systemd script.
 """
+import os
 
 from twisted.internet import reactor
 from twisted.python import threadpool
+from twisted.logger import Logger
 
 from .auth import localPortal, publicPortal
 from .session import SoledadSession
@@ -32,6 +34,7 @@ from ._wsgi import init_couch_state
 
 # load configuration from file
 conf = get_config()
+log = Logger()
 
 
 class SoledadEntrypoint(SoledadSession):
@@ -54,4 +57,20 @@ class LocalServicesEntrypoint(SoledadSession):
 # initialized when the reactor is running
 
 
+def check_conf():
+    path = conf['blobs_path']
+    blobs_not_empty = bool(os.path.exists(path) and os.listdir(path))
+    if not conf['blobs'] and blobs_not_empty:
+        message = """
+**  WARNING: Blobs is disabled, but blobs directory isn't empty.          **
+**  If it was previously enabled, disabling can cause data loss due blobs **
+**  documents not being accessible to users.                              **
+**  Blobs directory: %s
+**  REFUSING TO START. Please double check your configuration.            **
+    """
+        log.error(message % path)
+        reactor.stop()
+
+
+reactor.callWhenRunning(check_conf)
 reactor.callWhenRunning(init_couch_state, conf)
