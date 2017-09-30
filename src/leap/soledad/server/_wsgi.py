@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# application.py
+# _wsgi.py
 # Copyright (C) 2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify

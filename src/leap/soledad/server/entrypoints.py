@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# entrypoint.py
+# entrypoints.py
 # Copyright (C) 2016 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -50,7 +50,7 @@ class LocalServicesEntrypoint(SoledadSession):
         portal = localPortal()
         SoledadSession.__init__(self, portal)
 
-# see the comments in application.py recarding why couch state has to be
+# see the comments in _wsgi.py recarding why couch state has to be
 # initialized when the reactor is running
 
 
