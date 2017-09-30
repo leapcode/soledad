@@ -258,7 +258,7 @@ class BlobsResource(resource.Resource):
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        if not blob_id and request.args.get('only_count', False):
+        if not blob_id and request.args.get('only_count', [False])[0]:
             return self._handler.count(user, request, namespace)
         elif not blob_id:
             order = request.args.get('order_by', [None])[0]
@@ -266,7 +266,8 @@ class BlobsResource(resource.Resource):
             return self._handler.list_blobs(user, request, namespace,
                                             order_by=order,
                                             filter_flag=filter_flag)
-        if 'only_flags' in request.args:
+        only_flags = request.args.get('only_flags', [False])[0]
+        if only_flags:
             return self._handler.get_flags(user, blob_id, request, namespace)
         self._handler.add_tag_header(user, blob_id, request, namespace)
         return self._handler.read_blob(user, blob_id, request, namespace)

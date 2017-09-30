@@ -259,11 +259,12 @@ class BlobManager(object):
         """
         uri = urljoin(self.remote, self.user + '/')
         params = {'namespace': namespace} if namespace else {}
-        params.update({
-            'order_by': order_by,
-            'filter_flag': filter_flag,
-            'only_count': only_count,
-        })
+        if order_by:
+            params['order_by'] = order_by
+        if filter_flag:
+            params['filter_flag'] = filter_flag
+        if only_count:
+            params['only_count'] = only_count
         response = yield self._client.get(uri, params=params)
         check_http_status(response.code)
         defer.returnValue((yield response.json()))
