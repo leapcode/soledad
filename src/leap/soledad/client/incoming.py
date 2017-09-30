@@ -131,7 +131,7 @@ class IncomingBox:
         :rtype: Deferred
         """
         try:
-            yield self.blob_manager.set_flags(blob_id, [Flags.PROCESSED],
+            yield self.blob_manager.set_flags(blob_id, [Flags.PROCESSING],
                                               namespace=self.namespace)
         except:
             defer.returnValue(None)

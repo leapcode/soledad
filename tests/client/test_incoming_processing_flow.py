@@ -20,6 +20,8 @@ Unit tests for incoming box processing flow.
 from mock import Mock, call
 from leap.soledad.client import interfaces
 from leap.soledad.client.incoming import IncomingBoxProcessingLoop
+from leap.soledad.client.incoming import IncomingBox
+from leap.soledad.common.blobs import Flags
 from twisted.internet import defer
 from twisted.trial import unittest
 from zope.interface import implementer
@@ -195,3 +197,53 @@ class IncomingBoxProcessingTestCase(unittest.TestCase):
         self.loop.add_consumer(consumer)
         yield self.loop()
         self.box.set_failed.assert_has_calls([call(x) for x in items])
+
+
+class IncomingBoxCase(unittest.TestCase):
+    """
+    IncomingBox is just a wrapper for some operations on blob manager. This
+    test case checks if the underlying operations are implemented as intended.
+    """
+
+    def setUp(self):
+        self.manager = Mock()
+        self.namespace = 'mynamespace'
+        self.box = IncomingBox(self.manager, 'mynamespace')
+
+    @defer.inlineCallbacks
+    def test_fetch_for_processing_marks_as_processing(self):
+        self.manager.set_flags.return_value = defer.succeed(None)
+        some_blob = Mock()
+        self.manager.get.return_value = defer.succeed(some_blob)
+        yield self.box.fetch_for_processing('some_blob')
+
+        self.manager.set_flags.assert_called_with(
+            'some_blob', [Flags.PROCESSING], namespace=self.namespace)
+
+    @defer.inlineCallbacks
+    def test_fetch_for_processing_returns_blob_when_set_flag_succeeds(self):
+        self.manager.set_flags.return_value = defer.succeed(None)
+        some_blob = Mock()
+        self.manager.get.return_value = defer.succeed(some_blob)
+
+        result = yield self.box.fetch_for_processing('some_blob')
+        self.assertEquals(result, some_blob)
+        self.manager.get.assert_called_with(
+            'some_blob', namespace=self.namespace)
+
+    @defer.inlineCallbacks
+    def test_fetch_for_processing_returns_None_when_flag_fails(self):
+        self.manager.set_flags.return_value = defer.fail(Exception())
+        some_blob = Mock()
+        self.manager.get.return_value = defer.succeed(some_blob)
+
+        result = yield self.box.fetch_for_processing('some_blob')
+        self.assertEquals(result, None)
+
+    @defer.inlineCallbacks
+    def test_list_pending_asks_for_oldest_pending_flagged_blobs_by_date(self):
+        yield self.box.list_pending()
+        self.manager.remote_list.assert_called_with(
+            namespace=self.namespace,
+            order_by='+date',
+            filter_flag=Flags.PENDING)
