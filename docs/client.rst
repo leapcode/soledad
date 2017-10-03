@@ -1,3 +1,5 @@
+.. _soledad-client:
+
 Soledad Client
 ==============
 

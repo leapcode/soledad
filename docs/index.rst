@@ -17,15 +17,10 @@ applications to securely share a common state among devices. It is `LEAP
 client-encrypted data among a user's devices that access an account in a LEAP
 provider.
 
-The local application is presented with a simple, document-centric searchable
-database API. Any data saved to the database by the application is
-client-encrypted, backed up in the cloud, and synchronized among a user's
-devices. Soledad is cross-platform, open source, scalable, and features
-a highly efficient synchronization algorithm.
-
-Soledad Client and Server are written in Python using `Twisted
-<https://twistedmatrix.com/>`_. Source code is available at `0xacab
-<https://0xacab.org/leap/soledad>`_ and is licensed under the `GPLv3
+Soledad is cross-platform, open source, scalable, and features a highly
+efficient synchronization algorithm. The Client and Server are written in
+Python using `Twisted <https://twistedmatrix.com/>`_. Source code is available
+at `0xacab <https://0xacab.org/leap/soledad>`_ and is licensed under the `GPLv3
 <http://www.gnu.org/licenses/gpl.txt>`_. Client and server are packaged
 together and distributed in `pypi
 <https://pypi.python.org/pypi/leap.soledad>`_. `Debian packages

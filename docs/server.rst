@@ -1,3 +1,5 @@
+.. _soledad-server:
+
 Soledad Server
 ==============
 
