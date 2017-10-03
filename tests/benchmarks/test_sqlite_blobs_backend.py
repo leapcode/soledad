@@ -33,6 +33,9 @@ def create_put_test(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.sqlite_blobs_backend_put
     def test(txbenchmark, payload, tmpdir):
+        """
+        Insert a certain amount of data in the sqlite blobs backend.
+        """
         dbpath = os.path.join(tmpdir.strpath, 'blobs.db')
         backend = SQLiteBlobBackend(dbpath, key='123')
         data = payload(size)
@@ -66,6 +69,9 @@ def create_get_test(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.sqlite_blobs_backend_get
     def test(txbenchmark, payload, tmpdir):
+        """
+        Retrieve a certain amount of data from the sqlite blobs backend.
+        """
         dbpath = os.path.join(tmpdir.strpath, 'blobs.db')
         backend = SQLiteBlobBackend(dbpath, key='123')
         data = payload(size)
