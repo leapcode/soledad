@@ -37,6 +37,7 @@ Soledad documentation
 .. toctree::
    :maxdepth: 2
 
+   intro
    server
    client
    reference
