@@ -13,6 +13,8 @@ the server. Authorization for creating, updating, deleting and retrieving
 information about the user database as well as performing synchronization is
 handled by the `leap.soledad.server.auth` module.
 
+.. _shared-database:
+
 Shared database
 ---------------
 

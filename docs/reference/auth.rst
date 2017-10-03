@@ -3,9 +3,6 @@
 Authentication
 ==============
 
-.. contents::
-   :local:
-
 Authentication with the Soledad server is made using `Twisted's Pluggable
 Authentication system
 <https://twisted.readthedocs.io/en/latest/core/howto/cred.html>`_. The
