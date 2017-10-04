@@ -352,7 +352,7 @@ class BlobManager(object):
             try:
                 yield self._encrypt_and_upload(blob_id, fd)
                 yield self.local.update_sync_status(blob_id, SyncStatus.SYNCED)
-            except Exception, e:
+            except Exception as e:
                 yield self.local.increment_retries(blob_id)
                 _, retries = yield self.local.get_sync_status(blob_id)
                 if retries > self.max_retries:
@@ -398,7 +398,7 @@ class BlobManager(object):
             yield self.refresh_sync_status_from_server(namespace)
             yield self.fetch_missing(namespace)
             yield self.send_missing(namespace)
-        except defer.FirstError, e:
+        except defer.FirstError as e:
             e.subFailure.raiseException()
 
     @defer.inlineCallbacks
@@ -550,7 +550,7 @@ class BlobManager(object):
         yield treq.collect(response, buf.write)
         try:
             fd, size = buf.close()
-        except InvalidBlob, e:
+        except InvalidBlob as e:
             _, retries = yield self.local.get_sync_status(blob_id)
             message = "Corrupted blob received from server! ID: %s\n"
             message += "Retries: %s - Attempts left: %s\n"
