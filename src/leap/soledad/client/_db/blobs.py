@@ -553,11 +553,12 @@ class BlobManager(object):
         except InvalidBlob as e:
             _, retries = yield self.local.get_sync_status(blob_id)
             message = "Corrupted blob received from server! ID: %s\n"
+            message += "Error: %r\n"
             message += "Retries: %s - Attempts left: %s\n"
             message += "There is a chance of tampering. If this problem "
             message += "persists, please check your connection then report to "
             message += "your provider sysadmin and submit a bug report."
-            message = message % (blob_id, retries, self.max_retries - retries)
+            message %= (blob_id, e, retries, self.max_retries - retries)
             logger.error(message)
             yield self.local.increment_retries(blob_id)
             if (retries + 1) >= self.max_retries:
