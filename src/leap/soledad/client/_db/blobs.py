@@ -557,10 +557,10 @@ class BlobManager(object):
             message += "There is a chance of tampering. If this problem "
             message += "persists, please check your connection then report to "
             message += "your provider sysadmin and submit a bug report."
-            message = message % (blob_id, retries, 3 - retries)
+            message = message % (blob_id, retries, self.max_retries - retries)
             logger.error(message)
             yield self.local.increment_retries(blob_id)
-            if (retries + 1) >= 3:
+            if (retries + 1) >= self.max_retries:
                 failed_download = SyncStatus.FAILED_DOWNLOAD
                 yield self.local.update_sync_status(blob_id, failed_download)
                 raise e
