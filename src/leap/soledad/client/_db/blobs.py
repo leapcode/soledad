@@ -147,7 +147,7 @@ def check_http_status(code, blob_id=None, flags=None):
         raise SoledadError("Server Error: %s" % code)
 
 
-class RetriableTransferException(Exception):
+class RetriableTransferError(Exception):
     pass
 
 
@@ -164,7 +164,7 @@ MAX_WAIT = 60  # In seconds. Max time between retries
 def with_retry(func, *args, **kwargs):
     retry_wait = 1
     retriable_errors = (error.ConnectError, error.ConnectionClosed,
-                        RetriableTransferException,)
+                        RetriableTransferError,)
     while True:
         try:
             yield func(*args, **kwargs)
@@ -545,7 +545,7 @@ class BlobManager(object):
                 yield self.local.update_sync_status(blob_id, failed_download)
                 raise e
             else:
-                raise RetriableTransferException()
+                raise RetriableTransferError()
         logger.info("Finished download: (%s, %d)" % (blob_id, size))
         defer.returnValue((fd, size))
 
