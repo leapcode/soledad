@@ -312,7 +312,7 @@ class BlobManager(object):
         pending_download_ids = tuple(set(remote_list) - set(local_list))
         yield self.local.update_batch_sync_status(
             pending_download_ids,
-            sync_status=SyncStatus.PENDING_DOWNLOAD,
+            SyncStatus.PENDING_DOWNLOAD,
             namespace=namespace)
 
     @defer.inlineCallbacks
