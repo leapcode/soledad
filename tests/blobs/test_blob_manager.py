@@ -19,6 +19,7 @@ Tests for BlobManager.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
+from twisted.web.error import SchemeNotSupported
 from leap.soledad.client._db.blobs import BlobManager, BlobDoc, FIXED_REV
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import SyncStatus
@@ -154,7 +155,8 @@ class BlobManagerTestCase(unittest.TestCase):
         self.manager._encrypt_and_upload = Mock(return_value=upload_failure)
         content, blob_id = "Blob content", uuid4().hex
         doc1 = BlobDoc(BytesIO(content), blob_id)
-        with pytest.raises(Exception):
+        with pytest.raises(SchemeNotSupported):
+            # should fail because manager URL is invalid
             yield self.manager.put(doc1, len(content))
         pending_upload = SyncStatus.PENDING_UPLOAD
         local_list = yield self.manager.local_list(sync_status=pending_upload)
@@ -166,7 +168,8 @@ class BlobManagerTestCase(unittest.TestCase):
         self.manager.remote_list = Mock(return_value=[])
         content, blob_id = "Blob content", uuid4().hex
         doc1 = BlobDoc(BytesIO(content), blob_id)
-        with pytest.raises(Exception):
+        with pytest.raises(SchemeNotSupported):
+            # should fail because manager URL is invalid
             yield self.manager.put(doc1, len(content))
         for _ in range(self.manager.max_retries + 1):
             with pytest.raises(defer.FirstError):
