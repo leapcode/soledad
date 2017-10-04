@@ -555,10 +555,10 @@ class BlobManager(object):
             message = "Corrupted blob received from server! ID: %s\n"
             message += "Error: %r\n"
             message += "Retries: %s - Attempts left: %s\n"
-            message += "There is a chance of tampering. If this problem "
-            message += "persists, please check your connection then report to "
-            message += "your provider sysadmin and submit a bug report."
-            message %= (blob_id, e, retries, self.max_retries - retries)
+            message += "This is either a bug or the contents of the "
+            message += "blob have been tampered with. Please, report "
+            message += "to your provider's sysadmin and submit a bug report."
+            message %= (blob_id, e, retries, (self.max_retries - retries))
             logger.error(message)
             yield self.local.increment_retries(blob_id)
             if (retries + 1) >= self.max_retries:
