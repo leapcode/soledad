@@ -307,7 +307,7 @@ class BlobManager(object):
     @defer.inlineCallbacks
     def refresh_sync_status_from_server(self, namespace=''):
         d1 = self.remote_list(namespace=namespace)
-        d2 = self.local_list(namespace)
+        d2 = self.local_list(namespace=namespace)
         remote_list, local_list = yield defer.gatherResults([d1, d2])
         pending_download_ids = tuple(set(remote_list) - set(local_list))
         yield self.local.update_batch_sync_status(
@@ -324,7 +324,8 @@ class BlobManager(object):
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
         """
-        d = self.local_list(namespace, SyncStatus.PENDING_UPLOAD)
+        d = self.local_list(namespace=namespace,
+                            sync_status=SyncStatus.PENDING_UPLOAD)
         missing = yield d
         logger.info("Amount of documents missing on server: %s" % len(missing))
         while missing:
@@ -338,7 +339,7 @@ class BlobManager(object):
     @defer.inlineCallbacks
     def __send_one(self, blob_id, namespace):
             logger.info("Upload local blob: %s" % blob_id)
-            fd = yield self.local.get(blob_id, namespace)
+            fd = yield self.local.get(blob_id, namespace=namespace)
             try:
                 yield self._encrypt_and_upload(blob_id, fd)
                 yield self.local.update_sync_status(blob_id, SyncStatus.SYNCED)
@@ -361,7 +362,8 @@ class BlobManager(object):
         :type namespace: str
         """
         # TODO: Use something to prioritize user requests over general new docs
-        d = self.local_list(namespace, SyncStatus.PENDING_DOWNLOAD)
+        d = self.local_list(namespace=namespace,
+                            sync_status=SyncStatus.PENDING_DOWNLOAD)
         docs_we_want = yield d
         logger.info("Fetching new docs from server: %s" % len(docs_we_want))
         while docs_we_want:
@@ -395,7 +397,7 @@ class BlobManager(object):
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
         """
-        if (yield self.local.exists(doc.blob_id, namespace)):
+        if (yield self.local.exists(doc.blob_id, namespace=namespace)):
             error_message = "Blob already exists: %s" % doc.blob_id
             raise BlobAlreadyExistsError(error_message)
         fd = doc.blob_fd
@@ -404,7 +406,7 @@ class BlobManager(object):
         yield self.local.put(doc.blob_id, fd, size=size, namespace=namespace)
         # In fact, some kind of pipe is needed here, where each write on db
         # handle gets forwarded into a write on the connection handle
-        fd = yield self.local.get(doc.blob_id, namespace)
+        fd = yield self.local.get(doc.blob_id, namespace=namespace)
         yield self._encrypt_and_upload(doc.blob_id, fd, namespace=namespace)
         yield self.local.update_sync_status(doc.blob_id, SyncStatus.SYNCED)
 
@@ -480,7 +482,8 @@ class BlobManager(object):
             logger.info("Got decrypted blob of type: %s" % type(blob))
             blob.seek(0)
             yield self.local.put(blob_id, blob, size=size, namespace=namespace)
-            defer.returnValue((yield self.local.get(blob_id, namespace)))
+            local_blob = yield self.local.get(blob_id, namespace=namespace)
+            defer.returnValue(local_blob)
         else:
             # XXX we shouldn't get here, but we will...
             # lots of ugly error handling possible:
@@ -565,8 +568,8 @@ class BlobManager(object):
         """
         logger.info("Staring deletion of blob: %s" % blob_id)
         yield self._delete_from_remote(blob_id, namespace=namespace)
-        if (yield self.local.exists(blob_id, namespace)):
-            yield self.local.delete(blob_id, namespace)
+        if (yield self.local.exists(blob_id, namespace=namespace)):
+            yield self.local.delete(blob_id, namespace=namespace)
 
     @defer.inlineCallbacks
     def _delete_from_remote(self, blob_id, namespace=''):
@@ -611,7 +614,7 @@ class SQLiteBlobBackend(object):
         previous_state = yield self.get_sync_status(blob_id)
         unavailable = SyncStatus.UNAVAILABLE_STATUSES
         if previous_state and previous_state[0] in unavailable:
-            yield self.delete(blob_id, namespace)
+            yield self.delete(blob_id, namespace=namespace)
             status = SyncStatus.SYNCED
         logger.info("Saving blob in local database...")
         insert = 'INSERT INTO blobs (blob_id, namespace, payload, sync_status)'
