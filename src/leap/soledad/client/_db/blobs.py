@@ -489,7 +489,28 @@ class BlobManager(object):
             logger.info("Found blob in local database: %s" % blob_id)
             defer.returnValue(local_blob)
 
-        result = yield self._download_and_decrypt(blob_id, namespace)
+        try:
+            result = yield self._download_and_decrypt(blob_id, namespace)
+        except Exception as e:
+            _, retries = yield self.local.get_sync_status(blob_id)
+
+            if isinstance(e, InvalidBlob):
+                message = "Corrupted blob received from server! ID: %s\n"
+                message += "Error: %r\n"
+                message += "Retries: %s - Attempts left: %s\n"
+                message += "This is either a bug or the contents of the "
+                message += "blob have been tampered with. Please, report to "
+                message += "your provider's sysadmin and submit a bug report."
+                message %= (blob_id, e, retries, (self.max_retries - retries))
+                logger.error(message)
+
+            yield self.local.increment_retries(blob_id)
+            if (retries + 1) >= self.max_retries:
+                failed_download = SyncStatus.FAILED_DOWNLOAD
+                yield self.local.update_sync_status(blob_id, failed_download)
+                raise e
+            else:
+                raise RetriableTransferError(e)
 
         if not result:
             defer.returnValue(None)
@@ -548,25 +569,7 @@ class BlobManager(object):
 
         # incrementally collect the body of the response
         yield treq.collect(response, buf.write)
-        try:
-            fd, size = buf.close()
-        except InvalidBlob as e:
-            _, retries = yield self.local.get_sync_status(blob_id)
-            message = "Corrupted blob received from server! ID: %s\n"
-            message += "Error: %r\n"
-            message += "Retries: %s - Attempts left: %s\n"
-            message += "This is either a bug or the contents of the "
-            message += "blob have been tampered with. Please, report "
-            message += "to your provider's sysadmin and submit a bug report."
-            message %= (blob_id, e, retries, (self.max_retries - retries))
-            logger.error(message)
-            yield self.local.increment_retries(blob_id)
-            if (retries + 1) >= self.max_retries:
-                failed_download = SyncStatus.FAILED_DOWNLOAD
-                yield self.local.update_sync_status(blob_id, failed_download)
-                raise e
-            else:
-                raise RetriableTransferError()
+        fd, size = buf.close()
         logger.info("Finished download: (%s, %d)" % (blob_id, size))
         defer.returnValue((fd, size))
 
