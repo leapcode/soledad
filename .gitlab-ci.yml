@@ -142,14 +142,14 @@ package:amd64_zesty:
 # "benchmarks" stage
 #
 
-time-cpu:
+.job_template: &benchmark
   stage: benchmarks
   image: 0xacab.org:4567/leap/soledad:latest
   tags:
     - benchmark
   services:
     - couchdb
-  script:
+  before_script:
     - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && git checkout origin/master scripts/benchmark/setup-all-commits-env.sh'
     - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
@@ -163,44 +163,21 @@ time-cpu:
     # Add $PYTEST_OPTS to pytest.ini to allow posting benchmark tests
     # to an elasticsearch instance
     - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
-    - /usr/bin/unbuffer tox --recreate -e benchmark-time-cpu -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
+  after_script:
     # Output locally saved benchmarks if they exist
     - 'if [ -d .benchmarks ]; then find .benchmarks -type f -exec cat {} \; ; fi'
+
+time-cpu:
+  <<: *benchmark
+  script:
+    - /usr/bin/unbuffer tox --recreate -e benchmark-time-cpu -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
 
 memory:
-  stage: benchmarks
-  image: 0xacab.org:4567/leap/soledad:latest
-  tags:
-    - benchmark
-  services:
-    - couchdb
+  <<: *benchmark
   script:
-    - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
-    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && git checkout origin/master scripts/benchmark/setup-all-commits-env.sh'
-    - '[ -n "${BENCHMARK_ALL_COMMITS}" ] && ./scripts/benchmark/setup-all-commits-env.sh'
-    - curl -s couchdb:5984
-    # You can provide a $NETRC variable containing the creds for your
-    # elasticsearch instance so it's protected from being leaked in the
-    # CI console
-    # We can't get it working inside docker for unknown reasons.
-    # - echo "$NETRC" > /root/.netrc && chmod 600 /root/.netrc
-    #
-    # Add $PYTEST_OPTS to pytest.ini to allow posting benchmark tests
-    # to an elasticsearch instance
-    - echo "addopts=$PYTEST_OPTS" >> pytest.ini && chmod 600 pytest.ini
     - /usr/bin/unbuffer tox --recreate -e benchmark-memory -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
-    # Output locally saved benchmarks if they exist
-    - 'if [ -d .benchmarks ]; then find .benchmarks -type f -exec cat {} \; ; fi'
 
 responsiveness:
-  stage: benchmarks
-  image: 0xacab.org:4567/leap/soledad:latest
-  tags:
-    - benchmark
-  services:
-    - couchdb
+  <<: *benchmark
   script:
-    - git checkout -B "$CI_COMMIT_REF_NAME" "$CI_COMMIT_SHA"
-    - curl -s couchdb:5984
-    - echo "addopts=--elasticsearch-url=\"$ELASTICSEARCH_URL\"" >> pytest.ini && chmod 600 pytest.ini
     - /usr/bin/unbuffer tox --recreate -e responsiveness -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
