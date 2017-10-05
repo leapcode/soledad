@@ -34,8 +34,9 @@ from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import InvalidFlagsError
 from leap.soledad.client._db.blobs import SoledadError
 from leap.soledad.client._db.blobs import SyncStatus
+from leap.soledad.client._db.blobs import RetriableTransferError
+from leap.soledad.client._db.blobs import MaximumRetriesError
 from leap.soledad.client._db import blobs as client_blobs
-from leap.soledad.client._crypto import InvalidBlob
 
 
 def sleep(x):
@@ -333,7 +334,7 @@ class BlobServerTestCase(unittest.TestCase):
             # Corrupt the tag (last 16 bytes)
             corrupted_blob.seek(-16, 2)
             corrupted_blob.write('x' * 16)
-        with pytest.raises(InvalidBlob):
+        with pytest.raises(MaximumRetriesError):
             yield manager.sync()
         status, retries = yield manager.local.get_sync_status(blob_id)
         self.assertEquals(status, SyncStatus.FAILED_DOWNLOAD)
@@ -370,7 +371,7 @@ class BlobServerTestCase(unittest.TestCase):
         manager = BlobManager(self.tempdir, self.uri, self.secret,
                               self.secret, uuid4().hex)
         self.addCleanup(manager.close)
-        with pytest.raises(SoledadError):
+        with pytest.raises(RetriableTransferError):
             yield manager.get('missing_id')
 
     @defer.inlineCallbacks

@@ -19,15 +19,19 @@ Tests for BlobManager.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from twisted.web.error import SchemeNotSupported
 from leap.soledad.client._db.blobs import BlobManager, BlobDoc, FIXED_REV
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import SyncStatus
+from leap.soledad.client._db.blobs import RetriableTransferError
 from io import BytesIO
 from mock import Mock
 from uuid import uuid4
 import pytest
 import os
+
+# monkey-patch the blobmanager MAX_WAIT time so tests run faster
+from leap.soledad.client._db import blobs
+blobs.MAX_WAIT = 1
 
 
 class BlobManagerTestCase(unittest.TestCase):
@@ -155,8 +159,7 @@ class BlobManagerTestCase(unittest.TestCase):
         self.manager._encrypt_and_upload = Mock(return_value=upload_failure)
         content, blob_id = "Blob content", uuid4().hex
         doc1 = BlobDoc(BytesIO(content), blob_id)
-        with pytest.raises(SchemeNotSupported):
-            # should fail because manager URL is invalid
+        with pytest.raises(Exception):
             yield self.manager.put(doc1, len(content))
         pending_upload = SyncStatus.PENDING_UPLOAD
         local_list = yield self.manager.local_list(sync_status=pending_upload)
@@ -165,18 +168,44 @@ class BlobManagerTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_upload_retry_limit(self):
+        # prepare the manager to fail accordingly
         self.manager.remote_list = Mock(return_value=[])
+        self.manager._encrypt_and_upload = Mock(
+            side_effect=RetriableTransferError)
+        # put a blob in local storage
         content, blob_id = "Blob content", uuid4().hex
-        doc1 = BlobDoc(BytesIO(content), blob_id)
-        with pytest.raises(SchemeNotSupported):
-            # should fail because manager URL is invalid
-            yield self.manager.put(doc1, len(content))
-        for _ in range(self.manager.max_retries + 1):
-            with pytest.raises(defer.FirstError):
-                yield self.manager.send_missing()
+        yield self.manager.local.put(blob_id, BytesIO(content), len(content))
+        # try to send missing
+        with pytest.raises(defer.FirstError):
+            yield self.manager.send_missing()
+        # assert failed state and number of retries
         failed_upload = SyncStatus.FAILED_UPLOAD
         local_list = yield self.manager.local_list(sync_status=failed_upload)
         self.assertIn(blob_id, local_list)
+        sync_status, retries = \
+            yield self.manager.local.get_sync_status(blob_id)
+        self.assertEqual(failed_upload, sync_status)
+        self.assertEqual(self.manager.max_retries, retries)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_download_retry_limit(self):
+        # prepare the manager to fail accordingly
+        blob_id = uuid4().hex
+        self.manager.local_list = Mock(return_value=[blob_id])
+        self.manager._download_and_decrypt = Mock(
+            side_effect=RetriableTransferError)
+        # try to fetch missing
+        with pytest.raises(defer.FirstError):
+            yield self.manager.fetch_missing()
+        # assert failed state and number of retries
+        failed_download = SyncStatus.FAILED_DOWNLOAD
+        local_list = yield self.manager.local.list(sync_status=failed_download)
+        self.assertIn(blob_id, local_list)
+        sync_status, retries = \
+            yield self.manager.local.get_sync_status(blob_id)
+        self.assertEqual(failed_download, sync_status)
+        self.assertEqual(self.manager.max_retries, retries)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
