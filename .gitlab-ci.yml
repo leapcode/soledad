@@ -170,14 +170,15 @@ package:amd64_zesty:
 time-cpu:
   <<: *benchmark
   script:
-    - /usr/bin/unbuffer tox --recreate -e benchmark-time-cpu -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
+    - scripts/benchmark/run-benchmarks-ci-job.sh benchmark-time-cpu
 
 memory:
   <<: *benchmark
   script:
-    - /usr/bin/unbuffer tox --recreate -e benchmark-memory -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
+    - scripts/benchmark/run-benchmarks-ci-job.sh benchmark-memory
 
 responsiveness:
   <<: *benchmark
   script:
+    - scripts/benchmark/run-benchmarks-ci-job.sh responsiveness
     - /usr/bin/unbuffer tox --recreate -e responsiveness -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
