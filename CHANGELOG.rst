@@ -10,6 +10,7 @@ Misc
 ~~~~
 
 - Add packages for debian buster.
+- deb: Make soledad-client depend on soledad-common
 
 
 0.10.3 - Mon 11 Sep, 2017
