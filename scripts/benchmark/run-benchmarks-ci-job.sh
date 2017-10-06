@@ -13,6 +13,7 @@
 # the variable from their environments as they see fit.
 
 set -eu
+set -o xtrace
 
 ENVIRONMENT=${1}
 RUN_BENCHMARKS=${RUN_BENCHMARKS:-}
@@ -22,9 +23,11 @@ if [ -z "${RUN_BENCHMARKS}" ]; then
   exit 0
 fi
 
+echo "Running tox in environment ${ENVIRONMENT}..."
+
 /usr/bin/unbuffer \
   tox \
-    --recreate
+    --recreate \
     -e ${ENVIRONMENT} \
     -- \
     --couch-url http://couchdb:5984 \
