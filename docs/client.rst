@@ -41,6 +41,7 @@ Once all pieces are in place, you can instantiate the client as following:
 .. code-block:: python
 
     from leap.soledad.client import Soledad
+    
     client = Soledad(
         uuid,
         passphrase,
@@ -59,18 +60,27 @@ you will need to make sure a `reactor
 <http://twistedmatrix.com/documents/current/core/howto/reactor-basics.html>`_
 is running.
 
-Creation of a document and synchronization is done as follows:
+An example of usage of Soledad Client for creating a document and Creation of
+a document and synchronization is done as follows:
 
 .. code-block:: python
 
-    yield client.create_doc({'my': 'doc'}, doc_id='some-id')
-    doc = yield client.get_doc('some-id')
-    yield client.sync()
+    from twisted.internet import defer, reactor
+    
+    @defer.inlineCallbacks
+    def client_usage_example():
 
-The document can be modified and synchronized again:
+        # create a document and sync it with the server
+        yield client.create_doc({'my': 'doc'}, doc_id='some-id')
+        doc = yield client.get_doc('some-id')
+        yield client.sync()
+        
+        # modify the document and sync again
+        doc.content = {'new': 'content'}
+        yield client.put_doc(doc)
+        yield client.sync()
+    
+    d = client_usage_example()
+    d.addCallback(lambda _: reactor.stop())
 
-.. code-block:: python
-
-    doc.content = {'new': 'content'}
-    yield client.put_doc(doc)
-    yield client.sync()
+    reactor.run()
