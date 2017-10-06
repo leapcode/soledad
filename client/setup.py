@@ -24,7 +24,7 @@ from setuptools import find_packages
 from setuptools import Command
 import versioneer
 
-trove_classifiers = (
+trove_classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: "
@@ -35,7 +35,7 @@ trove_classifiers = (
     "Programming Language :: Python :: 2.7",
     "Topic :: Database :: Front-Ends",
     "Topic :: Software Development :: Libraries :: Python Modules"
-)
+]
 
 DOWNLOAD_BASE = ('https://github.com/leapcode/bitmask_client/'
                  'archive/%s.tar.gz')
@@ -132,6 +132,9 @@ setup(
     maintainer='Kali Kaneko',
     maintainer_email='kali@leap.se',
     long_description=(
+        "**DEPRECATED - this package has been merged with other parts of "
+        "Soledad as is now available in**: "
+        "https://pypi.python.org/pypi/leap.soledad - "
         "Soledad is the part of LEAP that allows application data to be "
         "securely shared among devices. It provides, to other parts of the "
         "LEAP project, an API for data storage and sync."
