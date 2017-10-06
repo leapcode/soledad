@@ -1,6 +1,10 @@
 Soledad
 ==================================================================
+
 *Synchronization Of Locally Encrypted Data Among Devices*
+
+.. image:: https://badge.fury.io/py/leap.soledad.svg
+    :target: http://badge.fury.io/py/leap.soledad
 
 Soledad is the part of LEAP that allows application data to be
 securely shared among devices. It provides, to other parts of the
@@ -8,45 +12,39 @@ LEAP project, an API for data storage and sync.
 
 This software is under development.
 
-From version ``0.9.7`` on, soledad is a single package, with extra dependencies
-for the client and the server backends.
+Installing
+----------
 
-**leap.soledad**
+Soledad is distributed as a single package, with extra dependencies for the
+client and the server backends. To install the main package from `pypi
+<https://pypi.python.org/pypi/leap.soledad>`_, do the following::
 
-.. image:: https://badge.fury.io/py/leap.soledad.svg
-    :target: http://badge.fury.io/py/leap.soledad
-.. image:: https://img.shields.io/pypi/dm/leap.soledad.svg
-    :target: http://badge.fury.io/py/leap.soledad
+    pip install leap.soledad
 
+To use Soledad Client, make sure to install client-specific dependencies::
 
-Installing extra dependencies
------------------------------
+    pip install "leap.soledad[client]"
 
-The client backend is based on sqlcipher::
+To use Soledad Server, also install server-specific dependencies::
 
-  pip install ".[client]" 
+    pip install "leap.soledad[server]"
 
-The server depends on CouchDB::
+If you want to install from the repository, you can do so like this::
 
-  pip install ".[server]" 
+    git clone https://0xacab.org/leap/soledad
+    cd soledad/
+    pip install .
+    pip install ".[client]"
+    pip install ".[server]"
 
 
 Compatibility
 -------------
 
-* Soledad Server >= 0.7.0 is incompatible with client < 0.7.0 because of
-  modifications on encrypted document MAC calculation.
-
-* Soledad Server >= 0.7.0 is incompatible with LEAP Platform < 0.6.1 because
-  that platform version implements ephemeral tokens databases and Soledad
-  Server needs to act accordingly.
-
-* Upgrades of Soledad Server < 0.9.0 to >= 0.9.0 need database migration
-  because older code used to use CouchDB's design documents, while newer code
-  got rid of that because it made everything cpu and memory hungry. See `the
-  documentation
-  <http://soledad.readthedocs.io/en/latest/migrations.html#soledad-server-0-8-to-0-9-couch-database-schema-migration-needed>`_
-  for more information.
+See the documentation page about `compatibility
+<http://soledad.readthedocs.io/en/latest/development/compatibility.html>`_
+for information about compatibility between different versions of Soledad
+Server and Client and with the LEAP Plaform.
 
 
 Tests
@@ -59,6 +57,9 @@ tests. Currently, some tests also depend on availability of a `CouchDB`_ server
 
 Once you have both *tox* and *CouchDB* installed in your system, just run the
 ``tox`` command in the root of the repository to get started running tests.
+
+See the `documentation pages about tests
+<https://soledad.readthedocs.io/en/latest/development/tests.html>`_ for more details.
 
 .. _dependency-on-couchdb:
 

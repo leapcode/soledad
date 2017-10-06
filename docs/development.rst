@@ -11,4 +11,5 @@ should help you get started with development for Soledad.
    development/deprecation
    development/tests
    development/benchmarks
+   development/compatibility
    changelog
