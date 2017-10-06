@@ -116,8 +116,8 @@ setup(
     description='Synchronization of locally encrypted data among devices.',
     author='The LEAP Encryption Access Project',
     author_email='info@leap.se',
-    maintainer='Kali Kaneko',
-    maintainer_email='kali@leap.se',
+    maintainer='LEAP Encryption Access Project',
+    maintainer_email='info@leap.se',
     long_description=(
         "Soledad is the part of LEAP that allows application data to be "
         "securely shared among devices. It provides, to other parts of the "
