@@ -28,6 +28,8 @@ before_script:
 
 code-check:
   stage: code-check
+  except:
+    - schedules
   image: 0xacab.org:4567/leap/soledad:latest
   script:
     - tox -e code-check
@@ -39,6 +41,8 @@ code-check:
 
 build_docker_image:
   stage: build
+  except:
+    - schedules
   image: 0xacab.org:4567/leap/soledad:latest
   services:
     - docker:dind
@@ -54,6 +58,8 @@ build_docker_image:
 
 tests:
   stage: tests
+  except:
+    - schedules
   image: 0xacab.org:4567/leap/soledad:latest
   services:
     - couchdb
@@ -62,6 +68,8 @@ tests:
 
 e2e:
   stage: tests
+  except:
+    - schedules
   image: 0xacab.org:4567/leap/soledad:latest
   script:
     - tox -e e2e
@@ -73,6 +81,8 @@ e2e:
 
 .job_template: &job_definition
   stage: package
+  except:
+    - schedules
   image: "0xacab.org:4567/leap/gitlab-buildpackage:build_${DIST}_${ARCH}"
   script:
     - "if [ -z \"$(git remote | grep upstream)\" ]; then git remote add upstream https://0xacab.org/leap/soledad; fi"
