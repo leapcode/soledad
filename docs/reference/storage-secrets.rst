@@ -11,7 +11,7 @@ passphrase, and saved locally on disk.
 The encrypted secrets are stored in a local file in the user's in a JSON
 structure that looks like this::
 
-    encrypted = {
+    {
         'version': 2,
         'kdf': 'scrypt',
         'kdf_salt': <base64 encoded salt>,
