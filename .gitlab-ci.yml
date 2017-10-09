@@ -144,6 +144,8 @@ package:amd64_zesty:
 
 .job_template: &benchmark
   stage: benchmarks
+  only:
+    - schedules
   image: 0xacab.org:4567/leap/soledad:latest
   tags:
     - benchmark
