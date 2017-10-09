@@ -79,19 +79,13 @@ e2e:
 # "package" stage
 #
 
-.job_template: &job_definition
+.job_template: &package
   stage: package
   except:
     - schedules
   image: "0xacab.org:4567/leap/gitlab-buildpackage:build_${DIST}_${ARCH}"
   script:
-    - "if [ -z \"$(git remote | grep upstream)\" ]; then git remote add upstream https://0xacab.org/leap/soledad; fi"
-    - "git fetch --tags upstream"
-    - "pwd; git describe"
-    - build-build-package
-    # Test the package with lintian
-    - build-test-lintian
-    - "if [ -n \"${SSH_PRIVATE_KEY}\" ]; then upload-package; else echo \"Skipping package upload because SSH_PRIVATE_KEY is not set.\"; fi"
+    - /usr/bin/unbuffer scripts/packaging/run-packaging-ci-job.sh | /usr/bin/ts -s
     # sleep 1h to allow debugging of running container
     # - sleep 3600
   artifacts:
@@ -111,7 +105,7 @@ package:amd64_jessie:
       # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
     LINTIAN_OPTS: "-X filename-length"
-  <<: *job_definition
+  <<: *package
 
 
 package:amd64_stretch:
@@ -122,7 +116,7 @@ package:amd64_stretch:
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
     LINTIAN_OPTS: "-X filename-length"
-  <<: *job_definition
+  <<: *package
 
 package:amd64_buster:
   variables:
@@ -135,7 +129,7 @@ package:amd64_buster:
     # until we can deprecate jessie and take out the dh-systemd
     # build-depends (see #8963)
     LINTIAN_OPTS: "-X filename-length --suppress-tags build-depends-on-obsolete-package"
-  <<: *job_definition
+  <<: *package
 
 package:amd64_zesty:
   variables:
@@ -145,7 +139,7 @@ package:amd64_zesty:
       # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
     LINTIAN_OPTS: "-X filename-length"
-  <<: *job_definition
+  <<: *package
 
 
 #
