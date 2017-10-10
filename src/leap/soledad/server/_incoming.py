@@ -19,6 +19,7 @@ A twisted resource that saves externally delivered documents into user's db.
 """
 import json
 import base64
+from twisted.logger import Logger
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
 from twisted.web.test.test_web import DummyRequest
@@ -35,6 +36,9 @@ from leap.soledad.common.blobs import preamble
 
 
 __all__ = ['IncomingResource']
+
+
+logger = Logger()
 
 
 def _get_backend_from_config():
@@ -60,10 +64,14 @@ class IncomingResource(Resource):
         scheme = EncryptionSchemes.PUBKEY
         db = self.factory.open_database(uuid)
         if uses_legacy(db):
-            doc = ServerDocument(doc_id)
-            doc.content = self.formatter.format(request.content.read(), scheme)
-            db.put_doc(doc)
-            self._finish(request)
+            try:
+                doc = ServerDocument(doc_id)
+                content = request.content.read()
+                doc.content = self.formatter.format(content, scheme)
+                db.put_doc(doc)
+                self._finish(request)
+            except Exception as e:
+                self._error(e, request)
         else:
             raw_content = request.content.read()
             preamble = self.formatter.preamble(raw_content, doc_id)
@@ -76,6 +84,7 @@ class IncomingResource(Resource):
             flagsReq.content = BytesIO(json.dumps([Flags.PENDING]))
             d.addCallback(lambda _: db.set_flags(uuid, doc_id, flagsReq, 'MX'))
             d.addCallback(lambda _: self._finish(request))
+            d.addErrback(self._error, request)
         return NOT_DONE_YET
 
     def _finish(self, request):
@@ -83,6 +92,7 @@ class IncomingResource(Resource):
         request.finish()
 
     def _error(self, e, request):
+        logger.error('Error processing request: %s' % e.getErrorMessage())
         request.write('{"success": false}')
         request.setResponseCode(500)
         request.finish()
