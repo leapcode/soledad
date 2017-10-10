@@ -71,6 +71,9 @@ def create_blobs_download(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group=group)
     def test(soledad_client, txbenchmark_with_setup):
+        """
+        Download many blobs of the same size.
+        """
         client = soledad_client()
         blob_payload = payload(size)
 
@@ -136,6 +139,9 @@ def create_blobs_upload(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group=group)
     def test(soledad_client, txbenchmark_with_setup):
+        """
+        Upload many blobs of the same size.
+        """
         client = soledad_client()
         blob_payload = payload(size)
 
