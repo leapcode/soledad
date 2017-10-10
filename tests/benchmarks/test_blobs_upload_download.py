@@ -10,7 +10,6 @@ from twisted.internet.defer import gatherResults
 from twisted.internet.defer import returnValue
 from twisted.internet.defer import DeferredSemaphore
 
-from leap.soledad.common.blobs import Flags
 from leap.soledad.client._db.blobs import BlobDoc
 
 
@@ -87,7 +86,7 @@ def create_blobs_download(amount, size):
         @pytest.inlineCallbacks
         def download(client):
             pending = yield client.blobmanager.remote_list(
-                namespace='payload', filter_flag=Flags.PENDING)
+                namespace='payload')
             yield download_blobs(client, pending)
             yield client.sync()
 
