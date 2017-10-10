@@ -106,8 +106,8 @@ class FilesystemBlobsBackend(object):
         path = self._get_path(user, blob_id, namespace)
         try:
             mkdir_p(os.path.split(path)[0])
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warn("Got exception trying to create directory: %r" % e)
         if os.path.isfile(path):
             # 409 - Conflict
             request.setResponseCode(409)
