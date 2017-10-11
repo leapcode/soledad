@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -e
-set -o xtrace
 
 if [ -z "${LEAP_CODE_O_MATIC_PRIVATE_TOKEN}" ]; then
   echo "Can't proceed without LEAP_CODE_O_MATIC_PRIVATE_TOKEN variable set."

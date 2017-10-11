@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -eu
-set -o xtrace
 
 echo "Starting packaging script for architecture ${ARCH}, distribution ${DIST}..."
 
