@@ -66,5 +66,6 @@ class ConfigurationParsingTest(unittest.TestCase):
                     'batching': False,
                     'blobs': False,
                     'services_tokens_file': '/etc/soledad/services.tokens',
-                    'blobs_path': '/var/lib/soledad/blobs'}
+                    'blobs_path': '/var/lib/soledad/blobs',
+                    'concurrent_blob_writes': 50}
         self.assertDictEqual(expected, config['soledad-server'])

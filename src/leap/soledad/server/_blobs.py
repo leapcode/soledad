@@ -62,9 +62,10 @@ VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')
 @implementer(interfaces.IIncomingBoxBackend)
 class FilesystemBlobsBackend(object):
 
-    def __init__(self, blobs_path='/tmp/blobs/', quota=200 * 1024):
+    def __init__(self, blobs_path='/tmp/blobs/', quota=200 * 1024,
+                 concurrent_writes=50):
         self.quota = quota
-        self.semaphore = defer.DeferredSemaphore(50)  # TODO: make configurable
+        self.semaphore = defer.DeferredSemaphore(concurrent_writes)
         if not os.path.isdir(blobs_path):
             os.makedirs(blobs_path)
         self.path = blobs_path

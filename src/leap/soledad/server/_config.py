@@ -33,6 +33,7 @@ CONFIG_DEFAULTS = {
         'blobs': False,
         'blobs_path': '/var/lib/soledad/blobs',
         'services_tokens_file': '/etc/soledad/services.tokens',
+        'concurrent_blob_writes': 50,
     },
     'database-security': {
         'members': ['soledad'],
