@@ -64,6 +64,7 @@ class FilesystemBlobsBackend(object):
 
     def __init__(self, blobs_path='/tmp/blobs/', quota=200 * 1024):
         self.quota = quota
+        self.semaphore = defer.DeferredSemaphore(50)  # TODO: make configurable
         if not os.path.isdir(blobs_path):
             os.makedirs(blobs_path)
         self.path = blobs_path
@@ -103,6 +104,7 @@ class FilesystemBlobsBackend(object):
 
     @defer.inlineCallbacks
     def write_blob(self, user, blob_id, request, namespace=''):
+        yield self.semaphore.acquire()
         path = self._get_path(user, blob_id, namespace)
         try:
             mkdir_p(os.path.split(path)[0])
@@ -123,6 +125,7 @@ class FilesystemBlobsBackend(object):
         fbp = FileBodyProducer(request.content)
         with open(path, 'wb') as blobfile:
             yield fbp.startProducing(blobfile)
+        yield self.semaphore.release()
 
     def delete_blob(self, user, blob_id, request, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
