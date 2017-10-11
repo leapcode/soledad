@@ -56,8 +56,11 @@ class SoledadRealm(object):
         if conf is None:
             conf = get_config()
         blobs = conf['blobs']
-        blobs_resource = BlobsResource("filesystem",
-                                       conf['blobs_path']) if blobs else None
+        concurrent_writes = conf['concurrent_blob_writes']
+        blobs_resource = BlobsResource(
+            "filesystem",
+            conf['blobs_path'],
+            concurrent_writes=concurrent_writes) if blobs else None
         self.anon_resource = AnonymousResource(
             enable_blobs=blobs)
         self.auth_resource = PublicResource(

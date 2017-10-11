@@ -43,7 +43,7 @@ class SoledadRealmTestCase(unittest.TestCase):
 
     def test_returned_resource(self):
         # we have to pass a pool to the realm , otherwise tests will hang
-        conf = {'blobs': False}
+        conf = {'blobs': False, 'concurrent_blob_writes': 50}
         pool = reactor.getThreadPool()
         realm = SoledadRealm(conf=conf, sync_pool=pool)
         iface, avatar, logout = realm.requestAvatar('any', None, IResource)
