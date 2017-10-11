@@ -1,4 +1,4 @@
 sphinx
 sphinxcontrib-zopeext
-pyzmq --install-option="--zmq=bundled"
+pyzmq
 mock
