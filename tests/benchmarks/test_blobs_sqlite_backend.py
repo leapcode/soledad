@@ -5,12 +5,8 @@ from uuid import uuid4
 from io import BytesIO
 
 from twisted.internet.defer import gatherResults
-from twisted.internet.defer import DeferredSemaphore
 
 from leap.soledad.client._db.blobs import SQLiteBlobBackend
-
-
-semaphore = DeferredSemaphore(2)
 
 
 #
@@ -23,7 +19,7 @@ def put(backend, amount, data):
         blob_id = uuid4().hex
         fd = BytesIO(data)
         size = len(data)
-        d = semaphore.run(backend.put, blob_id, fd, size)
+        d = backend.put(blob_id, fd, size)
         deferreds.append(d)
     return gatherResults(deferreds)
 
@@ -51,7 +47,7 @@ test_sqlite_blobs_backend_put_1000_10k = create_put_test(1000, 10 * 1000)
 
 
 #
-# put
+# get
 #
 
 @pytest.inlineCallbacks

@@ -8,7 +8,6 @@ from io import BytesIO
 
 from twisted.internet.defer import gatherResults
 from twisted.internet.defer import returnValue
-from twisted.internet.defer import DeferredSemaphore
 
 from leap.soledad.client._db.blobs import BlobDoc
 
@@ -18,10 +17,6 @@ def payload(size):
     payload_bytes = bytearray(random.getrandbits(8) for _ in xrange(size))
     # encode as base64 to avoid ascii encode/decode errors
     return base64.b64encode(payload_bytes)[:size]  # remove b64 overhead
-
-
-# used to limit the amount of concurrent accesses to the blob manager
-semaphore = DeferredSemaphore(2)
 
 
 def reclaim_free_space(client):
@@ -38,8 +33,7 @@ def load_up_downloads(client, amount, data):
     ids = yield client.blobmanager.remote_list(namespace='payload')
     deferreds = []
     for blob_id in ids:
-        d = semaphore.run(
-            client.blobmanager.delete, blob_id, namespace='payload')
+        d = client.blobmanager.delete(blob_id, namespace='payload')
         deferreds.append(d)
     yield gatherResults(deferreds)
 
@@ -49,8 +43,7 @@ def load_up_downloads(client, amount, data):
         fd = BytesIO(data)
         doc = BlobDoc(fd, blob_id=uuid.uuid4().hex)
         size = sys.getsizeof(fd)
-        d = semaphore.run(
-            client.blobmanager.put, doc, size, namespace='payload')
+        d = client.blobmanager.put(doc, size, namespace='payload')
         deferreds.append(d)
     yield gatherResults(deferreds)
 
@@ -59,8 +52,7 @@ def load_up_downloads(client, amount, data):
 def download_blobs(client, pending):
     deferreds = []
     for item in pending:
-        d = semaphore.run(
-            client.blobmanager.get, item, namespace='payload')
+        d = client.blobmanager.get(item, namespace='payload')
         deferreds.append(d)
     yield gatherResults(deferreds)
 
@@ -114,8 +106,7 @@ def load_up_uploads(client, amount, data):
     ids = yield client.blobmanager.remote_list(namespace='payload')
     deferreds = []
     for blob_id in ids:
-        d = semaphore.run(
-            client.blobmanager.delete, blob_id, namespace='payload')
+        d = client.blobmanager.delete(blob_id, namespace='payload')
         deferreds.append(d)
     yield gatherResults(deferreds)
 
@@ -127,8 +118,7 @@ def upload_blobs(client, amount, data):
         fd = BytesIO(data)
         doc = BlobDoc(fd, blob_id=uuid.uuid4().hex)
         size = sys.getsizeof(fd)
-        d = semaphore.run(
-            client.blobmanager.put, doc, size, namespace='payload')
+        d = client.blobmanager.put(doc, size, namespace='payload')
         deferreds.append(d)
     yield gatherResults(deferreds)
 
