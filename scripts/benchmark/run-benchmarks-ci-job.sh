@@ -44,7 +44,6 @@ tempfile=$(mktemp)
     -- \
     --couch-url http://couchdb:5984 \
     --benchmark-json=${tempfile} \
-    -m runme \
   | /usr/bin/ts -s
 
 #
