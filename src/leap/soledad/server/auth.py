@@ -48,13 +48,17 @@ from ._config import get_config
 log = Logger()
 
 
+def _update_with_defaults(conf):
+    for k, v in get_config().items():
+        conf.setdefault(k, v)
+
+
 @implementer(IRealm)
 class SoledadRealm(object):
 
-    def __init__(self, sync_pool, conf=None):
+    def __init__(self, sync_pool, conf={}):
         assert sync_pool is not None
-        if conf is None:
-            conf = get_config()
+        _update_with_defaults(conf)
         blobs = conf['blobs']
         concurrent_writes = conf['concurrent_blob_writes']
         blobs_resource = BlobsResource(
@@ -110,9 +114,9 @@ class LocalServicesRealm(object):
 class FileTokenChecker(object):
     credentialInterfaces = [IUsernamePassword, IAnonymous]
 
-    def __init__(self, conf=None):
+    def __init__(self, conf={}):
         # conf parameter is only used during tests
-        conf = conf or get_config()
+        _update_with_defaults(conf)
         self._trusted_services_tokens = {}
         self._tokens_file_path = conf['services_tokens_file']
         self._reload_tokens()
