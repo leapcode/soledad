@@ -187,4 +187,3 @@ responsiveness:
   <<: *benchmark
   script:
     - scripts/benchmark/run-benchmarks-ci-job.sh responsiveness
-    - /usr/bin/unbuffer tox --recreate -e responsiveness -- --couch-url http://couchdb:5984 | /usr/bin/ts -s
