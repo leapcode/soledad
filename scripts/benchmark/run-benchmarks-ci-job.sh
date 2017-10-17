@@ -16,8 +16,8 @@
 # Environment Variables
 # ---------------------
 #
-#   RUN_BENCHMARKS:     If not set, skip this run.
-#   CHECK_FOR_OUTLIERS: If set, check if results are outliers.
+#   RUN_BENCHMARKS          - If not set, skip this run.
+#   STATUS_CODE_IF_OUTLIERS - Exit with this status code if outliers are detected.
 
 set -eu
 set -o xtrace
@@ -55,12 +55,6 @@ if [ -z "$(echo ${ENVIRONMENT} | grep ^benchmark-)" ]; then
   exit 0
 fi
 
-# stop here unless the CHECK_FOR_OUTLIERS environment variable is set
-if [ -z "${CHECK_FOR_OUTLIERS:-}" ]; then
-  exit 0
-fi
-
-# fail test for bad outliers
-echo "Comparing current test results with history..."
+# check for bad outliers
 basedir=$(dirname "${0}")
-${basedir}/compare-results-with-history.py ${tempfile}
+${basedir}/check-for-outliers.py --status-code ${STATUS_CODE_IF_OUTLIERS:-0} ${tempfile} 

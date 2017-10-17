@@ -9,6 +9,8 @@
 #     master branch.
 #
 #   - compare the result in the file with the results in elastic.
+#
+#   - if there are bad outliers, exit with status code given in command line.
 
 import argparse
 import copy
@@ -27,6 +29,9 @@ def parse_args():
     parser.add_argument(
         'file',
         help='The file with JSON results of pytest-benchmark')
+    parser.add_argument(
+        '--status-code', type=int, default=0,
+        help='The status code to exit with in case bad outliers are detected.')
     return parser.parse_args()
 
 
@@ -127,31 +132,31 @@ def detect_bad_outlier(test, mean, extra):
     if 'memory_percent' in extra:
         mem = get_mem_stats(test)
         value = extra['memory_percent']['stats']['max']
-        bad |= _detect_outlier('mem', value, mem) > 0
+        bad |= _detect_outlier(test, 'mem', value, mem) > 0
     else:
         time, cpu = get_time_cpu_stats(test)
 
         value = mean
-        bad |= _detect_outlier('time', value, time) > 0
+        bad |= _detect_outlier(test, 'time', value, time) > 0
 
         value = extra['cpu_percent']
-        bad |= _detect_outlier('cpu', value, cpu) > 0
+        bad |= _detect_outlier(test, 'cpu', value, cpu) > 0
     return bad
 
 
-def _detect_outlier(name, value, list):
+def _detect_outlier(test, name, value, list):
     mean = _mean(list)
     std = _std(list)
     result = 0
-    print "%s: %f ? %f +- %f * %f" \
-          % (name, value, mean, MULTIPLIER, std)
+    print "Checking %s (%s):" % (test, name)
+    print "  value: %f" % (value,)
+    print "  lower limit: %f" % (mean - (MULTIPLIER * std))
+    print "  upper limit: %f" % (mean + (MULTIPLIER * std))
     if value < mean - MULTIPLIER * std:
-        print "%s: %f < %f - %f * %f" \
-              % (name, value, mean, MULTIPLIER, std)
+        print "  => good outlier detected!"
         result = -1
     elif value > mean + MULTIPLIER * std:
-        print "%s: %f > %f - %f * %f" \
-              % (name, value, mean, MULTIPLIER, std)
+        print "  => bad outlier detected!"
         result = 1
     return result
 
@@ -159,8 +164,12 @@ def _detect_outlier(name, value, list):
 if __name__ == '__main__':
     args = parse_args()
     tests = parse_file(args.file)
+    print "Checking %d test results for outliers..." % len(tests)
     failed = False
     for test, mean, extra in tests:
         failed |= detect_bad_outlier(test, mean, extra)
     if failed:
-        sys.exit(1)
+        print "Tests have bad outliers! o_O"
+        sys.exit(args.status_code)
+    else:
+        print "All good, no outliers were detected. :-)"
