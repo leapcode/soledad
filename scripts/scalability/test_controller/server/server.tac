@@ -206,7 +206,8 @@ class MonitorResource(resource.Resource):
 class SetupResource(resource.Resource):
 
     def render_POST(self, request):
-        d = ensure_dbs()
+        create = request.args.get('create') or [1000]
+        d = ensure_dbs(create=int(create.pop()))
         d.addCallback(self._success, request)
         d.addErrback(self._error, request)
         return server.NOT_DONE_YET
@@ -216,7 +217,8 @@ class SetupResource(resource.Resource):
         request.finish()
 
     def _error(self, e, request):
-        logger.error('Error processing request: %s' % e.getErrorMessage())
+        message = e.getErrorMessage() if e.getErrorMessage() else repr(e)
+        logger.error('Error processing request: %s' % message)
         request.setResponseCode(500)
         request.write(json.dumps({'error': str(e)}))
         request.finish()

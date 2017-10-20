@@ -3,8 +3,12 @@
 # Handle creation of user databases for scalability tests.
 
 import argparse
+import json
+import os
+import time
 import treq
 
+from hashlib import sha512
 from functools import partial
 from urlparse import urljoin
 
@@ -38,17 +42,25 @@ def get_db_names(create):
 semaphore = defer.DeferredSemaphore(20)
 
 
-def _log(db, action, res):
-    logger.info('table %s %s' % (db, action))
+def _log(db, item, action, res):
+    logger.info('%s %s %s' % (item, db, action))
     return res
+
+
+def _req(method, *args, **kwargs):
+    method = getattr(treq, method)
+    auth = os.environ.get('HTTP_AUTH')
+    if auth:
+        kwargs.update({'auth': tuple(auth.split(':'))})
+    return method(*args, **kwargs)
 
 
 @defer.inlineCallbacks
 def delete_dbs(dbs):
     deferreds = []
     for db in dbs:
-        d = semaphore.run(treq.delete, urljoin(COUCH_URL, db))
-        logfun = partial(_log, db, 'deleted')
+        d = semaphore.run(_req, 'delete', urljoin(COUCH_URL, db))
+        logfun = partial(_log, 'table', db, 'deleted')
         d.addCallback(logfun)
         deferreds.append(d)
     responses = yield defer.gatherResults(deferreds)
@@ -60,8 +72,8 @@ def delete_dbs(dbs):
 def create_dbs(dbs):
     deferreds = []
     for db in dbs:
-        d = semaphore.run(treq.put, urljoin(COUCH_URL, db))
-        logfun = partial(_log, db, 'created')
+        d = semaphore.run(_req, 'put', urljoin(COUCH_URL, db))
+        logfun = partial(_log, 'table', db, 'created')
         d.addCallback(logfun)
         deferreds.append(d)
     responses = yield defer.gatherResults(deferreds)
@@ -69,11 +81,44 @@ def create_dbs(dbs):
     assert all(map(lambda c: c == 201, codes))
 
 
+def _get_tokens_db_name():
+    prefix = 'tokens_'
+    expire = 30 * 24 * 3600
+    db_name = prefix + str(int(time.time() / expire))
+    return db_name
+
+
+@defer.inlineCallbacks
+def _create_token(res, url, user_id):
+    data = {'user_id': user_id, 'type': 'Token'}
+    if res.code == 200:
+        current = yield res.json()
+        data['_rev'] = current['_rev']
+    res = yield _req('put', url, json.dumps(data))
+    defer.returnValue(res)
+
+
+def create_tokens(create):
+    deferreds = []
+    tokens_db = _get_tokens_db_name()
+    for i in xrange(create):
+        user_id = str(i)
+        token = sha512('%s-token' % user_id).hexdigest()
+        url = '/'.join([COUCH_URL, tokens_db, token])
+        d = semaphore.run(_req, 'get', url)
+        d.addCallback(_create_token, url, user_id)
+        logfun = partial(_log, 'token', user_id, 'created')
+        d.addCallback(logfun)
+        deferreds.append(d)
+    return defer.gatherResults(deferreds)
+
+
 @defer.inlineCallbacks
 def ensure_dbs(couch_url=COUCH_URL, create=CREATE):
     dbs = get_db_names(create)
     yield delete_dbs(dbs)
     yield create_dbs(dbs)
+    yield create_tokens(create)
 
 
 @defer.inlineCallbacks
