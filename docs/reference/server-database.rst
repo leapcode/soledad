@@ -29,20 +29,20 @@ which recovery document belongs to each user.
 
 This has some implications:
 
-  * The security of the recovery document doc_id, and thus of access to the
-    recovery document (encrypted) content, as well as tampering with the
-    stored data, all rely on the difficulty of obtaining the user's password
-    (supposing the user's uid is somewhat public) and the security of the hash
-    function used to calculate the doc_id.
+* The security of the recovery document doc_id, and thus of access to the
+  recovery document (encrypted) content, as well as tampering with the
+  stored data, all rely on the difficulty of obtaining the user's password
+  (supposing the user's uid is somewhat public) and the security of the hash
+  function used to calculate the doc_id.
 
-  * The security of the content of a recovery document relies on the
-    difficulty of obtaining the user's password.
+* The security of the content of a recovery document relies on the
+  difficulty of obtaining the user's password.
 
-  * If the user looses his/her password, he/she will not be able to obtain the
-    recovery document.
+* If the user looses his/her password, he/she will not be able to obtain the
+  recovery document.
 
-  * Because of the above, it is recommended that recovery documents expire
-    (not implemented yet) to prevent excess storage.
+* Because of the above, it is recommended that recovery documents expire
+  (not implemented yet) to prevent excess storage.
 
 The authorization for creating, updating, deleting and retrieving recovery
 documents on the shared database is handled by `leap.soledad.server.auth`

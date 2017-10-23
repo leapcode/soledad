@@ -230,22 +230,20 @@ registered Trusted Application Consumers.
   process, attention SHOULD be payed to the callbacks not blocking the main
   event loop.
 
-Example of a Trusted Application Client Consumer:
+Example of a Trusted Application Client Consumer::
 
-```python
-@implementer(interfaces.IIncomingBoxConsumer)
-class MyConsumer(object):
-    def __init__(self):
-        self.name = 'My Consumer'
+    @implementer(interfaces.IIncomingBoxConsumer)
+    class MyConsumer(object):
+        def __init__(self):
+            self.name = 'My Consumer'
 
-    def process(self, item, item_id, encrypted=True):
-        cleartext = my_custom_decrypt(item) if encrypted else item
-        processed_parts = my_custom_processing(item)
-        return defer.succeed(processed_parts)
+        def process(self, item, item_id, encrypted=True):
+            cleartext = my_custom_decrypt(item) if encrypted else item
+            processed_parts = my_custom_processing(item)
+            return defer.succeed(processed_parts)
 
-    def save(self, parts, item_id):
-        return defer.gatherResults([db.save(part) for part in parts])
-```
+        def save(self, parts, item_id):
+            return defer.gatherResults([db.save(part) for part in parts])
 
 
 Future Features

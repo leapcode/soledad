@@ -39,7 +39,7 @@ The public endpoint provides the following REST API for interacting with the
 =========================== ========== ================================= ============================================
 path                        method     action                            accepted query string fields
 =========================== ========== ================================= ============================================
-``/blobs/{uuid}             ``GET``    Get a list of blobs. filtered by  ``namespace``, ``filter_flag``, ``order_by``
+``/blobs/{uuid}``           ``GET``    Get a list of blobs. filtered by  ``namespace``, ``filter_flag``, ``order_by``
                                        a flag.
 ``/blobs/{uuid}/{blob_id}`` ``GET``    Get the contents of a blob.       ``namespace``
 ``/blobs/{uuid}/{blob_id}`` ``PUT``    Create a blob. The content of the ``namespace``
