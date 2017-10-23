@@ -26,7 +26,6 @@ from twisted.internet import reactor
 from twisted.python import threadpool
 from twisted.logger import Logger
 
-from ..common.couch.state import check_schema_versions
 from .auth import localPortal, publicPortal
 from .session import SoledadSession
 from ._config import get_config
@@ -74,5 +73,4 @@ def check_conf():
 
 
 reactor.callWhenRunning(check_conf)
-reactor.callWhenRunning(check_schema_versions, conf['couch_url'])
 reactor.callWhenRunning(init_couch_state, conf)
