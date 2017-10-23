@@ -17,10 +17,12 @@
 """
 Server state using CouchDatabase as backend.
 """
-import couchdb
 import re
+import treq
 
 from six.moves.urllib.parse import urljoin
+from twisted.internet import defer
+from urlparse import urlsplit
 
 from leap.soledad.common.log import getLogger
 from leap.soledad.common.couch import CouchDatabase
@@ -51,14 +53,61 @@ def is_db_name_valid(name):
     return re.match(db_name_regex, name) is not None
 
 
+@defer.inlineCallbacks
+def _check_db(url, db, auth, agent=None):
+    # if there are documents, ensure that a config doc exists
+    db_url = urljoin(url, '%s/' % db)
+    config_doc_url = urljoin(db_url, CONFIG_DOC_ID)
+    res = yield treq.get(config_doc_url, auth=auth, agent=agent)
+    raise Exception
+
+    if res.code != 200 and res.code != 404:
+        raise Exception
+
+    if res.code == 404:
+        res = yield treq.get(urljoin(db_url, '_all_docs'), auth=auth,
+                             params={'limit': 1}, agent=agent)
+        docs = yield res.json()
+        if docs['total_rows'] != 0:
+            logger.error(
+                "Missing couch config document in database %s" % db)
+            raise MissingCouchConfigDocumentError(db)
+
+    if res.code == 200:
+        config_doc = yield res.json()
+        if config_doc[SCHEMA_VERSION_KEY] != SCHEMA_VERSION:
+            logger.error(
+                "Unsupported database schema in database %s" % db)
+            raise WrongCouchSchemaVersionError(db)
+
+
+@defer.inlineCallbacks
+def check_schema_versions(couch_url, agent=None):
+    """
+    Check that all user databases use the correct couch schema.
+    """
+    url = urlsplit(couch_url)
+    auth = (url.username, url.password) if url.username else None
+    url = "%s://%s:%d" % (url.scheme, url.hostname, url.port)
+    res = yield treq.get(urljoin(url, '_all_dbs'), auth=auth, agent=agent)
+    dbs = yield res.json()
+    deferreds = []
+    semaphore = defer.DeferredSemaphore(20)
+    for db in dbs:
+        if not db.startswith('user-'):
+            continue
+        d = semaphore.run(_check_db, url, db, auth, agent=agent)
+        deferreds.append(d)
+    yield defer.gatherResults(deferreds)
+
+
 class CouchServerState(ServerState):
 
     """
     Inteface of the WSGI server with the CouchDB backend.
     """
 
-    def __init__(self, couch_url, create_cmd=None,
-                 check_schema_versions=False):
+    def __init__(self, couch_url, create_cmd=None):
         """
         Initialize the couch server state.
 
@@ -69,40 +118,9 @@ class CouchServerState(ServerState):
                            name and should access CouchDB with necessary
                            privileges, which server lacks for security reasons.
         :type create_cmd: str
-        :param check_schema_versions: Whether to check couch schema version of
-                                      user dbs. Set to False as this is only
-                                      intended to run once during start-up.
-        :type check_schema_versions: bool
         """
         self.couch_url = couch_url
         self.create_cmd = create_cmd
-        if check_schema_versions:
-            self._check_schema_versions()
-
-    def _check_schema_versions(self):
-        """
-        Check that all user databases use the correct couch schema.
-        """
-        server = couchdb.client.Server(self.couch_url)
-        for dbname in server:
-            if not dbname.startswith('user-'):
-                continue
-            db = server[dbname]
-
-            # if there are documents, ensure that a config doc exists
-            config_doc = db.get(CONFIG_DOC_ID)
-            if config_doc:
-                if config_doc[SCHEMA_VERSION_KEY] != SCHEMA_VERSION:
-                    logger.error(
-                        "Unsupported database schema in database %s" % dbname)
-                    raise WrongCouchSchemaVersionError(dbname)
-            else:
-                result = db.view('_all_docs', limit=1)
-                if result.total_rows != 0:
-                    logger.error(
-                        "Missing couch config document in database %s"
-                        % dbname)
-                    raise MissingCouchConfigDocumentError(dbname)
 
     def open_database(self, dbname):
         """

@@ -33,8 +33,7 @@ __all__ = ['init_couch_state', 'get_sync_resource']
 
 
 def _get_couch_state(conf):
-    state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'],
-                             check_schema_versions=True)
+    state = CouchServerState(conf['couch_url'], create_cmd=conf['create_cmd'])
     SoledadBackend.BATCH_SUPPORT = conf.get('batching', False)
     return state
 
