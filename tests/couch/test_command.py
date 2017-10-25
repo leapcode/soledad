@@ -10,7 +10,7 @@ class CommandBasedDBCreationTest(unittest.TestCase):
 
     def test_ensure_db_using_custom_command(self):
         state = couch_state.CouchServerState(
-            "url", create_cmd="/bin/echo", check_schema_versions=False)
+            "url", create_cmd="/bin/echo")
         mock_db = Mock()
         mock_db.replica_uid = 'replica_uid'
         state.open_database = Mock(return_value=mock_db)
@@ -20,12 +20,11 @@ class CommandBasedDBCreationTest(unittest.TestCase):
 
     def test_raises_unauthorized_on_failure(self):
         state = couch_state.CouchServerState(
-            "url", create_cmd="inexistent", check_schema_versions=False)
+            "url", create_cmd="inexistent")
         self.assertRaises(u1db_errors.Unauthorized,
                           state.ensure_database, "user-1337")
 
     def test_raises_unauthorized_by_default(self):
-        state = couch_state.CouchServerState("url",
-                                             check_schema_versions=False)
+        state = couch_state.CouchServerState("url")
         self.assertRaises(u1db_errors.Unauthorized,
                           state.ensure_database, "user-1337")
