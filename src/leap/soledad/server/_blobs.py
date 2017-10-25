@@ -136,7 +136,7 @@ class FilesystemBlobsBackend(object):
         os.unlink(blob_path)
         try:
             os.unlink(blob_path + '.flags')
-        except:
+        except Exception:
             pass
 
     def get_blob_size(user, blob_id, namespace=''):

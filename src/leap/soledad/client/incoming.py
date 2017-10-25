@@ -85,7 +85,7 @@ class IncomingBoxProcessingLoop:
             for consumer in self.consumers:
                 try:
                     parts = yield consumer.process(item, item_id=item_id)
-                except:
+                except Exception:
                     msg = "Consumer %s failed to process item %s: %s"
                     msg %= (consumer.name, item_id, sys.exc_info()[0])
                     log.error(msg)
@@ -94,7 +94,7 @@ class IncomingBoxProcessingLoop:
                 yield self.incoming_box.set_processed(item_id)
                 try:
                     yield consumer.save(parts, item_id=item_id)
-                except:
+                except Exception:
                     msg = "Consumer %s failed to save item %s: %s"
                     msg %= (consumer.name, item_id, sys.exc_info()[0])
                     log.error(msg)
@@ -133,7 +133,7 @@ class IncomingBox:
         try:
             yield self.blob_manager.set_flags(blob_id, [Flags.PROCESSING],
                                               namespace=self.namespace)
-        except:
+        except Exception:
             defer.returnValue(None)
         blob = yield self.blob_manager.get(blob_id, namespace=self.namespace)
         defer.returnValue(blob)

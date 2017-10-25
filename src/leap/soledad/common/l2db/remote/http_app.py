@@ -623,7 +623,7 @@ class HTTPApp(object):
             responder.send_response_json(400, error="bad request")
         except KeyboardInterrupt:
             raise
-        except:
+        except Exception:
             self.request_failed(environ)
             raise
         else:

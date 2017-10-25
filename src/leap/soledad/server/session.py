@@ -117,7 +117,7 @@ class SoledadSession(HTTPAuthSessionWrapper):
             credentials = self._credentialFactory.decode(auth_data, request)
         except error.LoginFailed:
             return UnauthorizedResource()
-        except:
+        except Exception:
             # If you port this to the newer log facility, be aware that
             # the tests rely on the error to be logged.
             log.err(None, "Unexpected failure from credentials factory")

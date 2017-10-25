@@ -275,11 +275,11 @@ class U1DBConnectionPool(adbapi.ConnectionPool):
             trans.close()
             conn.commit()
             return result
-        except:
+        except Exception:
             excType, excValue, excTraceback = sys.exc_info()
             try:
                 conn.rollback()
-            except:
+            except Exception:
                 logger.error(None, "Rollback failed")
             compat.reraise(excValue, excTraceback)
 

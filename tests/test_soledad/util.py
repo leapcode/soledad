@@ -331,7 +331,7 @@ class CouchDBTestCase(unittest.TestCase, MockedSharedDBTest):
     def delete_db(self, name):
         try:
             self.couch_server.delete(name)
-        except:
+        except Exception:
             # ignore if already missing
             pass
 
