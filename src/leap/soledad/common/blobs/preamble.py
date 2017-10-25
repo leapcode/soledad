@@ -84,7 +84,7 @@ class Preamble(object):
 
 def decode_preamble(encoded_preamble, armored=False):
     if armored:
-        encoded_preamble = base64.b64decode(encoded_preamble)
+        encoded_preamble = base64.urlsafe_b64decode(encoded_preamble)
     preamble_size = len(encoded_preamble)
     try:
         if preamble_size == LEGACY_PACMAN.size:
