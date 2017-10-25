@@ -9,7 +9,7 @@ from io import BytesIO
 from twisted.internet.defer import gatherResults
 from twisted.internet.defer import returnValue
 
-from leap.soledad.client._db.blobs import BlobDoc
+from leap.soledad.client._document import BlobDoc
 
 
 def payload(size):

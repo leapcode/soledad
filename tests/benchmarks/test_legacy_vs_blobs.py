@@ -59,7 +59,7 @@ from twisted.internet.defer import returnValue
 from twisted.internet.defer import DeferredSemaphore
 
 from leap.soledad.common.blobs import Flags
-from leap.soledad.client._db.blobs import BlobDoc
+from leap.soledad.client._document import BlobDoc
 
 
 def payload(size):

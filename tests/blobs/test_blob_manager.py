@@ -19,7 +19,8 @@ Tests for BlobManager.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
-from leap.soledad.client._db.blobs import BlobManager, BlobDoc, FIXED_REV
+from leap.soledad.client._document import BlobDoc
+from leap.soledad.client._db.blobs import BlobManager, FIXED_REV
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import SyncStatus
 from leap.soledad.client._db.blobs import RetriableTransferError
