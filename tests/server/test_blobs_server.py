@@ -48,7 +48,7 @@ def sleep(x):
 class BlobServerTestCase(unittest.TestCase):
 
     def setUp(self):
-        client_blobs.MAX_WAIT = 0.1
+        client_blobs.sync.MAX_WAIT = 0.1
         root = server_blobs.BlobsResource("filesystem", self.tempdir)
         self.site = Site(root)
         self.port = reactor.listenTCP(0, self.site, interface='127.0.0.1')
@@ -261,6 +261,8 @@ class BlobServerTestCase(unittest.TestCase):
         self.addCleanup(manager.close)
         blob_id = 'local_only_blob_id'
         yield manager.local.put(blob_id, BytesIO("X"), size=1)
+        pending = SyncStatus.PENDING_UPLOAD
+        yield manager.local.update_sync_status(blob_id, pending)
         yield manager.send_missing()
         result = yield manager._download_and_decrypt(blob_id)
         self.assertIsNotNone(result)
@@ -274,6 +276,8 @@ class BlobServerTestCase(unittest.TestCase):
         self.addCleanup(manager.close)
         blob_id = 'remote_only_blob_id'
         yield manager.local.put(blob_id, BytesIO("X"), size=1)
+        pending = SyncStatus.PENDING_UPLOAD
+        yield manager.local.update_sync_status(blob_id, pending)
         yield self.port.stopListening()
 
         d = manager.send_missing()

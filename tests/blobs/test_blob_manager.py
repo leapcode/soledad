@@ -31,8 +31,8 @@ import pytest
 import os
 
 # monkey-patch the blobmanager MAX_WAIT time so tests run faster
-from leap.soledad.client._db import blobs
-blobs.MAX_WAIT = 1
+from leap.soledad.client._db.blobs import sync
+sync.MAX_WAIT = 1
 
 
 class BlobManagerTestCase(unittest.TestCase):
@@ -117,7 +117,8 @@ class BlobManagerTestCase(unittest.TestCase):
         fd, missing_id = BytesIO('test'), uuid4().hex
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager.remote_list = Mock(return_value=[])
-        yield self.manager.local.put(missing_id, fd, 4)
+        doc1 = BlobDoc(fd, missing_id)
+        yield self.manager.put(doc1, 4)
         yield self.manager.send_missing()
 
         call_list = self.manager._encrypt_and_upload.call_args_list
@@ -163,7 +164,7 @@ class BlobManagerTestCase(unittest.TestCase):
         with pytest.raises(Exception):
             yield self.manager.put(doc1, len(content))
         pending_upload = SyncStatus.PENDING_UPLOAD
-        local_list = yield self.manager.local_list(sync_status=pending_upload)
+        local_list = yield self.manager.local_list_status(pending_upload)
         self.assertIn(blob_id, local_list)
 
     @defer.inlineCallbacks
@@ -176,12 +177,14 @@ class BlobManagerTestCase(unittest.TestCase):
         # put a blob in local storage
         content, blob_id = "Blob content", uuid4().hex
         yield self.manager.local.put(blob_id, BytesIO(content), len(content))
+        pending = SyncStatus.PENDING_UPLOAD
+        yield self.manager.local.update_sync_status(blob_id, pending)
         # try to send missing
         with pytest.raises(defer.FirstError):
             yield self.manager.send_missing()
         # assert failed state and number of retries
         failed_upload = SyncStatus.FAILED_UPLOAD
-        local_list = yield self.manager.local_list(sync_status=failed_upload)
+        local_list = yield self.manager.local_list_status(failed_upload)
         self.assertIn(blob_id, local_list)
         sync_status, retries = \
             yield self.manager.local.get_sync_status(blob_id)
@@ -193,7 +196,7 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_download_retry_limit(self):
         # prepare the manager to fail accordingly
         blob_id = uuid4().hex
-        self.manager.local_list = Mock(return_value=[blob_id])
+        self.manager.local_list_status = Mock(return_value=[blob_id])
         self.manager._download_and_decrypt = Mock(
             side_effect=RetriableTransferError)
         # try to fetch missing
@@ -201,7 +204,7 @@ class BlobManagerTestCase(unittest.TestCase):
             yield self.manager.fetch_missing()
         # assert failed state and number of retries
         failed_download = SyncStatus.FAILED_DOWNLOAD
-        local_list = yield self.manager.local.list(sync_status=failed_download)
+        local_list = yield self.manager.local.list_status(failed_download)
         self.assertIn(blob_id, local_list)
         sync_status, retries = \
             yield self.manager.local.get_sync_status(blob_id)
@@ -213,11 +216,10 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_local_list_doesnt_include_unavailable_blobs(self):
         local = self.manager.local
         unavailable_ids, deferreds = [], []
-        for unavailable_status in SyncStatus.UNAVAILABLE_STATUSES:
-            current_blob_id = uuid4().hex
-            deferreds.append(local.put(current_blob_id, BytesIO(''), 0,
-                                       status=unavailable_status))
-            unavailable_ids.append(current_blob_id)
+        for status in SyncStatus.UNAVAILABLE_STATUSES:
+            blob_id = uuid4().hex
+            deferreds.append(local.update_sync_status(blob_id, status))
+            unavailable_ids.append(blob_id)
         available_blob_id = uuid4().hex
         content, length = self.cleartext, len(self.cleartext.getvalue())
         deferreds.append(local.put(available_blob_id, content, length))
@@ -232,11 +234,10 @@ class BlobManagerTestCase(unittest.TestCase):
     def test_get_doesnt_include_unavailable_blobs(self):
         local = self.manager.local
         unavailable_ids, deferreds = [], []
-        for unavailable_status in SyncStatus.UNAVAILABLE_STATUSES:
-            current_blob_id = uuid4().hex
-            deferreds.append(local.put(current_blob_id, BytesIO(''), 0,
-                                       status=unavailable_status))
-            unavailable_ids.append(current_blob_id)
+        for status in SyncStatus.UNAVAILABLE_STATUSES:
+            blob_id = uuid4().hex
+            deferreds.append(local.update_sync_status(blob_id, status))
+            unavailable_ids.append(blob_id)
         available_blob_id = uuid4().hex
         content, length = self.cleartext, len(self.cleartext.getvalue())
         deferreds.append(local.put(available_blob_id, content, length))
@@ -256,13 +257,15 @@ class BlobManagerTestCase(unittest.TestCase):
         content, pending = self.cleartext, SyncStatus.PENDING_UPLOAD
         length, deferreds = len(content.getvalue()), []
         for blob_id in local_ids:
-            d = local.put(blob_id, content, length, status=pending)
+            d = local.put(blob_id, content, length)
+            deferreds.append(d)
+            d = local.update_sync_status(blob_id, pending)
             deferreds.append(d)
         yield defer.gatherResults(deferreds)
         yield self.manager.refresh_sync_status_from_server()
-        d = self.manager.local_list(sync_status=SyncStatus.PENDING_UPLOAD)
+        d = self.manager.local_list_status(SyncStatus.PENDING_UPLOAD)
         pending_upload_list = yield d
-        d = self.manager.local_list(sync_status=SyncStatus.PENDING_DOWNLOAD)
+        d = self.manager.local_list_status(SyncStatus.PENDING_DOWNLOAD)
         pending_download_list = yield d
         self.assertEquals(set(pending_upload_list), set(local_ids))
         self.assertEquals(set(pending_download_list), set(remote_ids))

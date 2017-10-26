@@ -55,7 +55,7 @@ class SQLiteBlobBackend(object):
             '/tmp/ignored', binascii.b2a_hex(key),
             is_raw_key=True, create=True)
         openfun = partial(pragmas.set_init_pragmas, opts=opts,
-                          schema_func=_init_blob_table)
+                          schema_func=_init_tables)
 
         self.dbpool = ConnectionPool(
             backend, self.path, check_same_thread=False, timeout=5,
@@ -70,19 +70,22 @@ class SQLiteBlobBackend(object):
 
     @defer.inlineCallbacks
     def put(self, blob_id, blob_fd, size=None,
-            namespace='', status=SyncStatus.PENDING_UPLOAD):
-        previous_state = yield self.get_sync_status(blob_id)
-        unavailable = SyncStatus.UNAVAILABLE_STATUSES
-        if previous_state and previous_state[0] in unavailable:
-            yield self.delete(blob_id, namespace=namespace)
-            status = SyncStatus.SYNCED
+            namespace=''):
         logger.info("Saving blob in local database...")
-        insert = 'INSERT INTO blobs (blob_id, namespace, payload, sync_status)'
-        insert += ' VALUES (?, ?, zeroblob(?), ?)'
-        values = (blob_id, namespace, size, status)
+        insert = 'INSERT INTO blobs (blob_id, namespace, payload)'
+        insert += ' VALUES (?, ?, zeroblob(?))'
+        values = (blob_id, namespace, size)
         irow = yield self.dbpool.insertAndGetLastRowid(insert, values)
         yield self.dbpool.write_blob('blobs', 'payload', irow, blob_fd)
         logger.info("Finished saving blob in local database.")
+        """
+        # set as synced if it was pending
+        previous_state = yield self.get_sync_status(blob_id)
+        unavailable = SyncStatus.UNAVAILABLE_STATUSES
+        if previous_state and previous_state[0] in unavailable:
+            status = SyncStatus.SYNCED
+        yield self.update_sync_status(blob_id, status, namespace)
+        """
 
     @defer.inlineCallbacks
     def get(self, blob_id, namespace=''):
@@ -90,33 +93,32 @@ class SQLiteBlobBackend(object):
         # incremental interface for blobs - and just return the raw fd instead
         select = 'SELECT payload FROM blobs WHERE blob_id = ? AND namespace= ?'
         values = (blob_id, namespace,)
-        avoid_values = SyncStatus.UNAVAILABLE_STATUSES
-        select += ' AND sync_status NOT IN (%s)'
-        select %= ','.join(['?' for _ in avoid_values])
-        values += avoid_values
         result = yield self.dbpool.runQuery(select, values)
         if result:
             defer.returnValue(BytesIO(str(result[0][0])))
 
     @defer.inlineCallbacks
     def get_sync_status(self, blob_id):
-        select = 'SELECT sync_status, retries FROM blobs WHERE blob_id = ?'
+        select = 'SELECT sync_status, retries FROM sync_state WHERE blob_id= ?'
         result = yield self.dbpool.runQuery(select, (blob_id,))
         if result:
             defer.returnValue((result[0][0], result[0][1]))
 
     @defer.inlineCallbacks
-    def list(self, namespace='', sync_status=False):
+    def list(self, namespace=''):
         query = 'select blob_id from blobs where namespace = ?'
         values = (namespace,)
-        if sync_status:
-            query += ' and sync_status = ?'
-            values += (sync_status,)
+        result = yield self.dbpool.runQuery(query, values)
+        if result:
+            defer.returnValue([b_id[0] for b_id in result])
         else:
-            avoid_values = SyncStatus.UNAVAILABLE_STATUSES
-            query += ' AND sync_status NOT IN (%s)'
-            query %= ','.join(['?' for _ in avoid_values])
-            values += avoid_values
+            defer.returnValue([])
+
+    @defer.inlineCallbacks
+    def list_status(self, sync_status, namespace=''):
+        query = 'select blob_id from sync_state where sync_status = ?'
+        query += 'AND namespace = ?'
+        values = (sync_status, namespace,)
         result = yield self.dbpool.runQuery(query, values)
         if result:
             defer.returnValue([b_id[0] for b_id in result])
@@ -125,34 +127,34 @@ class SQLiteBlobBackend(object):
 
     @defer.inlineCallbacks
     def update_sync_status(self, blob_id, sync_status, namespace=""):
-        query = 'SELECT sync_status FROM blobs WHERE blob_id = ?'
+        query = 'SELECT sync_status FROM sync_state WHERE blob_id = ?'
         result = yield self.dbpool.runQuery(query, (blob_id,))
 
         if not result:
-            insert = 'INSERT INTO blobs'
-            insert += ' (blob_id, namespace, payload, sync_status)'
-            insert += ' VALUES (?, ?, zeroblob(0), ?)'
+            insert = 'INSERT INTO sync_state'
+            insert += ' (blob_id, namespace, sync_status)'
+            insert += ' VALUES (?, ?, ?)'
             values = (blob_id, namespace, sync_status)
             yield self.dbpool.runOperation(insert, values)
             return
 
-        update = 'UPDATE blobs SET sync_status = ? WHERE blob_id = ?'
+        update = 'UPDATE sync_state SET sync_status = ? WHERE blob_id = ?'
         values = (sync_status, blob_id,)
         result = yield self.dbpool.runOperation(update, values)
 
     def update_batch_sync_status(self, blob_id_list, sync_status,
                                  namespace=''):
-        insert = 'INSERT INTO blobs (blob_id, namespace, payload, sync_status)'
+        insert = 'INSERT INTO sync_state (blob_id, namespace, sync_status)'
         first_blob_id, blob_id_list = blob_id_list[0], blob_id_list[1:]
-        insert += ' VALUES (?, ?, zeroblob(0), ?)'
+        insert += ' VALUES (?, ?, ?)'
         values = (first_blob_id, namespace, sync_status)
         for blob_id in blob_id_list:
-            insert += ', (?, ?, zeroblob(0), ?)'
+            insert += ', (?, ?, ?)'
             values += (blob_id, namespace, sync_status)
         return self.dbpool.runQuery(insert, values)
 
     def increment_retries(self, blob_id):
-        query = 'update blobs set retries = retries + 1 where blob_id = ?'
+        query = 'update sync_state set retries = retries + 1 where blob_id = ?'
         return self.dbpool.runQuery(query, (blob_id,))
 
     @defer.inlineCallbacks
@@ -175,11 +177,18 @@ class SQLiteBlobBackend(object):
         return self.dbpool.runQuery(query, (blob_id, namespace,))
 
 
+def _init_tables(conn):
+    # unified init for running under the same lock
+    _init_blob_table(conn)
+    _init_sync_table(conn)
+
+
 def _init_sync_table(conn):
     maybe_create = """
         CREATE TABLE IF NOT EXISTS
         sync_state (
         blob_id PRIMARY KEY,
+        namespace TEXT,
         sync_status INT default %s,
         retries INT default 0)"""
     default_status = SyncStatus.PENDING_UPLOAD

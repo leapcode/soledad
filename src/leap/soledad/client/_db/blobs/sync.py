@@ -71,7 +71,8 @@ class BlobsSynchronizer(object):
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
         """
-        missing = yield self.local.list(namespace, SyncStatus.PENDING_UPLOAD)
+        missing = yield self.local.list_status(
+            SyncStatus.PENDING_UPLOAD, namespace)
         total = len(missing)
         logger.info("Will send %d blobs to server." % total)
         deferreds = []
@@ -119,8 +120,7 @@ class BlobsSynchronizer(object):
         :type namespace: str
         """
         # TODO: Use something to prioritize user requests over general new docs
-        d = self.local_list(namespace=namespace,
-                            sync_status=SyncStatus.PENDING_DOWNLOAD)
+        d = self.local_list_status(SyncStatus.PENDING_DOWNLOAD, namespace)
         docs_we_want = yield d
         total = len(docs_we_want)
         logger.info("Will fetch %d blobs from server." % total)

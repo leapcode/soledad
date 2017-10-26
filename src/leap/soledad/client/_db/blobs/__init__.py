@@ -196,8 +196,11 @@ class BlobManager(BlobsSynchronizer):
         check_http_status(response.code)
         defer.returnValue((yield response.json()))
 
-    def local_list(self, namespace='', sync_status=None):
-        return self.local.list(namespace, sync_status)
+    def local_list(self, namespace=''):
+        return self.local.list(namespace)
+
+    def local_list_status(self, status, namespace=''):
+        return self.local.list_status(status, namespace)
 
     def put(self, doc, size, namespace=''):
         """
@@ -222,6 +225,8 @@ class BlobManager(BlobsSynchronizer):
         # TODO this is a tee really, but ok... could do db and upload
         # concurrently. not sure if we'd gain something.
         yield self.local.put(doc.blob_id, fd, size=size, namespace=namespace)
+        yield self.local.update_sync_status(
+            doc.blob_id, SyncStatus.PENDING_UPLOAD)
         # In fact, some kind of pipe is needed here, where each write on db
         # handle gets forwarded into a write on the connection handle
         fd = yield self.local.get(doc.blob_id, namespace=namespace)
