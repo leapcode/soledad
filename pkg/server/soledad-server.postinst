@@ -34,3 +34,5 @@ fi
 # update systemd and start service
 systemctl --system daemon-reload >/dev/null || true
 deb-systemd-invoke start soledad-server.service >/dev/null || true
+
+#DEBHELPER#
