@@ -78,18 +78,12 @@ class BlobsSynchronizer(object):
         deferreds = []
         semaphore = defer.DeferredSemaphore(self.concurrent_transfers_limit)
 
-        def release(result):
-            print result
-            semaphore.release()
-            return result
-
         for i in xrange(total):
-            yield semaphore.acquire()
             blob_id = missing.pop()
-            d = with_retry(self.__send_one, blob_id, namespace, i, total)
-            d.addCallbacks(release, release)
+            d = semaphore.run(
+                with_retry, self.__send_one, blob_id, namespace, i, total)
             deferreds.append(d)
-        yield defer.gatherResults(deferreds)
+        yield defer.gatherResults(deferreds, consumeErrors=True)
 
     @defer.inlineCallbacks
     def __send_one(self, blob_id, namespace, i, total):
@@ -127,18 +121,12 @@ class BlobsSynchronizer(object):
         deferreds = []
         semaphore = defer.DeferredSemaphore(self.concurrent_transfers_limit)
 
-        def release(result):
-            semaphore.release()
-            return result
-
         for i in xrange(len(docs_we_want)):
-            yield semaphore.acquire()
             blob_id = docs_we_want.pop()
             logger.info("Fetching blob (%d/%d): %s" % (i, total, blob_id))
-            d = with_retry(self.get, blob_id, namespace)
-            d.addCallbacks(release, release)
+            d = semaphore.run(with_retry, self.get, blob_id, namespace)
             deferreds.append(d)
-        yield defer.gatherResults(deferreds)
+        yield defer.gatherResults(deferreds, consumeErrors=True)
 
     @defer.inlineCallbacks
     def sync(self, namespace=''):
