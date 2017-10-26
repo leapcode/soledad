@@ -122,7 +122,7 @@ package:amd64_buster:
   variables:
     ARCH: "amd64"
     DIST: "buster"
-    REPONAMES: "platform,client"
+    REPONAMES: "client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
     # Also, ignore the `build-depends-on-obsolete-package` tag
@@ -135,7 +135,7 @@ package:amd64_zesty:
   variables:
     ARCH: "amd64"
     DIST: "zesty"
-    REPONAMES: "platform,client"
+    REPONAMES: "client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
     LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages,standards-version"
@@ -145,7 +145,7 @@ package:amd64_artful:
   variables:
     ARCH: "amd64"
     DIST: "artful"
-    REPONAMES: "platform,client"
+    REPONAMES: "client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
     LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages --suppress-tags build-depends-on-obsolete-package"
