@@ -102,9 +102,9 @@ package:amd64_jessie:
     ARCH: "amd64"
     DIST: "jessie"
     REPONAMES: "platform,client"
-      # Default is to fail on warnings, we disable it here
+    # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "-X filename-length"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
   <<: *package
 
 
@@ -115,7 +115,7 @@ package:amd64_stretch:
     REPONAMES: "platform,client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "-X filename-length"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
   <<: *package
 
 package:amd64_buster:
@@ -128,7 +128,7 @@ package:amd64_buster:
     # Also, ignore the `build-depends-on-obsolete-package` tag
     # until we can deprecate jessie and take out the dh-systemd
     # build-depends (see #8963)
-    LINTIAN_OPTS: "-X filename-length --suppress-tags build-depends-on-obsolete-package"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages --suppress-tags build-depends-on-obsolete-package"
   <<: *package
 
 package:amd64_zesty:
@@ -136,9 +136,19 @@ package:amd64_zesty:
     ARCH: "amd64"
     DIST: "zesty"
     REPONAMES: "platform,client"
-      # Default is to fail on warnings, we disable it here
+    # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "-X filename-length"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
+  <<: *package
+
+package:amd64_artful:
+  variables:
+    ARCH: "amd64"
+    DIST: "artful"
+    REPONAMES: "platform,client"
+    # Default is to fail on warnings, we disable it here
+    # unless a manpage is included (see #8895)
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
   <<: *package
 
 

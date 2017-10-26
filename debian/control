@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Micah Anderson <micah@debian.org>
 Uploaders: LEAP automated build <sysdev@leap.se>
 Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), python-wheel, debhelper (>= 9), dh-python, dh-systemd
-Standards-Version: 4.1.0
+Standards-Version: 4.1.1
 
 Package: soledad-server
 Architecture: all
