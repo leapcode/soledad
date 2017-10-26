@@ -104,7 +104,7 @@ package:amd64_jessie:
     REPONAMES: "platform,client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages,standards-version"
   <<: *package
 
 
@@ -115,7 +115,7 @@ package:amd64_stretch:
     REPONAMES: "platform,client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages,standards-version"
   <<: *package
 
 package:amd64_buster:
@@ -138,7 +138,7 @@ package:amd64_zesty:
     REPONAMES: "platform,client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages,standards-version"
   <<: *package
 
 package:amd64_artful:
