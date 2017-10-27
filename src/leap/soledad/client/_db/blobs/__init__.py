@@ -107,6 +107,9 @@ class BlobManager(BlobsSynchronizer):
     The BlobManager can list, put, get, set flags and synchronize blobs stored
     in local and remote storages.
     """
+    max_decrypt_retries = 3
+    concurrent_transfers_limit = 3
+    concurrent_writes_limit = 100
 
     def __init__(
             self, local_path, remote, key, secret, user, token=None,
@@ -128,9 +131,6 @@ class BlobManager(BlobsSynchronizer):
         :type cert_file: str
         """
         super(BlobsSynchronizer, self).__init__()
-        self.max_retries = 3
-        self.concurrent_transfers_limit = 3
-        self.concurrent_writes_limit = 100
         if local_path:
             mkdir_p(os.path.dirname(local_path))
             self.local = SQLiteBlobBackend(local_path, key=key, user=user)
@@ -307,22 +307,23 @@ class BlobManager(BlobsSynchronizer):
             _, retries = yield self.local.get_sync_status(blob_id)
 
             if isinstance(e, InvalidBlob):
+                max_retries = self.max_decrypt_retries
                 message = "Corrupted blob received from server! ID: %s\n"
                 message += "Error: %r\n"
                 message += "Retries: %s - Attempts left: %s\n"
                 message += "This is either a bug or the contents of the "
                 message += "blob have been tampered with. Please, report to "
                 message += "your provider's sysadmin and submit a bug report."
-                message %= (blob_id, e, retries, (self.max_retries - retries))
+                message %= (blob_id, e, retries, (max_retries - retries))
                 logger.error(message)
 
-            yield self.local.increment_retries(blob_id)
+                yield self.local.increment_retries(blob_id)
 
-            if (retries + 1) >= self.max_retries:
-                failed_download = SyncStatus.FAILED_DOWNLOAD
-                yield self.local.update_sync_status(
-                    blob_id, failed_download, namespace=namespace)
-                raise MaximumRetriesError(e)
+                if (retries + 1) >= max_retries:
+                    failed_download = SyncStatus.FAILED_DOWNLOAD
+                    yield self.local.update_sync_status(
+                        blob_id, failed_download, namespace=namespace)
+                    raise MaximumRetriesError(e)
 
             raise RetriableTransferError(e)
 

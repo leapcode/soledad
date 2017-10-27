@@ -22,7 +22,7 @@ from twisted.internet import reactor
 from twisted.logger import Logger
 from twisted.internet import error
 from .sql import SyncStatus
-from .errors import MaximumRetriesError, RetriableTransferError
+from .errors import RetriableTransferError
 logger = Logger()
 
 
@@ -90,18 +90,8 @@ class BlobsSynchronizer(object):
         logger.info("Sending blob to server (%d/%d): %s"
                     % (i, total, blob_id))
         fd = yield self.local.get(blob_id, namespace=namespace)
-        try:
-            yield self._encrypt_and_upload(blob_id, fd)
-            yield self.local.update_sync_status(blob_id, SyncStatus.SYNCED)
-        except Exception as e:
-            yield self.local.increment_retries(blob_id)
-            res = yield self.local.get_sync_status(blob_id)
-            _, retries = res
-            if (retries + 1) > self.max_retries:
-                failed_upload = SyncStatus.FAILED_UPLOAD
-                yield self.local.update_sync_status(blob_id, failed_upload)
-                raise MaximumRetriesError(e)
-            raise e
+        yield self._encrypt_and_upload(blob_id, fd)
+        yield self.local.update_sync_status(blob_id, SyncStatus.SYNCED)
 
     @defer.inlineCallbacks
     def fetch_missing(self, namespace=''):
