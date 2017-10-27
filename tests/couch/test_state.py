@@ -47,7 +47,7 @@ class CouchDesignDocsTests(CouchDBTestCase):
         mocked_reactor = mock.Mock()
         yield check_schema_versions(
             self.couch_url, agent=self.agent, reactor=mocked_reactor)
-        self.assertTrue(mocked_reactor.stop.call_count == 1)
+        mocked_reactor.stop.assert_called()
 
     @defer.inlineCallbacks
     def test__check_db_schema_version_missing_config_doc_raises(self):
@@ -62,4 +62,4 @@ class CouchDesignDocsTests(CouchDBTestCase):
         mocked_reactor = mock.Mock()
         yield check_schema_versions(
             self.couch_url, agent=self.agent, reactor=mocked_reactor)
-        self.assertTrue(mocked_reactor.stop.call_count == 1)
+        mocked_reactor.stop.assert_called()

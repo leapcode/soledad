@@ -93,9 +93,8 @@ def _check_db_schema_version(url, db, auth, agent=None):
 
 
 def _stop(failure, reactor):
-    exception = failure.value.subFailure.value
     logger.error("Failure while checking schema versions: %r - %s"
-                 % (exception, exception.message))
+                 % (failure, failure.message))
     reactor.addSystemEventTrigger('after', 'shutdown', os._exit, 1)
     reactor.stop()
 
@@ -124,9 +123,9 @@ def check_schema_versions(couch_url, agent=None, reactor=reactor):
         if not db.startswith('user-'):
             continue
         d = semaphore.run(_check_db_schema_version, url, db, auth, agent=agent)
+        d.addErrback(_stop, reactor=reactor)
         deferreds.append(d)
     d = defer.gatherResults(deferreds, consumeErrors=True)
-    d.addErrback(_stop, reactor=reactor)
     yield d
 
 
