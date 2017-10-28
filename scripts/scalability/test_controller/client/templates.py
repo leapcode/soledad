@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
-import base64
-import errno
 import mock
 import os
-import random
 
 from argparse import ArgumentParser
 from io import BytesIO
@@ -13,6 +10,8 @@ from tempfile import mkdtemp
 from twisted.internet import reactor, defer
 
 from leap.soledad.client._db.blobs import BlobManager
+
+from test_controller.utils import mkdir_p, payload
 
 
 DEFAULT_TARGET_DIR = './blob-templates'
@@ -33,26 +32,9 @@ def _get_encrypt_function(user, path):
     return manager._encrypt_and_upload
 
 
-def payload(size):
-    random.seed(1337)  # same seed to avoid different bench results
-    payload_bytes = bytearray(random.getrandbits(8) for _ in xrange(size))
-    # encode as base64 to avoid ascii encode/decode errors
-    return base64.b64encode(payload_bytes)[:size]  # remove b64 overhead
-
-
 def _encrypt(path, data):
     encrypt = _get_encrypt_function('user-0', path)
     return encrypt('blob', BytesIO(data))
-
-
-def mkdir_p(path):
-    try:
-        os.makedirs(path)
-    except OSError as exc:  # Python >2.5
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
 
 
 def create_blob_templates(target_dir, amount, size):

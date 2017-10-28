@@ -43,9 +43,12 @@ import psutil
 from twisted.application import service, internet
 from twisted.web import resource, server
 from twisted.internet.task import LoopingCall
+from twisted.internet.threads import deferToThread
 from twisted.logger import Logger
 
 from test_controller.server.user_dbs import ensure_dbs
+from test_controller.server.blobs import create_blobs
+from test_controller.server.blobs import delete_blobs
 
 
 DEFAULT_HTTP_PORT = 7001
@@ -224,6 +227,33 @@ class SetupResource(resource.Resource):
         request.finish()
 
 
+class BlobsResource(resource.Resource):
+
+    def render_POST(self, request):
+        action = (request.args.get('action') or ['create']).pop()
+        amount = int((request.args.get('amount') or [1000]).pop())
+        size = int((request.args.get('size') or [1000]).pop())
+        if action == 'create':
+            d = deferToThread(create_blobs, '/tmp/soledad-server/blobs',
+                              amount, size)
+        elif action == 'delete':
+            d = deferToThread(delete_blobs, '/tmp/soledad-server/blobs')
+        d.addCallback(self._success, request)
+        d.addErrback(self._error, request)
+        return server.NOT_DONE_YET
+
+    def _success(self, _, request):
+        request.write(SUCCESS)
+        request.finish()
+
+    def _error(self, e, request):
+        message = e.getErrorMessage() if e.getErrorMessage() else repr(e)
+        logger.error('Error processing request: %s' % message)
+        request.setResponseCode(500)
+        request.write(json.dumps({'error': str(e)}))
+        request.finish()
+
+
 class Root(resource.Resource):
 
     def __init__(self):
@@ -231,6 +261,7 @@ class Root(resource.Resource):
         self.putChild('mem', MonitorResource(MemoryWatcher))
         self.putChild('cpu', MonitorResource(CpuWatcher))
         self.putChild('setup', SetupResource())
+        self.putChild('blobs', BlobsResource())
 
 
 application = service.Application("Resource Monitor")
