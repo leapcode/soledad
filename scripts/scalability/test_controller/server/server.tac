@@ -49,6 +49,7 @@ from twisted.logger import Logger
 from test_controller.server.user_dbs import ensure_dbs
 from test_controller.server.blobs import create_blobs
 from test_controller.server.blobs import delete_blobs
+from test_controller.server.utils import get_soledad_server_pid
 
 
 DEFAULT_HTTP_PORT = 7001
@@ -62,6 +63,9 @@ logger = Logger(__name__)
 #
 
 class ResourceWatcher(object):
+    """
+    A generic system resource watcher. Real watchers inherit from this class.
+    """
 
     def __init__(self, pid):
         logger.info('%s started for process with PID %d'
@@ -95,6 +99,9 @@ class ResourceWatcher(object):
 
 
 class CpuWatcher(ResourceWatcher):
+    """
+    A watcher that trackes cpu usage of a process.
+    """
 
     interval = 1
 
@@ -118,6 +125,9 @@ def _std(l):
 
 
 class MemoryWatcher(ResourceWatcher):
+    """
+    A watcher that tracks the memory usage of a process.
+    """
 
     interval = 0.1
 
@@ -161,7 +171,9 @@ class InvalidPidError(Exception):
 
 class MonitorResource(resource.Resource):
     """
-    A generic resource-monitor web resource.
+    A generic web resource to monitor system resources. Which system resource
+    it allows monitoring depends on the watcher class passed to the
+    constructor.
     """
 
     isLeaf = 1
@@ -173,7 +185,7 @@ class MonitorResource(resource.Resource):
 
     def _get_pid(self, request):
         if 'pid' not in request.args:
-            raise MissingPidError()
+            return get_soledad_server_pid()
         pid = request.args['pid'].pop()
         if not pid.isdigit():
             raise InvalidPidError(pid)
@@ -206,7 +218,11 @@ class MonitorResource(resource.Resource):
             self.watcher.stop()
 
 
-class SetupResource(resource.Resource):
+class UsersResource(resource.Resource):
+    """
+    Allow controlling the creation of server-side user databases and access
+    tokens.
+    """
 
     def render_POST(self, request):
         create = request.args.get('create') or [1000]
@@ -228,6 +244,9 @@ class SetupResource(resource.Resource):
 
 
 class BlobsResource(resource.Resource):
+    """
+    Allow controlling the creation and deletion of server-side blobs.
+    """
 
     def render_POST(self, request):
         action = (request.args.get('action') or ['create']).pop()
@@ -255,12 +274,15 @@ class BlobsResource(resource.Resource):
 
 
 class Root(resource.Resource):
+    """
+    The root resource that gives access to all others.
+    """
 
     def __init__(self):
         resource.Resource.__init__(self)
         self.putChild('mem', MonitorResource(MemoryWatcher))
         self.putChild('cpu', MonitorResource(CpuWatcher))
-        self.putChild('setup', SetupResource())
+        self.putChild('users', UsersResource())
         self.putChild('blobs', BlobsResource())
 
 

@@ -15,6 +15,7 @@ from urlparse import urljoin
 from twisted.internet import reactor, defer
 from twisted.logger import Logger
 
+
 COUCH_URL = "http://127.0.0.1:5984"
 CREATE = 1000
 
@@ -56,10 +57,10 @@ def _req(method, *args, **kwargs):
 
 
 @defer.inlineCallbacks
-def delete_dbs(dbs):
+def delete_dbs(couch_url, dbs):
     deferreds = []
     for db in dbs:
-        d = semaphore.run(_req, 'delete', urljoin(COUCH_URL, db))
+        d = semaphore.run(_req, 'delete', urljoin(couch_url, db))
         logfun = partial(_log, 'table', db, 'deleted')
         d.addCallback(logfun)
         deferreds.append(d)
@@ -69,10 +70,10 @@ def delete_dbs(dbs):
 
 
 @defer.inlineCallbacks
-def create_dbs(dbs):
+def create_dbs(couch_url, dbs):
     deferreds = []
     for db in dbs:
-        d = semaphore.run(_req, 'put', urljoin(COUCH_URL, db))
+        d = semaphore.run(_req, 'put', urljoin(couch_url, db))
         logfun = partial(_log, 'table', db, 'created')
         d.addCallback(logfun)
         deferreds.append(d)
@@ -98,13 +99,13 @@ def _create_token(res, url, user_id):
     defer.returnValue(res)
 
 
-def create_tokens(create):
+def create_tokens(couch_url, create):
     deferreds = []
     tokens_db = _get_tokens_db_name()
     for i in xrange(create):
         user_id = str(i)
         token = sha512('%s-token' % user_id).hexdigest()
-        url = '/'.join([COUCH_URL, tokens_db, token])
+        url = '/'.join([couch_url, tokens_db, token])
         d = semaphore.run(_req, 'get', url)
         d.addCallback(_create_token, url, user_id)
         logfun = partial(_log, 'token', user_id, 'created')
@@ -115,15 +116,15 @@ def create_tokens(create):
 
 @defer.inlineCallbacks
 def ensure_dbs(couch_url=COUCH_URL, create=CREATE):
-    dbs = get_db_names(create)
-    yield delete_dbs(dbs)
-    yield create_dbs(dbs)
-    yield create_tokens(create)
+    # dbs = get_db_names(create)
+    # yield delete_dbs(couch_url, dbs)
+    # yield create_dbs(couch_url, dbs)
+    yield create_tokens(couch_url, create)
 
 
 @defer.inlineCallbacks
 def main(couch_url, create):
-    yield ensure_dbs(couch_url, create)
+    yield ensure_dbs(couch_url=couch_url, create=create)
     reactor.stop()
 
 
