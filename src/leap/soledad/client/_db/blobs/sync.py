@@ -126,3 +126,7 @@ class BlobsSynchronizer(object):
             yield self.send_missing(namespace)
         except defer.FirstError as e:
             e.subFailure.raiseException()
+
+    @property
+    def sync_progress(self):
+        return self.local.get_sync_progress()

@@ -128,6 +128,22 @@ class BlobManagerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_sync_progress(self):
+        deferreds = []
+        local = self.manager.local
+        pending_download = SyncStatus.PENDING_DOWNLOAD
+        pending_upload = SyncStatus.PENDING_UPLOAD
+        synced = SyncStatus.SYNCED
+        for status in [pending_download, pending_upload, synced, synced]:
+            deferreds.append(local.update_sync_status(uuid4().hex, status))
+        yield defer.gatherResults(deferreds)
+
+        progress = yield self.manager.sync_progress
+        self.assertEquals(progress, {
+            'PENDING_DOWNLOAD': 1, 'PENDING_UPLOAD': 1, 'SYNCED': 2})
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_duplicated_blob_error_on_put(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         content, existing_id = "Blob content", uuid4().hex

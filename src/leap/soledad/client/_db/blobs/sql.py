@@ -105,6 +105,20 @@ class SQLiteBlobBackend(object):
             defer.returnValue((result[0][0], result[0][1]))
 
     @defer.inlineCallbacks
+    def get_sync_progress(self):
+        query = 'SELECT sync_status, COUNT(sync_status) FROM sync_state'
+        query += ' GROUP BY sync_status'
+
+        def by_value(value):
+            statuses = SyncStatus.__dict__.items()
+            return filter(lambda x: x[1] == value, statuses)[0][0]
+        result = yield self.dbpool.runQuery(query)
+        if result:
+            defer.returnValue(dict([(by_value(r[0]), r[1]) for r in result]))
+        else:
+            defer.returnValue([])
+
+    @defer.inlineCallbacks
     def list(self, namespace=''):
         query = 'select blob_id from blobs where namespace = ?'
         values = (namespace,)
