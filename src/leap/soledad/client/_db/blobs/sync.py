@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# _blobs.py
+# sync.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -37,6 +37,11 @@ MAX_WAIT = 60  # In seconds. Max time between retries
 
 @defer.inlineCallbacks
 def with_retry(func, *args, **kwargs):
+    """
+    Run func repeatedly until success, as long as the exception raised is
+    a "retriable error". If an exception of another kind is raised by func,
+    the retrying stops and that exception is propagated up the stack.
+    """
     retry_wait = 1
     retriable_errors = (error.ConnectError, error.ConnectionClosed,
                         RetriableTransferError,)

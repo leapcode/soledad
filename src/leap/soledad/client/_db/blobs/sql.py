@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# _blobs.py
+# sql.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
@@ -78,14 +78,6 @@ class SQLiteBlobBackend(object):
         irow = yield self.dbpool.insertAndGetLastRowid(insert, values)
         yield self.dbpool.write_blob('blobs', 'payload', irow, blob_fd)
         logger.info("Finished saving blob in local database.")
-        """
-        # set as synced if it was pending
-        previous_state = yield self.get_sync_status(blob_id)
-        unavailable = SyncStatus.UNAVAILABLE_STATUSES
-        if previous_state and previous_state[0] in unavailable:
-            status = SyncStatus.SYNCED
-        yield self.update_sync_status(blob_id, status, namespace)
-        """
 
     @defer.inlineCallbacks
     def get(self, blob_id, namespace=''):
