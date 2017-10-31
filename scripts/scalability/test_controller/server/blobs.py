@@ -2,24 +2,28 @@
 
 import shutil
 import os
-
 from argparse import ArgumentParser
-
+from twisted.logger import Logger
 from test_controller.utils import mkdir_p, payload
+
+logger = Logger()
 
 
 def _create_blob(path, data):
-    if not os.path.isfile(path):
-        with open(path, 'w') as f:
-            f.write(data)
+    with open(path, 'w') as f:
+        logger.info('Creating %s' % path)
+        f.write(data)
 
 
 def create_blobs(target_dir, amount, size):
+    delete_blobs(target_dir)
     data = payload(size * 1000)
     for i in xrange(amount):
-        basedir = os.path.join(target_dir, '%d/default/0/0/0' % i)
+        istr = str(i)
+        blob_dir = '%s/%s/%s' % (istr[0], istr[0:3], istr[0:6])
+        basedir = os.path.join(target_dir, '0/default/%s' % blob_dir)
         mkdir_p(basedir)
-        _create_blob(os.path.join(basedir, '0'), data)
+        _create_blob(os.path.join(basedir, str(i)), data)
 
 
 def delete_blobs(target_dir):
@@ -28,6 +32,7 @@ def delete_blobs(target_dir):
     for f in os.listdir(target_dir):
         if f.isdigit():
             directory = os.path.join(target_dir, f)
+            logger.info('Deleting %s' % directory)
             shutil.rmtree(directory)
 
 

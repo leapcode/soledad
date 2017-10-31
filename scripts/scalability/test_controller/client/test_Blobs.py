@@ -37,21 +37,21 @@ def _ensure_template(templates_dir, size):
 
 class Blobs(FunkLoadTestCase):
 
-    next_user_id = 0
+    next_blob_id = 0
     lock = threading.Lock()
 
-    def _get_next_user_id(self):
+    def _get_next_blob_id(self):
         with Blobs.lock:
-            user_id = Blobs.next_user_id
-            Blobs.next_user_id += 1
-            Blobs.next_user_id %= 5000
-        return user_id
+            blob_id = Blobs.next_blob_id
+            Blobs.next_blob_id += 1
+            Blobs.next_blob_id %= 5000
+        return blob_id
 
     def setUp(self):
-        user_id = self._get_next_user_id()
+        blob_id = self._get_next_blob_id()
         base_url = self.conf_get('main', 'url')
-        self.url = urlparse.urljoin(base_url, 'blobs/%s/0' % user_id)
-        self.setHeader('Authorization', _get_auth_header(user_id))
+        self.url = urlparse.urljoin(base_url, 'blobs/0/%d' % blob_id)
+        self.setHeader('Authorization', _get_auth_header('0'))
         templates_dir = self.conf_get('main', 'templates_dir')
         size = self.conf_getInt('main', 'size')
         fpath = _ensure_template(templates_dir, size)

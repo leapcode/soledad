@@ -1,0 +1,4 @@
+test_controller/client/results/*
+test_controller/client/logs/*
+test_controller/client/test_download*
+test_controller/client/test_upload*

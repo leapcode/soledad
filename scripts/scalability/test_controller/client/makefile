@@ -25,8 +25,9 @@
 # run `make`.
 
 
-URI    = https://giraffe.cdev.bitmask.net:7001
-CREATE = 5000
+URI   ?= https://giraffe.cdev.bitmask.net:7001
+BLOBS ?= 10000
+SIZE  ?= 10
 
 
 #------------------#
@@ -51,12 +52,10 @@ bench-download: create-users create-blobs
 
 # for quick tests only
 bench-upload-quick: create-users delete-blobs
-	 curl -X POST "$(URI)/blobs?action=delete"
 	 fl-run-bench -c 1 --duration 10 -f test_Blobs.py Blobs.test_upload
 
 # for quick tests only
 bench-download-quick: create-users create-blobs
-	 curl -X POST "$(URI)/blobs?action=create&size=10"
 	 fl-run-bench -c 1 --duration 10 -f test_Blobs.py Blobs.test_download
 
 #---------------------#
@@ -81,10 +80,10 @@ stop-mem:
 #--------------#
 
 create-users:
-	 curl -X POST $(URI)/users?create=$(CREATE)
+	 curl -X POST $(URI)/users?create=1
 
 delete-blobs:
 	 curl -X POST "$(URI)/blobs?action=delete"
 
 create-blobs:
-	 curl -X POST "$(URI)/blobs?action=create&size=10&amount=5000"
+	 curl -X POST "$(URI)/blobs?action=create&size=$(SIZE)&amount=$(BLOBS)"
