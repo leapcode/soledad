@@ -33,4 +33,4 @@ Make sure an instance of the Test Controller Server is reachable at $(URI),
 and run:
 
   make install-client
-  make run-test
+  make test

@@ -7,7 +7,8 @@
 # See the file README.rst for more information on how to use this makefile.
 
 
-URI ?= https://giraffe.cdev.bitmask.net:7001
+URI  ?= https://giraffe.cdev.bitmask.net:7001
+SIZE ?= 10
 
 PIDFILE = /tmp/test_controller.pid
 LOGFILE = /tmp/test_controller.log
@@ -47,4 +48,4 @@ install-client:
 	pip install ".[client]"
 
 test:
-	(cd test_controller/client && make test URI=$(URI))
+	(cd test_controller/client && make test URI=$(URI) SIZE=$(SIZE))
