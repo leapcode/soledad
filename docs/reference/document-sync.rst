@@ -1,3 +1,5 @@
+.. _document-sync:
+
 Document synchronization
 ========================
 

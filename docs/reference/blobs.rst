@@ -17,3 +17,4 @@ synchronization process.
 
    blobs/server
    blobs/client
+   blobs/sync
