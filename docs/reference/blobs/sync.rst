@@ -19,10 +19,10 @@ Synchronization status
 In the client-side, each has an associated synchronization status, which can be
 one of:
 
-- `SYNCED`: The blob exists both in this client and in the server.
-- `PENDING_UPLOAD`: The blob was inserted locally, but has not yet been uploaded.
-- `PENDING_DOWNLOAD`: The blob exists in the server, but has not yet been downloaded.
-- `FAILED_DOWNLOAD`: A download attempt has been made but the content is corrupted for some reason.
+- ``SYNCED``: The blob exists both in this client and in the server.
+- ``PENDING_UPLOAD``: The blob was inserted locally, but has not yet been uploaded.
+- ``PENDING_DOWNLOAD``: The blob exists in the server, but has not yet been downloaded.
+- ``FAILED_DOWNLOAD``: A download attempt has been made but the content is corrupted for some reason.
 
 Concurrency limits
 ------------------
@@ -41,8 +41,8 @@ the transfer has been successful or until there has been an unrecoverable
 transfer error. Currently, the only unrecoverable transfer error is a failed
 verification of the blob tag (i.e. a failed MAC verification).
 
-Successive transfer attempts have an increasing delay between them, to minimize
-competition for resources used by other concurrent transfer attempts. The delay
-starts with 10 seconds and increases to 20, 30, 40, 50, and finally 60 seconds
-on each new failed attempt. The delay for a new retry then stays at 60 seconds
-for new attempts.
+Successive failed transfer attempts of the same blob are separated by an
+increasing time interval to minimize competition for resources used by other
+concurrent transfer attempts. The interaval starts at 10 seconds and increases
+to 20, 30, 40, 50, and finally 60 seconds. All further retries will be
+separated by a 60 seconds time interval.

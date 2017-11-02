@@ -1,5 +1,5 @@
-Client-side Attachments API
-===========================
+Document Attachments API
+========================
 
 Soledad Documents implement the ``IDocumentWithAttachment`` API that associates
 :ref:`blobs` with documents.

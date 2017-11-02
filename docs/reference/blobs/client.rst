@@ -1,20 +1,47 @@
 Client-side blobs
 =================
 
-On the client-side, blobs can be managed using the BlobManager API.  The
-BlobManager is responsible for managing storage of blobs both in local and
-remote storages
+Data storage
+------------
+
+On the client-side, blobs can be managed using the ``BlobManager`` API, which
+is responsible for managing storage of blobs both in local and remote storages.
+See :ref:`blobmanager-api` and :ref:`blobs-sync-api` for information on the
+client-side API.
 
 All data is stored locally in the ``blobs`` table of a SQLCipher database
 called ``{uuid}_blobs.db`` that lies in the same directory as the Soledad
-Client's JSON documents database. Both databases are encrypted with the same
-symmetric secret. All actions performed locally are mirrored remotelly using
-the :ref:`http-blobs-api`.
+Client's JSON documents database (see :ref:`client-databases`). All actions
+performed locally are mirrored remotelly using the :ref:`blobs-http-api`.
 
-The BlobManager supports *namespaces* and *flags* and can list local and remote
-blobs, possibly filtering by flags and ordering by date (increasingly or
-decreasingly). It has helper methods to send or fetch all missing blobs, thus
-aiding in synchronization of local and remote data.
+Namespaces
+----------
+
+The Blobs API supports **namespaces** so that applications can store and fetch
+blobs without interfering in each another. Namespaces are also used to
+implement the server-side :ref:`incoming-http-api`, used for mail delivery. All
+methods that deal with blobs storage, transfer and flagging provide
+a `namespace` parameter. If no namespace is given, the value `default` is used.
+
+Remote flags
+------------
+
+In order to allow clients to control the processing of blobs that are delivered
+by external applications, the Blobs API has the concept of **remote flags**.
+The client can get and set the following flags for Blobs that reside in the
+server: ``PENDING``, ``PROCESSING``, ``PROCESSED``, and ``FAILED``.
+
+Remote listing
+--------------
+
+The client can obtain a list of blobs in the server side so it can compare with
+its own local list and queue up blobs for download and upload. The remote
+listing can be ordered by *upload date* and filtered by *namespace* and *flag*.
+The listing can also only return the number of matches instead of the whole
+content.
+
+Client-side encryption
+----------------------
 
 When uploading, the content of the blob is encrypted with a symmetric secret
 prior to being sent to the server. When downloading, the content of the blob is

@@ -15,26 +15,38 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-Blobs exceptions
+This module contains the different errors that can happen when dealing with
+blobs.
 """
 from leap.soledad.common.errors import SoledadError
 
 
 class BlobAlreadyExistsError(SoledadError):
-    pass
+    """
+    Raised on attempts to put local or remote blobs that already exist in
+    storage.
+    """
 
 
 class BlobNotFoundError(SoledadError):
-    pass
+    """
+    Raised on attemtps to get remote blobs that do not exist in storage.
+    """
 
 
 class InvalidFlagsError(SoledadError):
-    pass
+    """
+    Raised on attempts to set invalid flags for remotelly stored blobs.
+    """
 
 
 class RetriableTransferError(Exception):
-    pass
+    """
+    Raised for any blob transfer error that is considered retriable.
+    """
 
 
 class MaximumRetriesError(Exception):
-    pass
+    """
+    Raised when the maximum number of transfer retries has been reached.
+    """

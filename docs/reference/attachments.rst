@@ -26,7 +26,7 @@ Server-side
 -----------
 
 In the server, attachments are stored as :ref:`blobs`. See
-:ref:`http-blobs-api` for more information on how to interact with the server
+:ref:`blobs-http-api` for more information on how to interact with the server
 using HTTP.
 
 The :ref:`IBlobsBackend <i-blobs-backend>` interface is provided, so in the

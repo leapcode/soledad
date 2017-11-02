@@ -5,5 +5,6 @@ API Reference
    :maxdepth: 1
 
    api/client
-   api/blobs
    api/attachments
+   api/blobs-client
+   api/blobs-server
