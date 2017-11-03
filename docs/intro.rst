@@ -14,7 +14,7 @@ Key aspects of Soledad include:
   <soledad-server>` and a :ref:`client application library <soledad-client>`.
 
 * **Client-side encrypted sync:** Soledad puts very little trust in the server
-  by :ref:`encrypting all data <document-encryption>` before it is
+  by :ref:`encrypting all data <client-encryption>` before it is
   :ref:`synchronized <document-sync>` to the server and by limiting ways in
   which the server can modify the user’s data.
 

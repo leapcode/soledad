@@ -9,7 +9,7 @@ Soledad follows `the U1DB synchronization protocol
 * A synchronization always happens between the Soledad Server and one Soledad
   Client. Many clients can synchronize with the same server.
 
-* Soledad Client :ref:`always encrypts <document-encryption>` before sending
+* Soledad Client :ref:`always encrypts <client-encryption>` before sending
   data to the server.
 
 * Soledad Client refuses to receive a document if it is encrypted and the MAC

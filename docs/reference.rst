@@ -10,7 +10,7 @@ This page gathers reference documentation to understanding the internals of Sole
    reference/storage-secrets
    reference/server-database
    reference/client-database
-   reference/document-encryption
+   reference/client-encryption
    reference/document-sync
    reference/auth
    reference/blobs

@@ -7,7 +7,7 @@ These are some important information about Soledad's client-side databases:
 
 - Soledad Client uses `SQLCipher <https://www.zetetic.net/sqlcipher/>`_ for
   storing data.
-- :ref:`Documents <document-encryption>` and :ref:`blobs <blobs>` are stored in
+- :ref:`Documents <client-encryption>` and :ref:`blobs <blobs>` are stored in
   different databases protected with the same symmetric key.
 - The symmetric key used to unlock databases is chosen randomly and is stored
   encrypted by the user's passphrase (see :ref:`storage-secrets` for more details).
