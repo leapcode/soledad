@@ -15,12 +15,35 @@ Immutability brings some characteristics to the blobs system:
 - There's no need for storage of versions or revisions.
 - Updating is not possible (you would need to delete and recreate a blob).
 
-Client-side encryption
-----------------------
+Client-side encryption and authentication
+-----------------------------------------
 
-Blobs are encrypted before being sent to the server and decrypted after being
-received. A MAC is also calculated to authenticate the contents of each blob.
-See :ref:`client-encryption` for more details of how this is done.
+When uploading, the content of the blob is encrypted with a symmetric secret
+prior to being sent to the server. When downloading, the content of the blob is
+decrypted accordingly. See :ref:`client-encryption` for more details.
+
+When a blob is uploaded by a client, a preamble is created and prepended to the
+encrypted content. The preamble is an encoded struct that contains the
+following metadata:
+
+- A 2 character **magic hexadecimal number** for easy identification of a Blob
+  data type. Currently, the value used for the magic number is: ``\x13\x37``.
+- The **cryptographic scheme** used for encryption. Currently, the only valid
+  schemes are ``symkey`` and ``external``.
+- The **encryption method** used. Currently, the only valid methods are
+  ``aes_256_gcm`` and ``pgp``.
+- The **initialization vector**.
+- The **blob_id**.
+- The **revision**, which is a fixed value (``ImmutableRev``) in the case of
+  blobs.
+- The **size** of the blob.
+
+The final format of a blob that is uploaded to the server is the following:
+
+- The URL-safe base64-encoded **preamble** (see above).
+- A space to act as a **separator**.
+- The URL-safe base64-encoded concatenated **encrypted data and MAC tag**.
+
 
 Synchronization status
 ----------------------
