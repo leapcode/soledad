@@ -3,10 +3,10 @@ Blobs Server-side HTTP API
 
 Soledad Server provides two different REST APIs for interacting with blobs:
 
-* A *public* :ref:`blobs-http-api`, providing the *Blobs* service for Soledad
+* A :ref:`blobs-http-api`, providing the *Blobs* service for Soledad
   Client (i.e. actual users of the infrastructure).
 
-* A *local* :ref:`incoming-http-api`, providing the delivery part of the
+* A :ref:`incoming-http-api`, providing the delivery part of the
   :ref:`incoming-box` service, currently used for the MX mail delivery.
 
 Authentication is handled differently for each of the endpoints, see
@@ -35,15 +35,22 @@ path                        method     action                            accepte
 ``/blobs/{uuid}/{blob_id}`` ``DELETE`` Delete a blob.                    ``namespace``
 =========================== ========== ================================= ============================================
 
+When listing blobs, results can be filtered and ordered by using different
+query string parameters. See the table above for accepted query string fields
+for each action.
+
 The Blobs service supports *namespaces*. All requests can be modified by the
 ``namespace`` query string parameter, and the results will be restricted to
 a certain namespace. When no namespace explicitelly given, the ``default``
 namespace is used.
 
-When listing blobs, the results can be filtered by flag and/or ordered by date
-using the ``filter_flag`` and ``order_by`` query string parameters. The
-possible values for ``order_by`` are ``date`` or ``+date`` for increasing
-order, or ``-date`` for decreasing order.
+Listing results can be filtered by flags using the ``filter_flag`` query string
+parameter. Currently valid values for flags ``PENDING``, ``PROCESSING``,
+``PROCESSED``, and ``FAILED``.
+
+Also, results can be ordered by date using the ``order_by`` query string
+parameters. The possible values for ``order_by`` are ``date`` or ``+date`` for
+increasing order, or ``-date`` for decreasing order.
 
 .. _incoming-http-api:
 

@@ -9,10 +9,10 @@ HTTP APIs
 
 Soledad Server provides two different REST APIs for interacting with blobs:
 
-* A *public* :ref:`blobs-http-api`, providing the *Blobs* service for Soledad
+* A :ref:`blobs-http-api`, providing the *Blobs* service for Soledad
   Client (i.e. actual users of the infrastructure).
 
-* A *local* :ref:`incoming-http-api`, providing the delivery part of the
+* A :ref:`incoming-http-api`, providing the delivery part of the
   :ref:`incoming-box` service, currently used for the MX mail delivery.
 
 Authentication is handled differently for each of the endpoints, see
