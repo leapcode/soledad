@@ -96,6 +96,8 @@ e2e:
       - '*_amd64.changes'
       - '*.deb'
       - 'results/*'
+  cache:
+    policy: pull
 
 package:amd64_jessie:
   variables:
