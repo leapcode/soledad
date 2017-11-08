@@ -19,14 +19,19 @@ Local blobs backend on SQLCipher
 """
 import os
 import binascii
+
 from functools import partial
+from io import BytesIO
+from pysqlcipher import dbapi2
 from twisted.internet import defer
 from twisted.logger import Logger
 from twisted.enterprise import adbapi
+
 from leap.common.files import mkdir_p
+
 from .. import sqlcipher
 from .. import pragmas
-from io import BytesIO
+
 logger = Logger()
 
 
@@ -225,6 +230,8 @@ def _init_blob_table(conn):
 
 class ConnectionPool(adbapi.ConnectionPool):
 
+    timeout_retries = 20
+
     def insertAndGetLastRowid(self, *args, **kwargs):
         """
         Execute an SQL query and return the last rowid.
@@ -279,3 +286,26 @@ class ConnectionPool(adbapi.ConnectionPool):
         # TODO: should not use transaction private variable here
         handle = trans._connection.blob(table, column, irow, flags)
         return handle
+
+    def _runInteraction(self, interaction, *args, **kwargs):
+        # interaction timeouts are expected for slower machines and lengthy
+        # operations because we usually launch several concurrent connections
+        # to the sqlcipher backend. The construction below will retry the
+        # interaction a number of times before failing in the case of locked
+        # database.
+        retries = self.timeout_retries
+        while True:
+            retries -= 1
+            try:
+                method = adbapi.ConnectionPool._runInteraction
+                return method(self, interaction, *args, **kwargs)
+            except dbapi2.OperationalError as e:
+                if e.message != 'database is locked':
+                    # raise if the exception is not about a locked database
+                    raise e
+                if not retries:
+                    # raise if we had already retried enough times
+                    logger.warn('database operation timed out, giving up!')
+                    raise e
+                # log and try again if we can still retry
+                logger.warn('database operation timed out, trying again...')
