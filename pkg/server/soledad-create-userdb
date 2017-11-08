@@ -21,7 +21,6 @@ import netrc
 import argparse
 from leap.soledad.common.couch import CouchDatabase
 from leap.soledad.common.couch.state import is_db_name_valid
-from leap.soledad.common.couch import list_users_dbs
 from leap.soledad.server._config import get_config
 
 
@@ -36,8 +35,6 @@ parser = argparse.ArgumentParser(description=description)
 parser.add_argument('dbname', metavar='user-d34db33f', type=str,
                     default='', nargs='?',
                     help='database name on the format user-{uuid4}')
-parser.add_argument('--migrate-all', action='store_true',
-                    help="recreate all design docs for all existing account")
 CONF = get_config()
 DBCONF = get_config(section='database-security')
 NETRC_PATH = CONF['admin_netrc']
@@ -89,9 +86,4 @@ def ensure_database(dbname):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    if args.migrate_all:
-        couch_url = url_for_db('')
-        for dbname in list_users_dbs(couch_url):
-            ensure_database(dbname)
-    else:
-        ensure_database(args.dbname)
+    ensure_database(args.dbname)
