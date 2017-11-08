@@ -13,6 +13,10 @@ NAME=soledad-server
 %:
 	dh $@ --with python2 --namespace=leap.soledad --buildsystem=pybuild --with=systemd
 
+override_dh_prep:
+	rst2man docs/man/soledad-create-userdb.1.rst docs/man/soledad-create-userdb.1
+	dh_prep
+
 override_dh_installinit:
 	dh_systemd_enable -p${NAME} --name=${NAME} ${NAME}.service
 	dh_installinit -p${NAME} --no-start --noscripts
@@ -21,3 +25,4 @@ override_dh_auto_clean:
 	dh_auto_clean
 	find . -name "*.pyc" -exec rm -rf {} \;
 	find . -name ".tox" -exec rm -rf {} \;
+	rm -f docs/man/soledad-create-userdb.1
