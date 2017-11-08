@@ -106,6 +106,8 @@ extras = {
     'signaling': signaling
 }
 
+soledad_server = 'soledad-server=leap.soledad.server.launcher:run_server'
+
 setup(
     name='leap.soledad',
     version=versioneer.get_version(),
@@ -129,5 +131,6 @@ setup(
     package_dir={'': 'src'},
     package_data={'': ["*.sql"]},
     install_requires=install_requires,
-    extras_require=extras
+    extras_require=extras,
+    entry_points={'console_scripts': [soledad_server]},
 )
