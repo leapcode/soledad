@@ -32,9 +32,8 @@ Creates a user database.
 This is meant to be used by Soledad Server.
 """
 parser = argparse.ArgumentParser(description=description)
-parser.add_argument('dbname', metavar='user-d34db33f', type=str,
-                    default='', nargs='?',
-                    help='database name on the format user-{uuid4}')
+parser.add_argument('dbname', type=str,
+                    help='database name on the format user-{user_id}')
 CONF = get_config()
 DBCONF = get_config(section='database-security')
 NETRC_PATH = CONF['admin_netrc']
