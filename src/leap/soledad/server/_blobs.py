@@ -70,6 +70,9 @@ class FilesystemBlobsBackend(object):
             os.makedirs(blobs_path)
         self.path = blobs_path
 
+    def __touch(self, path):
+        open(path, 'a')
+
     def read_blob(self, user, blob_id, request, namespace=''):
         logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
         path = self._get_path(user, blob_id, namespace)
@@ -138,6 +141,7 @@ class FilesystemBlobsBackend(object):
             os.unlink(blob_path + '.flags')
         except Exception:
             pass
+        self.__touch(blob_path + '.deleted')
 
     def get_blob_size(user, blob_id, namespace=''):
         raise NotImplementedError
@@ -150,13 +154,18 @@ class FilesystemBlobsBackend(object):
         return json.dumps({"count": count})
 
     def list_blobs(self, user, request, namespace='', order_by=None,
-                   filter_flag=False):
+                   deleted=False, filter_flag=False):
         namespace = namespace or 'default'
         blob_ids = []
         base_path = self._get_path(user, namespace=namespace)
+
+        def match(name):
+            if deleted:
+                return name.endswith('.deleted')
+            return VALID_STRINGS.match(name)
         for root, dirs, filenames in os.walk(base_path):
             blob_ids += [os.path.join(root, name) for name in filenames
-                         if not name.endswith('.flags')]
+                         if match(name)]
         if order_by in ['date', '+date']:
             blob_ids.sort(key=lambda x: os.path.getmtime(x))
         elif order_by == '-date':
@@ -165,7 +174,8 @@ class FilesystemBlobsBackend(object):
             raise Exception("Unsupported order_by parameter: %s" % order_by)
         if filter_flag:
             blob_ids = list(self._filter_flag(blob_ids, filter_flag))
-        blob_ids = [os.path.basename(path) for path in blob_ids]
+        blob_ids = [os.path.basename(path).replace('.deleted', '')
+                    for path in blob_ids]
         return json.dumps(blob_ids)
 
     def _filter_flag(self, blob_paths, flag):
@@ -267,8 +277,9 @@ class BlobsResource(resource.Resource):
         elif not blob_id:
             order = request.args.get('order_by', [None])[0]
             filter_flag = request.args.get('filter_flag', [False])[0]
+            deleted = request.args.get('deleted', [False])[0]
             return self._handler.list_blobs(user, request, namespace,
-                                            order_by=order,
+                                            order_by=order, deleted=deleted,
                                             filter_flag=filter_flag)
         only_flags = request.args.get('only_flags', [False])[0]
         if only_flags:

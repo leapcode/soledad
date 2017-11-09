@@ -353,7 +353,9 @@ class BlobServerTestCase(unittest.TestCase):
         yield manager._encrypt_and_upload('blob_id2', BytesIO("2"))
         yield manager._delete_from_remote('blob_id1')
         blobs_list = yield manager.remote_list()
+        deleted_blobs_list = yield manager.remote_list(deleted=True)
         self.assertEquals(set(['blob_id2']), set(blobs_list))
+        self.assertEquals(set(['blob_id1']), set(deleted_blobs_list))
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -367,7 +369,9 @@ class BlobServerTestCase(unittest.TestCase):
                                           namespace=namespace)
         yield manager._delete_from_remote('blob_id1', namespace=namespace)
         blobs_list = yield manager.remote_list(namespace=namespace)
+        deleted_blobs_list = yield manager.remote_list(namespace, deleted=True)
         self.assertEquals(set(['blob_id2']), set(blobs_list))
+        self.assertEquals(set(['blob_id1']), set(deleted_blobs_list))
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")

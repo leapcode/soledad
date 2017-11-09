@@ -159,7 +159,7 @@ class BlobManager(BlobsSynchronizer):
         return self.remote_list(namespace=namespace, only_count=True)
 
     @defer.inlineCallbacks
-    def remote_list(self, namespace='', order_by=None,
+    def remote_list(self, namespace='', order_by=None, deleted=False,
                     filter_flag=False, only_count=False):
         """
         List blobs from server, with filtering and ordering capabilities.
@@ -172,6 +172,9 @@ class BlobManager(BlobsSynchronizer):
             date or +date - Ascending order (older first)
             -date - Descending order (newer first)
         :type order_by: str
+        :param deleted:
+            Optional paramter to return only deleted blobs.
+        :type only_count: bool
         :param filter_flag:
             Optional parameter to filter listing to results containing the
             specified tag.
@@ -188,6 +191,8 @@ class BlobManager(BlobsSynchronizer):
         params = {'namespace': namespace} if namespace else {}
         if order_by:
             params['order_by'] = order_by
+        if deleted:
+            params['deleted'] = deleted
         if filter_flag:
             params['filter_flag'] = filter_flag
         if only_count:
