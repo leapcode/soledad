@@ -58,6 +58,7 @@ def copy_couch_database_for_test(test, db):
                     new_couch_db.put_attachment(new_doc, att,
                                                 filename=att_name)
         elif doc_id.startswith('gen-'):
+            del doc['_rev']
             new_couch_db.save(doc)
     # cleanup connections to prevent file descriptor leaking
     return new_db
