@@ -405,10 +405,15 @@ class BlobManager(BlobsSynchronizer):
 
     @defer.inlineCallbacks
     def _delete(self, blob_id, namespace):
+        logger.info("Marking blobs as PENDING_DELETE: %s" % blob_id)
+        yield self.local.update_sync_status(
+            blob_id, SyncStatus.PENDING_DELETE, namespace=namespace)
         logger.info("Staring deletion of blob: %s" % blob_id)
         yield self._delete_from_remote(blob_id, namespace=namespace)
         if (yield self.local.exists(blob_id, namespace=namespace)):
             yield self.local.delete(blob_id, namespace=namespace)
+        yield self.local.update_sync_status(
+            blob_id, SyncStatus.SYNCED, namespace=namespace)
 
     @defer.inlineCallbacks
     def _delete_from_remote(self, blob_id, namespace=''):

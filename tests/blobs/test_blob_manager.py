@@ -171,6 +171,34 @@ class BlobManagerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_offline_delete_marks_as_pending_download(self):
+        deletion_failure = defer.fail(Exception())
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager._delete_from_remote = Mock(return_value=deletion_failure)
+        content, blob_id = "Blob content", uuid4().hex
+        doc1 = BlobDoc(BytesIO(content), blob_id)
+        yield self.manager.put(doc1, len(content))
+        with pytest.raises(Exception):
+            yield self.manager.delete(blob_id)
+        sync_progress = yield self.manager.sync_progress
+        expected = {'PENDING_DELETE': 1}
+        self.assertEquals(expected, sync_progress)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_online_delete_marks_as_synced(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager._delete_from_remote = Mock(return_value=None)
+        content, blob_id = "Blob content", uuid4().hex
+        doc1 = BlobDoc(BytesIO(content), blob_id)
+        yield self.manager.put(doc1, len(content))
+        yield self.manager.delete(blob_id)
+        sync_progress = yield self.manager.sync_progress
+        expected = {'SYNCED': 1}
+        self.assertEquals(expected, sync_progress)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_local_sync_status_pending_upload(self):
         upload_failure = defer.fail(Exception())
         self.manager._encrypt_and_upload = Mock(return_value=upload_failure)
