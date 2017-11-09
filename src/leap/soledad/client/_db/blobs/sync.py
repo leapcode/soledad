@@ -62,9 +62,14 @@ class BlobsSynchronizer(object):
         d2 = self.local_list(namespace=namespace)
         remote_list, local_list = yield defer.gatherResults([d1, d2])
         pending_download_ids = tuple(set(remote_list) - set(local_list))
+        pending_upload_ids = tuple(set(local_list) - set(remote_list))
         yield self.local.update_batch_sync_status(
             pending_download_ids,
             SyncStatus.PENDING_DOWNLOAD,
+            namespace=namespace)
+        yield self.local.update_batch_sync_status(
+            pending_upload_ids,
+            SyncStatus.PENDING_UPLOAD,
             namespace=namespace)
 
     @defer.inlineCallbacks

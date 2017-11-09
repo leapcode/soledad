@@ -156,9 +156,11 @@ class SQLiteBlobBackend(object):
 
     def update_batch_sync_status(self, blob_id_list, sync_status,
                                  namespace=''):
-        insert = 'INSERT INTO sync_state (blob_id, namespace, sync_status)'
+        if not blob_id_list:
+            return
+        insert = 'INSERT or REPLACE INTO sync_state'
         first_blob_id, blob_id_list = blob_id_list[0], blob_id_list[1:]
-        insert += ' VALUES (?, ?, ?)'
+        insert += ' (blob_id, namespace, sync_status) VALUES (?, ?, ?)'
         values = (first_blob_id, namespace, sync_status)
         for blob_id in blob_id_list:
             insert += ', (?, ?, ?)'
