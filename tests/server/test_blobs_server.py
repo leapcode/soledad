@@ -37,6 +37,7 @@ from leap.soledad.client._db.blobs import SyncStatus
 from leap.soledad.client._db.blobs import RetriableTransferError
 from leap.soledad.client._db.blobs import MaximumRetriesError
 from leap.soledad.client._db import blobs as client_blobs
+from leap.soledad.client._document import BlobDoc
 
 
 def sleep(x):
@@ -321,6 +322,24 @@ class BlobServerTestCase(unittest.TestCase):
         result = yield manager.local.get(blob_id)
         self.assertIsNotNone(result)
         self.assertEquals(result.getvalue(), "X")
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_refresh_deletions_from_server(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, uuid4().hex)
+        self.addCleanup(manager.close)
+        blob_id, content = 'delete_me', 'content'
+        blob_id2 = 'dont_delete_me'
+        doc1 = BlobDoc(BytesIO(content), blob_id)
+        doc2 = BlobDoc(BytesIO(content), blob_id2)
+        yield manager.put(doc1, len(content))
+        yield manager.put(doc2, len(content))
+        yield manager._delete_from_remote(blob_id)  # remote only deletion
+        self.assertTrue((yield manager.local.exists(blob_id)))
+        yield manager.sync()
+        self.assertFalse((yield manager.local.exists(blob_id)))
+        self.assertTrue((yield manager.local.exists(blob_id2)))
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")

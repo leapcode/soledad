@@ -73,6 +73,12 @@ class BlobsSynchronizer(object):
             namespace=namespace)
 
     @defer.inlineCallbacks
+    def _apply_deletions_from_server(self, namespace=''):
+        remote_deletions = self.remote_list(namespace=namespace, deleted=True)
+        remote_deletions = yield remote_deletions
+        yield self.local.batch_delete(remote_deletions)
+
+    @defer.inlineCallbacks
     def send_missing(self, namespace=''):
         """
         Compare local and remote blobs and send what's missing in server.
@@ -131,6 +137,7 @@ class BlobsSynchronizer(object):
     @defer.inlineCallbacks
     def sync(self, namespace=''):
         try:
+            yield self._apply_deletions_from_server(namespace)
             yield self.refresh_sync_status_from_server(namespace)
             yield self.fetch_missing(namespace)
             yield self.send_missing(namespace)

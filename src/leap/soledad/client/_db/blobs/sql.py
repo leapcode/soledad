@@ -190,6 +190,13 @@ class SQLiteBlobBackend(object):
         query = 'DELETE FROM blobs WHERE blob_id = ? AND namespace = ?'
         return self.dbpool.runQuery(query, (blob_id, namespace,))
 
+    def batch_delete(self, blob_id_list, namespace=''):
+        query = 'DELETE FROM blobs WHERE blob_id IN '
+        size = len(blob_id_list)
+        query += ('(%s)' % ', '.join(['?' for _ in range(size)]))
+        values = tuple(blob_id_list)
+        return self.dbpool.runQuery(query, values)
+
 
 def _init_tables(conn):
     # unified init for running under the same lock
