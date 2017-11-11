@@ -77,6 +77,10 @@ class BlobsSynchronizer(object):
         remote_deletions = self.remote_list(namespace=namespace, deleted=True)
         remote_deletions = yield remote_deletions
         yield self.local.batch_delete(remote_deletions)
+        yield self.local.update_batch_sync_status(
+            remote_deletions,
+            SyncStatus.SYNCED,
+            namespace=namespace)
 
     @defer.inlineCallbacks
     def send_missing(self, namespace=''):

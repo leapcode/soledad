@@ -207,7 +207,7 @@ class BlobManager(BlobsSynchronizer):
     def local_list_status(self, status, namespace=''):
         return self.local.list_status(status, namespace)
 
-    def put(self, doc, size, namespace=''):
+    def put(self, doc, size, namespace='', local_only=False):
         """
         Put a blob in local storage and upload it to server.
 
@@ -215,14 +215,16 @@ class BlobManager(BlobsSynchronizer):
         :type doc: leap.soledad.client._document.BlobDoc
         :param size: The size of the blob.
         :type size: int
+        :param local_only: Avoids sync (doesn't send to server).
+        :type local_only: bool
         :param namespace:
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
         """
-        return self.semaphore.run(self._put, doc, size, namespace)
+        return self.semaphore.run(self._put, doc, size, namespace, local_only)
 
     @defer.inlineCallbacks
-    def _put(self, doc, size, namespace):
+    def _put(self, doc, size, namespace, local_only=False):
         if (yield self.local.exists(doc.blob_id, namespace=namespace)):
             error_message = "Blob already exists: %s" % doc.blob_id
             raise BlobAlreadyExistsError(error_message)
@@ -230,6 +232,10 @@ class BlobManager(BlobsSynchronizer):
         # TODO this is a tee really, but ok... could do db and upload
         # concurrently. not sure if we'd gain something.
         yield self.local.put(doc.blob_id, fd, size=size, namespace=namespace)
+        if local_only:
+            yield self.local.update_sync_status(
+                doc.blob_id, SyncStatus.LOCAL_ONLY)
+            defer.returnValue(None)
         yield self.local.update_sync_status(
             doc.blob_id, SyncStatus.PENDING_UPLOAD)
         # In fact, some kind of pipe is needed here, where each write on db

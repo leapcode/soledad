@@ -42,6 +42,7 @@ class SyncStatus:
     FAILED_UPLOAD = 4
     FAILED_DOWNLOAD = 5
     PENDING_DELETE = 6
+    LOCAL_ONLY = 7
     UNAVAILABLE_STATUSES = (3, 5)
 
 

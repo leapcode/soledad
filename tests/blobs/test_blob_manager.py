@@ -83,6 +83,19 @@ class BlobManagerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_put_local_only_doesnt_send_to_server(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        msg, blob_id = "Hey Joe", uuid4().hex
+        doc = BlobDoc(BytesIO(msg), blob_id=blob_id)
+        yield self.manager.put(doc, size=len(msg), local_only=True)
+        result = yield self.manager.local.get(blob_id)
+        status, _ = yield self.manager.local.get_sync_status(blob_id)
+        self.assertEquals(result.getvalue(), msg)
+        self.assertEquals(status, SyncStatus.LOCAL_ONLY)
+        self.assertFalse(self.manager._encrypt_and_upload.called)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_put_then_get_using_real_file_descriptor(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager._download_and_decrypt = Mock(return_value=None)
