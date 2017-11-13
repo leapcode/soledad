@@ -15,6 +15,7 @@ NAME=soledad-server
 
 override_dh_prep:
 	(cd ./docs/man; for src in *.rst; do tgt=$$(basename $${src} .rst); rst2man $${src} $${tgt}; done)
+	PYTHONPATH=./ ./scripts/packaging/replace-version-file.py
 	dh_prep
 
 override_dh_installinit:
