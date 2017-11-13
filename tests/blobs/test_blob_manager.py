@@ -184,7 +184,7 @@ class BlobManagerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
-    def test_offline_delete_marks_as_pending_download(self):
+    def test_offline_delete_marks_as_pending_delete(self):
         deletion_failure = defer.fail(Exception())
         self.manager._encrypt_and_upload = Mock(return_value=None)
         self.manager._delete_from_remote = Mock(return_value=deletion_failure)

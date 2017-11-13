@@ -221,7 +221,8 @@ class BlobManager(BlobsSynchronizer):
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
         """
-        return self.semaphore.run(self._put, doc, size, namespace, local_only)
+        return self.semaphore.run(
+            self._put, doc, size, namespace, local_only=local_only)
 
     @defer.inlineCallbacks
     def _put(self, doc, size, namespace, local_only=False):

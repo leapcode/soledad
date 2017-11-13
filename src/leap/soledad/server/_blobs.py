@@ -136,12 +136,12 @@ class FilesystemBlobsBackend(object):
         if not os.path.isfile(blob_path):
             request.setResponseCode(404)
             return "Blob doesn't exists: %s" % blob_id
+        self.__touch(blob_path + '.deleted')
         os.unlink(blob_path)
         try:
             os.unlink(blob_path + '.flags')
         except Exception:
             pass
-        self.__touch(blob_path + '.deleted')
 
     def get_blob_size(user, blob_id, namespace=''):
         raise NotImplementedError
