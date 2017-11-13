@@ -200,7 +200,7 @@ class SoledadServer(object):
             '--logfile=%s' % self._logfile,
             '--pidfile=%s' % self._pidfile,
             'web',
-            '--class=leap.soledad.server.entrypoints.SoledadEntrypoint',
+            '--class=leap.soledad.server.entrypoints.UsersEntrypoint',
             '--port=tcp:2424'
         ])
 

@@ -15,10 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-The entrypoint for Soledad server.
-
-This is the entrypoint for the application that is loaded from the initscript
-or the systemd script.
+Entrypoints for the Soledad server.
 """
 import os
 
@@ -33,12 +30,11 @@ from ._config import get_config
 from ._wsgi import init_couch_state
 
 
-# load configuration from file
 conf = get_config()
 log = Logger()
 
 
-class SoledadEntrypoint(SoledadSession):
+class UsersEntrypoint(SoledadSession):
 
     def __init__(self):
         pool = threadpool.ThreadPool(name='wsgi')
@@ -48,14 +44,11 @@ class SoledadEntrypoint(SoledadSession):
         SoledadSession.__init__(self, portal)
 
 
-class LocalServicesEntrypoint(SoledadSession):
+class ServicesEntrypoint(SoledadSession):
 
     def __init__(self):
         portal = localPortal()
         SoledadSession.__init__(self, portal)
-
-# see the comments in _wsgi.py recarding why couch state has to be
-# initialized when the reactor is running
 
 
 def check_conf():
@@ -75,4 +68,6 @@ def check_conf():
 
 reactor.callWhenRunning(check_conf)
 reactor.callWhenRunning(check_schema_versions, conf['couch_url'])
+# see the comments in _wsgi.py regarding why couch state has to be
+# initialized when the reactor is running
 reactor.callWhenRunning(init_couch_state, conf)

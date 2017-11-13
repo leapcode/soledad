@@ -12,7 +12,7 @@ application = service.Application('soledad-server')
 # local entrypoint
 local_port = os.getenv('LOCAL_SERVICES_PORT', 2525)
 local_description = 'tcp:%s:interface=127.0.0.1' % local_port
-local_site = server.Site(entrypoints.LocalServicesEntrypoint())
+local_site = server.Site(entrypoints.ServicesEntrypoint())
 
 local_server = strports.service(local_description, local_site)
 local_server.setServiceParent(application)
@@ -39,7 +39,7 @@ else:
     log.err("HTTPS_PORT env var is required to be set!")
     sys.exit(20)
 
-public_site = server.Site(entrypoints.SoledadEntrypoint())
+public_site = server.Site(entrypoints.UsersEntrypoint())
 
 public_server = strports.service(public_description, public_site)
 public_server.setServiceParent(application)
