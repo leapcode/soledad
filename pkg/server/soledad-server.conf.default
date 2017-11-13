@@ -1,0 +1,15 @@
+[soledad-server]
+couch_url=http://localhost:5984
+create_cmd=
+admin_netrc=/etc/couchdb/couchdb-admin.netrc
+batching=true
+blobs=false
+blobs_path=/var/lib/soledad/blobs
+services_tokens_file=/etc/soledad/services.tokens
+concurrent_blob_writes=50
+
+[database-security]
+members=soledad
+members_roles=
+admins=
+admins_roles=

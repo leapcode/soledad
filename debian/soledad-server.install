@@ -1,5 +1,6 @@
 debian/python-leap.soledad/usr/bin/soledad-server usr/bin/
 pkg/server/soledad-create-userdb usr/bin/
 pkg/server/soledad-sudoers etc/sudoers.d/
+pkg/server/soledad-server.conf.default usr/share/doc/soledad-server/
 src/leap/soledad/server usr/lib/python2.7/dist-packages/leap/soledad/
 scripts/migration usr/share/soledad-server/
