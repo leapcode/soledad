@@ -17,20 +17,14 @@
 """
 Entrypoints for the Soledad server.
 """
-import os
-
 from twisted.internet import reactor
-from twisted.python import threadpool
 from twisted.logger import Logger
+from twisted.python import threadpool
 
-from ..common.couch.state import check_schema_versions
 from .auth import localPortal, publicPortal
 from .session import SoledadSession
-from ._config import get_config
-from ._wsgi import init_couch_state
 
 
-conf = get_config()
 log = Logger()
 
 
@@ -49,25 +43,3 @@ class ServicesEntrypoint(SoledadSession):
     def __init__(self):
         portal = localPortal()
         SoledadSession.__init__(self, portal)
-
-
-def check_conf():
-    path = conf['blobs_path']
-    blobs_not_empty = bool(os.path.exists(path) and os.listdir(path))
-    if not conf['blobs'] and blobs_not_empty:
-        message = """
-**  WARNING: Blobs is disabled, but blobs directory isn't empty.          **
-**  If it was previously enabled, disabling can cause data loss due blobs **
-**  documents not being accessible to users.                              **
-**  Blobs directory: %s
-**  REFUSING TO START. Please double check your configuration.            **
-    """
-        log.error(message % path)
-        reactor.stop()
-
-
-reactor.callWhenRunning(check_conf)
-reactor.callWhenRunning(check_schema_versions, conf['couch_url'])
-# see the comments in _wsgi.py regarding why couch state has to be
-# initialized when the reactor is running
-reactor.callWhenRunning(init_couch_state, conf)

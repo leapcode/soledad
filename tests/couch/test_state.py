@@ -4,8 +4,8 @@ import pytest
 from leap.soledad.common.couch import CONFIG_DOC_ID
 from leap.soledad.common.couch import SCHEMA_VERSION
 from leap.soledad.common.couch import SCHEMA_VERSION_KEY
-from leap.soledad.common.couch.state import _check_db_schema_version
-from leap.soledad.common.couch.state import check_schema_versions
+from leap.soledad.common.couch.check import _check_db_schema_version
+from leap.soledad.common.couch.check import check_schema_versions
 from uuid import uuid4
 
 from leap.soledad.common.errors import WrongCouchSchemaVersionError
