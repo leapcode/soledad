@@ -33,7 +33,7 @@ logger = getLogger(__name__)
 # necessary checks
 #
 
-def _check_env(local_port, public_port):
+def check_env(local_port, public_port):
     if local_port == public_port:
         logger.error("LOCAL_SERVICES_PORT and HTTPS_PORT can't be the same!")
         sys.exit(20)
@@ -43,7 +43,7 @@ def _check_env(local_port, public_port):
         sys.exit(20)
 
 
-def _check_conf(conf):
+def check_conf(conf):
     path = conf['blobs_path']
     blobs_not_empty = bool(os.path.exists(path) and os.listdir(path))
     if not conf['blobs'] and blobs_not_empty:
@@ -62,7 +62,7 @@ def _check_conf(conf):
 # service creation functions
 #
 
-def _create_local_service(port, application):
+def create_local_service(port, application):
     logger.info('Starting local Services HTTP API')
     desc = 'tcp:%s:interface=127.0.0.1' % port
     site = server.Site(entrypoints.ServicesEntrypoint())
@@ -70,7 +70,7 @@ def _create_local_service(port, application):
     service.setServiceParent(application)
 
 
-def _get_tls_service_description(port):
+def get_tls_service_description(port):
     privateKey = os.getenv('PRIVKEY_PATH', '/etc/soledad/soledad-server.key')
     certKey = os.getenv('CERT_PATH', '/etc/soledad/soledad-server.pem')
     sslmethod = os.getenv('SSL_METHOD', 'SSLv23_METHOD')
@@ -83,10 +83,10 @@ def _get_tls_service_description(port):
     return desc
 
 
-def _create_public_service(port, application):
+def create_public_service(port, application):
     logger.info('Starting public Users HTTP API')
     if port:
-        desc = _get_tls_service_description(port)
+        desc = get_tls_service_description(port)
     else:
         logger.warn('Using plain HTTP on public Users API.')
         desc = 'tcp:port=2424:interface=0.0.0.0'
@@ -96,25 +96,25 @@ def _create_public_service(port, application):
     service.setServiceParent(application)
 
 
-def _create_services(local_port, public_port, application):
-    _create_local_service(local_port, application)
-    _create_public_service(public_port, application)
+def create_services(local_port, public_port, application):
+    create_local_service(local_port, application)
+    create_public_service(public_port, application)
 
 
 #
 # the application
 #
 
-def _run(application):
+def run(application):
     local_port = os.getenv('LOCAL_SERVICES_PORT', 2525)
     public_port = os.getenv('HTTPS_PORT', None)
     conf = get_config()
-    _check_env(local_port, public_port)
-    _check_conf(conf)
+    check_env(local_port, public_port)
+    check_conf(conf)
     d = check_schema_versions(conf['couch_url'])
-    d.addCallback(lambda _: _create_services(local_port, public_port,
-                                             application))
+    d.addCallback(lambda _: create_services(local_port, public_port,
+                                            application))
 
 
 application = service.Application('soledad-server')
-_run(application)
+run(application)
