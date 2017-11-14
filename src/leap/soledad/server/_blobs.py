@@ -29,7 +29,6 @@ import base64
 import json
 import re
 
-from twisted.logger import Logger
 from twisted.web import static
 from twisted.web import resource
 from twisted.web.client import FileBodyProducer
@@ -39,6 +38,7 @@ from twisted.internet import utils, defer
 from zope.interface import implementer
 
 from leap.common.files import mkdir_p
+from leap.soledad.common.log import getLogger
 from leap.soledad.server import interfaces
 from leap.soledad.common.blobs import ACCEPTED_FLAGS
 
@@ -46,7 +46,7 @@ from leap.soledad.common.blobs import ACCEPTED_FLAGS
 __all__ = ['BlobsResource']
 
 
-logger = Logger()
+logger = getLogger(__name__)
 
 # Used for sanitizers, we accept only letters, numbers, '-' and '_'
 VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')

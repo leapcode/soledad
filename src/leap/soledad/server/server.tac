@@ -18,15 +18,15 @@ import sys
 import os
 
 from twisted.application import service, strports
-from twisted.logger import Logger
 from twisted.web import server
 
 from leap.soledad.common.couch.check import check_schema_versions
+from leap.soledad.common.log import getLogger
 from leap.soledad.server import entrypoints
 from leap.soledad.server import get_config
 
 
-logger = Logger(__name__)
+logger = getLogger(__name__)
 
 
 #

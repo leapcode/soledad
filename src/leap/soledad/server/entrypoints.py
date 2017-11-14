@@ -18,14 +18,15 @@
 Entrypoints for the Soledad server.
 """
 from twisted.internet import reactor
-from twisted.logger import Logger
 from twisted.python import threadpool
+
+from leap.soledad.common.log import getLogger
 
 from .auth import localPortal, publicPortal
 from .session import SoledadSession
 
 
-log = Logger()
+log = getLogger(__name__)
 
 
 class UsersEntrypoint(SoledadSession):

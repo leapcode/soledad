@@ -33,11 +33,11 @@ from twisted.cred.credentials import UsernamePassword
 from twisted.cred.portal import IRealm
 from twisted.cred.portal import Portal
 from twisted.internet import defer
-from twisted.logger import Logger
 from twisted.web.iweb import ICredentialFactory
 from twisted.web.resource import IResource
 
 from leap.soledad.common.couch import couch_server
+from leap.soledad.common.log import getLogger
 
 from ._resource import PublicResource, AnonymousResource
 from ._resource import LocalResource
@@ -45,7 +45,7 @@ from ._blobs import BlobsResource
 from ._config import get_config
 
 
-log = Logger()
+log = getLogger(__name__)
 
 
 def _update_with_defaults(conf):

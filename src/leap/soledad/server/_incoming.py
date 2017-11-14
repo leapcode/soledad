@@ -19,26 +19,29 @@ A twisted resource that saves externally delivered documents into user's db.
 """
 import json
 import base64
-from twisted.logger import Logger
+
+from io import BytesIO
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
 from twisted.web.test.test_web import DummyRequest
-from ._config import get_config
-from io import BytesIO
-from leap.soledad.server._blobs import BlobsServerState
-from leap.soledad.common.couch.state import CouchServerState
-from leap.soledad.common.document import ServerDocument
+
 from leap.soledad.common.blobs import Flags
+from leap.soledad.common.blobs import preamble
+from leap.soledad.common.couch.state import CouchServerState
 from leap.soledad.common.crypto import ENC_JSON_KEY
 from leap.soledad.common.crypto import ENC_SCHEME_KEY
 from leap.soledad.common.crypto import EncryptionSchemes
-from leap.soledad.common.blobs import preamble
+from leap.soledad.common.document import ServerDocument
+from leap.soledad.common.log import getLogger
+
+from leap.soledad.server._config import get_config
+from leap.soledad.server._blobs import BlobsServerState
 
 
 __all__ = ['IncomingResource']
 
 
-logger = Logger()
+logger = getLogger(__name__)
 
 
 def _get_backend_from_config():
