@@ -23,8 +23,7 @@ from twisted.web import server
 
 from leap.soledad.common.couch.check import check_schema_versions
 from leap.soledad.server import entrypoints
-from leap.soledad.server._wsgi import init_couch_state
-from leap.soledad.server._config import get_config
+from leap.soledad.server import get_config
 
 
 logger = Logger(__name__)
@@ -113,7 +112,6 @@ def _run(application):
     _check_env(local_port, public_port)
     _check_conf(conf)
     d = check_schema_versions(conf['couch_url'])
-    d.addCallback(lambda _: init_couch_state(conf))
     d.addCallback(lambda _: _create_services(local_port, public_port,
                                              application))
 
