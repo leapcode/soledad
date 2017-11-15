@@ -1,16 +1,43 @@
 Changelog
 =========
 
-0.10.4 -  `master`_ 
+0.10.4 -  Wed 15 Nov, 2017
 -------------------------------
 
-.. note:: This version is not yet released and is under active development.
+Server
+~~~~~~
+
+- [feature] improve server entrypoint (several refactors and introduction of
+  binary in debian package)
+- [feature] improve speed of server startup
+- [bug] wait for couch schema, configuration and environment checks before
+  running servers.
+- [bug] debian package now reports the correct version
+- [pkg] improve user db creation script (fixes and man page)
+- [bug] limit concurrent blob writes in server
+
+Client
+~~~~~~
+
+- [feature] support unsynced local only blobs
+- [feature] add/fix blob deletion
+- [feature] add and control concurrency of blobs local and remote operations
+- [feature] add retries for blob transfers
+- [bug] fixes in blob download/upload pipeline
+- [bug] improve resilience of blobs concurrent access to sqlcipher
+- [bug] fix blobs preamble flakiness
+- [refactor] split blobs backend in many modules
 
 Misc
 ~~~~
 
-- Add packages for debian buster.
-- deb: Make soledad-client depend on soledad-common
+- [doc] many documentation improvements
+- [doc] documentation was mirrored in https://leap.se/en/docs/design/soledad
+- [benchmarks] add server scalability tests
+- [benchmarks] add outlier detection
+- [test] add e2e test for incoming mail pipeline
+- [pkg] Add packages for debian buster.
+- [pkg] deb: Make soledad-client depend on soledad-common
 
 
 0.10.3 - Mon 11 Sep, 2017
