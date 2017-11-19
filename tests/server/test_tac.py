@@ -70,7 +70,20 @@ class TacServerTestCase(unittest.TestCase):
         t = reactor.spawnProcess(protocol, executable, args, env=env)
         self.addCleanup(os.kill, t.pid, signal.SIGKILL)
         self.addCleanup(t.loseConnection)
-        return self._sleep(1)  # it takes a while to start server
+        d = self._wait_for_server()
+        return d
+
+    @defer.inlineCallbacks
+    def _wait_for_server(self, retries=10):
+        while retries:
+            retries -= 1
+            yield self._sleep(1)
+            try:
+                yield self._get('http://localhost:2525')
+                break
+            except Exception as e:
+                if not retries:
+                    raise e
 
     def _sleep(self, time):
         d = defer.Deferred()
