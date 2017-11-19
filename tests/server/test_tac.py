@@ -61,15 +61,25 @@ class TacServerTestCase(unittest.TestCase):
             yield self._get(public_using_local_port_url)
 
     def _spawnServer(self):
+
+        # Format the following command:
+        #   /path/to/twistd --pidfile= -noy /path/to/server.tac
+        path = os.environ.get('VIRTUAL_ENV', '/usr')
+        twistd = os.path.join(path, 'bin', 'twistd')
+        args = [twistd, '--pidfile=', '-noy', TAC_FILE_PATH]
+
+        # Use a special environment when running twistd.
+        couch_url = os.environ.get('SOLEDAD_COUCH_URL')
+        env = {
+            'DEBUG_SERVER': 'yes',  # run Users API on port 2424 without TLS
+            'SOLEDAD_COUCH_URL': couch_url,  # used by gitlab ci with docker
+        }
+
         protocol = ProcessProtocol()
-        env = os.environ.get('VIRTUAL_ENV', '/usr')
-        executable = os.path.join(env, 'bin', 'twistd')
-        no_pid_argument = '--pidfile='
-        args = [executable, no_pid_argument, '-noy', TAC_FILE_PATH]
-        env = {'DEBUG_SERVER': 'yes'}
-        t = reactor.spawnProcess(protocol, executable, args, env=env)
-        self.addCleanup(os.kill, t.pid, signal.SIGKILL)
-        self.addCleanup(t.loseConnection)
+        proc = reactor.spawnProcess(protocol, twistd, args, env=env)
+        self.addCleanup(os.kill, proc.pid, signal.SIGKILL)
+        self.addCleanup(proc.loseConnection)
+
         d = self._wait_for_server()
         return d
 

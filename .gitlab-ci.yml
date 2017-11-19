@@ -63,6 +63,8 @@ tests:
   image: 0xacab.org:4567/leap/soledad:latest
   services:
     - couchdb
+  variables:
+     SOLEDAD_COUCH_URL: http://couchdb:5984
   script:
     - tox -- --couch-url http://couchdb:5984
 
