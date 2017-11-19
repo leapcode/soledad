@@ -22,6 +22,7 @@ from twisted.trial import unittest
 from pkg_resources import resource_filename
 
 from leap.soledad.server._config import _load_config
+from leap.soledad.server._config import _reflect_environment
 from leap.soledad.server._config import CONFIG_DEFAULTS
 
 
@@ -32,7 +33,7 @@ class ConfigurationParsingTest(unittest.TestCase):
 
     def test_use_defaults_on_failure(self):
         config = _load_config('this file will never exist')
-        expected = CONFIG_DEFAULTS
+        expected = _reflect_environment(CONFIG_DEFAULTS)
         self.assertEquals(expected, config)
 
     def test_security_values_configuration(self):
@@ -57,15 +58,18 @@ class ConfigurationParsingTest(unittest.TestCase):
         config = _load_config(config_path)
 
         # then
-        expected = {'couch_url':
-                    'http://soledad:passwd@localhost:5984',
-                    'create_cmd':
-                    'sudo -u soledad-admin /usr/bin/soledad-create-userdb',
-                    'admin_netrc':
-                    '/etc/couchdb/couchdb-soledad-admin.netrc',
-                    'batching': False,
-                    'blobs': False,
-                    'services_tokens_file': '/etc/soledad/services.tokens',
-                    'blobs_path': '/var/lib/soledad/blobs',
-                    'concurrent_blob_writes': 50}
-        self.assertDictEqual(expected, config['soledad-server'])
+        expected = {
+            'couch_url': 'http://soledad:passwd@localhost:5984',
+            'create_cmd':
+                'sudo -u soledad-admin /usr/bin/soledad-create-userdb',
+            'admin_netrc': '/etc/couchdb/couchdb-soledad-admin.netrc',
+            'batching': False,
+            'blobs': False,
+            'services_tokens_file': '/etc/soledad/services.tokens',
+            'blobs_path': '/var/lib/soledad/blobs',
+            'concurrent_blob_writes': 50
+        }
+        expected = _reflect_environment({'soledad-server': expected})
+        self.assertDictEqual(
+            expected['soledad-server'],
+            config['soledad-server'])

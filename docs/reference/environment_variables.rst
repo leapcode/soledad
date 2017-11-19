@@ -6,6 +6,7 @@ Some environment variables affect the behaviour of Soledad:
 ============================== =============== =================================
 variable                       affects         description
 ============================== =============== =================================
+``SOLEDAD_COUCH_URL``          server          override the CouchDB url.
 ``SOLEDAD_HTTP_PERSIST``       client          persist HTTP connections.
 ``SOLEDAD_USE_PYTHON_LOGGING`` client / server use python logging instead of
                                                twisted's logger.

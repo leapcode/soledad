@@ -19,8 +19,12 @@
 import configparser
 import os
 
+from twisted.logger import Logger
+
 
 __all__ = ['get_config']
+
+logger = Logger()
 
 # make sure to update documentation if this default is changed.
 DEFAULT_CONFIG_FILE = '/etc/soledad/soledad-server.conf'
@@ -44,6 +48,48 @@ CONFIG_DEFAULTS = {
 }
 
 
+def _load_from_file(file_path):
+    logger.info('Loading configuration from %s' % file_path)
+    conf = dict(CONFIG_DEFAULTS)
+    parsed = configparser.SafeConfigParser()
+    parsed.read(file_path)
+    for section in conf:
+        if not parsed.has_section(section):
+            continue
+        for key, value in conf[section].items():
+            if not parsed.has_option(section, key):
+                continue
+            elif type(value) == bool:
+                conf[section][key] = parsed.getboolean(section, key)
+            elif type(value) == list:
+                values = parsed.get(section, key).split(',')
+                values = [v.strip() for v in values]
+                conf[section][key] = values
+            else:
+                conf[section][key] = parsed.get(section, key)
+    # TODO: implement basic parsing/sanitization of options comming from
+    # parsed file.
+    return conf
+
+
+def _reflect_environment(conf):
+    from_environment = ['couch_url']
+    for option in from_environment:
+        name = 'SOLEDAD_%s' % option.upper()
+        value = os.environ.get(name)
+        if value:
+            logger.info('Using %s=%s because of %s environment variable.'
+                        % (option, value, name))
+            conf['soledad-server'][option] = value
+    return conf
+
+
+def _load_config(file_path):
+    conf = _load_from_file(file_path)
+    conf = _reflect_environment(conf)
+    return conf
+
+
 _config = None
 
 
@@ -54,35 +100,3 @@ def get_config(section='soledad-server'):
             'SOLEDAD_SERVER_CONFIG_FILE', DEFAULT_CONFIG_FILE)
         _config = _load_config(fname)
     return _config[section]
-
-
-def _load_config(file_path):
-    """
-    Load server configuration from file.
-
-    @param file_path: The path to the configuration file.
-    @type file_path: str
-
-    @return: A dictionary with the configuration.
-    @rtype: dict
-    """
-    conf = dict(CONFIG_DEFAULTS)
-    config = configparser.SafeConfigParser()
-    config.read(file_path)
-    for section in conf:
-        if not config.has_section(section):
-            continue
-        for key, value in conf[section].items():
-            if not config.has_option(section, key):
-                continue
-            elif type(value) == bool:
-                conf[section][key] = config.getboolean(section, key)
-            elif type(value) == list:
-                values = config.get(section, key).split(',')
-                values = [v.strip() for v in values]
-                conf[section][key] = values
-            else:
-                conf[section][key] = config.get(section, key)
-    # TODO: implement basic parsing/sanitization of options comming from
-    # config file.
-    return conf

@@ -61,6 +61,9 @@ SOLEDAD_SERVER_CONFIG_FILE
   Load configuration from this file instead of using the default one
   (*/etc/soledad/soledad-server.conf*).
 
+SOLEDAD_COUCH_URL
+  If set, use this URL for accessing couchdb (overrides the configuration file).
+
 SOLEDAD_HTTP_PERSIST
   If set, persist HTTP connections.
 
