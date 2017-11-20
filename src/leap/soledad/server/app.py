@@ -39,6 +39,12 @@ def _exit(status):
     reactor.stop()
 
 
+def _log_and_exit(failure):
+    logger.error('Error while starting up server: %r'
+                 % failure.getErrorMessage())
+    _exit(20)
+
+
 #
 # necessary checks
 #
@@ -124,6 +130,7 @@ def run(application):
     d = check_schema_versions(conf['couch_url'])
     d.addCallback(lambda _: create_services(local_port, public_port,
                                             application))
+    d.addErrback(_log_and_exit)
 
 
 application = service.Application('soledad-server')
