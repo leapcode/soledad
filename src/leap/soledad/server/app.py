@@ -21,6 +21,7 @@ import sys
 import os
 
 from twisted.application import service, strports
+from twisted.internet import reactor
 from twisted.web import server
 
 from leap.soledad.common.couch.check import check_schema_versions
@@ -32,6 +33,12 @@ from leap.soledad.server import get_config
 logger = getLogger(__name__)
 
 
+def _exit(status):
+    reactor.addSystemEventTrigger(
+        'after', 'shutdown', sys.exit, status)
+    reactor.stop()
+
+
 #
 # necessary checks
 #
@@ -39,11 +46,11 @@ logger = getLogger(__name__)
 def check_env(local_port, public_port):
     if local_port == public_port:
         logger.error("LOCAL_SERVICES_PORT and HTTPS_PORT can't be the same!")
-        sys.exit(20)
+        _exit(20)
 
     if public_port is None and not os.getenv('DEBUG_SERVER'):
         logger.error("HTTPS_PORT env var is required to be set!")
-        sys.exit(20)
+        _exit(20)
 
 
 def check_conf(conf):
@@ -58,7 +65,7 @@ def check_conf(conf):
 **  REFUSING TO START. Please double check your configuration.            **
     """
         logger.error(message % path)
-        sys.exit(20)
+        _exit(20)
 
 
 #
