@@ -205,16 +205,7 @@ class SoledadServer(object):
         ])
 
     def _create_conf_file(self):
-
-        # come up with name of the configuration file
-        fname = '/etc/soledad/soledad-server.conf'
-        if not os.access('/etc', os.W_OK):
-            fname = os.path.join(self.tmpdir.strpath, 'soledad-server.conf')
-
-        # create the configuration file
-        dirname = os.path.dirname(fname)
-        if not os.path.isdir(dirname):
-            os.mkdir(dirname)
+        fname = os.path.join(self.tmpdir.strpath, 'soledad-server.conf')
         with open(fname, 'w') as f:
             blobs_path = os.path.join(str(self.tmpdir), 'blobs')
             content = '''[soledad-server]
