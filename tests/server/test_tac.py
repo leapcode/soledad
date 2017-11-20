@@ -68,12 +68,14 @@ class TacServerTestCase(unittest.TestCase):
         twistd = os.path.join(path, 'bin', 'twistd')
         args = [twistd, '--pidfile=', '-noy', TAC_FILE_PATH]
 
-        # Use a special environment when running twistd.
+        # run Users API on port 2424 without TLS
+        env = {'DEBUG_SERVER': 'yes'}
+
+        # allow passing of couch url using environment variable, used by gitlab
+        # ci with docker
         couch_url = os.environ.get('SOLEDAD_COUCH_URL')
-        env = {
-            'DEBUG_SERVER': 'yes',  # run Users API on port 2424 without TLS
-            'SOLEDAD_COUCH_URL': couch_url,  # used by gitlab ci with docker
-        }
+        if couch_url:
+            env.update({'SOLEDAD_COUCH_URL': couch_url})
 
         protocol = ProcessProtocol()
         proc = reactor.spawnProcess(protocol, twistd, args, env=env)
