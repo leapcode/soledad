@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.10.5 - `master`_
+-------------------
+
+.. note:: This version is not yet released and is under active development.
+
+
 0.10.4 -  Wed 15 Nov, 2017
 -------------------------------
 
