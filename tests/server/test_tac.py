@@ -36,6 +36,7 @@ from twisted.web.client import Agent
 TAC_FILE_PATH = resource_filename('leap.soledad.server', 'server.tac')
 
 
+@pytest.mark.usefixtures("couch_url")
 class TacServerTestCase(unittest.TestCase):
 
     def test_tac_file_exists(self):
@@ -68,14 +69,12 @@ class TacServerTestCase(unittest.TestCase):
         twistd = os.path.join(path, 'bin', 'twistd')
         args = [twistd, '--pidfile=', '-noy', TAC_FILE_PATH]
 
-        # run Users API on port 2424 without TLS
-        env = {'DEBUG_SERVER': 'yes'}
-
-        # allow passing of couch url using environment variable, used by gitlab
-        # ci with docker
-        couch_url = os.environ.get('SOLEDAD_COUCH_URL')
-        if couch_url:
-            env.update({'SOLEDAD_COUCH_URL': couch_url})
+        # Use a special environment when running twistd that allow passing of
+        # couch url using environment variable, used by gitlab ci with docker
+        env = {
+            'DEBUG_SERVER': 'yes',  # run Users API on port 2424 without TLS
+            'SOLEDAD_COUCH_URL': self.couch_url,  # used by gitlab ci
+        }
 
         protocol = ProcessProtocol()
         proc = reactor.spawnProcess(protocol, twistd, args, env=env)
