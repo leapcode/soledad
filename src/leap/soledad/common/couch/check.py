@@ -77,9 +77,13 @@ def _check_db_schema_version(url, db, auth, agent=None):
 
     elif res.code == 200:
         config_doc = yield res.json()
+        if SCHEMA_VERSION_KEY not in config_doc:
+            logger.error(
+                "Database has config document but no schema version: %s" % db)
+            raise WrongCouchSchemaVersionError(db)
         if config_doc[SCHEMA_VERSION_KEY] != SCHEMA_VERSION:
             logger.error(
-                "Unsupported database schema in database %s" % db)
+                "Unsupported database schema in database: %s" % db)
             raise WrongCouchSchemaVersionError(db)
 
 
