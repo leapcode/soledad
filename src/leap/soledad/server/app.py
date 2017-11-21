@@ -17,7 +17,6 @@
 """
 Soledad Server, as a Twisted Application.
 """
-import sys
 import os
 
 from twisted.application import service, strports
@@ -34,9 +33,12 @@ logger = getLogger(__name__)
 
 
 def _exit(status):
-    reactor.addSystemEventTrigger(
-        'after', 'shutdown', sys.exit, status)
-    reactor.stop()
+    if reactor.running:
+        reactor.addSystemEventTrigger(
+            'after', 'shutdown', os._exit, status)
+        reactor.stop()
+    else:
+        os._exit(status)
 
 
 def _log_and_exit(failure):
