@@ -32,13 +32,14 @@ from leap.soledad.server import get_config
 logger = getLogger(__name__)
 
 
+def _deferred_shutdown(status):
+    reactor.addSystemEventTrigger('after', 'shutdown',
+                                  os._exit, status)
+    reactor.stop()
+
+
 def _exit(status):
-    if reactor.running:
-        reactor.addSystemEventTrigger(
-            'after', 'shutdown', os._exit, status)
-        reactor.stop()
-    else:
-        os._exit(status)
+    reactor.callWhenRunning(_deferred_shutdown, status)
 
 
 def _log_and_exit(failure):
