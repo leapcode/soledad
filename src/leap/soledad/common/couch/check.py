@@ -18,7 +18,6 @@
 Database schema version verification
 """
 
-import os
 import treq
 
 from six.moves.urllib.parse import urljoin
@@ -84,13 +83,6 @@ def _check_db_schema_version(url, db, auth, agent=None):
             raise WrongCouchSchemaVersionError(db)
 
 
-def _stop(failure, reactor):
-    logger.error("Failure while checking schema versions: %r - %s"
-                 % (failure, failure.message))
-    reactor.addSystemEventTrigger('after', 'shutdown', os._exit, 1)
-    reactor.stop()
-
-
 @defer.inlineCallbacks
 def check_schema_versions(couch_url, agent=None, reactor=reactor):
     """
@@ -107,17 +99,26 @@ def check_schema_versions(couch_url, agent=None, reactor=reactor):
     url = urlsplit(couch_url)
     auth = (url.username, url.password) if url.username else None
     url = "%s://%s:%d" % (url.scheme, url.hostname, url.port)
-    res = yield treq.get(urljoin(url, '_all_dbs'), auth=auth, agent=agent)
-    dbs = yield res.json()
+    try:
+        res = yield treq.get(urljoin(url, '_all_dbs'), auth=auth, agent=agent)
+        dbs = yield res.json()
+    except Exception as e:
+        logger.error('Error trying to get list of dbs from %s: %r'
+                     % (url, e))
+        raise e
     deferreds = []
     semaphore = defer.DeferredSemaphore(20)
-    logger.info('Starting schema versions check...')
+    logger.info('Starting CouchDB schema versions check...')
     for db in dbs:
         if not db.startswith('user-'):
             continue
         d = semaphore.run(_check_db_schema_version, url, db, auth, agent=agent)
-        d.addErrback(_stop, reactor=reactor)
         deferreds.append(d)
     d = defer.gatherResults(deferreds, consumeErrors=True)
-    d.addCallback(lambda _: logger.info('Finished schema versions check.'))
-    yield d
+    try:
+        yield d
+        logger.info('Finished CouchDB schema versions check.')
+    except Exception as e:
+        msg = 'Error checking CouchDB schema versions: %r' % e
+        logger.error(msg)
+        raise Exception(msg)

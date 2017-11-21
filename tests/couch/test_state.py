@@ -1,4 +1,3 @@
-import mock
 import pytest
 
 from leap.soledad.common.couch import CONFIG_DOC_ID
@@ -17,7 +16,7 @@ from twisted.internet import reactor
 from twisted.web.client import HTTPConnectionPool, Agent
 
 
-class CouchDesignDocsTests(CouchDBTestCase):
+class CouchStateTests(CouchDBTestCase):
 
     def setUp(self):
         CouchDBTestCase.setUp(self)
@@ -40,14 +39,14 @@ class CouchDesignDocsTests(CouchDBTestCase):
                 self.couch_url, self.db.name, None, agent=self.agent)
 
     @defer.inlineCallbacks
-    def test_check_schema_versions_wrong_schema_version_stops_reactor(self):
+    def test_check_schema_versions_wrong_schema_version_raises(self):
         wrong_schema_version = SCHEMA_VERSION + 1
         self.db.create(
             {'_id': CONFIG_DOC_ID, SCHEMA_VERSION_KEY: wrong_schema_version})
-        mocked_reactor = mock.Mock()
-        yield check_schema_versions(
-            self.couch_url, agent=self.agent, reactor=mocked_reactor)
-        mocked_reactor.stop.assert_called()
+        expected_msg = 'Error checking CouchDB schema versions: ' \
+                       'FirstError.*WrongCouchSchemaVersionError()'
+        with pytest.raises(Exception, match=expected_msg):
+            yield check_schema_versions(self.couch_url, agent=self.agent)
 
     @defer.inlineCallbacks
     def test__check_db_schema_version_missing_config_doc_raises(self):
@@ -57,9 +56,9 @@ class CouchDesignDocsTests(CouchDBTestCase):
                 self.couch_url, self.db.name, None, agent=self.agent)
 
     @defer.inlineCallbacks
-    def test_check_schema_versions_missing_config_doc_stops_reactor(self):
+    def test_check_schema_versions_missing_config_doc_raises(self):
         self.db.create({})
-        mocked_reactor = mock.Mock()
-        yield check_schema_versions(
-            self.couch_url, agent=self.agent, reactor=mocked_reactor)
-        mocked_reactor.stop.assert_called()
+        expected_msg = 'Error checking CouchDB schema versions: ' \
+                       'FirstError.*MissingCouchConfigDocumentError()'
+        with pytest.raises(Exception, match=expected_msg):
+            yield check_schema_versions(self.couch_url, agent=self.agent)
