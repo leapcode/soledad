@@ -124,7 +124,13 @@ def create_services(local_port, public_port, application):
 # the application
 #
 
+def patch_noisy_factory():
+    from twisted.internet.protocol import Factory
+    Factory.noisy = False
+
+
 def run(application):
+    patch_noisy_factory()
     local_port = os.getenv('LOCAL_SERVICES_PORT', 2525)
     public_port = os.getenv('HTTPS_PORT', None)
     conf = get_config()
