@@ -98,16 +98,10 @@ def check_schema_versions(couch_url, agent=None):
     url = urlsplit(couch_url)
     auth = (url.username, url.password) if url.username else None
     url = "%s://%s:%d" % (url.scheme, url.hostname, url.port)
-    try:
-        res = yield treq.get(urljoin(url, '_all_dbs'), auth=auth, agent=agent)
-        dbs = yield res.json()
-    except Exception as e:
-        logger.error('Error trying to get list of dbs from %s: %r'
-                     % (url, e))
-        raise e
     deferreds = []
     semaphore = defer.DeferredSemaphore(20)
     logger.info('Starting CouchDB schema versions check...')
+    dbs = yield list_dbs(url, auth, agent)
     for db in dbs:
         if not db.startswith('user-'):
             continue
@@ -121,3 +115,14 @@ def check_schema_versions(couch_url, agent=None):
         msg = 'Error checking CouchDB schema versions: %r' % e
         logger.error(msg)
         raise Exception(msg)
+
+
+@defer.inlineCallbacks
+def list_dbs(url, auth, agent):
+    try:
+        res = yield treq.get(urljoin(url, '_all_dbs'), auth=auth, agent=agent)
+        defer.returnValue((yield res.json()))
+    except Exception as e:
+        logger.error('Error trying to get list of dbs from %s: %r'
+                     % (url, e))
+        raise e
