@@ -1,11 +1,21 @@
 Changelog
 =========
 
-0.10.5 - `master`_
+0.10.6 - `master`_
 -------------------
 
 .. note:: This version is not yet released and is under active development.
 
+
+0.10.5 -  Wed 22 Nov, 2017
+-------------------------------
+
+Server 
+~~~~~~
+
+- [feature] add the SOLEDAD_COUCH_URL environment variable on server side
+- [bug] properly shutdown server if startup checks fail
+- [bug] fix and improve logging of server startup checks
 
 0.10.4 -  Wed 15 Nov, 2017
 -------------------------------
