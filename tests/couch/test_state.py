@@ -1,4 +1,5 @@
 import pytest
+import mock
 
 from leap.soledad.common.couch import CONFIG_DOC_ID
 from leap.soledad.common.couch import SCHEMA_VERSION
@@ -16,6 +17,14 @@ from twisted.internet import reactor
 from twisted.web.client import HTTPConnectionPool, Agent
 
 
+def restricted_listing(function):
+    @mock.patch('leap.soledad.common.couch.check.list_dbs')
+    def _set_list(self, *args, **kwargs):
+        args[-1].return_value = defer.succeed([self.db.name])
+        return function(self, *args, **kwargs)
+    return _set_list
+
+
 class CouchStateTests(CouchDBTestCase):
 
     def setUp(self):
@@ -29,8 +38,9 @@ class CouchStateTests(CouchDBTestCase):
     def tearDown(self):
         yield self.pool.closeCachedConnections()
 
+    @restricted_listing
     @defer.inlineCallbacks
-    def test__check_db_schema_version_wrong_schema_version_raises(self):
+    def test__check_db_schema_version_wrong_schema_version_raises(self, lmock):
         wrong_schema_version = SCHEMA_VERSION + 1
         self.db.create(
             {'_id': CONFIG_DOC_ID, SCHEMA_VERSION_KEY: wrong_schema_version})
@@ -38,8 +48,9 @@ class CouchStateTests(CouchDBTestCase):
             yield _check_db_schema_version(
                 self.couch_url, self.db.name, None, agent=self.agent)
 
+    @restricted_listing
     @defer.inlineCallbacks
-    def test_check_schema_versions_wrong_schema_version_raises(self):
+    def test_check_schema_versions_wrong_schema_version_raises(self, lmock):
         wrong_schema_version = SCHEMA_VERSION + 1
         self.db.create(
             {'_id': CONFIG_DOC_ID, SCHEMA_VERSION_KEY: wrong_schema_version})
@@ -48,15 +59,17 @@ class CouchStateTests(CouchDBTestCase):
         with pytest.raises(Exception, match=expected_msg):
             yield check_schema_versions(self.couch_url, agent=self.agent)
 
+    @restricted_listing
     @defer.inlineCallbacks
-    def test__check_db_schema_version_missing_config_doc_raises(self):
+    def test__check_db_schema_version_missing_config_doc_raises(self, lmock):
         self.db.create({})
         with pytest.raises(MissingCouchConfigDocumentError):
             yield _check_db_schema_version(
                 self.couch_url, self.db.name, None, agent=self.agent)
 
+    @restricted_listing
     @defer.inlineCallbacks
-    def test_check_schema_versions_missing_config_doc_raises(self):
+    def test_check_schema_versions_missing_config_doc_raises(self, lmock):
         self.db.create({})
         expected_msg = 'Error checking CouchDB schema versions: ' \
                        'FirstError.*MissingCouchConfigDocumentError()'
