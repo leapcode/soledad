@@ -24,8 +24,6 @@ from six.moves.urllib.parse import urljoin
 from twisted.internet import defer
 from urlparse import urlsplit
 
-from twisted.internet import reactor
-
 from leap.soledad.common.couch import CONFIG_DOC_ID
 from leap.soledad.common.couch import SCHEMA_VERSION
 from leap.soledad.common.couch import SCHEMA_VERSION_KEY
@@ -88,7 +86,7 @@ def _check_db_schema_version(url, db, auth, agent=None):
 
 
 @defer.inlineCallbacks
-def check_schema_versions(couch_url, agent=None, reactor=reactor):
+def check_schema_versions(couch_url, agent=None):
     """
     Check that all user databases use the correct couch schema.
 
@@ -96,9 +94,6 @@ def check_schema_versions(couch_url, agent=None, reactor=reactor):
     :type couch_url: str
     :param agent: an optional agent for doing requests, used in tests.
     :type agent: twisted.web.client.Agent
-    :param reactor: an optional reactor for stopping in case of errors, used
-                    in tests.
-    :type reactor: twisted.internet.base.ReactorBase
     """
     url = urlsplit(couch_url)
     auth = (url.username, url.password) if url.username else None
