@@ -21,7 +21,7 @@ def restricted_listing(function):
     @mock.patch('leap.soledad.common.couch.check.list_dbs')
     def _set_list(self, *args, **kwargs):
         args[-1].return_value = defer.succeed([self.db.name])
-        return function(self, *args, **kwargs)
+        return function(self)
     return _set_list
 
 
@@ -40,7 +40,7 @@ class CouchStateTests(CouchDBTestCase):
 
     @restricted_listing
     @defer.inlineCallbacks
-    def test__check_db_schema_version_wrong_schema_version_raises(self, lmock):
+    def test__check_db_schema_version_wrong_schema_version_raises(self):
         wrong_schema_version = SCHEMA_VERSION + 1
         self.db.create(
             {'_id': CONFIG_DOC_ID, SCHEMA_VERSION_KEY: wrong_schema_version})
@@ -50,7 +50,7 @@ class CouchStateTests(CouchDBTestCase):
 
     @restricted_listing
     @defer.inlineCallbacks
-    def test_check_schema_versions_wrong_schema_version_raises(self, lmock):
+    def test_check_schema_versions_wrong_schema_version_raises(self):
         wrong_schema_version = SCHEMA_VERSION + 1
         self.db.create(
             {'_id': CONFIG_DOC_ID, SCHEMA_VERSION_KEY: wrong_schema_version})
@@ -61,7 +61,7 @@ class CouchStateTests(CouchDBTestCase):
 
     @restricted_listing
     @defer.inlineCallbacks
-    def test__check_db_schema_version_missing_config_doc_raises(self, lmock):
+    def test__check_db_schema_version_missing_config_doc_raises(self):
         self.db.create({})
         with pytest.raises(MissingCouchConfigDocumentError):
             yield _check_db_schema_version(
@@ -69,7 +69,7 @@ class CouchStateTests(CouchDBTestCase):
 
     @restricted_listing
     @defer.inlineCallbacks
-    def test_check_schema_versions_missing_config_doc_raises(self, lmock):
+    def test_check_schema_versions_missing_config_doc_raises(self):
         self.db.create({})
         expected_msg = 'Error checking CouchDB schema versions: ' \
                        'FirstError.*MissingCouchConfigDocumentError()'
