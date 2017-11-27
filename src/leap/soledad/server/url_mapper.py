@@ -60,6 +60,7 @@ class URLMapper(object):
             /blobs/{uuid}/{blob_id}         | GET, PUT, DELETE, POST
             /blobs/{uuid}                   | GET
             /incoming/                      | PUT
+            /stream/{uuid}/{namespace}      | POST
         """
         # global resource
         self._connect('/', ['GET'])
@@ -77,5 +78,7 @@ class URLMapper(object):
         self._connect('/blobs/{uuid}/{blob_id}',
                       ['GET', 'PUT', 'DELETE', 'POST'])
         self._connect('/blobs/{uuid}/', ['GET'])
+        # streaming resource
+        self._connect('/stream/{uuid}/{namespace}', ['POST'])
         # incoming resource
         self._connect('/incoming/{target_user_uuid}/{incoming_id}', ['PUT'])

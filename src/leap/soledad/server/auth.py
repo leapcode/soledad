@@ -42,6 +42,7 @@ from leap.soledad.common.log import getLogger
 from ._resource import PublicResource, AnonymousResource
 from ._resource import LocalResource
 from ._blobs import BlobsResource
+from ._streaming_resource import StreamingResource
 from ._config import get_config
 
 
@@ -65,10 +66,15 @@ class SoledadRealm(object):
             "filesystem",
             conf['blobs_path'],
             concurrent_writes=concurrent_writes) if blobs else None
+        streaming_resource = StreamingResource(
+            "filesystem",
+            conf['blobs_path'],
+            concurrent_writes=concurrent_writes) if blobs else None
         self.anon_resource = AnonymousResource(
             enable_blobs=blobs)
         self.auth_resource = PublicResource(
             blobs_resource=blobs_resource,
+            streaming_resource=streaming_resource,
             sync_pool=sync_pool)
 
     def requestAvatar(self, avatarId, mind, *interfaces):

@@ -66,7 +66,8 @@ class PublicResource(Resource):
     for the Soledad Server.
     """
 
-    def __init__(self, blobs_resource=None, sync_pool=None):
+    def __init__(self, blobs_resource=None, streaming_resource=None,
+                 sync_pool=None):
         """
         Initialize the Soledad resource.
 
@@ -85,6 +86,7 @@ class PublicResource(Resource):
         # requests to /blobs will serve blobs if enabled
         if blobs_resource:
             self.putChild('blobs', blobs_resource)
+            self.putChild('stream', streaming_resource)
 
         # other requests are routed to legacy sync resource
         self._sync_resource = get_sync_resource(sync_pool)

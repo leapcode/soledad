@@ -28,6 +28,7 @@ from leap.soledad.server._resource import LocalResource
 from leap.soledad.server._server_info import ServerInfo
 from leap.soledad.server._blobs import BlobsResource
 from leap.soledad.server._incoming import IncomingResource
+from leap.soledad.server._streaming_resource import StreamingResource
 from leap.soledad.server.gzip_middleware import GzipMiddleware
 
 
@@ -46,11 +47,17 @@ class PublicResourceTestCase(unittest.TestCase):
 
     def test_get_blobs_enabled(self):
         blobs_resource = BlobsResource("filesystem", '/tmp')
+        streaming_resource = StreamingResource("filesystem", '/tmp')
         resource = PublicResource(
-            blobs_resource=blobs_resource, sync_pool=_pool)
+            blobs_resource=blobs_resource,
+            streaming_resource=streaming_resource,
+            sync_pool=_pool)
         request = DummyRequest(['blobs'])
         child = getChildForRequest(resource, request)
         self.assertIsInstance(child, BlobsResource)
+        request = DummyRequest(['stream'])
+        child = getChildForRequest(resource, request)
+        self.assertIsInstance(child, StreamingResource)
 
     def test_get_blobs_disabled(self):
         blobs_resource = None
