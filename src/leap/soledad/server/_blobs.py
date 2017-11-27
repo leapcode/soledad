@@ -143,7 +143,7 @@ class FilesystemBlobsBackend(object):
         except Exception:
             pass
 
-    def get_blob_size(user, blob_id, namespace=''):
+    def get_blob_size(self, user, blob_id, namespace=''):
         raise NotImplementedError
 
     def count(self, user, request, namespace=''):
