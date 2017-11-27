@@ -19,16 +19,19 @@ Integration tests for blobs server
 """
 import os
 import pytest
+from urlparse import urljoin
 from uuid import uuid4
 from io import BytesIO
 from twisted.trial import unittest
 from twisted.web.server import Site
+from twisted.web.resource import Resource
 from twisted.internet import reactor
 from twisted.internet import defer
 from treq._utils import set_global_pool
 
 from leap.soledad.common.blobs import Flags
 from leap.soledad.server import _blobs as server_blobs
+from leap.soledad.server._streaming_resource import StreamingResource
 from leap.soledad.client._db.blobs import BlobManager
 from leap.soledad.client._db.blobs import BlobAlreadyExistsError
 from leap.soledad.client._db.blobs import InvalidFlagsError
@@ -50,11 +53,17 @@ class BlobServerTestCase(unittest.TestCase):
 
     def setUp(self):
         client_blobs.sync.MAX_WAIT = 0.1
-        root = server_blobs.BlobsResource("filesystem", self.tempdir)
+        blobs_resource = server_blobs.BlobsResource("filesystem", self.tempdir)
+        stream_resource = StreamingResource("filesystem", self.tempdir)
+        root = Resource()
+        root.putChild('blobs', blobs_resource)
+        root.putChild('stream', stream_resource)
         self.site = Site(root)
         self.port = reactor.listenTCP(0, self.site, interface='127.0.0.1')
         self.host = self.port.getHost()
         self.uri = 'http://%s:%s/' % (self.host.host, self.host.port)
+        self.stream_uri = urljoin(self.uri, 'stream/')
+        self.uri = urljoin(self.uri, 'blobs/')
         self.secret = 'A' * 96
         set_global_pool(None)
 
