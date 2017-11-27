@@ -144,7 +144,8 @@ class FilesystemBlobsBackend(object):
             pass
 
     def get_blob_size(self, user, blob_id, namespace=''):
-        raise NotImplementedError
+        blob_path = self._get_path(user, blob_id, namespace)
+        return os.stat(blob_path).st_size
 
     def count(self, user, request, namespace=''):
         base_path = self._get_path(user, namespace=namespace)

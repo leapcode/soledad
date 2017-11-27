@@ -52,6 +52,19 @@ class FilesystemBackendTestCase(unittest.TestCase):
         expected_method.assert_called_once_with('Tag', [expected_tag])
 
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_blob_size(self):
+        # get a backend
+        backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
+        # write a blob with size=10
+        path = backend._get_path('user', 'blob_id', '')
+        mkdir_p(os.path.split(path)[0])
+        with open(path, "w") as f:
+            f.write("0123456789")
+        # check it's size
+        size = backend.get_blob_size('user', 'blob_id', '')
+        self.assertEquals(10, size)
+
+    @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(_blobs.static, 'File')
     @mock.patch.object(_blobs.FilesystemBlobsBackend, '_get_path',
                        Mock(return_value='path'))
