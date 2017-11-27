@@ -87,7 +87,7 @@ class DecrypterBuffer(object):
                 tag=self.tag)
             return TruncatedTailPipe(self.decrypter, tail_size=len(self.tag))
         except EncryptionSchemeNotImplementedException:
-            # If we do not support the provided encryption scheme, than that's
+            # If we do not support the provided encryption scheme, then that's
             # something for the application using soledad to handle. This is
             # the case on asymmetrically encrypted documents on IncomingBox.
             self.raw_data = BytesIO()
