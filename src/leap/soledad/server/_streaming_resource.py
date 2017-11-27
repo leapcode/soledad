@@ -54,8 +54,9 @@ class StreamingResource(Resource):
         assert interfaces.IBlobsBackend.providedBy(self._handler)
 
     def render_POST(self, request):
-        user, namespace = request.postpath
-        db = self.factory.open_database(user)
+        user = request.postpath[0]
+        namespace = request.args.get('namespace', ['default'])[0]
+        db = self._handler
         raw_content = request.content.read()
         blob_ids = json.loads(raw_content)
         for blob_id in blob_ids:
