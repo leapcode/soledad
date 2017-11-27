@@ -35,7 +35,7 @@ __all__ = ['StreamingResource']
 
 
 logger = getLogger(__name__)
-SIZE_PACKER = struct.Struct("I")
+SIZE_PACKER = struct.Struct('<I')
 
 
 class StreamingResource(Resource):
@@ -64,7 +64,12 @@ class StreamingResource(Resource):
             size = db.get_blob_size(user, blob_id, namespace)
             request.write(SIZE_PACKER.pack(size))
             with open(path, 'rb') as blob_fd:
-                request.content.write(blob_fd.read())
+                # TODO: use a producer
+                blob_fd.seek(-16, 2)
+                request.write(blob_fd.read())  # sends tag
+                blob_fd.seek(0)
+                request.write(' ')
+                request.write(blob_fd.read())
 
         request.finish()
         return NOT_DONE_YET
