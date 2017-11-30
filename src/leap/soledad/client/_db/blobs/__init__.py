@@ -482,7 +482,10 @@ class BlobManager(BlobsSynchronizer):
         check_http_status(response.code, blob_id=blob_id)
         defer.returnValue(response)
 
-    def set_priority(self, blob_id, priority, namespace=''):
+    # TODO: evaluate if the following get/set priority methods are needed in
+    # the public interface of then blob manager, and remove if not.
+
+    def _set_priority(self, blob_id, priority, namespace=''):
         """
         Set the transfer priority for a certain blob.
 
@@ -497,10 +500,11 @@ class BlobManager(BlobsSynchronizer):
         :return: A deferred that fires after the priority has been set.
         :rtype: twisted.internet.defer.Deferred
         """
-        d = self.local.update_priority(blob_id, priority, namespace=namespace)
+        prio = _parse_priority(priority)
+        d = self.local.update_priority(blob_id, prio, namespace=namespace)
         return d
 
-    def get_priority(self, blob_id, namespace=''):
+    def _get_priority(self, blob_id, namespace=''):
         """
         Get the transfer priority for a certain blob.
 

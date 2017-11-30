@@ -49,7 +49,7 @@ class BlobPrioritiesTests(unittest.TestCase):
         missing_blob_id = uuid4().hex
         result = yield self.manager.get(missing_blob_id)
         self.assertIsNone(result)
-        priority = yield self.manager.get_priority(missing_blob_id)
+        priority = yield self.manager._get_priority(missing_blob_id)
         self.assertEqual(Priority.DEFAULT, priority)
 
     @defer.inlineCallbacks
@@ -57,11 +57,11 @@ class BlobPrioritiesTests(unittest.TestCase):
     def test_get_sets_priority(self):
         self.manager._download_and_decrypt = Mock(return_value=None)
         missing_blob_id = uuid4().hex
-        urgent = Priority.URGENT
+        urgent = 'urgent'
         result = yield self.manager.get(missing_blob_id, priority=urgent)
         self.assertIsNone(result)
-        priority = yield self.manager.get_priority(missing_blob_id)
-        self.assertEqual(urgent, priority)
+        priority = yield self.manager._get_priority(missing_blob_id)
+        self.assertEqual(Priority.URGENT, priority)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -72,7 +72,7 @@ class BlobPrioritiesTests(unittest.TestCase):
         doc1 = BlobDoc(BytesIO(content), blob_id)
         with pytest.raises(Exception):
             yield self.manager.put(doc1, len(content))
-        priority = yield self.manager.get_priority(blob_id)
+        priority = yield self.manager._get_priority(blob_id)
         self.assertEqual(Priority.DEFAULT, priority)
 
     @defer.inlineCallbacks
@@ -82,11 +82,10 @@ class BlobPrioritiesTests(unittest.TestCase):
         self.manager._encrypt_and_upload = Mock(return_value=upload_failure)
         content, blob_id = "Blob content", uuid4().hex
         doc1 = BlobDoc(BytesIO(content), blob_id)
-        urgent = Priority.URGENT
         with pytest.raises(Exception):
-            yield self.manager.put(doc1, len(content), priority=urgent)
-        priority = yield self.manager.get_priority(blob_id)
-        self.assertEqual(urgent, priority)
+            yield self.manager.put(doc1, len(content), priority='urgent')
+        priority = yield self.manager._get_priority(blob_id)
+        self.assertEqual(Priority.URGENT, priority)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -95,10 +94,10 @@ class BlobPrioritiesTests(unittest.TestCase):
         missing_blob_id = uuid4().hex
         result = yield self.manager.get(missing_blob_id)
         self.assertIsNone(result)
-        urgent = Priority.URGENT
-        yield self.manager.set_priority(missing_blob_id, urgent)
-        priority = yield self.manager.get_priority(missing_blob_id)
-        self.assertEqual(urgent, priority)
+        urgent = 'urgent'
+        yield self.manager._set_priority(missing_blob_id, urgent)
+        priority = yield self.manager._get_priority(missing_blob_id)
+        self.assertEqual(Priority.URGENT, priority)
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
@@ -112,10 +111,10 @@ class BlobPrioritiesTests(unittest.TestCase):
             return d
 
         # get some blobs in arbitrary order
-        low = yield _get(Priority.LOW)
-        high = yield _get(Priority.HIGH)
-        medium = yield _get(Priority.MEDIUM)
-        urgent = yield _get(Priority.URGENT)
+        low = yield _get('low')
+        high = yield _get('high')
+        medium = yield _get('medium')
+        urgent = yield _get('urgent')
 
         # make sure they are ordered by priority
         status = SyncStatus.PENDING_DOWNLOAD
@@ -129,7 +128,7 @@ class BlobPrioritiesTests(unittest.TestCase):
         self.manager.remote_list = Mock(return_value=defer.succeed(remote_ids))
         yield self.manager.refresh_sync_status_from_server()
         for blob_id in remote_ids:
-            priority = yield self.manager.get_priority(blob_id)
+            priority = yield self.manager._get_priority(blob_id)
             self.assertEquals(Priority.DEFAULT, priority)
 
     @defer.inlineCallbacks
@@ -137,20 +136,18 @@ class BlobPrioritiesTests(unittest.TestCase):
     def test_fetch_missing_fetches_with_priority(self):
 
         # pretend we have some pending downloads
-        deferreds = [
-            self.manager.local.update_sync_status(
-                'low', SyncStatus.PENDING_DOWNLOAD,
-                priority=Priority.LOW),
-            self.manager.local.update_sync_status(
-                'high', SyncStatus.PENDING_DOWNLOAD,
-                priority=Priority.HIGH),
-            self.manager.local.update_sync_status(
-                'medium', SyncStatus.PENDING_DOWNLOAD,
-                priority=Priority.MEDIUM),
-            self.manager.local.update_sync_status(
-                'urgent', SyncStatus.PENDING_DOWNLOAD,
-                priority=Priority.URGENT),
+        status = SyncStatus.PENDING_DOWNLOAD
+        update_meth = self.manager.local.update_sync_status
+        priorities = [
+            ('low', Priority.LOW),
+            ('high', Priority.HIGH),
+            ('medium', Priority.MEDIUM),
+            ('urgent', Priority.URGENT),
         ]
+        deferreds = []
+        for blob_id, priority in priorities:
+            d = update_meth(blob_id, status, priority=priority)
+            deferreds.append(d)
         yield defer.gatherResults(deferreds)
 
         # make sure download "succeeds" so fetching works
@@ -177,20 +174,17 @@ class BlobPrioritiesTests(unittest.TestCase):
         self.manager._send = Mock(return_value=None)
         content = "vegan cake"
         length = len(content)
-        deferreds = [
-            self.manager.put(
-                BlobDoc(BytesIO(content), 'low'), length,
-                priority=Priority.LOW),
-            self.manager.put(
-                BlobDoc(BytesIO(content), 'high'), length,
-                priority=Priority.HIGH),
-            self.manager.put(
-                BlobDoc(BytesIO(content), 'medium'), length,
-                priority=Priority.MEDIUM),
-            self.manager.put(
-                BlobDoc(BytesIO(content), 'urgent'), length,
-                priority=Priority.URGENT),
+        priorities = [
+            ('low', Priority.LOW),
+            ('high', Priority.HIGH),
+            ('medium', Priority.MEDIUM),
+            ('urgent', Priority.URGENT),
         ]
+        deferreds = []
+        for blob_id, priority in priorities:
+            doc = BlobDoc(BytesIO(content), blob_id)
+            d = self.manager.put(doc, length, priority=priority)
+            deferreds.append(d)
         yield defer.gatherResults(deferreds)
 
         # make sure upload "succeeds" so sending works
