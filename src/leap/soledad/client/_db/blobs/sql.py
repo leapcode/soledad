@@ -149,15 +149,16 @@ class SQLiteBlobBackend(object):
     @defer.inlineCallbacks
     def update_sync_status(self, blob_id, sync_status, namespace="",
                            priority=None):
-        retries = '(SELECT retries from sync_state' \
-                  ' WHERE blob_id="%s" and namespace="%s")' \
+        retries = 'SELECT retries from sync_state' \
+                  ' WHERE blob_id="%s" and namespace="%s"' \
                   % (blob_id, namespace)
         if not priority:
-            priority = '(SELECT priority FROM sync_state' \
-                       ' WHERE blob_id="%s" AND namespace="%s")' \
+            priority = 'SELECT priority FROM sync_state' \
+                       ' WHERE blob_id="%s" AND namespace="%s"' \
                        % (blob_id, namespace)
         fields = 'blob_id, namespace, sync_status, retries, priority'
-        markers = '?, ?, ?, %s, %s' % (retries, priority)
+        markers = '?, ?, ?, (%s), COALESCE((%s), %s)' \
+                  % (retries, priority, Priority.DEFAULT)
         values = [blob_id, namespace, sync_status]
         insert = 'INSERT or REPLACE INTO sync_state (%s) VALUES (%s)' \
                  % (fields, markers)
@@ -188,15 +189,20 @@ class SQLiteBlobBackend(object):
                                  namespace=''):
         if not blob_id_list:
             return
-        insert = 'INSERT or REPLACE INTO sync_state'
-        first_blob_id, blob_id_list = blob_id_list[0], blob_id_list[1:]
-        insert += ' (blob_id, namespace, sync_status, priority)'
-        insert += ' VALUES (?, ?, ?, ?)'
-        values = (first_blob_id, namespace, sync_status, Priority.DEFAULT)
+        inserts = []
+        values = ()
         for blob_id in blob_id_list:
-            insert += ', (?, ?, ?, ?)'
-            values += (blob_id, namespace, sync_status, Priority.DEFAULT)
-        return self.dbpool.runQuery(insert, values)
+            priority = 'SELECT priority FROM sync_state' \
+                       ' WHERE blob_id="%s" AND namespace="%s"' \
+                       % (blob_id, namespace)
+            insert = '(?, ?, ?, COALESCE((%s), %s))' \
+                     % (priority, Priority.DEFAULT)
+            inserts.append(insert)
+            values += (blob_id, namespace, sync_status)
+        query = 'INSERT or REPLACE INTO sync_state'
+        query += ' (blob_id, namespace, sync_status, priority) VALUES '
+        query += ', '.join(inserts)
+        return self.dbpool.runQuery(query, values)
 
     def increment_retries(self, blob_id):
         query = 'update sync_state set retries = retries + 1 where blob_id = ?'
