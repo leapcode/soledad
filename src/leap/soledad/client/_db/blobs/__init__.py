@@ -219,17 +219,21 @@ class BlobManager(BlobsSynchronizer):
         :type doc: leap.soledad.client._document.BlobDoc
         :param size: The size of the blob.
         :type size: int
-        :param local_only: Avoids sync (doesn't send to server).
-        :type local_only: bool
         :param namespace:
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
+        :param local_only: Avoids sync (doesn't send to server).
+        :type local_only: bool
+        :param priority: Priority for blob upload (one of:
+                         low, medium, high, urgent)
+        :type priority: str
 
         :return: A deferred that fires when the blob has been put.
         :rtype: twisted.internet.defer.Deferred
         """
+        prio = _parse_priority(priority)
         return self.semaphore.run(
-            self._put, doc, size, namespace, local_only, priority)
+            self._put, doc, size, namespace, local_only, prio)
 
     @defer.inlineCallbacks
     def _put(self, doc, size, namespace, local_only, priority):
@@ -325,11 +329,15 @@ class BlobManager(BlobsSynchronizer):
         :param namespace:
             Optional parameter to restrict operation to a given namespace.
         :type namespace: str
+        :param priority: Priority for blob download (one of:
+                         low, medium, high, urgent)
+        :type priority: str
 
         :return: A deferred that fires with the file descriptor for the
                  contents of the blob.
         :rtype: twisted.internet.defer.Deferred
         """
+        prio = _parse_priority(priority)
         local_blob = yield self.local.get(blob_id, namespace=namespace)
         if local_blob:
             logger.info("Found blob in local database: %s" % blob_id)
@@ -337,7 +345,7 @@ class BlobManager(BlobsSynchronizer):
 
         yield self.local.update_sync_status(
             blob_id, SyncStatus.PENDING_DOWNLOAD, namespace=namespace,
-            priority=priority)
+            priority=prio)
 
         fd = yield self._fetch(blob_id, namespace)
         defer.returnValue(fd)
@@ -480,7 +488,7 @@ class BlobManager(BlobsSynchronizer):
 
         :param blob_id: Unique identifier of a blob.
         :type blob_id: str
-        :param priority: The priority to be set.
+        :param priority: The numerical priority to be set.
         :type priority: int
         :param namespace: Optional parameter to restrict operation to a given
                           namespace.
@@ -508,3 +516,22 @@ class BlobManager(BlobsSynchronizer):
         """
         d = self.local.get_priority(blob_id, namespace=namespace)
         return d
+
+
+def _parse_priority(prio):
+    if isinstance(prio, int):
+        if Priority.LOW <= prio <= Priority.URGENT:
+            return prio
+        else:
+            raise ValueError()
+    elif isinstance(prio, str):
+        if prio == 'low':
+            return Priority.LOW
+        elif prio == 'medium':
+            return Priority.MEDIUM
+        elif prio == 'high':
+            return Priority.HIGH
+        elif prio == 'urgent':
+            return Priority.URGENT
+        raise ValueError()
+    raise ValueError()
