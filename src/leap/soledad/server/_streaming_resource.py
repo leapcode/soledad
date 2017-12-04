@@ -16,7 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 A twisted resource that serves download as a single stream of multiple blobs.
--> POST .../uuid/namespace/ DATA: [blob_id, blob_id2, ..., blob_idn]
+-> POST .../uuid/ DATA: [blob_id, blob_id2, ..., blob_idn]
 <- [(size(blob_id), content(blob_id)) for blob_id in DATA] (as a binary stream)
 """
 import json

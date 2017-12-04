@@ -56,6 +56,7 @@ from .errors import (
 
 logger = Logger()
 FIXED_REV = 'ImmutableRevision'  # Blob content is immutable
+SEPARATOR = ' '
 
 
 def check_http_status(code, blob_id=None, flags=None):
@@ -112,20 +113,22 @@ class StreamDecrypterBuffer(object):
         self.blobs_list = blobs_list
         self.secret = secret
         self.done_callback = done_callback
+        # self.buf is used to collect size and tag, before becoming a
+        # DecrypterBuffer, which then gets used to process the content.
         self.buf = b''
         self.reset()
 
     def reset(self):
-        self.current_blob_size = False
+        self.current_blob_size = None
         self.current_blob_id = None
         self.received = 0
 
     def write(self, data):
         if not self.current_blob_size:
             self.buf += data
-            if ' ' in self.buf:
+            if SEPARATOR in self.buf:
                 marker, self.buf = self.buf.split(' ')
-                assert(len(marker) == 20)  # 16 byte tag + 4 byte size
+                assert(len(marker) == 20)  # 4 byte size + 16 byte tag
                 size, tag = marker[:4], marker[4:]
                 self.current_blob_size = self.size_pack.unpack(size)[0]
                 self.received = len(self.buf)
@@ -181,8 +184,8 @@ class BlobManager(BlobsSynchronizer):
         :type token: str
         :param cert_file: The path to the CA certificate file.
         :type cert_file: str
-        :param cert_file: Remote storage stream URL, if supported.
-        :type cert_file: str
+        :param remote_stream: Remote storage stream URL, if supported.
+        :type remote_stream: str
         """
         super(BlobsSynchronizer, self).__init__()
         if local_path:
@@ -480,7 +483,7 @@ class BlobManager(BlobsSynchronizer):
     def _downstream(self, blobs_id_list, namespace=''):
         uri = urljoin(self.remote_stream, self.user)
         params = {'namespace': namespace} if namespace else None
-        data = BytesIO(json.dumps(list(blobs_id_list)))
+        data = BytesIO(json.dumps(blobs_id_list))
         response = yield self._client.post(uri, params=params, data=data)
         deferreds = []
 
