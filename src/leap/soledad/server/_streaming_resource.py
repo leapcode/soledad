@@ -20,7 +20,7 @@ A twisted resource that serves download as a single stream of multiple blobs.
 <- [(size(blob_id), content(blob_id)) for blob_id in DATA] (as a binary stream)
 """
 import json
-import struct
+import base64
 
 from zope.interface import implementer
 from twisted.internet.interfaces import IPushProducer
@@ -38,7 +38,6 @@ __all__ = ['StreamingResource']
 
 
 logger = getLogger(__name__)
-SIZE_PACKER = struct.Struct('<I')
 
 
 class StreamingResource(Resource):
@@ -94,10 +93,11 @@ class DownstreamProducer(object):
         request, paths = self.request, self.paths
         while paths:
             blob_id, path, size = paths.pop(0)
-            request.write(SIZE_PACKER.pack(size))  # sends file size
+            request.write('%08x' % size)  # sends file size
             with open(path, 'rb') as blob_fd:
                 blob_fd.seek(-16, 2)
-                request.write(blob_fd.read())  # sends AES-GCM tag
+                encoded_tag = base64.urlsafe_b64encode(blob_fd.read())
+                request.write(encoded_tag)  # sends AES-GCM tag
                 blob_fd.seek(0)
                 request.write(' ')
                 data = blob_fd.read(self.chunk_size)

@@ -128,9 +128,9 @@ class StreamDecrypterBuffer(object):
             self.buf += data
             if SEPARATOR in self.buf:
                 marker, self.buf = self.buf.split(' ')
-                assert(len(marker) == 20)  # 4 byte size + 16 byte tag
-                size, tag = marker[:4], marker[4:]
-                self.current_blob_size = self.size_pack.unpack(size)[0]
+                size, tag = marker[:8], marker[8:]
+                tag = base64.urlsafe_b64decode(tag)
+                self.current_blob_size = int(size, 16)
                 self.received = len(self.buf)
                 blob_id = self.blobs_list.pop(0)
                 buf = DecrypterBuffer(blob_id, self.secret, tag)
