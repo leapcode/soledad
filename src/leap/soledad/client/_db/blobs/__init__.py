@@ -309,17 +309,15 @@ class BlobManager(BlobsSynchronizer):
         yield self.local.update_sync_status(
             doc.blob_id, SyncStatus.PENDING_UPLOAD, namespace=namespace,
             priority=priority)
-        yield self._send(doc.blob_id, namespace, 1, 1)
+        yield self._send(doc.blob_id, namespace)
 
-    def _send(self, blob_id, namespace, i, total):
+    def _send(self, blob_id, namespace):
         lock = self.locks[blob_id]
-        d = lock.run(self.__send, blob_id, namespace, i, total)
+        d = lock.run(self.__send, blob_id, namespace)
         return d
 
     @defer.inlineCallbacks
-    def __send(self, blob_id, namespace, i, total):
-        logger.info("Sending blob to server (%d/%d): %s"
-                    % (i, total, blob_id))
+    def __send(self, blob_id, namespace):
         # In fact, some kind of pipe is needed here, where each write on db
         # handle gets forwarded into a write on the connection handle
         fd = yield self.local.get(blob_id, namespace=namespace)
