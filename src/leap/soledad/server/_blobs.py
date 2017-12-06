@@ -157,8 +157,8 @@ class FilesystemBlobsBackend(object):
             count += len(filter(lambda i: not i.endswith('.flags'), filenames))
         return json.dumps({"count": count})
 
-    def list_blobs(self, user, request, namespace='', order_by=None,
-                   deleted=False, filter_flag=False):
+    def list_blobs(self, user, namespace='', order_by=None, deleted=False,
+                   filter_flag=False):
         namespace = namespace or 'default'
         blob_ids = []
         base_path = self._get_path(user, namespace=namespace)
@@ -180,7 +180,7 @@ class FilesystemBlobsBackend(object):
             blob_ids = list(self._filter_flag(blob_ids, filter_flag))
         blob_ids = [os.path.basename(path).replace('.deleted', '')
                     for path in blob_ids]
-        return json.dumps(blob_ids)
+        return blob_ids
 
     def _filter_flag(self, blob_paths, flag):
         for blob_path in blob_paths:
@@ -280,9 +280,10 @@ class BlobsResource(resource.Resource):
             order = request.args.get('order_by', [None])[0]
             filter_flag = request.args.get('filter_flag', [False])[0]
             deleted = request.args.get('deleted', [False])[0]
-            return self._handler.list_blobs(user, request, namespace,
-                                            order_by=order, deleted=deleted,
-                                            filter_flag=filter_flag)
+            blobs = self._handler.list_blobs(user, namespace,
+                                             order_by=order, deleted=deleted,
+                                             filter_flag=filter_flag)
+            return json.dumps(blobs)
         only_flags = request.args.get('only_flags', [False])[0]
         try:
             if only_flags:

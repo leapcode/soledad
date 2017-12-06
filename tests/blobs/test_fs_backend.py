@@ -26,7 +26,6 @@ from mock import Mock
 import mock
 import os
 import base64
-import json
 import pytest
 
 
@@ -131,7 +130,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         _ = None
         walk_mock.return_value = [('', _, ['blob_0']), ('', _, ['blob_1'])]
-        result = json.loads(backend.list_blobs('user', DummyRequest([''])))
+        result = backend.list_blobs('user')
         self.assertEquals(result, ['blob_0', 'blob_1'])
 
     @pytest.mark.usefixtures("method_tmpdir")
@@ -140,8 +139,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
         _ = None
         walk_mock.return_value = [('', _, ['blob_0']), ('', _, ['blob_1'])]
-        result = json.loads(backend.list_blobs('user', DummyRequest(['']),
-                                               namespace='incoming'))
+        result = backend.list_blobs('user', namespace='incoming')
         self.assertEquals(result, ['blob_0', 'blob_1'])
         target_dir = os.path.join(self.tempdir, 'user', 'incoming')
         walk_mock.assert_called_once_with(target_dir)

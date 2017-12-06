@@ -112,7 +112,7 @@ class IBlobsBackend(Interface):
         :rtype: int
         """
 
-    def list_blobs(user, request, namespace='', order_by=None, deleted=False,
+    def list_blobs(user, namespace='', order_by=None, deleted=False,
                    filter_flag=None):
         """
         List the blobs stored in the backend.
@@ -122,12 +122,8 @@ class IBlobsBackend(Interface):
 
         :param user: The id of the user who owns the blob.
         :type user: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
         :param namespace: Restrict the count to a certain namespace.
         :type namespace: str
-
         :param order_by: 'date' (equivalent to '+date') or  '-date', to sort
             ascending or descending by date, respectivelly.
         :type order_by: str
@@ -137,9 +133,9 @@ class IBlobsBackend(Interface):
             be returned.
         :type filter_flag: str
 
-        :return: A JSON list of blob ids, optionally ordered and/or restricted
-                 by namespace.
-        :rtype: str
+        :return: A list of blob ids, optionally ordered and/or restricted by
+                 namespace.
+        :rtype: list of str
         """
 
     def get_total_storage(user):
