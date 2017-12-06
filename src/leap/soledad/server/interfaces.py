@@ -171,13 +171,6 @@ class IBlobsBackend(Interface):
         :type namespace: str
         """
 
-
-class IIncomingBoxBackend(Interface):
-
-    """
-    An interface for a backend that can deliver
-    """
-
     def get_flags(user, blob_id, request, namespace=''):
         """
         Get the flags for a blob.

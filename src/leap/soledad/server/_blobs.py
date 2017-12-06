@@ -59,7 +59,6 @@ VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')
 
 
 @implementer(interfaces.IBlobsBackend)
-@implementer(interfaces.IIncomingBoxBackend)
 class FilesystemBlobsBackend(object):
 
     def __init__(self, blobs_path='/tmp/blobs/', quota=200 * 1024,
