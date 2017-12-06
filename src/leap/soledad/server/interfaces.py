@@ -30,27 +30,19 @@ class IBlobsBackend(Interface):
     ``twisted.web.server.Request`` and should use them to serve the Blobs API.
     """
 
-    def read_blob(user, blob_id, request, namespace=''):
+    def read_blob(user, blob_id, namespace=''):
         """
-        Read a blob from the backend storage and write it as a response to a
-        request.
+        Read a blob from the backend storage return it as a twisted resource.
 
         :param user: The id of the user who owns the blob.
         :type user: str
         :param blob_id: The id of the blob.
         :type blob_id: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
         :param namespace: An optional namespace for the blob.
         :type namespace: str
 
-        :return: Either ``server.NOT_DONE_YET`` to indicate an asynchronous
-            operation or a ``bytes`` instance to write as the response to the
-            request. If ``NOT_DONE_YET`` is returned, at some point later (for
-            example, in a Deferred callback) call ``request.write(b"data")`` to
-            write data to the request, and ``request.finish()`` to send the
-            data to the browser.
+        :return: The blob as a twisted resource.
+        :rtype: twisted.web.resource.Resource
         """
 
     def write_blob(user, blob_id, request, namespace=''):

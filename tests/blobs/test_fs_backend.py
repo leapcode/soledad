@@ -66,7 +66,8 @@ class FilesystemBackendTestCase(unittest.TestCase):
         file_mock.return_value = render_mock
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         request = DummyRequest([''])
-        backend.read_blob('user', 'blob_id', request)
+        resource = backend.read_blob('user', 'blob_id')
+        resource.render_GET(request)
 
         backend._get_path.assert_called_once_with('user', 'blob_id', '')
         ctype = 'application/octet-stream'

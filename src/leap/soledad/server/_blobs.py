@@ -78,12 +78,12 @@ class FilesystemBlobsBackend(object):
     def __touch(self, path):
         open(path, 'a')
 
-    def read_blob(self, user, blob_id, request, namespace=''):
+    def read_blob(self, user, blob_id, namespace=''):
         logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
         path = self._get_path(user, blob_id, namespace)
         logger.debug('blob path: %s' % path)
-        _file = static.File(path, defaultType='application/octet-stream')
-        return _file.render_GET(request)
+        res = static.File(path, defaultType='application/octet-stream')
+        return res
 
     def get_flags(self, user, blob_id, namespace=''):
         path = self._get_path(user, blob_id, namespace)
@@ -295,8 +295,8 @@ class BlobsResource(resource.Resource):
             # 404 - Not Found
             request.setResponseCode(404)
             return "Blob doesn't exists: %s" % blob_id
-        return self._handler.read_blob(user, blob_id, request,
-                                       namespace=namespace)
+        res = self._handler.read_blob(user, blob_id, namespace=namespace)
+        return res.render_GET(request)
 
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)
