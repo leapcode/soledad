@@ -137,11 +137,10 @@ class FilesystemBlobsBackend(object):
             yield fbp.startProducing(blobfile)
         yield self.semaphore.release()
 
-    def delete_blob(self, user, blob_id, request, namespace=''):
+    def delete_blob(self, user, blob_id, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
         if not os.path.isfile(blob_path):
-            request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
+            raise BlobNotFound
         self.__touch(blob_path + '.deleted')
         os.unlink(blob_path)
         try:
@@ -304,8 +303,12 @@ class BlobsResource(resource.Resource):
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        self._handler.delete_blob(user, blob_id, request, namespace=namespace)
-        return ''
+        try:
+            self._handler.delete_blob(user, blob_id, namespace=namespace)
+            return ''
+        except BlobNotFound:
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
 
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)

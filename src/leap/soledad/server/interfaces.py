@@ -23,11 +23,6 @@ class IBlobsBackend(Interface):
 
     """
     An interface for a backend that can store blobs.
-
-    Classes that implement this interface are supposed to be used by
-    ``BlobsResource``, which is a ``twisted.web.resource.Resource`` that serves
-    the Blobs API. Because of that, their methods receive instances of
-    ``twisted.web.server.Request`` and should use them to serve the Blobs API.
     """
 
     def read_blob(user, blob_id, namespace=''):
