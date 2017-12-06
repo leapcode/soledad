@@ -8,3 +8,4 @@ API Reference
    api/attachments
    api/blobs-client
    api/blobs-server
+   api/blobs-server-backend

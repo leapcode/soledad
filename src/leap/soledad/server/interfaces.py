@@ -22,86 +22,197 @@ from zope.interface import Interface
 class IBlobsBackend(Interface):
 
     """
-    An interface for a BlobsBackend.
+    An interface for a backend that can store blobs.
+
+    Classes that implement this interface are supposed to be used by
+    ``BlobsResource``, which is a ``twisted.web.resource.Resource`` that serves
+    the Blobs API. Because of that, their methods receive instances of
+    ``twisted.web.server.Request`` and should use them to serve the Blobs API.
     """
 
     def read_blob(user, blob_id, request, namespace=''):
         """
-        Read blob with a given blob_id, and write it to the passed request.
+        Read a blob from the backend storage and write it as a response to a
+        request.
 
-        :returns: a deferred that fires upon finishing.
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
+
+        :return: Either ``server.NOT_DONE_YET`` to indicate an asynchronous
+            operation or a ``bytes`` instance to write as the response to the
+            request. If ``NOT_DONE_YET`` is returned, at some point later (for
+            example, in a Deferred callback) call ``request.write(b"data")`` to
+            write data to the request, and ``request.finish()`` to send the
+            data to the browser.
         """
 
     def write_blob(user, blob_id, request, namespace=''):
         """
-        Write blob to the storage, reading it from the passed request.
+        Write a blob to the backend storage after reading it from a request.
 
-        :returns: a deferred that fires upon finishing.
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
+
+        :return: A deferred that fires when the blob has been written to the
+                 backend storage.
         """
 
     def delete_blob(user, blob_id, namespace=''):
         """
-        Delete the given blob_id.
+        Delete a blob from the backend storage.
+
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
         """
 
     def get_blob_size(user, blob_id, namespace=''):
         """
-        Get the size of the given blob id.
+        Get the size of a blob.
+
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
+
+        :return: The size of the blob.
+        :rtype: int
         """
 
     def count(user, request, namespace=''):
         """
-        Counts the total number of blobs.
+        Count the total number of blobs.
+
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: Restrict the count to a certain namespace.
+        :type namespace: str
+
+        :return: The number of blobs in the backend storage, possibly
+                 restricted to a certain namespace.
+        :rtype: int
         """
 
-    def list_blobs(user, request, namespace='', order_by=None):
+    def list_blobs(user, request, namespace='', order_by=None, deleted=False,
+                   filter_flag=None):
         """
-        Returns a json-encoded list of ids from user's blobs storage,
-        optionally ordered by order_by parameter and optionally restricted by
-        namespace.
+        List the blobs stored in the backend.
 
-        :returns: a deferred that fires upon finishing.
+        The resulting list can be ordered by date, filtered by namespace or
+        flag, and include deleted items or not.
+
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: Restrict the count to a certain namespace.
+        :type namespace: str
+
+        :param order_by: 'date' (equivalent to '+date') or  '-date', to sort
+            ascending or descending by date, respectivelly.
+        :type order_by: str
+        :param deleted: Whether to include deleted items in the result.
+        :type deleted: bool
+        :param filter_flag: If given, only results flagged with that flag will
+            be returned.
+        :type filter_flag: str
+
+        :return: A JSON list of blob ids, optionally ordered and/or restricted
+                 by namespace.
+        :rtype: str
         """
 
     def get_total_storage(user):
         """
         Get the size used by a given user as the sum of all the blobs stored
-        unders its namespace.
+        under all that user's namespaces.
+
+        :param user: The id of a user.
+        :type user: str
+
+        :return: The size in units of 1024 bytes.
+        :rtype: int
         """
 
     def add_tag_header(user, blob_id, request, namespace=''):
         """
-        Adds a header 'Tag' to the passed request object, containing the last
-        16 bytes of the encoded blob, which according to the spec contains the
-        tag.
+        Add a ``Tag`` HTTP header to the passed request containing the tag of
+        a blob.
 
-        :returns: a deferred that fires upon finishing.
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
         """
 
 
 class IIncomingBoxBackend(Interface):
 
     """
-    An interface for an IncomingBoxBackend implementation.
+    An interface for a backend that can deliver
     """
 
     def get_flags(user, blob_id, request, namespace=''):
         """
-        Given a blob_id, return it's associated flags.
+        Get the flags for a blob.
 
-        :returns: a JSON encoded string with a list of flags.
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
+
+        :return: a JSON encoded string with a list of flags.
+        :rtype: str
         """
 
-    def set_flags(self, user, blob_id, request, namespace=''):
+    def set_flags(user, blob_id, request, namespace=''):
         """
-        Set flags for a blob_id.
-        """
+        Set flags for a blob.
 
-    def list_blobs(self, user, request, namespace='', order_by=None,
-                   filter_flag=False):
-        """
-        Blobs listing with flags support. Accepts a filter_flag parameter,
-        which is a flag that can be used to filter results matching it.
+        The flags are expected to be send in the body of the request, as a JSON
+        list of strings.
 
-        :returns: a deferred that fires upon finishing.
+        :param user: The id of the user who owns the blob.
+        :type user: str
+        :param blob_id: The id of the blob.
+        :type blob_id: str
+        :param request: A representation of all of the information about the
+            request that is being made.
+        :type request: twisted.web.server.Request
+        :param namespace: An optional namespace for the blob.
+        :type namespace: str
+
+        :return: A string describing an error or ``None`` in case of success.
+        :rtype: str
         """
