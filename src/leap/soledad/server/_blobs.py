@@ -85,16 +85,14 @@ class FilesystemBlobsBackend(object):
         _file = static.File(path, defaultType='application/octet-stream')
         return _file.render_GET(request)
 
-    def get_flags(self, user, blob_id, request, namespace=''):
+    def get_flags(self, user, blob_id, namespace=''):
         path = self._get_path(user, blob_id, namespace)
         if not os.path.isfile(path):
-            # 404 - Not Found
-            request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
+            raise BlobNotFound
         if not os.path.isfile(path + '.flags'):
-            return '[]'
+            return []
         with open(path + '.flags', 'r') as flags_file:
-            return flags_file.read()
+            return json.loads(flags_file.read())
 
     def set_flags(self, user, blob_id, request, namespace=''):
         path = self._get_path(user, blob_id, namespace)
@@ -286,16 +284,18 @@ class BlobsResource(resource.Resource):
                                             order_by=order, deleted=deleted,
                                             filter_flag=filter_flag)
         only_flags = request.args.get('only_flags', [False])[0]
-        if only_flags:
-            return self._handler.get_flags(user, blob_id, request, namespace)
         try:
+            if only_flags:
+                flags = self._handler.get_flags(user, blob_id, namespace)
+                return json.dumps(flags)
             tag = self._handler.get_tag(user, blob_id, namespace)
+            request.responseHeaders.setRawHeaders('Tag', [tag])
         except BlobNotFound:
             # 404 - Not Found
             request.setResponseCode(404)
             return "Blob doesn't exists: %s" % blob_id
-        request.responseHeaders.setRawHeaders('Tag', [tag])
-        return self._handler.read_blob(user, blob_id, request, namespace)
+        return self._handler.read_blob(user, blob_id, request,
+                                       namespace=namespace)
 
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)

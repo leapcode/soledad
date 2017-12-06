@@ -167,7 +167,7 @@ class IBlobsBackend(Interface):
         :rtype: str
         """
 
-    def get_flags(user, blob_id, request, namespace=''):
+    def get_flags(user, blob_id, namespace=''):
         """
         Get the flags for a blob.
 
@@ -175,14 +175,11 @@ class IBlobsBackend(Interface):
         :type user: str
         :param blob_id: The id of the blob.
         :type blob_id: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
         :param namespace: An optional namespace for the blob.
         :type namespace: str
 
-        :return: a JSON encoded string with a list of flags.
-        :rtype: str
+        :return: a list of flags.
+        :rtype: list of str
         """
 
     def set_flags(user, blob_id, request, namespace=''):
