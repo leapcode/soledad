@@ -84,8 +84,9 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
 
         db = self.state.open_database(user_id)
         request = DummyRequest([user_id, doc_id])
-        yield db.read_blob(user_id, doc_id, request, 'MX')
-        flags = db.get_flags(user_id, doc_id, 'MX')
+        res = db.read_blob(user_id, doc_id, namespace='MX')
+        yield res.render_GET(request)
+        flags = db.get_flags(user_id, doc_id, namespace='MX')
         expected_preamble = formatter.preamble(content, doc_id)
         expected_preamble = decode_preamble(expected_preamble, True)
         written_preamble, written_content = request.written[0].split()

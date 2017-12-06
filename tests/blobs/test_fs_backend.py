@@ -82,10 +82,9 @@ class FilesystemBackendTestCase(unittest.TestCase):
     def test_cannot_overwrite(self, isfile):
         isfile.return_value = True
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        request = DummyRequest([''])
-        yield backend.write_blob('user', 'blob_id', request)
-        self.assertEquals(request.written[0], "Blob already exists: blob_id")
-        self.assertEquals(request.responseCode, 409)
+        with pytest.raises(_blobs.BlobExists):
+            fd = Mock()
+            yield backend.write_blob('user', 'blob_id', fd)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
@@ -93,14 +92,11 @@ class FilesystemBackendTestCase(unittest.TestCase):
     def test_write_cannot_exceed_quota(self, isfile):
         isfile.return_value = False
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        request = Mock()
-
         backend.get_total_storage = lambda x: 100
         backend.quota = 90
-        yield backend.write_blob('user', 'blob_id', request)
-
-        request.setResponseCode.assert_called_once_with(507)
-        request.write.assert_called_once_with('Quota Exceeded!')
+        with pytest.raises(_blobs.QuotaExceeded):
+            fd = Mock()
+            yield backend.write_blob('user', 'blob_id', fd)
 
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_path_partitioning_by_default(self):

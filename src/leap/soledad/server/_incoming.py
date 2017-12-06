@@ -34,6 +34,8 @@ from leap.soledad.common.log import getLogger
 
 from leap.soledad.server._config import get_config
 from leap.soledad.server._blobs import BlobsServerState
+from leap.soledad.server._blobs import BlobExists
+from leap.soledad.server._blobs import QuotaExceeded
 
 
 __all__ = ['IncomingResource']
@@ -65,28 +67,48 @@ class IncomingResource(Resource):
         scheme = EncryptionSchemes.PUBKEY
         db = self.factory.open_database(uuid)
         if uses_legacy(db):
-            try:
-                doc = ServerDocument(doc_id)
-                content = request.content.read()
-                doc.content = self.formatter.format(content, scheme)
-                db.put_doc(doc)
-                self._finish(request)
-            except Exception as e:
-                self._error(e, request)
+            self._put_legacy(doc_id, scheme, db, request)
         else:
-            raw_content = request.content.read()
-            preamble = self.formatter.preamble(raw_content, doc_id)
-            request.content = BytesIO(preamble + ' ' + raw_content)
-            d = db.write_blob(uuid, doc_id, request, namespace='MX')
-            # FIXME: We really need to decouple request handling from the
-            # backend! This is very ugly, but will change when this refactor
-            # is done.
-            flags = [Flags.PENDING]
-            d.addCallback(lambda _: db.set_flags(uuid, doc_id, flags,
-                                                 namespace='MX'))
-            d.addCallback(lambda _: self._finish(request))
-            d.addErrback(self._error, request)
+            self._put_incoming(uuid, doc_id, scheme, db, request)
         return NOT_DONE_YET
+
+    def _put_legacy(self, doc_id, scheme, db, request):
+        try:
+            doc = ServerDocument(doc_id)
+            content = request.content.read()
+            doc.content = self.formatter.format(content, scheme)
+            db.put_doc(doc)
+            self._finish(request)
+        except Exception as e:
+            self._error(e, request)
+
+    def _put_incoming(self, user, blob_id, scheme, db, request):
+        raw_content = request.content.read()
+        preamble = self.formatter.preamble(raw_content, blob_id)
+        request.content = BytesIO(preamble + ' ' + raw_content)
+
+        def catchBlobExists(failure):
+            failure.trap(BlobExists)
+            request.setResponseCode(409)
+            request.write("Blob already exists: %s" % blob_id)
+            request.finish()
+
+        def catchQuotaExceeded(failure):
+            failure.trap(QuotaExceeded)
+            logger.error("Error 507: Quota exceeded for user: %s" % user)
+            request.setResponseCode(507)
+            request.write('Quota Exceeded!')
+            request.finish()
+
+        fd = request.content
+        d = db.write_blob(user, blob_id, fd, namespace='MX')
+        flags = [Flags.PENDING]
+        d.addCallback(lambda _: db.set_flags(user, blob_id, flags,
+                                             namespace='MX'))
+        d.addCallback(lambda _: request.finish())
+        d.addErrback(catchBlobExists)
+        d.addErrback(catchQuotaExceeded)
+        d.addErrback(self._error, request)
 
     def _finish(self, request):
         request.write('{"success": true}')

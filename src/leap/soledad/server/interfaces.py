@@ -45,22 +45,23 @@ class IBlobsBackend(Interface):
         :rtype: twisted.web.resource.Resource
         """
 
-    def write_blob(user, blob_id, request, namespace=''):
+    def write_blob(user, blob_id, fd, namespace=''):
         """
-        Write a blob to the backend storage after reading it from a request.
+        Write a blob to the backend storage.
 
         :param user: The id of the user who owns the blob.
         :type user: str
         :param blob_id: The id of the blob.
         :type blob_id: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
+        :param fd: A file-like object into which the contents of the blob
+            should be written.
+        :type fd: file-like
         :param namespace: An optional namespace for the blob.
         :type namespace: str
 
         :return: A deferred that fires when the blob has been written to the
                  backend storage.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def delete_blob(user, blob_id, namespace=''):

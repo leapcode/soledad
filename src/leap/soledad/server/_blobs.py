@@ -65,6 +65,18 @@ class BlobNotFound(Exception):
     """
 
 
+class BlobExists(Exception):
+    """
+    Raised when a blob already exists in data storage backend.
+    """
+
+
+class QuotaExceeded(Exception):
+    """
+    Raised when the quota would be exceeded if an operation would be held.
+    """
+
+
 @implementer(interfaces.IBlobsBackend)
 class FilesystemBlobsBackend(object):
 
@@ -107,7 +119,7 @@ class FilesystemBlobsBackend(object):
             flags_file.write(raw_flags)
 
     @defer.inlineCallbacks
-    def write_blob(self, user, blob_id, request, namespace=''):
+    def write_blob(self, user, blob_id, fd, namespace=''):
         yield self.semaphore.acquire()
         path = self._get_path(user, blob_id, namespace)
         try:
@@ -115,18 +127,12 @@ class FilesystemBlobsBackend(object):
         except OSError as e:
             logger.warn("Got exception trying to create directory: %r" % e)
         if os.path.isfile(path):
-            # 409 - Conflict
-            request.setResponseCode(409)
-            request.write("Blob already exists: %s" % blob_id)
-            defer.returnValue(None)
+            raise BlobExists
         used = yield self.get_total_storage(user)
         if used > self.quota:
-            logger.error("Error 507: Quota exceeded for user: %s" % user)
-            request.setResponseCode(507)
-            request.write('Quota Exceeded!')
-            defer.returnValue(None)
+            raise QuotaExceeded
         logger.info('writing blob: %s - %s' % (user, blob_id))
-        fbp = FileBodyProducer(request.content)
+        fbp = FileBodyProducer(fd)
         with open(path, 'wb') as blobfile:
             yield fbp.startProducing(blobfile)
         yield self.semaphore.release()
@@ -304,8 +310,25 @@ class BlobsResource(resource.Resource):
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        d = self._handler.write_blob(user, blob_id, request, namespace)
+
+        def catchBlobExists(failure):
+            failure.trap(BlobExists)
+            request.setResponseCode(409)
+            request.write("Blob already exists: %s" % blob_id)
+            request.finish()
+
+        def catchQuotaExceeded(failure):
+            failure.trap(QuotaExceeded)
+            logger.error("Error 507: Quota exceeded for user: %s" % user)
+            request.setResponseCode(507)
+            request.write('Quota Exceeded!')
+            request.finish()
+
+        fd = request.content
+        d = self._handler.write_blob(user, blob_id, fd, namespace=namespace)
         d.addCallback(lambda _: request.finish())
+        d.addErrback(catchBlobExists)
+        d.addErrback(catchQuotaExceeded)
         d.addErrback(self._error, request)
         return NOT_DONE_YET
 
