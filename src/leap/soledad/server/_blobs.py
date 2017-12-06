@@ -58,6 +58,12 @@ VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')
 # [ ] chunking (should we do it on the client or on the server?)
 
 
+class BlobNotFound(Exception):
+    """
+    Raised when a blob is not found in data storage backend.
+    """
+
+
 @implementer(interfaces.IBlobsBackend)
 class FilesystemBlobsBackend(object):
 
