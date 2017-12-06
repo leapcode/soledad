@@ -41,6 +41,7 @@ from leap.common.files import mkdir_p
 from leap.soledad.common.log import getLogger
 from leap.soledad.server import interfaces
 from leap.soledad.common.blobs import ACCEPTED_FLAGS
+from leap.soledad.common.blobs import InvalidFlag
 
 
 __all__ = ['BlobsResource']
@@ -94,19 +95,15 @@ class FilesystemBlobsBackend(object):
         with open(path + '.flags', 'r') as flags_file:
             return json.loads(flags_file.read())
 
-    def set_flags(self, user, blob_id, request, namespace=''):
+    def set_flags(self, user, blob_id, flags, namespace=''):
         path = self._get_path(user, blob_id, namespace)
         if not os.path.isfile(path):
-            # 404 - Not Found
-            request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
-        raw_flags = request.content.read()
-        flags = json.loads(raw_flags)
+            raise BlobNotFound
         for flag in flags:
             if flag not in ACCEPTED_FLAGS:
-                request.setResponseCode(406)
-                return "Unsupported flag: %s" % flag
+                raise InvalidFlag(flag)
         with open(path + '.flags', 'w') as flags_file:
+            raw_flags = json.dumps(flags)
             flags_file.write(raw_flags)
 
     @defer.inlineCallbacks
@@ -315,7 +312,18 @@ class BlobsResource(resource.Resource):
     def render_POST(self, request):
         logger.info("http post: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        self._handler.set_flags(user, blob_id, request, namespace)
+        raw_flags = request.content.read()
+        flags = json.loads(raw_flags)
+        try:
+            self._handler.set_flags(user, blob_id, flags, namespace=namespace)
+        except BlobNotFound:
+            # 404 - Not Found
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
+        except InvalidFlag as e:
+            request.setResponseCode(406)
+            flag = e.message
+            return "Invalid flag: %s" % str(flag)
         return ''
 
     def _error(self, e, request):

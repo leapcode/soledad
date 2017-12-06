@@ -170,23 +170,16 @@ class IBlobsBackend(Interface):
         :rtype: list of str
         """
 
-    def set_flags(user, blob_id, request, namespace=''):
+    def set_flags(user, blob_id, flags, namespace=''):
         """
         Set flags for a blob.
-
-        The flags are expected to be send in the body of the request, as a JSON
-        list of strings.
 
         :param user: The id of the user who owns the blob.
         :type user: str
         :param blob_id: The id of the blob.
         :type blob_id: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
+        :param flags: The list of flags to be set.
+        :type flags: list of str
         :param namespace: An optional namespace for the blob.
         :type namespace: str
-
-        :return: A string describing an error or ``None`` in case of success.
-        :rtype: str
         """

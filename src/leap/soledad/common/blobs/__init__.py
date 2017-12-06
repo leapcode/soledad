@@ -20,3 +20,9 @@ Represents flags that can be used on blobs.
 from collections import namedtuple
 ACCEPTED_FLAGS = ['PENDING', 'PROCESSING', 'PROCESSED', 'FAILED']
 Flags = namedtuple('Flags', ' '.join(ACCEPTED_FLAGS))(*ACCEPTED_FLAGS)
+
+
+class InvalidFlag(Exception):
+    """
+    Raised when a flag that is not accepted is used.
+    """

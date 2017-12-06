@@ -17,13 +17,11 @@
 """
 A twisted resource that saves externally delivered documents into user's db.
 """
-import json
 import base64
 
 from io import BytesIO
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
-from twisted.web.test.test_web import DummyRequest
 
 from leap.soledad.common.blobs import Flags
 from leap.soledad.common.blobs import preamble
@@ -83,9 +81,9 @@ class IncomingResource(Resource):
             # FIXME: We really need to decouple request handling from the
             # backend! This is very ugly, but will change when this refactor
             # is done.
-            flagsReq = DummyRequest([''])
-            flagsReq.content = BytesIO(json.dumps([Flags.PENDING]))
-            d.addCallback(lambda _: db.set_flags(uuid, doc_id, flagsReq, 'MX'))
+            flags = [Flags.PENDING]
+            d.addCallback(lambda _: db.set_flags(uuid, doc_id, flags,
+                                                 namespace='MX'))
             d.addCallback(lambda _: self._finish(request))
             d.addErrback(self._error, request)
         return NOT_DONE_YET
