@@ -22,7 +22,6 @@ from twisted.internet import defer
 from twisted.web.test.test_web import DummyRequest
 from leap.common.files import mkdir_p
 from leap.soledad.server import _blobs
-from io import BytesIO
 from mock import Mock
 import mock
 import os
@@ -34,22 +33,17 @@ import pytest
 class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch.object(_blobs, 'open')
-    def test_tag_header(self, open_mock):
-        open_mock.return_value = BytesIO('A' * 40 + 'B' * 16)
+    def test_get_tag(self):
         expected_tag = base64.urlsafe_b64encode('B' * 16)
-        expected_method = Mock()
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         # write a blob...
         path = backend._get_path('user', 'blob_id', '')
         mkdir_p(os.path.split(path)[0])
         with open(path, "w") as f:
-            f.write("bl0b")
+            f.write('A' * 40 + 'B' * 16)
         # ...and get its tag
-        request = Mock(responseHeaders=Mock(setRawHeaders=expected_method))
-        backend.add_tag_header('user', 'blob_id', request)
-
-        expected_method.assert_called_once_with('Tag', [expected_tag])
+        tag = backend.get_tag('user', 'blob_id')
+        self.assertEquals(expected_tag, tag)
 
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_blob_size(self):

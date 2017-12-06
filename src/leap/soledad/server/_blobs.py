@@ -152,7 +152,7 @@ class FilesystemBlobsBackend(object):
         blob_path = self._get_path(user, blob_id, namespace)
         return os.stat(blob_path).st_size
 
-    def count(self, user, request, namespace=''):
+    def count(self, user, namespace=''):
         base_path = self._get_path(user, namespace=namespace)
         count = 0
         for _, _, filenames in os.walk(base_path):
@@ -277,7 +277,7 @@ class BlobsResource(resource.Resource):
         logger.info("http get: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
         if not blob_id and request.args.get('only_count', [False])[0]:
-            return self._handler.count(user, request, namespace)
+            return self._handler.count(user, namespace)
         elif not blob_id:
             order = request.args.get('order_by', [None])[0]
             filter_flag = request.args.get('filter_flag', [False])[0]

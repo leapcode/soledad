@@ -98,15 +98,12 @@ class IBlobsBackend(Interface):
         :rtype: int
         """
 
-    def count(user, request, namespace=''):
+    def count(user, namespace=''):
         """
         Count the total number of blobs.
 
         :param user: The id of the user who owns the blob.
         :type user: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
         :param namespace: Restrict the count to a certain namespace.
         :type namespace: str
 
