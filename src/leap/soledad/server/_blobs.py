@@ -197,16 +197,14 @@ class FilesystemBlobsBackend(object):
     def get_total_storage(self, user):
         return self._get_disk_usage(self._get_path(user))
 
-    def add_tag_header(self, user, blob_id, request, namespace=''):
+    def get_tag(self, user, blob_id, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
         if not os.path.isfile(blob_path):
-            # 404 - Not Found
-            request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
+            raise BlobNotFound
         with open(blob_path) as doc_file:
             doc_file.seek(-16, 2)
             tag = base64.urlsafe_b64encode(doc_file.read())
-            request.responseHeaders.setRawHeaders('Tag', [tag])
+            return tag
 
     @defer.inlineCallbacks
     def _get_disk_usage(self, start_path):
@@ -290,7 +288,13 @@ class BlobsResource(resource.Resource):
         only_flags = request.args.get('only_flags', [False])[0]
         if only_flags:
             return self._handler.get_flags(user, blob_id, request, namespace)
-        self._handler.add_tag_header(user, blob_id, request, namespace)
+        try:
+            tag = self._handler.get_tag(user, blob_id, namespace)
+        except BlobNotFound:
+            # 404 - Not Found
+            request.setResponseCode(404)
+            return "Blob doesn't exists: %s" % blob_id
+        request.responseHeaders.setRawHeaders('Tag', [tag])
         return self._handler.read_blob(user, blob_id, request, namespace)
 
     def render_DELETE(self, request):

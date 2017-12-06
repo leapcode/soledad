@@ -157,18 +157,17 @@ class IBlobsBackend(Interface):
         :rtype: int
         """
 
-    def add_tag_header(user, blob_id, request, namespace=''):
+    def get_tag(user, blob_id, namespace=''):
         """
-        Add a ``Tag`` HTTP header to the passed request containing the tag of
-        a blob.
+        Get the tag of a blob.
 
         :param blob_id: The id of the blob.
         :type blob_id: str
-        :param request: A representation of all of the information about the
-            request that is being made.
-        :type request: twisted.web.server.Request
         :param namespace: An optional namespace for the blob.
         :type namespace: str
+
+        :return: The tag of the blob.
+        :rtype: str
         """
 
     def get_flags(user, blob_id, request, namespace=''):
