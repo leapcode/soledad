@@ -147,6 +147,7 @@ class FilesystemBlobsBackend(object):
             os.unlink(blob_path + '.flags')
         except Exception:
             pass
+        return defer.succeed(None)
 
     def get_blob_size(self, user, blob_id, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
@@ -303,12 +304,16 @@ class BlobsResource(resource.Resource):
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
-        try:
-            self._handler.delete_blob(user, blob_id, namespace=namespace)
-            return ''
-        except BlobNotFound:
+
+        def catchBlobNotFound(failure):
+            failure.trap(BlobNotFound)
             request.setResponseCode(404)
             return "Blob doesn't exists: %s" % blob_id
+
+        d = self._handler.delete_blob(user, blob_id, namespace=namespace)
+        d.addCallback(lambda _: request.finish())
+        d.addErrback(catchBlobNotFound)
+        return NOT_DONE_YET
 
     def render_PUT(self, request):
         logger.info("http put: %s" % request.path)

@@ -170,6 +170,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.unlink')
+    @defer.inlineCallbacks
     def test_delete_blob(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         # write a blob...
@@ -178,7 +179,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         with open(path, "w") as f:
             f.write("bl0b")
         # ...and delete it
-        backend.delete_blob('user', 'blob_id')
+        yield backend.delete_blob('user', 'blob_id')
         unlink_mock.assert_any_call(backend._get_path('user',
                                                       'blob_id'))
         unlink_mock.assert_any_call(backend._get_path('user',
@@ -186,6 +187,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.unlink')
+    @defer.inlineCallbacks
     def test_delete_blob_custom_namespace(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         # write a blob...
@@ -194,7 +196,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         with open(path, "w") as f:
             f.write("bl0b")
         # ...and delete it
-        backend.delete_blob('user', 'blob_id', namespace='trash')
+        yield backend.delete_blob('user', 'blob_id', namespace='trash')
         unlink_mock.assert_any_call(backend._get_path('user',
                                                       'blob_id',
                                                       'trash'))

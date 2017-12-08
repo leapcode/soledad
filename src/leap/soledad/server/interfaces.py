@@ -69,6 +69,9 @@ class IBlobsBackend(Interface):
         :type blob_id: str
         :param namespace: An optional namespace for the blob.
         :type namespace: str
+
+        :return: A deferred that fires when the blob has been deleted.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def get_blob_size(user, blob_id, namespace=''):
