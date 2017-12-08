@@ -151,7 +151,8 @@ class FilesystemBlobsBackend(object):
 
     def get_blob_size(self, user, blob_id, namespace=''):
         blob_path = self._get_path(user, blob_id, namespace)
-        return os.stat(blob_path).st_size
+        size = os.stat(blob_path).st_size
+        return defer.succeed(size)
 
     def count(self, user, namespace=''):
         base_path = self._get_path(user, namespace=namespace)

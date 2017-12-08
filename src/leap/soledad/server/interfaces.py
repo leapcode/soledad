@@ -85,8 +85,8 @@ class IBlobsBackend(Interface):
         :param namespace: An optional namespace for the blob.
         :type namespace: str
 
-        :return: The size of the blob.
-        :rtype: int
+        :return: A deferred that fires with the size of the blob.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def count(user, namespace=''):

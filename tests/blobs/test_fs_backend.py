@@ -45,6 +45,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(expected_tag, tag)
 
     @pytest.mark.usefixtures("method_tmpdir")
+    @defer.inlineCallbacks
     def test_get_blob_size(self):
         # get a backend
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
@@ -54,7 +55,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         with open(path, "w") as f:
             f.write("0123456789")
         # check it's size
-        size = backend.get_blob_size('user', 'blob_id', '')
+        size = yield backend.get_blob_size('user', 'blob_id', '')
         self.assertEquals(10, size)
 
     @pytest.mark.usefixtures("method_tmpdir")
