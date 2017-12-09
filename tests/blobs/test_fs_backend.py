@@ -127,20 +127,22 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.walk')
+    @defer.inlineCallbacks
     def test_list_blobs(self, walk_mock):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         _ = None
         walk_mock.return_value = [('', _, ['blob_0']), ('', _, ['blob_1'])]
-        result = backend.list_blobs('user')
+        result = yield backend.list_blobs('user')
         self.assertEquals(result, ['blob_0', 'blob_1'])
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.walk')
+    @defer.inlineCallbacks
     def test_list_blobs_limited_by_namespace(self, walk_mock):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
         _ = None
         walk_mock.return_value = [('', _, ['blob_0']), ('', _, ['blob_1'])]
-        result = backend.list_blobs('user', namespace='incoming')
+        result = yield backend.list_blobs('user', namespace='incoming')
         self.assertEquals(result, ['blob_0', 'blob_1'])
         target_dir = os.path.join(self.tempdir, 'user', 'incoming')
         walk_mock.assert_called_once_with(target_dir)

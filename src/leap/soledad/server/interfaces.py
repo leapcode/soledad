@@ -127,6 +127,10 @@ class IBlobsBackend(Interface):
         :return: A list of blob ids, optionally ordered and/or restricted by
                  namespace.
         :rtype: list of str
+
+        :return: A deferred that fires with a list of blob ids, optionally
+            ordered and/or restricted by namespace.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def get_total_storage(user):
