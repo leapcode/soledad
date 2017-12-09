@@ -142,18 +142,19 @@ class FilesystemBackendTestCase(unittest.TestCase):
         target_dir = os.path.join(self.tempdir, 'user', 'incoming')
         walk_mock.assert_called_once_with(target_dir)
 
+    @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_path_validation_on_read_blob(self):
         blobs_path, request = self.tempdir, DummyRequest([''])
         backend = _blobs.FilesystemBlobsBackend(blobs_path=blobs_path)
         with pytest.raises(Exception):
-            backend.read_blob('..', '..', request)
+            yield backend.read_blob('..', '..', request)
         with pytest.raises(Exception):
-            backend.read_blob('user', '../../../', request)
+            yield backend.read_blob('user', '../../../', request)
         with pytest.raises(Exception):
-            backend.read_blob('../../../', 'blob_id', request)
+            yield backend.read_blob('../../../', 'blob_id', request)
         with pytest.raises(Exception):
-            backend.read_blob('user', 'blob_id', request, namespace='..')
+            yield backend.read_blob('user', 'blob_id', request, namespace='..')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @defer.inlineCallbacks

@@ -95,13 +95,19 @@ class FilesystemBlobsBackend(object):
 
     def read_blob(self, user, blob_id, namespace=''):
         logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
-        path = self._get_path(user, blob_id, namespace)
+        try:
+            path = self._get_path(user, blob_id, namespace)
+        except Exception as e:
+            return defer.fail(e)
         logger.debug('blob path: %s' % path)
         fd = open(path)
         return defer.succeed(fd)
 
     def get_flags(self, user, blob_id, namespace=''):
-        path = self._get_path(user, blob_id, namespace)
+        try:
+            path = self._get_path(user, blob_id, namespace)
+        except Exception as e:
+            return defer.fail(e)
         if not os.path.isfile(path):
             return defer.fail(BlobNotFound())
         if not os.path.isfile(path + '.flags'):
@@ -111,7 +117,10 @@ class FilesystemBlobsBackend(object):
             return defer.succeed(flags)
 
     def set_flags(self, user, blob_id, flags, namespace=''):
-        path = self._get_path(user, blob_id, namespace)
+        try:
+            path = self._get_path(user, blob_id, namespace)
+        except Exception as e:
+            return defer.fail(e)
         if not os.path.isfile(path):
             return defer.fail(BlobNotFound())
         for flag in flags:
@@ -142,7 +151,10 @@ class FilesystemBlobsBackend(object):
         yield self.semaphore.release()
 
     def delete_blob(self, user, blob_id, namespace=''):
-        blob_path = self._get_path(user, blob_id, namespace)
+        try:
+            blob_path = self._get_path(user, blob_id, namespace)
+        except Exception as e:
+            return defer.fail(e)
         if not os.path.isfile(blob_path):
             return defer.fail(BlobNotFound())
         self.__touch(blob_path + '.deleted')
@@ -154,12 +166,18 @@ class FilesystemBlobsBackend(object):
         return defer.succeed(None)
 
     def get_blob_size(self, user, blob_id, namespace=''):
-        blob_path = self._get_path(user, blob_id, namespace)
+        try:
+            blob_path = self._get_path(user, blob_id, namespace)
+        except Exception as e:
+            return defer.fail(e)
         size = os.stat(blob_path).st_size
         return defer.succeed(size)
 
     def count(self, user, namespace=''):
-        base_path = self._get_path(user, namespace=namespace)
+        try:
+            base_path = self._get_path(user, namespace=namespace)
+        except Exception as e:
+            return defer.fail(e)
         count = 0
         for _, _, filenames in os.walk(base_path):
             count += len(filter(lambda i: not i.endswith('.flags'), filenames))
@@ -169,7 +187,10 @@ class FilesystemBlobsBackend(object):
                    filter_flag=False):
         namespace = namespace or 'default'
         blob_ids = []
-        base_path = self._get_path(user, namespace=namespace)
+        try:
+            base_path = self._get_path(user, namespace=namespace)
+        except Exception as e:
+            return defer.fail(e)
 
         def match(name):
             if deleted:
@@ -202,10 +223,17 @@ class FilesystemBlobsBackend(object):
                 yield blob_path
 
     def get_total_storage(self, user):
-        return self._get_disk_usage(self._get_path(user))
+        try:
+            path = self._get_path(user)
+        except Exception as e:
+            return defer.fail(e)
+        return self._get_disk_usage(path)
 
     def get_tag(self, user, blob_id, namespace=''):
-        blob_path = self._get_path(user, blob_id, namespace)
+        try:
+            blob_path = self._get_path(user, blob_id, namespace)
+        except Exception as e:
+            return defer.fail(e)
         if not os.path.isfile(blob_path):
             return defer.fail(BlobNotFound())
         with open(blob_path) as doc_file:
@@ -236,8 +264,11 @@ class FilesystemBlobsBackend(object):
         return desired_path
 
     def exists(self, user, blob_id, namespace):
-        return os.path.isfile(
-            self._get_path(user, blob_id=blob_id, namespace=namespace))
+        try:
+            path = self._get_path(user, blob_id=blob_id, namespace=namespace)
+        except Exception as e:
+            return defer.fail(e)
+        return os.path.isfile(path)
 
     def _get_path(self, user, blob_id='', namespace=''):
         parts = [user]
