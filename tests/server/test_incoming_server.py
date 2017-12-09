@@ -20,7 +20,6 @@ Integration tests for incoming API
 import pytest
 from io import BytesIO
 from uuid import uuid4
-from twisted.web.test.test_web import DummyRequest
 from twisted.web.server import Site
 from twisted.internet import reactor
 from twisted.internet import defer
@@ -83,13 +82,12 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
         yield treq.put(incoming_endpoint, BytesIO(content), persistent=False)
 
         db = self.state.open_database(user_id)
-        request = DummyRequest([user_id, doc_id])
-        res = db.read_blob(user_id, doc_id, namespace='MX')
-        yield res.render_GET(request)
-        flags = db.get_flags(user_id, doc_id, namespace='MX')
+        fd = yield db.read_blob(user_id, doc_id, namespace='MX')
+        flags = yield db.get_flags(user_id, doc_id, namespace='MX')
+        data = fd.read()
         expected_preamble = formatter.preamble(content, doc_id)
         expected_preamble = decode_preamble(expected_preamble, True)
-        written_preamble, written_content = request.written[0].split()
+        written_preamble, written_content = data.split()
         written_preamble = decode_preamble(written_preamble, True)
         self.assertEquals(expected_preamble, written_preamble)
         self.assertEquals(content, written_content)
