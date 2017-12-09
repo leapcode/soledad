@@ -27,7 +27,7 @@ class IBlobsBackend(Interface):
 
     def read_blob(user, blob_id, namespace=''):
         """
-        Read a blob from the backend storage return it as a twisted resource.
+        Read a blob from the backend storage.
 
         :param user: The id of the user who owns the blob.
         :type user: str
@@ -36,8 +36,9 @@ class IBlobsBackend(Interface):
         :param namespace: An optional namespace for the blob.
         :type namespace: str
 
-        :return: The blob as a twisted resource.
-        :rtype: twisted.web.resource.Resource
+        :return: A deferred that fires with a file-like object that gives
+            access to the contents of the blob.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def write_blob(user, blob_id, fd, namespace=''):

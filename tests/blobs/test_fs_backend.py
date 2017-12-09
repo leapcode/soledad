@@ -63,21 +63,15 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(10, size)
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch.object(_blobs.static, 'File')
+    @mock.patch('leap.soledad.server._blobs.open')
     @mock.patch.object(_blobs.FilesystemBlobsBackend, '_get_path',
                        Mock(return_value='path'))
-    def test_read_blob(self, file_mock):
-        render_mock = Mock()
-        file_mock.return_value = render_mock
+    @defer.inlineCallbacks
+    def test_read_blob(self, open):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        request = DummyRequest([''])
-        resource = backend.read_blob('user', 'blob_id')
-        resource.render_GET(request)
-
+        yield backend.read_blob('user', 'blob_id')
+        open.assert_called_once_with('path')
         backend._get_path.assert_called_once_with('user', 'blob_id', '')
-        ctype = 'application/octet-stream'
-        _blobs.static.File.assert_called_once_with('path', defaultType=ctype)
-        render_mock.render_GET.assert_called_once_with(request)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')

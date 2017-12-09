@@ -29,6 +29,8 @@ import base64
 import json
 import re
 
+from twisted.python.compat import intToBytes
+from twisted.web import http
 from twisted.web import static
 from twisted.web import resource
 from twisted.web.client import FileBodyProducer
@@ -95,8 +97,8 @@ class FilesystemBlobsBackend(object):
         logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
         path = self._get_path(user, blob_id, namespace)
         logger.debug('blob path: %s' % path)
-        res = static.File(path, defaultType='application/octet-stream')
-        return res
+        fd = open(path)
+        return defer.succeed(fd)
 
     def get_flags(self, user, blob_id, namespace=''):
         path = self._get_path(user, blob_id, namespace)
@@ -257,6 +259,23 @@ class ImproperlyConfiguredException(Exception):
     pass
 
 
+class BlobFile(resource.Resource):
+
+    def __init__(self, fd):
+        self.fd = fd
+        self.fd.seek(0, 2)
+        self.size = self.fd.tell()
+        self.fd.seek(0)
+
+    def render_GET(self, request):
+        request.setHeader(b'content-length', intToBytes(self.size))
+        request.setHeader(b'content-type', 'application/octet-stream')
+        request.setResponseCode(http.OK)
+        producer = static.NoRangeStaticProducer(request, self.fd)
+        producer.start()
+        return NOT_DONE_YET
+
+
 class BlobsResource(resource.Resource):
 
     isLeaf = True
@@ -296,22 +315,32 @@ class BlobsResource(resource.Resource):
             d.addCallback(lambda blobs: request.write(blobs))
             d.addCallback(lambda _: request.finish())
             return NOT_DONE_YET
-        only_flags = request.args.get('only_flags', [False])[0]
-        try:
-            if only_flags:
-                d = self._handler.get_flags(user, blob_id, namespace)
-                d.addCallback(lambda flags: json.dumps(flags))
-                d.addCallback(lambda flags: request.write(flags))
-                d.addCallback(lambda _: request.finish())
-                return NOT_DONE_YET
-            tag = self._handler.get_tag(user, blob_id, namespace)
-            request.responseHeaders.setRawHeaders('Tag', [tag])
-        except BlobNotFound:
-            # 404 - Not Found
+
+        def catchBlobNotFound(failure):
+            failure.trap(BlobNotFound)
             request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
-        res = self._handler.read_blob(user, blob_id, namespace=namespace)
-        return res.render_GET(request)
+            request.write("Blob doesn't exists: %s" % blob_id)
+            request.finish()
+
+        only_flags = request.args.get('only_flags', [False])[0]
+        if only_flags:
+            d = self._handler.get_flags(user, blob_id, namespace)
+            d.addErrback(catchBlobNotFound)
+            d.addCallback(lambda flags: json.dumps(flags))
+            d.addCallback(lambda flags: request.write(flags))
+            d.addCallback(lambda _: request.finish())
+            return NOT_DONE_YET
+
+        d = self._handler.get_tag(user, blob_id, namespace)
+        d.addCallback(
+            lambda tag: request.responseHeaders.setRawHeaders(
+                'Tag', [tag]))
+        d.addCallback(lambda _: self._handler.read_blob(user, blob_id,
+                                                        namespace=namespace))
+        d.addCallback(lambda fd: BlobFile(fd))
+        d.addCallback(lambda res: res.render_GET(request))
+
+        return NOT_DONE_YET
 
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)
