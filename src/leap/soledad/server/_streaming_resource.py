@@ -24,7 +24,7 @@ import base64
 
 from zope.interface import implementer
 from twisted.internet.interfaces import IPushProducer
-from twisted.internet import task
+from twisted.internet import task, defer
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
 
@@ -61,12 +61,20 @@ class StreamingResource(Resource):
         db = self._handler
         raw_content = request.content.read()
         blob_ids = json.loads(raw_content)
-        paths = []
+        deferreds = []
         for blob_id in blob_ids:
+
+            def _get_blob_info(blob_id, path):
+                d = db.get_blob_size(user, blob_id, namespace)
+                d.addCallback(lambda size: (blob_id, path, size))
+                return d
+
             path = db._get_path(user, blob_id, namespace)
-            size = db.get_blob_size(user, blob_id, namespace)
-            paths.append((blob_id, path, size))
-        DownstreamProducer(request, paths).start()
+            d = _get_blob_info(blob_id, path)
+            deferreds.append(d)
+        d = defer.gatherResults(deferreds)
+        d.addCallback(
+            lambda paths: DownstreamProducer(request, paths).start())
         return NOT_DONE_YET
 
 
