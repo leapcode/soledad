@@ -159,7 +159,7 @@ class FilesystemBlobsBackend(object):
         count = 0
         for _, _, filenames in os.walk(base_path):
             count += len(filter(lambda i: not i.endswith('.flags'), filenames))
-        return json.dumps({"count": count})
+        return defer.succeed(count)
 
     def list_blobs(self, user, namespace='', order_by=None, deleted=False,
                    filter_flag=False):
@@ -279,7 +279,11 @@ class BlobsResource(resource.Resource):
         logger.info("http get: %s" % request.path)
         user, blob_id, namespace = self._validate(request)
         if not blob_id and request.args.get('only_count', [False])[0]:
-            return self._handler.count(user, namespace)
+            d = self._handler.count(user, namespace)
+            d.addCallback(lambda count: json.dumps({"count": count}))
+            d.addCallback(lambda count: request.write(count))
+            d.addCallback(lambda _: request.finish())
+            return NOT_DONE_YET
         elif not blob_id:
             order = request.args.get('order_by', [None])[0]
             filter_flag = request.args.get('filter_flag', [False])[0]

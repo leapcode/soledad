@@ -98,9 +98,9 @@ class IBlobsBackend(Interface):
         :param namespace: Restrict the count to a certain namespace.
         :type namespace: str
 
-        :return: The number of blobs in the backend storage, possibly
-                 restricted to a certain namespace.
-        :rtype: int
+        :return: A deferred that fires with the number of blobs in the backend
+            storage, possibly restricted to a certain namespace.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def list_blobs(user, namespace='', order_by=None, deleted=False,

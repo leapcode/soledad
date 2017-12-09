@@ -19,6 +19,7 @@ Tests for blobs backend on server side.
 """
 from twisted.trial import unittest
 from twisted.internet import defer
+from twisted.web.client import FileBodyProducer
 from twisted.web.test.test_web import DummyRequest
 from leap.common.files import mkdir_p
 from leap.soledad.server import _blobs
@@ -26,6 +27,8 @@ from mock import Mock
 import mock
 import os
 import base64
+import io
+import json
 import pytest
 
 
@@ -209,11 +212,27 @@ class FilesystemBackendTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_write_blob_using_namespace(self):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        request = DummyRequest([''])
-        request.content = BytesIO('content')
-        yield backend.write_blob('user', 'blob_id', request,
+        producer = FileBodyProducer(io.BytesIO('content'))
+        yield backend.write_blob('user', 'blob_id', producer,
                                  namespace='custom')
-        default = yield backend.list_blobs('user', request)
-        custom = yield backend.list_blobs('user', request, namespace='custom')
+        default = yield backend.list_blobs('user')
+        custom = yield backend.list_blobs('user', namespace='custom')
         self.assertEquals([], json.loads(default))
         self.assertEquals(['blob_id'], json.loads(custom))
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @defer.inlineCallbacks
+    def test_count(self):
+        backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
+        content = 'blah'
+        yield backend.write_blob('user', 'blob_id_1', io.BytesIO(content))
+        yield backend.write_blob('user', 'blob_id_2', io.BytesIO(content))
+        yield backend.write_blob('user', 'blob_id_3', io.BytesIO(content))
+        count = yield backend.count('user')
+        self.assertEqual(3, count)
+        yield backend.write_blob('user', 'blob_id_1', io.BytesIO(content),
+                                 namespace='xfiles')
+        yield backend.write_blob('user', 'blob_id_2', io.BytesIO(content),
+                                 namespace='xfiles')
+        count = yield backend.count('user', namespace='xfiles')
+        self.assertEqual(2, count)
