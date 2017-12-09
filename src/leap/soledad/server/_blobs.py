@@ -101,11 +101,12 @@ class FilesystemBlobsBackend(object):
     def get_flags(self, user, blob_id, namespace=''):
         path = self._get_path(user, blob_id, namespace)
         if not os.path.isfile(path):
-            raise BlobNotFound
+            return defer.fail(BlobNotFound)
         if not os.path.isfile(path + '.flags'):
-            return []
+            return defer.succeed([])
         with open(path + '.flags', 'r') as flags_file:
-            return json.loads(flags_file.read())
+            flags = json.loads(flags_file.read())
+            return defer.succeed(flags)
 
     def set_flags(self, user, blob_id, flags, namespace=''):
         path = self._get_path(user, blob_id, namespace)
@@ -298,8 +299,11 @@ class BlobsResource(resource.Resource):
         only_flags = request.args.get('only_flags', [False])[0]
         try:
             if only_flags:
-                flags = self._handler.get_flags(user, blob_id, namespace)
-                return json.dumps(flags)
+                d = self._handler.get_flags(user, blob_id, namespace)
+                d.addCallback(lambda flags: json.dumps(flags))
+                d.addCallback(lambda flags: request.write(flags))
+                d.addCallback(lambda _: request.finish())
+                return NOT_DONE_YET
             tag = self._handler.get_tag(user, blob_id, namespace)
             request.responseHeaders.setRawHeaders('Tag', [tag])
         except BlobNotFound:
