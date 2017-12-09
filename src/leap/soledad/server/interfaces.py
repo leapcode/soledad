@@ -143,6 +143,10 @@ class IBlobsBackend(Interface):
 
         :return: The size in units of 1024 bytes.
         :rtype: int
+
+        :return: A deferred that fires with the amount of storage used in units
+            of 1024 bytes.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def get_tag(user, blob_id, namespace=''):

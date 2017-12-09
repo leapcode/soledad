@@ -96,7 +96,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
     def test_write_cannot_exceed_quota(self, isfile):
         isfile.return_value = False
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        backend.get_total_storage = lambda x: 100
+        backend.get_total_storage = lambda x: defer.succeed(100)
         backend.quota = 90
         with pytest.raises(_blobs.QuotaExceeded):
             fd = Mock()
