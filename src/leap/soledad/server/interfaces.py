@@ -189,4 +189,7 @@ class IBlobsBackend(Interface):
         :type flags: list of str
         :param namespace: An optional namespace for the blob.
         :type namespace: str
+
+        :return: A deferred that fires when the flags have been set.
+        :rtype: twisted.internet.defer.Deferred
         """

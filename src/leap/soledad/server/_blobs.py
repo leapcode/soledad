@@ -320,7 +320,8 @@ class BlobsResource(resource.Resource):
         def catchBlobNotFound(failure):
             failure.trap(BlobNotFound)
             request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
+            request.write("Blob doesn't exists: %s" % blob_id)
+            request.finish()
 
         d = self._handler.delete_blob(user, blob_id, namespace=namespace)
         d.addCallback(lambda _: request.finish())
@@ -357,17 +358,26 @@ class BlobsResource(resource.Resource):
         user, blob_id, namespace = self._validate(request)
         raw_flags = request.content.read()
         flags = json.loads(raw_flags)
-        try:
-            self._handler.set_flags(user, blob_id, flags, namespace=namespace)
-        except BlobNotFound:
-            # 404 - Not Found
+
+        def catchBlobNotFound(failure):
+            failure.trap(BlobNotFound)
             request.setResponseCode(404)
-            return "Blob doesn't exists: %s" % blob_id
-        except InvalidFlag as e:
+            request.write("Blob doesn't exists: %s" % blob_id)
+            request.finish()
+
+        def catchInvalidFlag(failure):
+            e = failure.trap(InvalidFlag)
             request.setResponseCode(406)
             flag = e.message
-            return "Invalid flag: %s" % str(flag)
-        return ''
+            request.write("Invalid flag: %s" % str(flag))
+            request.finish()
+
+        d = self._handler.set_flags(user, blob_id, flags, namespace=namespace)
+        d.addCallback(lambda _: request.write(''))
+        d.addCallback(lambda _: request.finish())
+        d.addErrback(catchBlobNotFound)
+        d.addErrback(catchInvalidFlag)
+        return NOT_DONE_YET
 
     def _error(self, e, request):
         logger.error('Error processing request: %s' % e.getErrorMessage())
