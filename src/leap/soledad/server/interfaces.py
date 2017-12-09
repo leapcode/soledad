@@ -158,8 +158,8 @@ class IBlobsBackend(Interface):
         :param namespace: An optional namespace for the blob.
         :type namespace: str
 
-        :return: The tag of the blob.
-        :rtype: str
+        :return: A deferred that fires with the tag of the blob.
+        :rtype: twisted.internet.defer.Deferred
         """
 
     def get_flags(user, blob_id, namespace=''):

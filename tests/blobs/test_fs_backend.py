@@ -35,6 +35,7 @@ import pytest
 class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
+    @defer.inlineCallbacks
     def test_get_tag(self):
         expected_tag = base64.urlsafe_b64encode('B' * 16)
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
@@ -44,7 +45,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         with open(path, "w") as f:
             f.write('A' * 40 + 'B' * 16)
         # ...and get its tag
-        tag = backend.get_tag('user', 'blob_id')
+        tag = yield backend.get_tag('user', 'blob_id')
         self.assertEquals(expected_tag, tag)
 
     @pytest.mark.usefixtures("method_tmpdir")

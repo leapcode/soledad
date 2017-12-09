@@ -206,7 +206,7 @@ class FilesystemBlobsBackend(object):
         with open(blob_path) as doc_file:
             doc_file.seek(-16, 2)
             tag = base64.urlsafe_b64encode(doc_file.read())
-            return tag
+            return defer.succeed(tag)
 
     @defer.inlineCallbacks
     def _get_disk_usage(self, start_path):
