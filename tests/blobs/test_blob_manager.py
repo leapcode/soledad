@@ -83,6 +83,29 @@ class BlobManagerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_put_stores_on_local_db_with_namespace(self):
+        self.manager._encrypt_and_upload = Mock(return_value=None)
+        self.manager._download_and_decrypt = Mock(return_value=None)
+        msg, blob_id = "Hey Joe", uuid4().hex
+        doc = BlobDoc(BytesIO(msg), blob_id=blob_id)
+
+        yield self.manager.put(doc, size=len(msg), namespace='custom')
+        self.assertTrue(self.manager._encrypt_and_upload.called)
+
+        arg1, arg2 = self.manager._encrypt_and_upload.call_args[0]
+        kwargs = self.manager._encrypt_and_upload.call_args[1]
+        self.assertEquals(arg1, blob_id)
+        self.assertTrue(isinstance(arg2, BytesIO))
+        self.assertEquals(kwargs, {'namespace': 'custom'})
+
+        result = yield self.manager.local.get(blob_id)
+        self.assertEquals(result, None)
+
+        result = yield self.manager.local.get(blob_id, namespace='custom')
+        self.assertEquals(result.getvalue(), msg)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_put_local_only_doesnt_send_to_server(self):
         self.manager._encrypt_and_upload = Mock(return_value=None)
         msg, blob_id = "Hey Joe", uuid4().hex

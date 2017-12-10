@@ -321,8 +321,9 @@ class BlobManager(BlobsSynchronizer):
         # In fact, some kind of pipe is needed here, where each write on db
         # handle gets forwarded into a write on the connection handle
         fd = yield self.local.get(blob_id, namespace=namespace)
-        yield self._encrypt_and_upload(blob_id, fd)
-        yield self.local.update_sync_status(blob_id, SyncStatus.SYNCED)
+        yield self._encrypt_and_upload(blob_id, fd, namespace=namespace)
+        yield self.local.update_sync_status(blob_id, SyncStatus.SYNCED,
+                                            namespace=namespace)
 
     def set_flags(self, blob_id, flags, namespace=''):
         """

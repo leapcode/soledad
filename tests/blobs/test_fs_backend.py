@@ -214,3 +214,16 @@ class FilesystemBackendTestCase(unittest.TestCase):
         unlink_mock.assert_any_call(backend._get_path('user',
                                                       'blob_id',
                                                       'trash') + '.flags')
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @defer.inlineCallbacks
+    def test_write_blob_using_namespace(self):
+        backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
+        request = DummyRequest([''])
+        request.content = BytesIO('content')
+        yield backend.write_blob('user', 'blob_id', request,
+                                 namespace='custom')
+        default = yield backend.list_blobs('user', request)
+        custom = yield backend.list_blobs('user', request, namespace='custom')
+        self.assertEquals([], json.loads(default))
+        self.assertEquals(['blob_id'], json.loads(custom))
