@@ -2,7 +2,7 @@ import pytest
 from io import BytesIO
 from leap.soledad.server._blobs import FilesystemBlobsBackend
 from twisted.internet import defer
-from twisted.web.test.test_web import DummyRequest
+from twisted.web.client import FileBodyProducer
 
 
 def create_write_test(amount, size):
@@ -12,12 +12,11 @@ def create_write_test(amount, size):
     def test(txbenchmark, payload, tmpdir):
         backend = FilesystemBlobsBackend(blobs_path=tmpdir.strpath)
         data = payload(size)
+        semaphore = defer.DeferredSemaphore(100)
         deferreds = []
         for i in xrange(amount):
-            fd = BytesIO(data)
-            request = DummyRequest([''])
-            request.content = fd
-            d = backend.write_blob('user', str(i), request)
+            producer = FileBodyProducer(BytesIO(data))
+            d = semaphore.run(backend.write_blob, 'user', str(i), producer)
             deferreds.append(d)
         yield txbenchmark(defer.gatherResults, deferreds)
 
@@ -30,6 +29,12 @@ test_blobs_fs_backend_write_100_100k = create_write_test(100, 100 * 1000)
 test_blobs_fs_backend_write_1000_10k = create_write_test(1000, 10 * 1000)
 
 
+class DevNull(object):
+
+    def write(self, data):
+        pass
+
+
 def create_read_test(amount, size):
 
     @pytest.inlineCallbacks
@@ -39,22 +44,20 @@ def create_read_test(amount, size):
         data = payload(size)
 
         # first write blobs to the backend...
+        semaphore = defer.DeferredSemaphore(100)
         deferreds = []
         for i in xrange(amount):
-            fd = BytesIO(data)
-            request = DummyRequest([''])
-            request.content = fd
-            d = backend.write_blob('user', str(i), request)
+            producer = FileBodyProducer(BytesIO(data))
+            d = semaphore.run(backend.write_blob, 'user', str(i), producer)
             deferreds.append(d)
         yield defer.gatherResults(deferreds)
 
         # ... then measure the read operation
         deferreds = []
         for i in xrange(amount):
-            request = DummyRequest([''])
-            d = request.notifyFinish()
+            consumer = DevNull()
+            d = semaphore.run(backend.read_blob, 'user', str(i), consumer)
             deferreds.append(d)
-            backend.read_blob('user', str(i), request)
         yield txbenchmark(defer.gatherResults, deferreds)
 
     return test

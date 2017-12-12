@@ -28,7 +28,6 @@ import mock
 import os
 import base64
 import io
-import json
 import pytest
 
 
@@ -64,14 +63,16 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.open')
-    @mock.patch.object(_blobs.FilesystemBlobsBackend, '_get_path',
-                       Mock(return_value='path'))
+    @mock.patch('leap.soledad.server._blobs.FilesystemBlobsBackend._get_path')
     @defer.inlineCallbacks
-    def test_read_blob(self, open):
+    def test_read_blob(self, get_path, open):
+        get_path.return_value = 'path'
+        open.return_value = io.BytesIO('content')
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        yield backend.read_blob('user', 'blob_id')
-        open.assert_called_once_with('path')
-        backend._get_path.assert_called_once_with('user', 'blob_id', '')
+        consumer = Mock()
+        yield backend.read_blob('user', 'blob_id', consumer)
+        consumer.write.assert_called_with('content')
+        get_path.assert_called_once_with('user', 'blob_id', '')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
@@ -215,22 +216,32 @@ class FilesystemBackendTestCase(unittest.TestCase):
                                  namespace='custom')
         default = yield backend.list_blobs('user')
         custom = yield backend.list_blobs('user', namespace='custom')
-        self.assertEquals([], json.loads(default))
-        self.assertEquals(['blob_id'], json.loads(custom))
+        self.assertEquals([], default)
+        self.assertEquals(['blob_id'], custom)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @defer.inlineCallbacks
     def test_count(self):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         content = 'blah'
-        yield backend.write_blob('user', 'blob_id_1', io.BytesIO(content))
-        yield backend.write_blob('user', 'blob_id_2', io.BytesIO(content))
-        yield backend.write_blob('user', 'blob_id_3', io.BytesIO(content))
+
+        ids = range(5)
+
+        def _write(namespace=''):
+            producer = FileBodyProducer(io.BytesIO(content))
+            d = backend.write_blob('user', str(ids.pop()), producer,
+                                   namespace=namespace)
+            return d
+
+        yield _write()
+        yield _write()
+        yield _write()
+
         count = yield backend.count('user')
         self.assertEqual(3, count)
-        yield backend.write_blob('user', 'blob_id_1', io.BytesIO(content),
-                                 namespace='xfiles')
-        yield backend.write_blob('user', 'blob_id_2', io.BytesIO(content),
-                                 namespace='xfiles')
+
+        yield _write(namespace='xfiles')
+        yield _write(namespace='xfiles')
+
         count = yield backend.count('user', namespace='xfiles')
         self.assertEqual(2, count)

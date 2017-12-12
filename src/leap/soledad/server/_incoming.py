@@ -22,6 +22,7 @@ import base64
 from io import BytesIO
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
+from twisted.web.client import FileBodyProducer
 
 from leap.soledad.common.blobs import Flags
 from leap.soledad.common.blobs import preamble
@@ -100,8 +101,8 @@ class IncomingResource(Resource):
             request.write('Quota Exceeded!')
             request.finish()
 
-        fd = request.content
-        d = db.write_blob(user, blob_id, fd, namespace='MX')
+        producer = FileBodyProducer(request.content)
+        d = db.write_blob(user, blob_id, producer, namespace='MX')
         flags = [Flags.PENDING]
         d.addCallback(lambda _: db.set_flags(user, blob_id, flags,
                                              namespace='MX'))

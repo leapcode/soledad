@@ -18,12 +18,13 @@
 Integration tests for incoming API
 """
 import pytest
+import mock
+import treq
 from io import BytesIO
 from uuid import uuid4
 from twisted.web.server import Site
 from twisted.internet import reactor
 from twisted.internet import defer
-import treq
 
 from leap.soledad.server._incoming import IncomingResource
 from leap.soledad.server._blobs import BlobsServerState
@@ -82,9 +83,10 @@ class IncomingOnCouchServerTestCase(CouchDBTestCase):
         yield treq.put(incoming_endpoint, BytesIO(content), persistent=False)
 
         db = self.state.open_database(user_id)
-        fd = yield db.read_blob(user_id, doc_id, namespace='MX')
+        consumer = mock.Mock()
+        yield db.read_blob(user_id, doc_id, consumer, namespace='MX')
         flags = yield db.get_flags(user_id, doc_id, namespace='MX')
-        data = fd.read()
+        data = consumer.write.call_args[0][0]
         expected_preamble = formatter.preamble(content, doc_id)
         expected_preamble = decode_preamble(expected_preamble, True)
         written_preamble, written_content = data.split()
