@@ -2,6 +2,7 @@ import pytest
 from io import BytesIO
 from leap.soledad.server._blobs import FilesystemBlobsBackend
 from twisted.internet import defer
+from twisted.web.test.test_web import DummyRequest
 
 
 def create_write_test(amount, size):
@@ -14,7 +15,9 @@ def create_write_test(amount, size):
         deferreds = []
         for i in xrange(amount):
             fd = BytesIO(data)
-            d = backend.write_blob('user', str(i), fd)
+            request = DummyRequest([''])
+            request.content = fd
+            d = backend.write_blob('user', str(i), request)
             deferreds.append(d)
         yield txbenchmark(defer.gatherResults, deferreds)
 
@@ -39,16 +42,19 @@ def create_read_test(amount, size):
         deferreds = []
         for i in xrange(amount):
             fd = BytesIO(data)
-            d = backend.write_blob('user', str(i), fd)
+            request = DummyRequest([''])
+            request.content = fd
+            d = backend.write_blob('user', str(i), request)
             deferreds.append(d)
         yield defer.gatherResults(deferreds)
 
         # ... then measure the read operation
         deferreds = []
         for i in xrange(amount):
-            d = backend.read_blob('user', str(i))
-            d.addCallback(lambda fd: fd.read())
+            request = DummyRequest([''])
+            d = request.notifyFinish()
             deferreds.append(d)
+            backend.read_blob('user', str(i), request)
         yield txbenchmark(defer.gatherResults, deferreds)
 
     return test
