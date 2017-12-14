@@ -258,6 +258,23 @@ class BlobServerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
+    def test_upstream_from_namespace(self):
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, uuid4().hex,
+                              remote_stream=self.stream_uri)
+        self.addCleanup(manager.close)
+        blob_ids = [uuid4().hex for _ in range(5)]
+        for i, blob_id in enumerate(blob_ids):
+            yield manager.local.put(blob_id, BytesIO("X" * i), size=i,
+                                    namespace='test')
+        yield manager._upstream(blob_ids, namespace='test')
+        for i, blob_id in enumerate(blob_ids):
+            got_blob = yield manager._download_and_decrypt(blob_id,
+                                                           namespace='test')
+            self.assertEquals(got_blob[0].getvalue(), "X" * i)
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
     def test_download_from_namespace(self):
         manager = BlobManager('', self.uri, self.secret,
                               self.secret, uuid4().hex)
