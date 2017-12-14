@@ -538,3 +538,13 @@ def _ceiling(size):
         step = 2 ** i
         if size < step:
             return step
+
+
+def get_unarmored_ciphertext_size(cleartext_size):
+    # used for blobs stream up (so we can tell the server how much data we are
+    # sending before starting to encrypt the stream)
+    PREAMBLE_SIZE = 736  # 552 urlsafe base64 encoded (it's always armored)
+    TAG_SIZE = 16
+    SEPARATOR_SIZE = 1
+    size = TAG_SIZE + PREAMBLE_SIZE + SEPARATOR_SIZE
+    return cleartext_size + size
