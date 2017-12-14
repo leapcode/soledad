@@ -218,6 +218,20 @@ class SQLiteBlobBackend(object):
             defer.returnValue([])
 
     @defer.inlineCallbacks
+    def get_size_list(self, blob_ids, namespace=''):
+        query = 'SELECT BLOB_ID, LENGTH(PAYLOAD) FROM BLOBS WHERE BLOB_ID IN '
+        query += ('(%s)' % ', '.join(['?' for _ in blob_ids]))
+        query += ' AND NAMESPACE = ? ORDER BY BLOB_ID'
+        values = tuple(blob_ids) + (namespace,)
+        results = yield self.dbpool.runQuery(query, values)
+        if results:
+            results = dict([(result[0], result[1]) for result in results])
+            results = [(blob_id, results[blob_id]) for blob_id in blob_ids]
+            defer.returnValue(results)
+        else:
+            defer.returnValue([])
+
+    @defer.inlineCallbacks
     def exists(self, blob_id, namespace=''):
         query = 'SELECT blob_id from blobs WHERE blob_id = ? AND namespace= ?'
         result = yield self.dbpool.runQuery(query, (blob_id, namespace,))
