@@ -73,3 +73,16 @@ class SQLBackendTestCase(unittest.TestCase):
         yield defer.gatherResults(deferreds)
         result = yield self.local.list()
         self.assertEquals(set(blob_ids), set(result))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_size_list(self):
+        blob_id1, blob_id2 = uuid4().hex, uuid4().hex
+        content1 = "some message"
+        content2 = "some other message"
+        size1, size2 = len(content1), len(content2)
+        yield self.local.put(blob_id1, BytesIO(content1), size1)
+        yield self.local.put(blob_id2, BytesIO(content1), size2)
+        result = yield self.local.get_size_list([blob_id1, blob_id2])
+        expected = [(blob_id1, size1), (blob_id2, size2)]
+        self.assertEquals(expected, result)
