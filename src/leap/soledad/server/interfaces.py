@@ -59,6 +59,10 @@ class IBlobsBackend(Interface):
         :return: A deferred that fires when the blob has been written to the
                  backend storage.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobExists: Raised when a blob with that id already exists.
+        :raise QuotaExceeded: Raised when the quota for that user would be
+            exceeded by this write operation.
         """
 
     def delete_blob(user, blob_id, namespace=''):
