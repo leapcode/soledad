@@ -10,6 +10,9 @@ def create_write_test(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group='test_blobs_fs_backend_write')
     def test(txbenchmark, payload, tmpdir):
+        """
+        Write many blobs of the same size to the filesystem backend.
+        """
         backend = FilesystemBlobsBackend(blobs_path=tmpdir.strpath)
         data = payload(size)
         semaphore = defer.DeferredSemaphore(100)
@@ -23,10 +26,10 @@ def create_write_test(amount, size):
     return test
 
 
-test_blobs_fs_backend_write_1_10000k = create_write_test(1, 10000 * 1000)
-test_blobs_fs_backend_write_10_1000k = create_write_test(10, 1000 * 1000)
-test_blobs_fs_backend_write_100_100k = create_write_test(100, 100 * 1000)
-test_blobs_fs_backend_write_1000_10k = create_write_test(1000, 10 * 1000)
+test_blobs_fs_backend_write_10_10000k = create_write_test(10, 10000 * 1000)
+test_blobs_fs_backend_write_100_1000k = create_write_test(100, 1000 * 1000)
+test_blobs_fs_backend_write_1000_100k = create_write_test(1000, 100 * 1000)
+test_blobs_fs_backend_write_10000_10k = create_write_test(10000, 10 * 1000)
 
 
 class DevNull(object):
@@ -40,6 +43,9 @@ def create_read_test(amount, size):
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group='test_blobs_fs_backend_read')
     def test(txbenchmark, payload, tmpdir):
+        """
+        Read many blobs of the same size from the filesystem backend.
+        """
         backend = FilesystemBlobsBackend(blobs_path=tmpdir.strpath)
         data = payload(size)
 
@@ -63,7 +69,7 @@ def create_read_test(amount, size):
     return test
 
 
-test_blobs_fs_backend_read_1_10000k = create_read_test(1, 10000 * 1000)
-test_blobs_fs_backend_read_10_1000k = create_read_test(10, 1000 * 1000)
-test_blobs_fs_backend_read_100_100k = create_read_test(100, 100 * 1000)
-test_blobs_fs_backend_read_1000_10k = create_read_test(1000, 10 * 1000)
+test_blobs_fs_backend_read_10_10000k = create_read_test(10, 10000 * 1000)
+test_blobs_fs_backend_read_100_1000k = create_read_test(100, 1000 * 1000)
+test_blobs_fs_backend_read_1000_100k = create_read_test(1000, 100 * 1000)
+test_blobs_fs_backend_read_10000_10k = create_read_test(10000, 10 * 1000)
