@@ -20,7 +20,6 @@ Tests for blobs backend on server side.
 from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.web.client import FileBodyProducer
-from twisted.web.test.test_web import DummyRequest
 from leap.common.files import mkdir_p
 from leap.soledad.server import _blobs
 from mock import Mock
@@ -83,8 +82,8 @@ class FilesystemBackendTestCase(unittest.TestCase):
         isfile.return_value = True
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
         with pytest.raises(_blobs.BlobExists):
-            fd = Mock()
-            yield backend.write_blob('user', 'blob_id', fd)
+            producer = Mock()
+            yield backend.write_blob('user', 'blob_id', producer)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
@@ -95,8 +94,8 @@ class FilesystemBackendTestCase(unittest.TestCase):
         backend.get_total_storage = lambda x: defer.succeed(100)
         backend.quota = 90
         with pytest.raises(_blobs.QuotaExceeded):
-            fd = Mock()
-            yield backend.write_blob('user', 'blob_id', fd)
+            producer = FileBodyProducer(io.BytesIO('a' * 100))
+            yield backend.write_blob('user', 'blob_id', producer)
 
     @pytest.mark.usefixtures("method_tmpdir")
     def test_get_path_partitioning_by_default(self):
@@ -146,30 +145,31 @@ class FilesystemBackendTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     @pytest.mark.usefixtures("method_tmpdir")
     def test_path_validation_on_read_blob(self):
-        blobs_path, request = self.tempdir, DummyRequest([''])
+        blobs_path, producer = self.tempdir, Mock()
         backend = _blobs.FilesystemBlobsBackend(blobs_path=blobs_path)
         with pytest.raises(Exception):
-            yield backend.read_blob('..', '..', request)
+            yield backend.read_blob('..', '..', producer)
         with pytest.raises(Exception):
-            yield backend.read_blob('user', '../../../', request)
+            yield backend.read_blob('user', '../../../', producer)
         with pytest.raises(Exception):
-            yield backend.read_blob('../../../', 'blob_id', request)
+            yield backend.read_blob('../../../', 'blob_id', producer)
         with pytest.raises(Exception):
-            yield backend.read_blob('user', 'blob_id', request, namespace='..')
+            yield backend.read_blob('user', 'blob_id', producer,
+                                    namespace='..')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @defer.inlineCallbacks
     def test_path_validation_on_write_blob(self):
-        blobs_path, request = self.tempdir, DummyRequest([''])
+        blobs_path, producer = self.tempdir, Mock()
         backend = _blobs.FilesystemBlobsBackend(blobs_path=blobs_path)
         with pytest.raises(Exception):
-            yield backend.write_blob('..', '..', request)
+            yield backend.write_blob('..', '..', producer)
         with pytest.raises(Exception):
-            yield backend.write_blob('user', '../../../', request)
+            yield backend.write_blob('user', '../../../', producer)
         with pytest.raises(Exception):
-            yield backend.write_blob('../../../', 'id1', request)
+            yield backend.write_blob('../../../', 'id1', producer)
         with pytest.raises(Exception):
-            yield backend.write_blob('user', 'id2', request, namespace='..')
+            yield backend.write_blob('user', 'id2', producer, namespace='..')
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch('leap.soledad.server._blobs.os.unlink')
