@@ -145,6 +145,8 @@ def detect_bad_outlier(test, mean, extra):
 
 
 def _detect_outlier(test, name, value, list):
+    if not list:
+        return 0
     mean = _mean(list)
     std = _std(list)
     result = 0
