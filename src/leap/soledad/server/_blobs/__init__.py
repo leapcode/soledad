@@ -14,19 +14,25 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 """
 Blobs Server implementation.
 """
 from .fs_backend import FilesystemBlobsBackend
 from .resource import BlobsResource
-
+from .state import BlobsServerState
 from .errors import BlobExists
-from .errors import ImproperlyConfiguredException
 from .errors import QuotaExceeded
+from .errors import ImproperlyConfiguredException
 
 
-__all__ = ['BlobsResource', 'BlobExists', 'QuotaExceeded']
+__all__ = [
+    'FilesystemBlobsBackend',
+    'BlobsResource',
+    'BlobsServerState',
+    'BlobExists',
+    'QuotaExceeded',
+    'ImproperlyConfiguredException',
+]
 
 
 if __name__ == '__main__':
@@ -40,39 +46,16 @@ if __name__ == '__main__':
     from twisted.web.server import Site
     from twisted.internet import reactor
 
-    # parse command line arguments
     import argparse
 
+    # parse command line
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', default=9000, type=int)
     parser.add_argument('--path', default='/tmp/blobs/user')
     args = parser.parse_args()
 
+    # run the server
     root = BlobsResource("filesystem", args.path)
-    # I picture somethink like
-    # BlobsResource(backend="filesystem", backend_opts={'path': '/tmp/blobs'})
-
     factory = Site(root)
     reactor.listenTCP(args.port, factory)
     reactor.run()
-
-
-class BlobsServerState(object):
-    """
-    Given a backend name, it gives a instance of IBlobsBackend
-    """
-    # Allowed backend classes are defined here
-    handlers = {"filesystem": FilesystemBlobsBackend}
-
-    def __init__(self, backend, **backend_kwargs):
-        if backend not in self.handlers:
-            raise ImproperlyConfiguredException("No such backend: %s", backend)
-        self.backend = self.handlers[backend](**backend_kwargs)
-
-    def open_database(self, user_id):
-        """
-        That method is just for compatibility with CouchServerState, so
-        IncomingAPI can change backends.
-        """
-        # TODO: deprecate/refactor it as it's here for compatibility.
-        return self.backend
