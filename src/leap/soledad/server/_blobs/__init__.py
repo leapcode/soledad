@@ -40,9 +40,13 @@ from zope.interface import implementer
 
 from leap.common.files import mkdir_p
 from leap.soledad.common.log import getLogger
-from leap.soledad.server import interfaces
 from leap.soledad.common.blobs import ACCEPTED_FLAGS
 from leap.soledad.common.blobs import InvalidFlag
+from leap.soledad.server import interfaces
+
+from .errors import BlobNotFound
+from .errors import BlobExists
+from .errors import QuotaExceeded
 
 
 __all__ = ['BlobsResource']
@@ -58,24 +62,6 @@ VALID_STRINGS = re.compile('^[a-zA-Z0-9_-]+$')
 # [ ] isolate user avatar in a safer way
 # [ ] catch timeout in the server (and delete incomplete upload)
 # [ ] chunking (should we do it on the client or on the server?)
-
-
-class BlobNotFound(Exception):
-    """
-    Raised when a blob is not found in data storage backend.
-    """
-
-
-class BlobExists(Exception):
-    """
-    Raised when a blob already exists in data storage backend.
-    """
-
-
-class QuotaExceeded(Exception):
-    """
-    Raised when the quota would be exceeded if an operation would be held.
-    """
 
 
 @implementer(interfaces.IBlobsBackend)
