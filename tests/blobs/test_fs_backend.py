@@ -61,8 +61,9 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(10, size)
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch('leap.soledad.server._blobs.open')
-    @mock.patch('leap.soledad.server._blobs.FilesystemBlobsBackend._get_path')
+    @mock.patch('leap.soledad.server._blobs.fs_backend.open')
+    @mock.patch('leap.soledad.server._blobs.fs_backend'
+                '.FilesystemBlobsBackend._get_path')
     @defer.inlineCallbacks
     def test_read_blob(self, get_path, open):
         get_path.return_value = 'path'
@@ -121,7 +122,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
             backend._get_path('user', 'blob_id', '..')
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch('leap.soledad.server._blobs.os.walk')
+    @mock.patch('leap.soledad.server._blobs.fs_backend.os.walk')
     @defer.inlineCallbacks
     def test_list_blobs(self, walk_mock):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
@@ -131,7 +132,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(result, ['blob_0', 'blob_1'])
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch('leap.soledad.server._blobs.os.walk')
+    @mock.patch('leap.soledad.server._blobs.fs_backend.os.walk')
     @defer.inlineCallbacks
     def test_list_blobs_limited_by_namespace(self, walk_mock):
         backend = _blobs.FilesystemBlobsBackend(self.tempdir)
@@ -172,7 +173,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
             yield backend.write_blob('user', 'id2', producer, namespace='..')
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch('leap.soledad.server._blobs.os.unlink')
+    @mock.patch('leap.soledad.server._blobs.fs_backend.os.unlink')
     @defer.inlineCallbacks
     def test_delete_blob(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
@@ -189,7 +190,7 @@ class FilesystemBackendTestCase(unittest.TestCase):
                                                       'blob_id') + '.flags')
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch('leap.soledad.server._blobs.os.unlink')
+    @mock.patch('leap.soledad.server._blobs.fs_backend.os.unlink')
     @defer.inlineCallbacks
     def test_delete_blob_custom_namespace(self, unlink_mock):
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
