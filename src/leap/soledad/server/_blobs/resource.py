@@ -19,6 +19,8 @@ A Twisted Web resource for blobs.
 """
 import json
 
+from twisted.python.compat import intToBytes
+from twisted.python.compat import networkString
 from twisted.web import resource
 from twisted.web.client import FileBodyProducer
 from twisted.web.server import NOT_DONE_YET
@@ -31,6 +33,7 @@ from .errors import BlobNotFound
 from .errors import BlobExists
 from .errors import ImproperlyConfiguredException
 from .errors import QuotaExceeded
+from .errors import RangeNotSatisfiable
 from .util import VALID_STRINGS
 
 from leap.soledad.common.log import getLogger
@@ -44,7 +47,7 @@ def _catchBlobNotFound(failure, request, user, blob_id):
     logger.error("Error 404: Blob %s does not exist for user %s"
                  % (blob_id, user))
     request.setResponseCode(404)
-    request.write("Blob doesn't exists: %s" % blob_id)
+    request.write("Blob doesn't exist: %s" % blob_id)
     request.finish()
 
 
@@ -128,7 +131,7 @@ class BlobsResource(resource.Resource):
         d.addErrback(_catchAllErrors, request)
         return NOT_DONE_YET
 
-    def _get_blob(self, request, user, blob_id, namespace):
+    def _get_blob(self, request, user, blob_id, namespace, range):
 
         def _set_tag_header(tag):
             request.responseHeaders.setRawHeaders('Tag', [tag])
@@ -136,17 +139,31 @@ class BlobsResource(resource.Resource):
         def _read_blob(_):
             handler = self._handler
             consumer = request
-            d = handler.read_blob(user, blob_id, consumer, namespace=namespace)
+            d = handler.read_blob(
+                user, blob_id, consumer, namespace=namespace, range=range)
             return d
 
         d = self._handler.get_tag(user, blob_id, namespace)
         d.addCallback(_set_tag_header)
         d.addCallback(_read_blob)
-        d.addCallback(lambda _: request.finish())
         d.addErrback(_catchBlobNotFound, request, user, blob_id)
         d.addErrback(_catchAllErrors, request, finishRequest=True)
 
         return NOT_DONE_YET
+
+    def _parseRange(self, range):
+        if not range:
+            return None
+        try:
+            kind, value = range.split(b'=', 1)
+            if kind.strip() != b'bytes':
+                raise Exception('Unknown unit: %s' % kind)
+            start, end = value.split('-')
+            start = int(start) if start else None
+            end = int(end) if end else None
+            return start, end
+        except Exception as e:
+            raise RangeNotSatisfiable(e)
 
     def render_GET(self, request):
         logger.info("http get: %s" % request.path)
@@ -162,7 +179,34 @@ class BlobsResource(resource.Resource):
         if only_flags:
             return self._only_flags(request, user, blob_id, namespace)
 
-        return self._get_blob(request, user, blob_id, namespace)
+        def _handleRangeHeader(size):
+            try:
+                range = self._parseRange(request.getHeader('Range'))
+            except RangeNotSatisfiable:
+                content_range = 'bytes */%d' % size
+                content_range = networkString(content_range)
+                request.setResponseCode(416)
+                request.setHeader(b'content-range', content_range)
+                request.finish()
+                return
+
+            if not range:
+                start = end = None
+                request.setResponseCode(200)
+                request.setHeader(b'content-length', intToBytes(size))
+            else:
+                start, end = range
+                content_range = 'bytes %d-%d/%d' % (start, end, size)
+                content_range = networkString(content_range)
+                length = intToBytes(end - start)
+                request.setResponseCode(206)
+                request.setHeader(b'content-range', content_range)
+                request.setHeader(b'content-length', length)
+            return self._get_blob(request, user, blob_id, namespace, range)
+
+        d = self._handler.get_blob_size(user, blob_id, namespace=namespace)
+        d.addCallback(_handleRangeHeader)
+        return NOT_DONE_YET
 
     def render_DELETE(self, request):
         logger.info("http put: %s" % request.path)

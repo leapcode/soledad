@@ -19,6 +19,8 @@ Integration tests for blobs server
 """
 import os
 import pytest
+import re
+import treq
 from urlparse import urljoin
 from uuid import uuid4
 from io import BytesIO
@@ -47,6 +49,11 @@ def sleep(x):
     d = defer.Deferred()
     reactor.callLater(x, d.callback, None)
     return d
+
+
+def _get(*args, **kwargs):
+    kwargs.update({'persistent': False})
+    return treq.get(*args, **kwargs)
 
 
 class BlobServerTestCase(unittest.TestCase):
@@ -455,3 +462,48 @@ class BlobServerTestCase(unittest.TestCase):
         self.addCleanup(manager.close)
         with pytest.raises(SoledadError):
             yield manager.delete('missing_id')
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_range(self):
+        user_id = uuid4().hex
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, user_id)
+        self.addCleanup(manager.close)
+        blob_id, content = 'blob_id', '0123456789'
+        doc = BlobDoc(BytesIO(content), blob_id)
+        yield manager.put(doc, len(content))
+        uri = urljoin(self.uri, '%s/%s' % (user_id, blob_id))
+        res = yield _get(uri, headers={'Range': 'bytes=10-20'})
+        text = yield res.text()
+        self.assertTrue(res.headers.hasHeader('content-range'))
+        content_range = res.headers.getRawHeaders('content-range').pop()
+        self.assertIsNotNone(re.match('^bytes 10-20/[0-9]+$', content_range))
+        self.assertEqual(10, len(text))
+
+    @defer.inlineCallbacks
+    @pytest.mark.usefixtures("method_tmpdir")
+    def test_get_range_not_satisfiable(self):
+        # put a blob in place
+        user_id = uuid4().hex
+        manager = BlobManager(self.tempdir, self.uri, self.secret,
+                              self.secret, user_id)
+        self.addCleanup(manager.close)
+        blob_id, content = uuid4().hex, 'content'
+        doc = BlobDoc(BytesIO(content), blob_id)
+        yield manager.put(doc, len(content))
+        # and check possible parsing errors
+        uri = urljoin(self.uri, '%s/%s' % (user_id, blob_id))
+        ranges = [
+            'bytes',
+            'bytes=',
+            'bytes=1',
+            'bytes=blah-100',
+            'potatoes=10-100'
+            'blah'
+        ]
+        for range in ranges:
+            res = yield _get(uri, headers={'Range': range})
+            self.assertEqual(416, res.code)
+            content_range = res.headers.getRawHeaders('content-range').pop()
+            self.assertIsNotNone(re.match('^bytes \*/[0-9]+$', content_range))

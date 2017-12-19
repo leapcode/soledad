@@ -20,6 +20,7 @@ Tests for blobs backend on server side.
 from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.web.client import FileBodyProducer
+from twisted.web.test.requesthelper import DummyRequest
 from leap.common.files import mkdir_p
 from leap.soledad.server import _blobs
 from mock import Mock
@@ -61,18 +62,18 @@ class FilesystemBackendTestCase(unittest.TestCase):
         self.assertEquals(10, size)
 
     @pytest.mark.usefixtures("method_tmpdir")
-    @mock.patch('leap.soledad.server._blobs.fs_backend.open')
     @mock.patch('leap.soledad.server._blobs.fs_backend'
                 '.FilesystemBlobsBackend._get_path')
     @defer.inlineCallbacks
-    def test_read_blob(self, get_path, open):
-        get_path.return_value = 'path'
-        open.return_value = io.BytesIO('content')
+    def test_read_blob(self, get_path):
+        path = os.path.join(self.tempdir, 'blob')
+        with open(path, 'w') as f:
+            f.write('bl0b')
+        get_path.return_value = path
         backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
-        consumer = Mock()
+        consumer = DummyRequest([''])
         yield backend.read_blob('user', 'blob_id', consumer)
-        consumer.write.assert_called_with('content')
-        get_path.assert_called_once_with('user', 'blob_id', '')
+        self.assertEqual(['bl0b'], consumer.written)
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
@@ -246,3 +247,13 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
         count = yield backend.count('user', namespace='xfiles')
         self.assertEqual(2, count)
+
+    @pytest.mark.usefixtures("method_tmpdir")
+    @defer.inlineCallbacks
+    def test_read_range(self):
+        backend = _blobs.FilesystemBlobsBackend(blobs_path=self.tempdir)
+        producer = FileBodyProducer(io.BytesIO("0123456789"))
+        yield backend.write_blob('user', 'blob-id', producer)
+        consumer = DummyRequest([''])
+        yield backend.read_blob('user', 'blob-id', consumer, range=(1, 3))
+        self.assertEqual(['12'], consumer.written)

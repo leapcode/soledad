@@ -27,7 +27,8 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet import utils
-from twisted.web.client import FileBodyProducer
+from twisted.web.static import NoRangeStaticProducer
+from twisted.web.static import SingleRangeStaticProducer
 
 from leap.common.files import mkdir_p
 from leap.soledad.common.blobs import ACCEPTED_FLAGS
@@ -42,6 +43,43 @@ from .util import VALID_STRINGS
 
 
 logger = getLogger(__name__)
+
+
+class NoRangeProducer(NoRangeStaticProducer):
+    """
+    A static file producer that fires a deferred when it's finished.
+    """
+
+    def start(self):
+        NoRangeStaticProducer.start(self)
+        if self.request is None:
+            return defer.succeed(None)
+        self.deferred = defer.Deferred()
+        return self.deferred
+
+    def stopProducing(self):
+        NoRangeStaticProducer.stopProducing(self)
+        if hasattr(self, 'deferred'):
+            self.deferred.callback(None)
+
+
+class SingleRangeProducer(SingleRangeStaticProducer):
+    """
+    A static file producer of a single file range that fires a deferred when
+    it's finished.
+    """
+
+    def start(self):
+        SingleRangeStaticProducer.start(self)
+        if self.request is None:
+            return defer.succeed(None)
+        self.deferred = defer.Deferred()
+        return self.deferred
+
+    def stopProducing(self):
+        SingleRangeStaticProducer.stopProducing(self)
+        if hasattr(self, 'deferred'):
+            self.deferred.callback(None)
 
 
 @implementer(interfaces.IBlobsBackend)
@@ -63,13 +101,20 @@ class FilesystemBlobsBackend(object):
         open(path, 'a')
 
     @defer.inlineCallbacks
-    def read_blob(self, user, blob_id, consumer, namespace=''):
+    def read_blob(self, user, blob_id, consumer, namespace='', range=None):
         logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
         path = self._get_path(user, blob_id, namespace)
         logger.debug('blob path: %s' % path)
         with open(path) as fd:
-            producer = FileBodyProducer(fd)
-            yield producer.startProducing(consumer)
+            if range is None:
+                producer = NoRangeProducer(consumer, fd)
+            else:
+                start, end = range
+                offset = start
+                size = end - start
+                args = (consumer, fd, offset, size)
+                producer = SingleRangeProducer(*args)
+            yield producer.start()
 
     def get_flags(self, user, blob_id, namespace=''):
         try:

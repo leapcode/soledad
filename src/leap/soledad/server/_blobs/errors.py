@@ -42,3 +42,10 @@ class ImproperlyConfiguredException(Exception):
     """
     Raised when there is a problem with the configuration of a backend.
     """
+
+
+class RangeNotSatisfiable(Exception):
+    """
+    Raised when the Range: HTTP header was sent but the server doesn't know how
+    to satisfy it.
+    """

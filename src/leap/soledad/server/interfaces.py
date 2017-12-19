@@ -25,7 +25,7 @@ class IBlobsBackend(Interface):
     An interface for a backend that can store blobs.
     """
 
-    def read_blob(user, blob_id, consumer, namespace=''):
+    def read_blob(user, blob_id, consumer, namespace='', range=None):
         """
         Read a blob from the backend storage.
 
@@ -37,6 +37,9 @@ class IBlobsBackend(Interface):
         :type consumer: twisted.internet.interfaces.IConsumer provider
         :param namespace: An optional namespace for the blob.
         :type namespace: str
+        :param range: An optional tuple indicating start and end position of
+            the blob to be produced.
+        :type range: (int, int)
 
         :return: A deferred that fires when the blob has been written to the
             consumer.
