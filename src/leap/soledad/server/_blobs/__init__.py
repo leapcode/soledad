@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# _blobs.py
+# _blobs/__init__.py
 # Copyright (C) 2017 LEAP
 #
 # This program is free software: you can redistribute it and/or modify
