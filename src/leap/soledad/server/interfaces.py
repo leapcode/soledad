@@ -61,8 +61,7 @@ class IBlobsBackend(Interface):
         :rtype: twisted.internet.defer.Deferred
 
         :raise BlobExists: Raised when a blob with that id already exists.
-        :raise QuotaExceeded: Raised when the quota for that user would be
-            exceeded by this write operation.
+        :raise QuotaExceeded: Raised when the quota for that user was exceeded.
         """
 
     def delete_blob(user, blob_id, namespace=''):
