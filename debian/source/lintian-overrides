@@ -1,0 +1,5 @@
+# The packaging environment for ubuntu artful is complaining about newer
+# Standards-Version, so we override it here. This override should be removed
+# when the environment is updated, or when there are even newer standards
+# versions available.
+soledad source: newer-standards-version
