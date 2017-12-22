@@ -104,6 +104,8 @@ class FilesystemBlobsBackend(object):
     def read_blob(self, user, blob_id, consumer, namespace='', range=None):
         logger.info('reading blob: %s - %s@%s' % (user, blob_id, namespace))
         path = self._get_path(user, blob_id, namespace)
+        if not os.path.isfile(path):
+            raise BlobNotFound((user, blob_id))
         logger.debug('blob path: %s' % path)
         with open(path) as fd:
             if range is None:
@@ -122,7 +124,7 @@ class FilesystemBlobsBackend(object):
         except Exception as e:
             return defer.fail(e)
         if not os.path.isfile(path):
-            return defer.fail(BlobNotFound())
+            return defer.fail(BlobNotFound((user, blob_id)))
         if not os.path.isfile(path + '.flags'):
             return defer.succeed([])
         with open(path + '.flags', 'r') as flags_file:
@@ -135,7 +137,7 @@ class FilesystemBlobsBackend(object):
         except Exception as e:
             return defer.fail(e)
         if not os.path.isfile(path):
-            return defer.fail(BlobNotFound())
+            return defer.fail(BlobNotFound((user, blob_id)))
         for flag in flags:
             if flag not in ACCEPTED_FLAGS:
                 return defer.fail(InvalidFlag(flag))
@@ -184,7 +186,7 @@ class FilesystemBlobsBackend(object):
         except Exception as e:
             return defer.fail(e)
         if not os.path.isfile(blob_path):
-            return defer.fail(BlobNotFound())
+            return defer.fail(BlobNotFound((user, blob_id)))
         self.__touch(blob_path + '.deleted')
         os.unlink(blob_path)
         try:
@@ -198,6 +200,8 @@ class FilesystemBlobsBackend(object):
             blob_path = self._get_path(user, blob_id, namespace)
         except Exception as e:
             return defer.fail(e)
+        if not os.path.isfile(blob_path):
+            return defer.fail(BlobNotFound((user, blob_id)))
         size = os.stat(blob_path).st_size
         return defer.succeed(size)
 
@@ -270,7 +274,7 @@ class FilesystemBlobsBackend(object):
         except Exception as e:
             return defer.fail(e)
         if not os.path.isfile(blob_path):
-            return defer.fail(BlobNotFound())
+            return defer.fail(BlobNotFound((user, blob_id)))
         with open(blob_path) as doc_file:
             doc_file.seek(-16, 2)
             tag = base64.urlsafe_b64encode(doc_file.read())

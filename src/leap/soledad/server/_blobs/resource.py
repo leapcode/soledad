@@ -206,6 +206,8 @@ class BlobsResource(resource.Resource):
 
         d = self._handler.get_blob_size(user, blob_id, namespace=namespace)
         d.addCallback(_handleRangeHeader)
+        d.addErrback(_catchBlobNotFound, request, user, blob_id)
+        d.addErrback(_catchAllErrors, request)
         return NOT_DONE_YET
 
     def render_DELETE(self, request):

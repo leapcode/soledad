@@ -44,6 +44,9 @@ class IBlobsBackend(Interface):
         :return: A deferred that fires when the blob has been written to the
             consumer.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobNotFound: Raised (asynchronously) when the blob was not
+            found in the backend.
         """
 
     def write_blob(user, blob_id, producer, namespace=''):
@@ -80,6 +83,9 @@ class IBlobsBackend(Interface):
 
         :return: A deferred that fires when the blob has been deleted.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobNotFound: Raised (asynchronously) when the blob was not
+            found in the backend.
         """
 
     def get_blob_size(user, blob_id, namespace=''):
@@ -95,6 +101,9 @@ class IBlobsBackend(Interface):
 
         :return: A deferred that fires with the size of the blob.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobNotFound: Raised (asynchronously) when the blob was not
+            found in the backend.
         """
 
     def count(user, namespace=''):
@@ -168,6 +177,9 @@ class IBlobsBackend(Interface):
 
         :return: A deferred that fires with the tag of the blob.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobNotFound: Raised (asynchronously) when the blob was not
+            found in the backend.
         """
 
     def get_flags(user, blob_id, namespace=''):
@@ -183,6 +195,9 @@ class IBlobsBackend(Interface):
 
         :return: A deferred that fires with the list of flags for a blob.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobNotFound: Raised (asynchronously) when the blob was not
+            found in the backend.
         """
 
     def set_flags(user, blob_id, flags, namespace=''):
@@ -200,4 +215,8 @@ class IBlobsBackend(Interface):
 
         :return: A deferred that fires when the flags have been set.
         :rtype: twisted.internet.defer.Deferred
+
+        :raise BlobNotFound: Raised (asynchronously) when the blob was not
+            found in the backend.
+        :raise InvalidFlag: Raised when one of the flags passed is invalid.
         """
