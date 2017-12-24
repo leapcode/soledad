@@ -67,6 +67,11 @@ class BlobsUpstreamProducer(object):
         """
         consumer.write(json.dumps(self.blobs_lengths) + '\n')
         for blob_id, _ in self.blobs_lengths:
+            if self.stop:
+                break
+            if self.pause:
+                yield self.sleep(0.001)
+                continue
             blob_fd = yield self.db.get(blob_id, namespace=self.namespace)
             doc_info = DocInfo(blob_id, FIXED_REV)
             crypter = BlobEncryptor(doc_info, blob_fd, secret=self.secret,
