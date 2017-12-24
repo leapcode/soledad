@@ -60,7 +60,7 @@ class StreamingResource(Resource):
     def render_POST(self, request):
         user = request.postpath[0]
         namespace = request.args.get('namespace', ['default'])[0]
-        direction = request.args.get('direction', ['download'])[0]
+        direction = request.args['direction'][0]
         if direction == 'download':
             return self._startDownstream(user, namespace, request)
         elif direction == 'upload':

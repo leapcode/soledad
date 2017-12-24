@@ -483,7 +483,8 @@ class BlobManager(BlobsSynchronizer):
     @defer.inlineCallbacks
     def _downstream(self, blobs_id_list, namespace=''):
         uri = urljoin(self.remote_stream, self.user)
-        params = {'namespace': namespace} if namespace else None
+        params = {'namespace': namespace} if namespace else {}
+        params['direction'] = 'download'
         data = BytesIO(json.dumps(blobs_id_list))
         response = yield self._client.post(uri, params=params, data=data)
         deferreds = []
@@ -501,7 +502,6 @@ class BlobManager(BlobsSynchronizer):
     def _upstream(self, blobs_id_list, namespace=''):
         local, secret = self.local, self.secret
         uri = urljoin(self.remote_stream, self.user)
-        params = {'namespace': namespace} if namespace else None
         sizes = yield self.local.get_size_list(blobs_id_list, namespace)
         convert = get_unarmored_ciphertext_size
         sizes = map(lambda (blob_id, size): (blob_id, convert(size)), sizes)
