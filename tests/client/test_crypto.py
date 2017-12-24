@@ -128,7 +128,7 @@ class BlobTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_unarmored_ciphertext_size(self):
-        for size_to_test in xrange(-1, 400):
+        for size_to_test in xrange(20):  # test from 0 to above tag size
             test_content = '\x00' * size_to_test
             size = _crypto.get_unarmored_ciphertext_size(len(test_content))
             inf = BytesIO(test_content)
