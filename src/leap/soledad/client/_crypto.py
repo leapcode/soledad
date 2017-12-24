@@ -90,7 +90,7 @@ from leap.soledad.common.blobs.preamble import InvalidPreambleException
 from leap.soledad.common.blobs.preamble import decode_preamble
 from leap.soledad.common.blobs.preamble import Preamble
 from leap.soledad.common.blobs.preamble import ENC_SCHEME, ENC_METHOD
-from leap.soledad.common.blobs.preamble import MAGIC
+from leap.soledad.common.blobs.preamble import MAGIC, PREAMBLE_SIZE
 
 
 SECRET_LENGTH = 64
@@ -543,8 +543,7 @@ def _ceiling(size):
 def get_unarmored_ciphertext_size(cleartext_size):
     # used for blobs stream up (so we can tell the server how much data we are
     # sending before starting to encrypt the stream)
-    PREAMBLE_SIZE = 736  # 552 urlsafe base64 encoded (it's always armored)
-    TAG_SIZE = 16
-    SEPARATOR_SIZE = 1
-    size = TAG_SIZE + PREAMBLE_SIZE + SEPARATOR_SIZE
+    tag_size = 16  # AES-GCM 16-byte tag appended to ciphertext
+    separator_size = 1  # space separating content from preamble
+    size = tag_size + PREAMBLE_SIZE + separator_size
     return cleartext_size + size

@@ -36,6 +36,7 @@ LEGACY_PACMAN = struct.Struct('2sbbQ16s255p255p')  # DEPRECATED
 MAGIC = '\x13\x37'
 ENC_SCHEME = namedtuple('SCHEME', 'symkey external')(1, 2)
 ENC_METHOD = namedtuple('METHOD', 'aes_256_ctr aes_256_gcm pgp')(1, 2, 3)
+PREAMBLE_SIZE = 736  # 552 urlsafe base64 encoded (it's always armored)
 
 
 class InvalidPreambleException(Exception):
