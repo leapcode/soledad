@@ -226,6 +226,7 @@ class SQLiteBlobBackend(object):
         results = yield self.dbpool.runQuery(query, values)
         if results:
             results = dict([(result[0], result[1]) for result in results])
+            # order results according to blob_ids parameter
             results = [(blob_id, results[blob_id]) for blob_id in blob_ids]
             defer.returnValue(results)
         else:
