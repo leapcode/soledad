@@ -35,22 +35,22 @@ path                        method     action                            accepte
 ``/blobs/{uuid}/{blob_id}`` ``DELETE`` Delete a blob.                    ``namespace``
 =========================== ========== ================================= ============================================
 
-When listing blobs, results can be filtered and ordered by using different
-query string parameters. See the table above for accepted query string fields
-for each action.
-
 The Blobs service supports *namespaces*. All requests can be modified by the
 ``namespace`` query string parameter, and the results will be restricted to
 a certain namespace. When no namespace explicitelly given, the ``default``
 namespace is used.
 
-Listing results can be filtered by flags using the ``filter_flag`` query string
-parameter. Currently valid values for flags ``PENDING``, ``PROCESSING``,
-``PROCESSED``, and ``FAILED``.
+When listing blobs, results can be filtered and ordered by using different
+query string parameters. Listing results can be filtered by flags using the
+``filter_flag`` query string parameter. Currently valid values for flags
+``PENDING``, ``PROCESSING``, ``PROCESSED``, and ``FAILED``.  Also, results can
+be ordered by date using the ``order_by`` query string parameters. The possible
+values for ``order_by`` are ``date`` or ``+date`` for increasing order, or
+``-date`` for decreasing order.
 
-Also, results can be ordered by date using the ``order_by`` query string
-parameters. The possible values for ``order_by`` are ``date`` or ``+date`` for
-increasing order, or ``-date`` for decreasing order.
+When downloading blobs (that is, when using the ``GET`` HTTP method), you can
+send the ``Range`` HTTP header in the request, which will result in the server
+returning only the requested range of the blob.
 
 .. _incoming-http-api:
 
