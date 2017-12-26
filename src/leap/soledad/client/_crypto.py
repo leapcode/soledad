@@ -541,9 +541,17 @@ def _ceiling(size):
 
 
 def get_unarmored_ciphertext_size(cleartext_size):
-    # used for blobs stream up (so we can tell the server how much data we are
-    # sending before starting to encrypt the stream)
+    """
+    Get the (unarmored) ciphertext size from the cleartext size.
+
+    In some cases (when streaming uploads, for example) we need to tell the
+    server how much data we are sending before starting to encrypt the stream.
+    This function returns the final size of what will be streamed from the
+    total size of the cleartext.
+    """
     tag_size = 16  # AES-GCM 16-byte tag appended to ciphertext
     separator_size = 1  # space separating content from preamble
     size = tag_size + PREAMBLE_SIZE + separator_size
+    # without considering the preamble and tag, the ciphertext size is equal to
+    # the cleartext size.
     return cleartext_size + size
