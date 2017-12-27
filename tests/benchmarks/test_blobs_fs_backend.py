@@ -3,6 +3,7 @@ from io import BytesIO
 from leap.soledad.server._blobs import FilesystemBlobsBackend
 from twisted.internet import defer
 from twisted.web.client import FileBodyProducer
+from twisted.internet._producer_helpers import _PullToPush
 
 
 def create_write_test(amount, size):
@@ -35,6 +36,16 @@ test_blobs_fs_backend_write_10000_10k = create_write_test(10000, 10 * 1000)
 class DevNull(object):
 
     def write(self, data):
+        pass
+
+    def registerProducer(self, producer, streaming):
+        producer = _PullToPush(producer, self)
+        producer.startStreaming()
+
+    def unregisterProducer(self):
+        pass
+
+    def finish(self):
         pass
 
 
