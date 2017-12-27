@@ -4,25 +4,42 @@ from leap.soledad.server._blobs import FilesystemBlobsBackend
 from twisted.internet import defer
 from twisted.web.client import FileBodyProducer
 from twisted.internet._producer_helpers import _PullToPush
+from uuid import uuid4
 
 
 def create_write_test(amount, size):
 
     @pytest.inlineCallbacks
     @pytest.mark.benchmark(group='test_blobs_fs_backend_write')
-    def test(txbenchmark, payload, tmpdir):
+    def test(txbenchmark_with_setup, payload, tmpdir):
         """
         Write many blobs of the same size to the filesystem backend.
         """
         backend = FilesystemBlobsBackend(blobs_path=tmpdir.strpath)
         data = payload(size)
-        semaphore = defer.DeferredSemaphore(100)
-        deferreds = []
-        for i in xrange(amount):
-            producer = FileBodyProducer(BytesIO(data))
-            d = semaphore.run(backend.write_blob, 'user', str(i), producer)
-            deferreds.append(d)
-        yield txbenchmark(defer.gatherResults, deferreds)
+
+        @pytest.inlineCallbacks
+        def setup():
+            blobs = yield backend.list_blobs('user')
+            deferreds = []
+            for blob_id in blobs:
+                d = backend.delete_blob('user', blob_id)
+                deferreds.append(d)
+            yield defer.gatherResults(deferreds)
+
+        @pytest.inlineCallbacks
+        def write():
+            semaphore = defer.DeferredSemaphore(100)
+            deferreds = []
+            for i in xrange(amount):
+                producer = FileBodyProducer(BytesIO(data))
+                blob_id = uuid4().hex
+                d = semaphore.run(
+                    backend.write_blob, 'user', blob_id, producer)
+                deferreds.append(d)
+            yield defer.gatherResults(deferreds)
+
+        yield txbenchmark_with_setup(setup, write)
 
     return test
 
@@ -70,12 +87,16 @@ def create_read_test(amount, size):
         yield defer.gatherResults(deferreds)
 
         # ... then measure the read operation
-        deferreds = []
-        for i in xrange(amount):
-            consumer = DevNull()
-            d = semaphore.run(backend.read_blob, 'user', str(i), consumer)
-            deferreds.append(d)
-        yield txbenchmark(defer.gatherResults, deferreds)
+        @pytest.inlineCallbacks
+        def read():
+            deferreds = []
+            for i in xrange(amount):
+                consumer = DevNull()
+                d = semaphore.run(backend.read_blob, 'user', str(i), consumer)
+                deferreds.append(d)
+            yield defer.gatherResults(deferreds)
+
+        yield txbenchmark(read)
 
     return test
 
