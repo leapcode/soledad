@@ -77,8 +77,6 @@ class FilesystemBackendTestCase(unittest.TestCase):
 
     @pytest.mark.usefixtures("method_tmpdir")
     @mock.patch.object(os.path, 'isfile')
-    @mock.patch.object(_blobs.FilesystemBlobsBackend, '_get_path',
-                       Mock(return_value='path'))
     @defer.inlineCallbacks
     def test_cannot_overwrite(self, isfile):
         isfile.return_value = True

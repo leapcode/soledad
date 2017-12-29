@@ -23,6 +23,10 @@ class IBlobsBackend(Interface):
 
     """
     An interface for a backend that can store blobs.
+
+    There might be concurrent calls to methods that modify the same blob, so
+    it's the backend implementation's responsibility to ensure isolation of
+    such actions.
     """
 
     def read_blob(user, blob_id, consumer, namespace='', range=None):
@@ -66,8 +70,11 @@ class IBlobsBackend(Interface):
                  backend storage.
         :rtype: twisted.internet.defer.Deferred
 
-        :raise BlobExists: Raised when a blob with that id already exists.
-        :raise QuotaExceeded: Raised when the quota for that user was exceeded.
+        :raise BlobExists: Raised (asynchronously) when a blob with that id
+            already exists.
+
+        :raise QuotaExceeded: Raised (asynchronously) when the quota for that
+            user was exceeded.
         """
 
     def delete_blob(user, blob_id, namespace=''):
@@ -218,5 +225,7 @@ class IBlobsBackend(Interface):
 
         :raise BlobNotFound: Raised (asynchronously) when the blob was not
             found in the backend.
-        :raise InvalidFlag: Raised when one of the flags passed is invalid.
+
+        :raise InvalidFlag: Raised (asynchronously) when one of the flags
+            passed is invalid.
         """
