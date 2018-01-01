@@ -104,8 +104,12 @@ class DecrypterBuffer(object):
         if self.decrypter:
             real_size = self.decrypter.decrypted_content_size
             return self.decrypter.endStream(), real_size
-        else:
+        elif hasattr(self, 'raw_data'):
+            # Externally encrypted blob, see Incoming API specification
             return self.raw_data, self.raw_data.tell()
+        else:
+            msg = "Incomplete Blob: %s" % self.doc_info.doc_id
+            raise RetriableTransferError(msg)
 
 
 class StreamDecrypterBuffer(object):

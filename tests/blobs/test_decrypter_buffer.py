@@ -27,6 +27,7 @@ from twisted.internet import defer
 from leap.soledad.client._db.blobs import DecrypterBuffer
 from leap.soledad.client._db.blobs import BlobManager
 from leap.soledad.client._db.blobs import FIXED_REV
+from leap.soledad.client._db.blobs.errors import RetriableTransferError
 from leap.soledad.client import _crypto
 
 
@@ -70,3 +71,15 @@ class DecrypterBufferCase(unittest.TestCase):
         fd = BytesIO('up and up')
         manager._client.put = _check_result
         yield manager._encrypt_and_upload(self.doc_info.doc_id, fd)
+
+    @defer.inlineCallbacks
+    def test_incomplete_decryption(self):
+        # SCENARIO: Transport failed and close was called with incomplete data
+        # CASE 1: Incomplete preamble
+        encrypted = (yield self.blob.encrypt()).getvalue()
+        encrypted = encrypted[:20]  # only 20 bytes of preamble arrived
+        tag = encrypted[-16:]
+        buf = DecrypterBuffer(self.doc_info.doc_id, self.secret, tag)
+        buf.write(encrypted)
+        self.assertRaises(RetriableTransferError,
+                          buf.close)
