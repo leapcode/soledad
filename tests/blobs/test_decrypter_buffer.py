@@ -28,6 +28,7 @@ from leap.soledad.client._db.blobs import DecrypterBuffer
 from leap.soledad.client._db.blobs import BlobManager
 from leap.soledad.client._db.blobs import FIXED_REV
 from leap.soledad.client._db.blobs.errors import RetriableTransferError
+from leap.soledad.client._crypto import InvalidBlob
 from leap.soledad.client import _crypto
 
 
@@ -73,13 +74,25 @@ class DecrypterBufferCase(unittest.TestCase):
         yield manager._encrypt_and_upload(self.doc_info.doc_id, fd)
 
     @defer.inlineCallbacks
-    def test_incomplete_decryption(self):
+    def test_incomplete_preamble_decryption(self):
         # SCENARIO: Transport failed and close was called with incomplete data
         # CASE 1: Incomplete preamble
+        # OUTCOME: Raise an error which can trigger a retry on crash recovery
         encrypted = (yield self.blob.encrypt()).getvalue()
         encrypted = encrypted[:20]  # only 20 bytes of preamble arrived
         tag = encrypted[-16:]
         buf = DecrypterBuffer(self.doc_info.doc_id, self.secret, tag)
         buf.write(encrypted)
-        self.assertRaises(RetriableTransferError,
-                          buf.close)
+        self.assertRaises(RetriableTransferError, buf.close)
+
+    @defer.inlineCallbacks
+    def test_incomplete_blob_decryption(self):
+        # SCENARIO: Transport failed and close was called with incomplete data
+        # CASE 1: Incomplete blob of known encryption type
+        # OUTCOME: InvalidBlob. It's safer to assume the tag is invalid
+        encrypted = (yield self.blob.encrypt()).getvalue()
+        encrypted = encrypted[:-20]  # 20 bytes missing
+        tag = encrypted[-16:]
+        buf = DecrypterBuffer(self.doc_info.doc_id, self.secret, tag)
+        buf.write(encrypted)
+        self.assertRaises(InvalidBlob, buf.close)
