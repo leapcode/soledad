@@ -88,7 +88,7 @@ class DecrypterBufferCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_incomplete_blob_decryption(self):
         # SCENARIO: Transport failed and close was called with incomplete data
-        # CASE 1: Incomplete blob of known encryption type
+        # CASE 2: Incomplete blob of known encryption type
         # OUTCOME: InvalidBlob. It's safer to assume the tag is invalid
         encrypted = (yield self.blob.encrypt()).getvalue()
         encrypted = encrypted[:-20]  # 20 bytes missing
