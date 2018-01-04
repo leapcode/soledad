@@ -78,8 +78,8 @@ def _catchInvalidFlag(failure, request, user, blob_id):
     request.finish()
 
 
-def _catchAllErrors(self, e, request):
-    logger.error('Error processing request: %s' % e.getErrorMessage())
+def _catchAllErrors(failure, request):
+    logger.error('Error processing request: %r' % failure.value)
     request.setResponseCode(500)
     request.finish()
 
@@ -147,7 +147,7 @@ class BlobsResource(resource.Resource):
         d.addCallback(_set_tag_header)
         d.addCallback(_read_blob)
         d.addErrback(_catchBlobNotFound, request, user, blob_id)
-        d.addErrback(_catchAllErrors, request, finishRequest=True)
+        d.addErrback(_catchAllErrors, request)
 
         return NOT_DONE_YET
 
