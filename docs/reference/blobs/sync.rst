@@ -78,3 +78,46 @@ increasing time interval to minimize competition for resources used by other
 concurrent transfer attempts. The interaval starts at 10 seconds and increases
 to 20, 30, 40, 50, and finally 60 seconds. All further retries will be
 separated by a 60 seconds time interval.
+
+Streaming
+=========
+
+Streaming is a method of synchronization optimized for small payloads, it
+transfers multiple small blobs in a single stream of data. This method improves
+resource usage, specially in scenarios which blobs are so small that opening
+one connection for each would generate a noticeable overhead.
+
+Downstream
+----------
+
+During download, client provides a list of blobs by POSTing a JSON formatted
+list of Blob identifiers. Then the server starts producing a stream of data in
+which each of the requested Blobs is written using the following format:
+
+
+* Blob Size in hex (padded to 8 bytes)
+* base64 encoded AES-GCM 16 byte tag
+* Space (separator)
+* Blob content
+
+Upstream
+--------
+
+During upload, the client will produce a stream of Blobs in the following
+format:
+
+* First line: JSON encoded list of tuples with each Blob identifier and size.
+  Note that the size is the encrypted Blob size, which matches exactly what the
+  client is sending on the stream.
+* Encrypted Blob content, for each Blob in the upstream list.
+
+Server endpoint specification
+-----------------------------
+
+Endpoint: /stream/{user-uuid}/
+Method: POST
+
+Query parameters:
+* namespace: Each stream can only stream for/from a single namespace, specified
+  on this POST query parameter.
+* direction: 'upload' for upstream, 'download' for downstream.
