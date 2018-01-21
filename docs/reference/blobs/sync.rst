@@ -15,16 +15,16 @@ Immutability brings some characteristics to the blobs system:
 - There's no need for storage of versions or revisions.
 - Updating is not possible (you would need to delete and recreate a blob).
 
-Client-side encryption and authentication
------------------------------------------
+Server-side storage format
+--------------------------
 
-When uploading, the content of the blob is encrypted with a symmetric secret
-prior to being sent to the server. When downloading, the content of the blob is
-decrypted accordingly. See :ref:`client-encryption` for more details.
+When a blob is uploaded by a client, its contents are encrypted with
+a symmetric secret prior to being sent to the server. When a blob is
+downloaded, its contents are decrypted accordingly. See
+:ref:`client-encryption` for more details.
 
-When a blob is uploaded by a client, a preamble is created and prepended to the
-encrypted content. The preamble is an encoded struct that contains the
-following metadata:
+In the server-side, a preamble is prepended to the encrypted content. The
+preamble is an encoded struct that contains the following metadata:
 
 - A 2 character **magic hexadecimal number** for easy identification of a Blob
   data type. Currently, the value used for the magic number is: ``\x13\x37``.
@@ -45,8 +45,11 @@ The final format of a blob that is uploaded to the server is the following:
 - The URL-safe base64-encoded concatenated **encrypted data and MAC tag**.
 
 
+Client-side synchronization details
+-----------------------------------
+
 Synchronization status
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 In the client-side, each blob has an associated synchronization status, which
 can be one of:
@@ -57,7 +60,7 @@ can be one of:
 - ``FAILED_DOWNLOAD``: A download attempt has been made but the content is corrupted for some reason.
 
 Concurrency limits
-------------------
+~~~~~~~~~~~~~~~~~~
 
 In order to increase the speed of synchronization on the client-size,
 concurrent database operations and transfers to the server are allowed. Despite
@@ -66,7 +69,7 @@ bandwith), concurrenty limits are set both for database operations and data
 transfer.
 
 Transfer retries
-----------------
+~~~~~~~~~~~~~~~~
 
 When a blob is queded for download or upload, it will stay in that queue until
 the transfer has been successful or until there has been an unrecoverable
@@ -80,44 +83,35 @@ to 20, 30, 40, 50, and finally 60 seconds. All further retries will be
 separated by a 60 seconds time interval.
 
 Streaming
-=========
+~~~~~~~~~
 
-Streaming is a method of synchronization optimized for small payloads, it
-transfers multiple small blobs in a single stream of data. This method improves
-resource usage, specially in scenarios which blobs are so small that opening
-one connection for each would generate a noticeable overhead.
+In order to optimize synchronization of small payloads, the blobs
+synchronization system provides a special ``stream/`` endpoint (see
+:ref:`blobs-http-api`). Using that endpoint, the client is able to transfer
+multiple blobs in a single stream of data. This method improves resources
+usage, specially in scenarios in which blobs are so small that setting up one
+connection for each blob would generate a noticeable overhead.
 
 Downstream
-----------
+``````````
 
-During download, client provides a list of blobs by POSTing a JSON formatted
-list of Blob identifiers. Then the server starts producing a stream of data in
-which each of the requested Blobs is written using the following format:
+During download, the client provides a list of blobs by POSTing a JSON
+formatted list of blob identifiers. The server then starts producing a stream
+of data in which each of the requested blobs is written in a format that is the
+concatenation of the following:
 
-
-* Blob Size in hex (padded to 8 bytes)
-* base64 encoded AES-GCM 16 byte tag
-* Space (separator)
-* Blob content
+* The blob size in hex (padded to 8 bytes).
+* A base64-encoded AES-GCM 16 byte tag.
+* A space (to act as a separator).
+* The encrypted contents of the blob.
 
 Upstream
---------
+````````
 
-During upload, the client will produce a stream of Blobs in the following
+During upload, the client will produce a stream of blobs in the following
 format:
 
-* First line: JSON encoded list of tuples with each Blob identifier and size.
-  Note that the size is the encrypted Blob size, which matches exactly what the
-  client is sending on the stream.
-* Encrypted Blob content, for each Blob in the upstream list.
-
-Server endpoint specification
------------------------------
-
-Endpoint: /stream/{user-uuid}/
-Method: POST
-
-Query parameters:
-* namespace: Each stream can only stream for/from a single namespace, specified
-  on this POST query parameter.
-* direction: 'upload' for upstream, 'download' for downstream.
+* First line: a JSON encoded list of tuples with each blob identifier and size.
+  Note that the size is the size of the encrypted blob, which matches exactly
+  what the client is sending on the stream.
+* Second line: all encrypted blobs contents, for each blob in the list above.

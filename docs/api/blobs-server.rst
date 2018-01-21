@@ -33,6 +33,7 @@ path                        method     action                            accepte
                                        of flags should be sent in the
                                        body of the request.
 ``/blobs/{uuid}/{blob_id}`` ``DELETE`` Delete a blob.                    ``namespace``
+``/stream/{uuid}``          ``POST``   Stream a set of blobs.            ``namespace``, ``direction``
 =========================== ========== ================================= ============================================
 
 The Blobs service supports *namespaces*. All requests can be modified by the
@@ -51,6 +52,11 @@ values for ``order_by`` are ``date`` or ``+date`` for increasing order, or
 When downloading blobs (that is, when using the ``GET`` HTTP method), you can
 send the ``Range`` HTTP header in the request, which will result in the server
 returning only the requested range of the blob.
+
+When streaming, the ``direction`` parameter is mandatory and indicates whether
+this is an upstream (``upload``) or a downstream (``download``). The
+``namespace`` parameter is also accepted when streaming and all blobs in the
+same stream are considered to be from the same namespace.
 
 .. _incoming-http-api:
 
