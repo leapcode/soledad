@@ -1,3 +1,4 @@
+import pytest
 from twisted.trial import unittest
 
 from leap.soledad.common.couch import state as couch_state
@@ -6,6 +7,7 @@ from leap.soledad.common.l2db import errors as u1db_errors
 from mock import Mock
 
 
+@pytest.mark.needs_couch
 class CommandBasedDBCreationTest(unittest.TestCase):
 
     def test_ensure_db_using_custom_command(self):

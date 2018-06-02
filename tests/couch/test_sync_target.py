@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from leap.soledad.common.l2db import SyncTarget
 from leap.soledad.common.l2db import errors as u1db_errors
@@ -19,6 +20,7 @@ target_scenarios = [
     ('local', {'create_db_and_target': make_local_db_and_target}), ]
 
 
+@pytest.mark.needs_couch
 class CouchBackendSyncTargetTests(
         TestWithScenarios,
         DatabaseBaseTests,

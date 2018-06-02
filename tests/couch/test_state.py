@@ -25,6 +25,7 @@ def restricted_listing(function):
     return _set_list
 
 
+@pytest.mark.needs_couch
 class CouchStateTests(CouchDBTestCase):
 
     def setUp(self):

@@ -36,6 +36,7 @@ from test_soledad.util import CouchServerStateForTests
 from test_soledad.util import CouchDBTestCase
 
 
+@pytest.mark.needs_couch
 class IncomingOnCouchServerTestCase(CouchDBTestCase):
 
     def setUp(self):

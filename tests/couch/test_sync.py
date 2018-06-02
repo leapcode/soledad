@@ -1,3 +1,4 @@
+import pytest
 from leap.soledad.common.l2db import vectorclock
 from leap.soledad.common.l2db import errors as u1db_errors
 
@@ -24,6 +25,7 @@ for name, scenario in COUCH_SCENARIOS:
 # The following tests come from `u1db.tests.test_sync`.
 # -----------------------------------------------------------------------------
 
+@pytest.mark.needs_couch
 class CouchBackendSyncTests(
         TestWithScenarios,
         DatabaseBaseTests,

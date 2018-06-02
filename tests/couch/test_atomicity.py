@@ -41,6 +41,7 @@ from test_soledad.u1db_tests import TestCaseWithServer
 REPEAT_TIMES = 20
 
 
+@pytest.mark.needs_couch
 @pytest.mark.usefixtures('method_tmpdir')
 class CouchAtomicityTestCase(CouchDBTestCase, TestCaseWithServer):
 

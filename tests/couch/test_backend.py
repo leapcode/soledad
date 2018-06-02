@@ -18,6 +18,7 @@
 Test ObjectStore and Couch backend bits.
 """
 
+import pytest
 from uuid import uuid4
 from six.moves.urllib.parse import urljoin
 from testscenarios import TestWithScenarios
@@ -35,6 +36,7 @@ from .common import COUCH_SCENARIOS
 # The following tests come from `u1db.tests.test_common_backend`.
 # -----------------------------------------------------------------------------
 
+@pytest.mark.needs_couch
 class TestCouchBackendImpl(CouchDBTestCase):
 
     def test__allocate_doc_id(self):
@@ -53,12 +55,14 @@ class TestCouchBackendImpl(CouchDBTestCase):
 # The following tests come from `u1db.tests.test_backends`.
 # -----------------------------------------------------------------------------
 
+@pytest.mark.needs_couch
 class CouchTests(
         TestWithScenarios, test_backends.AllDatabaseTests, CouchDBTestCase):
 
     scenarios = COUCH_SCENARIOS
 
 
+@pytest.mark.needs_couch
 class CouchBackendTests(
         TestWithScenarios,
         test_backends.LocalDatabaseTests,
@@ -67,6 +71,7 @@ class CouchBackendTests(
     scenarios = COUCH_SCENARIOS
 
 
+@pytest.mark.needs_couch
 class CouchValidateGenNTransIdTests(
         TestWithScenarios,
         test_backends.LocalDatabaseValidateGenNTransIdTests,
@@ -75,6 +80,7 @@ class CouchValidateGenNTransIdTests(
     scenarios = COUCH_SCENARIOS
 
 
+@pytest.mark.needs_couch
 class CouchValidateSourceGenTests(
         TestWithScenarios,
         test_backends.LocalDatabaseValidateSourceGenTests,
@@ -83,6 +89,7 @@ class CouchValidateSourceGenTests(
     scenarios = COUCH_SCENARIOS
 
 
+@pytest.mark.needs_couch
 class CouchWithConflictsTests(
         TestWithScenarios,
         test_backends.LocalDatabaseWithConflictsTests,
@@ -103,6 +110,7 @@ class CouchWithConflictsTests(
 #         test_backends.DatabaseIndexTests.tearDown(self)
 
 
+@pytest.mark.needs_couch
 class DatabaseNameValidationTest(unittest.TestCase):
 
     def test_database_name_validation(self):

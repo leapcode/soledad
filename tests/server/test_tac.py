@@ -36,6 +36,7 @@ from twisted.web.client import Agent
 TAC_FILE_PATH = resource_filename('leap.soledad.server', 'server.tac')
 
 
+@pytest.mark.needs_couch
 @pytest.mark.usefixtures("couch_url")
 class TacServerTestCase(unittest.TestCase):
 

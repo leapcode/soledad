@@ -1,3 +1,4 @@
+import pytest
 from uuid import uuid4
 
 from leap.soledad.common import couch
@@ -5,6 +6,7 @@ from leap.soledad.common import couch
 from test_soledad.util import CouchDBTestCase
 
 
+@pytest.mark.needs_couch
 class CouchDesignDocsTests(CouchDBTestCase):
 
     def setUp(self):
