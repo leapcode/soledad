@@ -71,6 +71,8 @@ class SecretsStorage(UserDataMixin):
     #
 
     def _init_shared_db(self):
+        if not self._soledad.server_url:
+            return None
         url = urlparse.urljoin(self._soledad.server_url, SHARED_DB_NAME)
         creds = self._creds
         db = SoledadSharedDatabase.open_database(url, creds)

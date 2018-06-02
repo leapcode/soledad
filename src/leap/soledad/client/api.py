@@ -129,8 +129,17 @@ class Soledad(object):
         :type local_db_path: str
 
         :param server_url:
-            URL for Soledad server. This is used either to sync with the user's
-            remote db and to interact with the shared recovery database.
+            URL for Soledad server. This is used to fetch and store user's
+            secrets and to sync with the user's remote db.
+
+            For the LEAP Platform/Bitmask use case, it is mandatory to check
+            for user secrets previously stored in remote storage during the
+            first initialization, because Soledad needs to encrypt/decrypt to
+            using the same secret as before.
+
+            For testing purposes, a value of None can be passed. If None is
+            passed, verification for a remote secret on first initialization is
+            bypassed and that might lead to unintented consequences.
         :type server_url: str
 
         :param cert_file:
@@ -216,9 +225,6 @@ class Soledad(object):
             self.default_prefix, self.secrets_file_name))
         initialize("_local_db_path", os.path.join(
             self.default_prefix, self.local_db_file_name))
-        # initialize server_url
-        soledad_assert(self.server_url is not None,
-                       'Missing URL for Soledad server.')
 
     def _init_working_dirs(self):
         """
@@ -276,6 +282,8 @@ class Soledad(object):
 
     def _init_blobmanager(self):
         path = os.path.dirname(self._local_db_path)
+        if not self.server_url:
+            return
         url = urlparse.urljoin(self.server_url, 'blobs/%s' % self.uuid)
         key = self._secrets.local_key
         self.blobmanager = blobs.BlobManager(
@@ -667,6 +675,8 @@ class Soledad(object):
             generation before the synchronization was performed.
         :rtype: twisted.internet.defer.Deferred
         """
+        if not self.server_url:
+            return
         sync_url = urlparse.urljoin(self.server_url, 'user-%s' % self.uuid)
         if not self._dbsyncer:
             return
