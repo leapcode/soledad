@@ -99,16 +99,6 @@ e2e:
   cache:
     policy: pull
 
-package:amd64_jessie:
-  variables:
-    ARCH: "amd64"
-    DIST: "jessie"
-    REPONAMES: "platform,client"
-    # Default is to fail on warnings, we disable it here
-    # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages,standards-version"
-  <<: *package
-
 
 package:amd64_stretch:
   variables:
@@ -133,14 +123,14 @@ package:amd64_buster:
     LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages --suppress-tags build-depends-on-obsolete-package"
   <<: *package
 
-package:amd64_zesty:
+package:amd64_sid:
   variables:
     ARCH: "amd64"
-    DIST: "zesty"
+    DIST: "sid"
     REPONAMES: "client"
     # Default is to fail on warnings, we disable it here
     # unless a manpage is included (see #8895)
-    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages,standards-version"
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages --suppress-tags build-depends-on-obsolete-package"
   <<: *package
 
 package:amd64_artful:
@@ -153,6 +143,15 @@ package:amd64_artful:
     LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages --suppress-tags build-depends-on-obsolete-package"
   <<: *package
 
+package:amd64_bionic:
+  variables:
+    ARCH: "amd64"
+    DIST: "bionic"
+    REPONAMES: "client"
+    # Default is to fail on warnings, we disable it here
+    # unless a manpage is included (see #8895)
+    LINTIAN_OPTS: "--fail-on-warnings -X filename-length,manpages --suppress-tags build-depends-on-obsolete-package"
+  <<: *package
 
 #
 # "benchmarks" stage
