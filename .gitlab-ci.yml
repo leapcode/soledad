@@ -66,13 +66,13 @@ tests:
   script:
     - tox -- --couch-url http://couchdb:5984
 
-e2e:
-  stage: tests
-  except:
-    - schedules
-  image: 0xacab.org:4567/leap/soledad:latest
-  script:
-    - tox -e e2e
+#e2e:
+#  stage: tests
+#  except:
+#    - schedules
+#  image: 0xacab.org:4567/leap/soledad:latest
+#  script:
+#    - tox -e e2e
 
 
 #
