@@ -1,10 +1,22 @@
 Changelog
 =========
 
-0.10.6 - `master`_
+0.10.7 - `master`_
 -------------------
 
 .. note:: This version is not yet released and is under active development.
+
+0.10.6 - Fri 29 Jun, 2018
+-------------------------
+
+Server
+~~~~~~
+- [feature] Improvements to the Blobs Filesystem backend
+
+Client
+~~~~~~
+- [feature] Add bandwidth throttling to the blobs client
+- [docs] Clarify offline use for tests
 
 
 0.10.5 -  Wed 22 Nov, 2017
