@@ -1,5 +1,13 @@
+soledad (0.10.7) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Packaging fixes
+
+ -- Kali Kaneko <kali@leap.se>  Tue, 03 Jul 2018 21:43:05 +0200
+
 soledad (0.10.6) unstable; urgency=medium
 
+  * Non-maintainer upload.
   * Update to 0.10.6 release
 
  -- Kali Kaneko <kali@leap.se>  Sat, 30 Jun 2018 13:30:08 +0200
