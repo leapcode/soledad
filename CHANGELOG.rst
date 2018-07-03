@@ -1,10 +1,19 @@
 Changelog
 =========
 
-0.10.7 - `master`_
+0.10.8 - `master`_
 -------------------
 
 .. note:: This version is not yet released and is under active development.
+
+0.10.7 - Tue 3 Jul, 2018
+-------------------------
+
+Misc
+~~~~
+- Fix errors in setup.py avoiding the package from being uploaded to pypi
+- Fix author in debian changelog
+
 
 0.10.6 - Fri 29 Jun, 2018
 -------------------------
