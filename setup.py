@@ -27,7 +27,7 @@ from setuptools import find_packages
 from setuptools.command.develop import develop as _cmd_develop
 
 
-trove_classifiers = (
+trove_classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: "
     "GNU General Public License v3 or later (GPLv3+)",
@@ -37,7 +37,7 @@ trove_classifiers = (
     "Programming Language :: Python :: 2.7",
     "Topic :: Database :: Front-Ends",
     "Topic :: Software Development :: Libraries :: Python Modules"
-)
+]
 
 DOWNLOAD_BASE = ('https://github.com/leapcode/soledad/'
                  'archive/%s.tar.gz')
